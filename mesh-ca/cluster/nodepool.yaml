@@ -1,0 +1,35 @@
+apiVersion: container.cnrm.cloud.google.com/v1alpha2
+kind: ContainerNodePool
+metadata:
+  clusterName: "[PROJECT_ID]/us-central1-c/mesh-ca" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.core.project","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"mesh-ca"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
+  name: default-pool
+  namespace: "[PROJECT_ID]" # {"type":"string","x-kustomize":{"setter":{"name":"gcloud.core.project"}}}
+spec:
+  initialNodeCount: 2
+  autoscaling:
+    minNodeCount: 2
+    maxNodeCount: 4
+  nodeConfig:
+    diskSizeGb: 100
+    diskType: pd-standard
+    machineType: n1-standard-4
+    preemptible: false
+    oauthScopes:
+    - "https://www.googleapis.com/auth/cloud-platform"
+    - "https://www.googleapis.com/auth/compute"
+    - "https://www.googleapis.com/auth/devstorage.read_only"
+    - "https://www.googleapis.com/auth/logging.write"
+    - "https://www.googleapis.com/auth/monitoring"
+    - "https://www.googleapis.com/auth/service.management.readonly"
+    - "https://www.googleapis.com/auth/servicecontrol"
+    - "https://www.googleapis.com/auth/trace.append"
+    metadata:
+      disable-legacy-endpoints: "true"
+    serviceAccount: asm-sa@[PROJECT_ID].iam.gserviceaccount.com # {"type":"string","x-kustomize":{"partialSetters":[{"name":"service-account","value":"asm-sa"},{"name":"gcloud.core.project","value":"[PROJECT_ID]"}]}}
+    workloadMetadataConfig:
+      nodeMetadata: EXPOSE
+  management:
+    autoRepair: true
+    autoUpgrade: true
+  clusterRef:
+    name: mesh-ca # {"type":"string","x-kustomize":{"setter":{"name":"cluster-name","value":"mesh-ca"}}}

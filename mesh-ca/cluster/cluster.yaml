@@ -1,0 +1,33 @@
+apiVersion: identity.cnrm.cloud.google.com/v1alpha2
+kind: IdentityNamespace
+metadata:
+  name: default
+  namespace: "[PROJECT_ID]" # {"type":"string","x-kustomize":{"setter":{"name":"gcloud.core.project"}}}
+spec: {}
+---
+apiVersion: container.cnrm.cloud.google.com/v1alpha2
+kind: ContainerCluster
+metadata:
+  clusterName: "[PROJECT_ID]/us-central1-c/mesh-ca" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.core.project","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"mesh-ca"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
+  name: mesh-ca # {"type":"string","x-kustomize":{"setter":{"name":"cluster-name","value":"mesh-ca"}}}
+  namespace: "[PROJECT_ID]" # {"type":"string","x-kustomize":{"setter":{"name":"gcloud.core.project"}}}
+spec:
+  location: us-central1-c # {"type":"string","x-kustomize":{"setter":{"name":"gcloud.compute.zone"}}}
+  workloadIdentity:
+    identityNamespace: default
+  labels:
+    mesh_id: "[PROJECT_ID]__svc__id__goog" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.core.project","value":"[PROJECT_ID]"}]}}
+  loggingService: logging.googleapis.com/kubernetes
+  monitoringService: monitoring.googleapis.com/kubernetes
+  addonsConfig:
+    horizontalPodAutoscaling:
+      disabled: false
+    httpLoadBalancing:
+      disabled: false
+    cloudrunConfig:
+      disabled: true # {"type":"boolean","x-kustomize":{"setter":{"name":"cloud-run-disabled","value":"true"}}}
+  ipAllocationPolicy:
+    useIpAliases: true
+  masterAuth:
+    username: admin
+  network: default
