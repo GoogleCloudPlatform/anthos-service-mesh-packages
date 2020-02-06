@@ -15,8 +15,8 @@ with [Anthos Service Mesh] features enabled.
 
     ```bash
     # [PACKAGE] is any directory name under the repository root.
-    # [OUTPUT_DIR] refers to the desired local location of the package.
-    $ kpt pkg get https://github.com/GoogleCloudPlatform/anthos-service-mesh-packages.git/[PACKAGE] [OUTPUT_DIR]
+    # [ASM_FOLDER] refers to the desired local location of the package.
+    $ kpt pkg get https://github.com/GoogleCloudPlatform/anthos-service-mesh-packages.git/[PACKAGE] [ASM_FOLDER]
 
     # e.g. to get the asm package into the current folder, run the following,
     # which will create an 'asm' folder under the current folder
