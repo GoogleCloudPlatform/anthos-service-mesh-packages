@@ -22,7 +22,7 @@ spec:
   initialNodeCount: 2
   autoscaling:
     minNodeCount: 2
-    maxNodeCount: 4
+    maxNodeCount: 4 # {"type":"integer","x-kustomize":{"setter":{"name":"max-nodes","value":"4"}}}
   nodeConfig:
     diskSizeGb: 100
     diskType: pd-standard
