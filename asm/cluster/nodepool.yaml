@@ -39,7 +39,6 @@ spec:
     - "https://www.googleapis.com/auth/trace.append"
     metadata:
       disable-legacy-endpoints: "true"
-    serviceAccount: anthos-svc-account@[PROJECT_ID].iam.gserviceaccount.com # {"type":"string","x-kustomize":{"partialSetters":[{"name":"service-account","value":"anthos-svc-account"},{"name":"gcloud.core.project","value":"[PROJECT_ID]"}]}}
     workloadMetadataConfig:
       nodeMetadata: EXPOSE
   management:
