@@ -15,21 +15,21 @@
 apiVersion: install.istio.io/v1alpha2
 kind: IstioControlPlane
 metadata:
-  clusterName: "[PROJECT_ID]/us-central1-c/asm" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.core.project","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
+  clusterName: "[PROJECT_ID]/us-central1-c/asm" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
 spec:
   profile: asm
   hub: gcr.io/gke-release/asm
   tag: 1.4.2-asm.2
   values:
     global:
-      meshID: "[PROJECT_ID]_us-central1-c_asm" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.core.project","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
-      trustDomain: "[PROJECT_ID].svc.id.goog" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.core.project","value":"[PROJECT_ID]"}]}}
+      meshID: "[PROJECT_ID]_us-central1-c_asm" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
+      trustDomain: "[PROJECT_ID].svc.id.goog" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"}]}}
       controlPlaneSecurityEnabled: true
       mtls:
         enabled: true
       sds:
         token:
-          aud: "[PROJECT_ID].svc.id.goog" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.core.project","value":"[PROJECT_ID]"}]}}
+          aud: "[PROJECT_ID].svc.id.goog" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"}]}}
       useMCP: true
     telemetry:
       v2:
@@ -39,5 +39,5 @@ spec:
       env:
         CA_ADDR: meshca.googleapis.com:443
         CA_PROVIDER: GoogleCA
-        GKE_CLUSTER_URL: "https://container.googleapis.com/v1/projects/[PROJECT_ID]/locations/us-central1-c/clusters/asm" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.core.project","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
+        GKE_CLUSTER_URL: "https://container.googleapis.com/v1/projects/[PROJECT_ID]/locations/us-central1-c/clusters/asm" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
         PLUGINS: GoogleTokenExchange
