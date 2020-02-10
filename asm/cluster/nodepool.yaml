@@ -39,6 +39,8 @@ spec:
     - "https://www.googleapis.com/auth/trace.append"
     metadata:
       disable-legacy-endpoints: "true"
+    workloadMetadataConfig:
+      nodeMetadata: GKE_METADATA_SERVER
   management:
     autoRepair: true
     autoUpgrade: true
