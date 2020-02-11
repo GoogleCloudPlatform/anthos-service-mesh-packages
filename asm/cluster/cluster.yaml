@@ -31,3 +31,7 @@ spec:
     identityNamespace: default
   labels:
     mesh_id: "[PROJECT_ID]_us-central1-c_asm" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
+
+  # These settings may be necessary if you use non-default VPC settings.
+  # network: default
+  # subnetwork: default
