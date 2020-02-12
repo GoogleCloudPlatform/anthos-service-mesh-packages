@@ -45,3 +45,4 @@ spec:
   masterAuth:
     username: admin
   network: default
+  subnetwork: default
