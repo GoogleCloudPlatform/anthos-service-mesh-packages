@@ -31,13 +31,6 @@ spec:
         token:
           aud: "[PROJECT_ID].svc.id.goog" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"}]}}
       useMCP: true
-    telemetry:
-      v2:
-        stackdriver:
-          topology: true
     nodeagent:
       env:
-        CA_ADDR: meshca.googleapis.com:443
-        CA_PROVIDER: GoogleCA
         GKE_CLUSTER_URL: "https://container.googleapis.com/v1/projects/[PROJECT_ID]/locations/us-central1-c/clusters/asm" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
-        PLUGINS: GoogleTokenExchange
