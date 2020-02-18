@@ -15,14 +15,14 @@
 apiVersion: install.istio.io/v1alpha2
 kind: IstioControlPlane
 metadata:
-  clusterName: "[PROJECT_ID]/[COMPUTE_ZONE]/[CLUSTER_NAME]" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"[CLUSTER_NAME]"},{"name":"gcloud.compute.zone","value":"[COMPUTE_ZONE]"}]}}
+  clusterName: "[PROJECT_ID]/us-central1-c/asm-cluster" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm-cluster"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
 spec:
   profile: asm
   hub: gcr.io/gke-release/asm
   tag: 1.4.2-asm.2
   values:
     global:
-      meshID: "[PROJECT_ID]_[COMPUTE_ZONE]_[CLUSTER_NAME]" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"[CLUSTER_NAME]"},{"name":"gcloud.compute.zone","value":"[COMPUTE_ZONE]"}]}}
+      meshID: "[PROJECT_ID]_us-central1-c_asm-cluster" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm-cluster"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
       trustDomain: "[PROJECT_ID].svc.id.goog" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"}]}}
       controlPlaneSecurityEnabled: true
       mtls:
@@ -39,5 +39,5 @@ spec:
       env:
         CA_ADDR: meshca.googleapis.com:443
         CA_PROVIDER: GoogleCA
-        GKE_CLUSTER_URL: "https://container.googleapis.com/v1/projects/[PROJECT_ID]/locations/[COMPUTE_ZONE]/clusters/[CLUSTER_NAME]" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"[CLUSTER_NAME]"},{"name":"gcloud.compute.zone","value":"[COMPUTE_ZONE]"}]}}
+        GKE_CLUSTER_URL: "https://container.googleapis.com/v1/projects/[PROJECT_ID]/locations/us-central1-c/clusters/asm-cluster" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm-cluster"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
         PLUGINS: GoogleTokenExchange
