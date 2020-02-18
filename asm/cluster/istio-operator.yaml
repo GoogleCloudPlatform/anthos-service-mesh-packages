@@ -15,22 +15,110 @@
 apiVersion: install.istio.io/v1alpha2
 kind: IstioControlPlane
 metadata:
-  clusterName: "[PROJECT_ID]/us-central1-c/asm" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
+  clusterName: "[PROJECT_ID]/us-east4-a/asm" # {"type":"string","x-kustomize":{"setBy":"kpt","partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm"},{"name":"gcloud.compute.zone","value":"us-east4-a"}]}}
 spec:
-  profile: asm
-  hub: gcr.io/gke-release/asm
-  tag: 1.4.2-asm.2
+  profile: default
+  hub: docker.io/istio
+  tag: 1.4.4
+  # Turn on node agent component
+  security:
+    components:
+      nodeAgent:
+        enabled: true
+
+  trafficManagement:
+    components:
+      # The default profile is tuned to fit on smaller clusters. Increase the requests and HPA
+      # a bit to ensure we can handle larger scale clusters.
+      pilot:
+        k8s:
+          resources:
+            requests:
+              cpu: 2000m
+
+  gateways:
+    components:
+      # Egress is supported but not default
+      egressGateway:
+        enabled: false
+
+  # Policy is not supported
+  policy:
+    enabled: false
+
+  # Telemetry here refers to mixer telemetry. We will enable telemetry v2 instead
+  telemetry:
+    enabled: false
+
   values:
+    # Protocol sniffing is not supported
+    pilot:
+      enableProtocolSniffingForOutbound: false
+      enableProtocolSniffingForInbound: false
+
+    # Grafana is disabled by default, but supported with --set values.grafana.enabled=true
+    # This requires enabling prometheus.
+    grafana:
+      enabled: false
+
+    # Prometheus is disabled by default, but supported with --set values.prometheus.enabled=true
+    prometheus:
+      enabled: false
+
+    # Set up SDS with Citadel as the CA.
+    nodeagent:
+      env:
+        CA_ADDR: meshca.googleapis.com:443
+        CA_PROVIDER: GoogleCA
+        GKE_CLUSTER_URL: "https://container.googleapis.com/v1/projects/[PROJECT_ID]/locations/us-east4-a/clusters/asm" # {"type":"string","x-kustomize":{"setBy":"kpt","partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm"},{"name":"gcloud.compute.zone","value":"us-east4-a"}]}}
+        PLUGINS: GoogleTokenExchange
+        VALID_TOKEN: true
+      image: node-agent-k8s
+
+    # Enable SDS on ingress
+    gateways:
+      istio-ingressgateway:
+        sds:
+          enabled: true
+
+    # Enable telemetry v2 backend by Stackdriver.
+    # Prometheus is also supported with --set values.telemetry.v2.prometheus.enabled=true --set prometheus.enabled=true
+    telemetry:
+      v1:
+        enabled: false
+      v2:
+        stackdriver:
+        enabled: true
+        prometheus:
+          enabled: false
+        stackdriver:
+          enabled: true
+          topology: true
+
+    sidecarInjectorWebhook:
+      rewriteAppHTTPProbe: true
+
     global:
-      meshID: "[PROJECT_ID]_us-central1-c_asm" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
+      meshID: "[PROJECT_ID]_us-east4-a_asm" # {"type":"string","x-kustomize":{"setBy":"kpt","partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm"},{"name":"gcloud.compute.zone","value":"us-east4-a"}]}}
       trustDomain: "[PROJECT_ID].svc.id.goog" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"}]}}
       controlPlaneSecurityEnabled: true
+      useMCP: true
+
+      proxy:
+        # Protocol detection timeout is not supported
+        protocolDetectionTimeout: 0s
+
+      # Locality load balancing is not supported
+      localityLbSetting:
+        enabled: false
+
+      # Enable permissive mTLS by default
       mtls:
         enabled: true
+
+      # Enable SDS
       sds:
         token:
           aud: "[PROJECT_ID].svc.id.goog" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"}]}}
-      useMCP: true
-    nodeagent:
-      env:
-        GKE_CLUSTER_URL: "https://container.googleapis.com/v1/projects/[PROJECT_ID]/locations/us-central1-c/clusters/asm" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
+        enabled: true
+        udsPath: "unix:/var/run/sds/uds_path"
