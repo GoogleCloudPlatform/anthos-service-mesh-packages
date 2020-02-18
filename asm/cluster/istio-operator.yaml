@@ -22,7 +22,7 @@ spec:
   tag: 1.4.2-asm.2
   values:
     global:
-      meshID: "[PROJECT_ID]_[ZONE]_asm" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm"},{"name":"gcloud.compute.zone","value":"[ZONE]"}]}}
+      meshID: "[PROJECT_ID]_[ZONE]_[CLUSTER_NAME]" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"[CLUSTER_NAME]"},{"name":"gcloud.compute.zone","value":"[ZONE]"}]}}
       trustDomain: "[PROJECT_ID].svc.id.goog" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"}]}}
       controlPlaneSecurityEnabled: true
       mtls:
@@ -39,5 +39,5 @@ spec:
       env:
         CA_ADDR: meshca.googleapis.com:443
         CA_PROVIDER: GoogleCA
-        GKE_CLUSTER_URL: "https://container.googleapis.com/v1/projects/[PROJECT_ID]/locations/[ZONE]/clusters/asm" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm"},{"name":"gcloud.compute.zone","value":"[ZONE]"}]}}
+        GKE_CLUSTER_URL: "https://container.googleapis.com/v1/projects/[PROJECT_ID]/locations/[ZONE]/clusters/[CLUSTER_NAME]" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"[CLUSTER_NAME]"},{"name":"gcloud.compute.zone","value":"[ZONE]"}]}}
         PLUGINS: GoogleTokenExchange
