@@ -15,7 +15,7 @@
 apiVersion: container.cnrm.cloud.google.com/v1alpha2
 kind: ContainerNodePool
 metadata:
-  clusterName: "[PROJECT_ID]/us-central1-c/asm" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
+  clusterName: "[PROJECT_ID]/us-central1-c/asm-cluster" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm-cluster"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
   name: default-pool
   namespace: "[PROJECT_ID]" # {"type":"string","x-kustomize":{"setter":{"name":"project-id"}}}
 spec:
@@ -28,4 +28,4 @@ spec:
     workloadMetadataConfig:
       nodeMetadata: GKE_METADATA_SERVER
   clusterRef:
-    name: asm # {"type":"string","x-kustomize":{"setter":{"name":"cluster-name","value":"asm"}}}
+    name: "asm-cluster" # {"type":"string","x-kustomize":{"setter":{"name":"cluster-name","value":"asm-cluster"}}}

@@ -22,15 +22,15 @@ spec: {}
 apiVersion: container.cnrm.cloud.google.com/v1alpha2
 kind: ContainerCluster
 metadata:
-  clusterName: "[PROJECT_ID]/us-central1-c/asm" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
-  name: asm # {"type":"string","x-kustomize":{"setter":{"name":"cluster-name","value":"asm"}}}
+  clusterName: "[PROJECT_ID]/us-central1-c/asm-cluster" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm-cluster"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
+  name: asm-cluster # {"type":"string","x-kustomize":{"setter":{"name":"cluster-name","value":"asm-cluster"}}}
   namespace: "[PROJECT_ID]" # {"type":"string","x-kustomize":{"setter":{"name":"project-id"}}}
 spec:
   location: us-central1-c # {"type":"string","x-kustomize":{"setter":{"name":"gcloud.compute.zone"}}}
   workloadIdentity:
     identityNamespace: default
   labels:
-    mesh_id: "[PROJECT_ID]_us-central1-c_asm" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
+    mesh_id: "[PROJECT_ID]_us-central1-c_asm-cluster" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"project-id","value":"[PROJECT_ID]"},{"name":"cluster-name","value":"asm-cluster"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
   loggingService: logging.googleapis.com/kubernetes
   monitoringService: monitoring.googleapis.com/kubernetes
   network: default
