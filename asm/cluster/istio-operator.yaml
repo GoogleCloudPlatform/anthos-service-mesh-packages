@@ -19,7 +19,7 @@ metadata:
 spec:
   profile: asm
   hub: gcr.io/asm-testing
-  tag: 1.4.5-asm-test.5
+  tag: 1.4.5-asm-test.7
   values:
     global:
       meshID: "PROJECT_ID_us-central1-c_asm-cluster" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.core.project","value":"PROJECT_ID"},{"name":"cluster-name","value":"asm-cluster"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
