@@ -18,20 +18,37 @@ metadata:
   name: default
   namespace: "PROJECT_ID" # {"type":"string","x-kustomize":{"setter":{"name":"gcloud.core.project"}}}
 spec: {}
+
 ---
+
 apiVersion: container.cnrm.cloud.google.com/v1alpha2
 kind: ContainerCluster
 metadata:
-  clusterName: "PROJECT_ID/us-central1-c/asm-cluster" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.core.project","value":"PROJECT_ID"},{"name":"cluster-name","value":"asm-cluster"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
-  name: asm-cluster # {"type":"string","x-kustomize":{"setter":{"name":"cluster-name","value":"asm-cluster"}}}
+  clusterName: "PROJECT_ID/us-central1-c/anthos-sample-cluster1" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.core.project","value":"PROJECT_ID"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
+  name: anthos-sample-cluster1
   namespace: "PROJECT_ID" # {"type":"string","x-kustomize":{"setter":{"name":"gcloud.core.project"}}}
 spec:
   location: us-central1-c # {"type":"string","x-kustomize":{"setter":{"name":"gcloud.compute.zone"}}}
+  minMasterVersion: "1.15.8-gke.2"
   workloadIdentity:
     identityNamespace: default
   labels:
-    mesh_id: "PROJECT_ID_us-central1-c_asm-cluster" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.core.project","value":"PROJECT_ID"},{"name":"cluster-name","value":"asm-cluster"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
-  loggingService: logging.googleapis.com/kubernetes
-  monitoringService: monitoring.googleapis.com/kubernetes
+    mesh_id: "PROJECT_ID_us-central1-c_anthos-sample-cluster1" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.core.project","value":"PROJECT_ID"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
+    created-for-anthos-sample-deployment: "20200309"
+  loggingService:
+    logging.googleapis.com/kubernetes
+  monitoringService:
+    monitoring.googleapis.com/kubernetes
+  addonsConfig:
+    horizontalPodAutoscaling:
+      disabled: false
+    httpLoadBalancing:
+      disabled: false
+    cloudrunConfig:
+      disabled: true
+  ipAllocationPolicy:
+    useIpAliases: true
+  masterAuth:
+    username: admin
   network: default
   subnetwork: default

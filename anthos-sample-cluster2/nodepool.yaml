@@ -15,17 +15,28 @@
 apiVersion: container.cnrm.cloud.google.com/v1alpha2
 kind: ContainerNodePool
 metadata:
-  clusterName: "PROJECT_ID/us-central1-c/asm-cluster" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.core.project","value":"PROJECT_ID"},{"name":"cluster-name","value":"asm-cluster"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
+  clusterName: "PROJECT_ID/us-central1-c/anthos-sample-cluster2" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.core.project","value":"PROJECT_ID"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
   name: default-pool
   namespace: "PROJECT_ID" # {"type":"string","x-kustomize":{"setter":{"name":"gcloud.core.project"}}}
 spec:
   initialNodeCount: 2
   autoscaling:
     minNodeCount: 2
-    maxNodeCount: 4 # {"type":"integer","x-kustomize":{"setter":{"name":"max-nodes","value":"4"}}}
+    maxNodeCount: 4
   nodeConfig:
+    diskSizeGb: 100
+    diskType: pd-standard
     machineType: e2-standard-4
+    preemptible: false
+    oauthScopes:
+      - "https://www.googleapis.com/auth/cloud-platform"
+    metadata:
+      disable-legacy-endpoints: "true"
+    serviceAccount: anthos-svc-account@PROJECT_ID.iam.gserviceaccount.com # {"type":"string","x-kustomize":{"setter":{"name":"service-account"}}}
     workloadMetadataConfig:
-      nodeMetadata: GKE_METADATA_SERVER
+      nodeMetadata: EXPOSE
+  management:
+    autoRepair: true
+    autoUpgrade: true
   clusterRef:
-    name: "asm-cluster" # {"type":"string","x-kustomize":{"setter":{"name":"cluster-name","value":"asm-cluster"}}}
+    name: anthos-sample-cluster2
