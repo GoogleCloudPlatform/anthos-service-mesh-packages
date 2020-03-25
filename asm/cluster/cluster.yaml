@@ -27,7 +27,8 @@ metadata:
   namespace: "PROJECT_ID" # {"type":"string","x-kustomize":{"setter":{"name":"gcloud.core.project"}}}
 spec:
   location: us-central1-c # {"type":"string","x-kustomize":{"setter":{"name":"gcloud.compute.zone"}}}
-  minMasterVersion: "GKE_CLUSTER_VERSION" # {"type":"string","x-kustomize":{"setter":{"name":"anthos.gke_cluster.version"}}}
+  releaseChannel:
+    channel: REGULAR
   workloadIdentity:
     identityNamespace: default
   labels:
