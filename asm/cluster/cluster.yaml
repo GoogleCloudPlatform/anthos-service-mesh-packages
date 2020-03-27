@@ -16,21 +16,21 @@ apiVersion: identity.cnrm.cloud.google.com/v1alpha2
 kind: IdentityNamespace
 metadata:
   name: default
-  namespace: "PROJECT_ID" # {"type":"string","x-kustomize":{"setter":{"name":"gcloud.core.project"}}}
+  namespace: "PROJECT_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
 spec: {}
 ---
 apiVersion: container.cnrm.cloud.google.com/v1alpha2
 kind: ContainerCluster
 metadata:
-  clusterName: "PROJECT_ID/us-central1-c/asm-cluster" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.core.project","value":"PROJECT_ID"},{"name":"cluster-name","value":"asm-cluster"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
-  name: asm-cluster # {"type":"string","x-kustomize":{"setter":{"name":"cluster-name","value":"asm-cluster"}}}
-  namespace: "PROJECT_ID" # {"type":"string","x-kustomize":{"setter":{"name":"gcloud.core.project"}}}
+  clusterName: "PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
+  name: "asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster"}
+  namespace: "PROJECT_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
 spec:
-  location: us-central1-c # {"type":"string","x-kustomize":{"setter":{"name":"gcloud.compute.zone"}}}
+  location: us-central1-c # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.compute.zone"}
   workloadIdentity:
     identityNamespace: default
   labels:
-    mesh_id: "proj-PROJECT_NUMBER" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.project.projectNumber","value":"PROJECT_NUMBER"}]}}
+    mesh_id: "proj-PROJECT_NUMBER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh-id"}
   loggingService: logging.googleapis.com/kubernetes
   monitoringService: monitoring.googleapis.com/kubernetes
   network: default
