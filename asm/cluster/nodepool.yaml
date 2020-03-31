@@ -34,7 +34,7 @@ spec:
       disable-legacy-endpoints: "true"
     serviceAccount: anthos-svc-account@PROJECT_ID.iam.gserviceaccount.com # {"type":"string","x-kustomize":{"setter":{"name":"service-account"}}}
     workloadMetadataConfig:
-      nodeMetadata: EXPOSE
+      nodeMetadata: GKE_METADATA_SERVER
   management:
     autoRepair: true
     autoUpgrade: true
