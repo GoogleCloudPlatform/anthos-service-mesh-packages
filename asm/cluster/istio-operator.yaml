@@ -19,7 +19,7 @@ metadata:
 spec:
   profile: asm
   hub: gcr.io/gke-release/asm
-  tag: 1.4.6-asm.0
+  tag: 1.4.7-asm.0
   values:
     global:
       meshID: "proj-PROJECT_NUMBER" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.project.projectNumber","value":"PROJECT_NUMBER"}]}}
