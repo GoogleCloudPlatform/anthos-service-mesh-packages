@@ -1,3 +1,4 @@
+---
 # This is an empty 1.4 control plane, used to force creation of p4sa
 apiVersion: install.istio.io/v1alpha2
 kind: IstioControlPlane
@@ -22,4 +23,3 @@ spec:
     enabled: false
   coreDNS:
     enabled: false
-

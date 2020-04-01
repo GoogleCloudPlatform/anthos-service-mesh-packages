@@ -1,17 +1,18 @@
-apiVersion: iam.cnrm.cloud.google.com/v1alpha1
-kind: IAMServiceAccount
-metadata:
-  name: anthos-svc-account
-  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gcloud.core.project"}
-spec:
-  displayName: Anthos Service Mesh credentials
-  projectRoles:
-  - roles/logging.logWriter
-  - roles/monitoring.metricWriter
-  - roles/meshtelemetry.reporter
-  - roles/compute.networkViewer
-  - roles/storage.objectViewer
-  - roles/cloudtrace.agent
+# TODO: Delete this file
+#apiVersion: iam.cnrm.cloud.google.com/v1alpha1
+#kind: IAMServiceAccount
+#metadata:
+#  name: anthos-svc-account
+#  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gcloud.core.project"}
+#spec:
+#  displayName: Anthos Service Mesh credentials
+#  projectRoles:
+#  - roles/logging.logWriter
+#  - roles/monitoring.metricWriter
+#  - roles/meshtelemetry.reporter
+#  - roles/compute.networkViewer
+#  - roles/storage.objectViewer
+#  - roles/cloudtrace.agent
 
 #---
 #

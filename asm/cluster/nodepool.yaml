@@ -28,7 +28,7 @@ spec:
     #    count: 1
     metadata:
       disable-legacy-endpoints: "true"
-    serviceAccount: anthos-svc-account@[PROJECT_ID].iam.gserviceaccount.com # {"$ref":"#/definitions/io.k8s.cli.substitutions.anthos-svc-account"}
+    #serviceAccount: anthos-svc-account@[PROJECT_ID].iam.gserviceaccount.com # {"$ref":"#/definitions/io.k8s.cli.substitutions.anthos-svc-account"}
     #    workloadMetadataConfig:
     #      nodeMetadata: EXPOSE
   management:

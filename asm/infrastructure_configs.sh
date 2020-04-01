@@ -134,4 +134,7 @@ if ! kubectl -n istio-system get secret google-cloud-key > /dev/null 2>&1; then
   kubectl -n istio-system create secret generic google-cloud-key  --from-file key.json=<(fetchCloudKey asm-galley)
 fi
 
+gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+    --member serviceAccount:service-$(gcloud projects list --filter="project_id=${PROJECT_ID}" --format='value(project_number)')@gcp-sa-meshdataplane.iam.gserviceaccount.com \
+    --role roles/compute.networkViewer
 
