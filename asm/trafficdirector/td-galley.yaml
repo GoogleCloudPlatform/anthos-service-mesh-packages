@@ -57,7 +57,7 @@ spec:
           - --validation-port=9443
           - --sinkAuthMode=$(SINKAUTHMODE)
           - --sinkAddress=$(SINKADDRESS)
-          - --sinkMeta=project_id=$(PROJECT_ID),sds_path=$(SDSPATH),trace=995644050134 # TODO-HOLD: Remove Trace
+          - --sinkMeta=project_id=$(PROJECT_ID),sds_path=$(SDSPATH)
           - --excludedResourceKinds=Pod,Node,Endpoints
           - --enableServiceDiscovery
           volumeMounts:

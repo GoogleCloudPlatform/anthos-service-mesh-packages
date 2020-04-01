@@ -33,6 +33,7 @@ metadata:
   annotations:
     iam.gke.io/gcp-service-account: "neg-service-account@[PROJECT_ID].iam.gserviceaccount.com" # {"$ref":"#/definitions/io.k8s.cli.substitutions.k8s-neg-service-account"}
 #---
+# TODO: Convert NEG configmap to kpt
 ## Neg Configmap
 #apiVersion: v1
 #kind: ConfigMap
