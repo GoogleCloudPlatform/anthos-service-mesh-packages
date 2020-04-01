@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: asm-galley-push
+  namespace: istio-system
+  labels:
+    app: asm-galley-push
+    release: asm-galley-push
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: asm-galley-push
+      release: asm-galley-push
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: asm-galley-push
+        release: asm-galley-push
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      serviceAccountName: asm-galley-service-account
+      containers:
+        - name: galley
+          image: gcr.io/asm-testing/galley:release-1.5-asm-7 # {"$ref":"#/definitions/io.k8s.cli.substitutions.galley-image"}
+          imagePullPolicy: "Always"
+          ports:
+          - containerPort: 9443
+          - containerPort: 15014
+          - containerPort: 15019
+          - containerPort: 9901
+          envFrom:
+            - configMapRef:
+                name: istio-galley-config-td
+                optional: true
+          command:
+          - /usr/local/bin/galley
+          - server
+          - --meshConfigFile=/etc/mesh-config/mesh
+          - --livenessProbeInterval=1s
+          - --livenessProbePath=/tmp/healthliveness
+          - --readinessProbePath=/tmp/healthready
+          - --readinessProbeInterval=1s
+          - --insecure=true
+          - --enable-validation=false
+          - --enable-reconcileWebhookConfiguration=false
+          - --enable-server=true
+          - --deployment-namespace=istio-system
+          - --validation-webhook-config-file
+          - /etc/config/validatingwebhookconfiguration.yaml
+          - --monitoringPort=15014
+          - --validation-port=9443
+          - --sinkAuthMode=$(SINKAUTHMODE)
+          - --sinkAddress=$(SINKADDRESS)
+          - --sinkMeta=project_id=$(PROJECT_ID),sds_path=$(SDSPATH),trace=995644050134 # TODO-HOLD: Remove Trace
+          - --excludedResourceKinds=Pod,Node,Endpoints
+          - --enableServiceDiscovery
+          volumeMounts:
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
+          - name: mesh-config
+            mountPath: /etc/mesh-config
+            readOnly: true
+          - mountPath: /var/secrets/google
+            name: google-cloud-key
+      volumes:
+      - name: google-cloud-key
+        secret:
+          secretName: google-cloud-key
+      - name: config
+        # Should be created at cluster creation time, include info about the cluster and vendor-specific options.
+        configMap:
+          name: istio-galley-config-td
+      - name: mesh-config
+        configMap:
+          name: istio-mesh-td
+---

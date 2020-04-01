@@ -1,0 +1,35 @@
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: tdprobe-client
+  namespace: tdprobe
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: cli-probe
+        version: v1
+    spec:
+      containers:
+      - name: echosrv
+        image: costinm/fortio:latest
+        imagePullPolicy: Always
+        args:
+          - load
+          - -allow-initial-errors
+          - -t
+          - "0"
+          - -c
+          - "30"
+          - -qps
+          - "10"
+          - http://tdprobe.tdprobe:8080/echo?size=5000
+        resources:
+          requests:
+            cpu: 100m
+            memory: "100M"
+          limits:
+            cpu: 800m
+            memory: "1G"

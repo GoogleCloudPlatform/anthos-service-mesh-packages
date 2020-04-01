@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: istio-galley-config-td
+  namespace: istio-system
+data:
+  TRAFFICDIRECTORADDRESS: "trafficdirector.googleapis.com:443" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trafficdirector-address"}
+  MESHCAADDRESS: "meshca.googleapis.com:443" # {"$ref":"#/definitions/io.k8s.cli.substitutions.meshca-address"}
+  SINKADDRESS: "meshconfig.googleapis.com:443" # {"$ref":"#/definitions/io.k8s.cli.substitutions.sink-address"}
+  SINKAUTHMODE: "GOOGLE" # {"$ref":"#/definitions/io.k8s.cli.substitutions.sink-auth-mode"}
+  SDSPATH: "unix:/etc/istio/proxy/SDS"
+  PROJECT_ID: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gcloud.core.project"}
+  GOOGLE_APPLICATION_CREDENTIALS: /var/secrets/google/key.json
+  AUDIENCE: "[PROJECT_ID].svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
+  trustDomain: "[PROJECT_ID].svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
+  TRUST_DOMAIN: "[PROJECT_ID].svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
+  gkeClusterUrl: https://container.googleapis.com/v1/projects/[PROJECT_ID]/locations/us-central1-c/clusters/asm-free-trial # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cluster-url"}
+  GCP_METADATA: "[PROJECT_ID]|[PROJECT_NUMBER]|asm-free-trial|us-central1-c" # { "$ref": "#/definitions/io.k8s.cli.substitutions.gcp-metadata" }
+  ISTIO_META_MESH_ID: "proj-[PROJECT_NUMBER]" # { "$ref": "#/definitions/io.k8s.cli.substitutions.mesh-id" }
+  ISTIO_META_TRAFFICDIRECTOR_GCP_PROJECT_NUMBER: "[PROJECT_NUMBER]" # { "$ref": "#/definitions/io.k8s.cli.substitutions.gcp-project-number" }
+

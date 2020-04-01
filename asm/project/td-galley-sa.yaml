@@ -1,0 +1,34 @@
+---
+apiVersion: iam.cnrm.cloud.google.com/v1alpha1
+kind: IAMServiceAccount
+metadata:
+  name: asm-galley-service-account
+  namespace: "[PROJECT_ID]"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.gcloud.core.project"}
+spec:
+  displayName: Istio galley credentials
+  projectRoles:
+  - roles/meshconfig.writer
+---
+apiVersion: iam.cnrm.cloud.google.com/v1alpha1
+kind: IAMPolicy
+metadata:
+  name: asm-galley-iam-policy
+  namespace: "[PROJECT_ID]"
+spec:
+  resourceRef:
+    apiVersion: iam.cnrm.cloud.google.com/v1alpha1
+    kind: IAMServiceAccount
+    name: asm-galley-service-account
+  bindings:
+  - role: roles/iam.workloadIdentityUser
+    members:
+    - serviceAccount:[PROJECT_ID].svc.id.goog[istio-system/asm-galley-service-account] # {"$ref":"#/definitions/io.k8s.cli.substitutions.galley-service-account"}
+---
+# Added to galley-sa file
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: asm-galley-service-account
+  namespace: istio-system
+  annotations:
+    iam.gke.io/gcp-service-account: "asm-galley-service-account@[PROJECT_ID].iam.gserviceaccount.com" # {"$ref":"#/definitions/io.k8s.cli.substitutions.k8s-galley-service-account"}

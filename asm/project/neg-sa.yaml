@@ -1,0 +1,58 @@
+---
+apiVersion: iam.cnrm.cloud.google.com/v1alpha1
+kind: IAMServiceAccount
+metadata:
+  name: neg-service-account
+  namespace: "[PROJECT_ID]"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.gcloud.core.project"}
+spec:
+  displayName: Service Account for NEG controller
+  projectRoles:
+  - roles/compute.admin
+---
+apiVersion: iam.cnrm.cloud.google.com/v1alpha1
+kind: IAMPolicy
+metadata:
+  name: neg-iam-policy
+  namespace: "[PROJECT_ID]"
+spec:
+  resourceRef:
+    apiVersion: iam.cnrm.cloud.google.com/v1alpha1
+    kind: IAMServiceAccount
+    name: neg-service-account
+  bindings:
+  - role: roles/iam.workloadIdentityUser
+    members:
+    - serviceAccount:[PROJECT_ID].svc.id.goog[kube-system/neg-controller] # {"$ref":"#/definitions/io.k8s.cli.substitutions.neg-service-account"}
+---
+# Added to neg-sa file
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: neg-controller
+  namespace: kube-system
+  annotations:
+    iam.gke.io/gcp-service-account: "neg-service-account@[PROJECT_ID].iam.gserviceaccount.com" # {"$ref":"#/definitions/io.k8s.cli.substitutions.k8s-neg-service-account"}
+#---
+## Neg Configmap
+#apiVersion: v1
+#kind: ConfigMap
+#metadata:
+#  name: gce-config
+#  namespace: kube-system
+#data:
+#  gce.conf: |
+#    [global]
+#    token-url = nil
+#    # Your cluster's project
+#    project-id = ${PROJECT_ID}
+#    # Your cluster's network
+#    network-name =  ${NETWORK_NAME}
+#    # Your cluster's subnetwork
+#    subnetwork-name = ${SUBNETWORK_NAME}
+#    # Prefix for your cluster's IG
+#    node-instance-prefix = gke-${CLUSTER_NAME}
+#    # Network tags for your cluster's IG
+#    node-tags = ${NETWORK_TAGS}
+#    # Zone the cluster lives in
+#    ${NEGZONE}
+

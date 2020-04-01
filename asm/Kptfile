@@ -1,0 +1,260 @@
+apiVersion: kpt.dev/v1alpha1
+kind: Kptfile
+metadata:
+  name: asm-istiod-15
+packageMetadata:
+  shortDescription: ASM Networking 1.5
+openAPI:
+  definitions:
+    io.k8s.cli.setters.meshca-address:
+      x-k8s-cli:
+        setter:
+          name: meshca-address
+          value: meshca.googleapis.com:443
+    io.k8s.cli.substitutions.meshca-address:
+      x-k8s-cli:
+        substitution:
+          name: meshca-address
+          pattern: MESHCA
+          values:
+          - marker: MESHCA
+            ref: '#/definitions/io.k8s.cli.setters.meshca-address'
+    io.k8s.cli.setters.trafficdirector-address:
+      x-k8s-cli:
+        setter:
+          name: trafficdirector-address
+          value: trafficdirector.googleapis.com:443
+    io.k8s.cli.substitutions.trafficdirector-address:
+      x-k8s-cli:
+        substitution:
+          name: trafficdirector-address
+          pattern: TRAFFICDIRECTOR
+          values:
+          - marker: TRAFFICDIRECTOR
+            ref: '#/definitions/io.k8s.cli.setters.trafficdirector-address'
+    io.k8s.cli.setters.sink-address:
+      x-k8s-cli:
+        setter:
+          name: sink-address
+          value: meshconfig.googleapis.com:443
+    io.k8s.cli.substitutions.sink-address:
+      x-k8s-cli:
+        substitution:
+          name: sink-address
+          pattern: SINKADDR
+          values:
+          - marker: SINKADDR
+            ref: '#/definitions/io.k8s.cli.setters.sink-address'
+    io.k8s.cli.setters.sink-auth-mode:
+      x-k8s-cli:
+        setter:
+          name: sink-auth-mode
+          value: GOOGLE
+    io.k8s.cli.substitutions.sink-auth-mode:
+      x-k8s-cli:
+        substitution:
+          name: sink-auth-mode
+          pattern: SINKAUTHMODE
+          values:
+          - marker: SINKAUTHMODE
+            ref: '#/definitions/io.k8s.cli.setters.sink-auth-mode'
+    io.k8s.cli.setters.gcloud.core.project:
+      x-k8s-cli:
+        setter:
+          name: gcloud.core.project
+          value: '[PROJECT_ID]'
+    io.k8s.cli.setters.gcloud.project.core.projectNumber:
+      x-k8s-cli:
+        setter:
+          name: gcloud.project.core.projectNumber
+          value: '[PROJECT_NUMBER]'
+    io.k8s.cli.substitutions.gcloud.core.project:
+      x-k8s-cli:
+        substitution:
+          name: project-id
+          pattern: PROJECT_ID
+          values:
+          - marker: PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+    io.k8s.cli.substitutions.trust-domain:
+      x-k8s-cli:
+        substitution:
+          name: trust-domain
+          pattern: PROJECT_ID.svc.id.goog
+          values:
+          - marker: PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+    io.k8s.cli.substitutions.galley-service-account:
+      x-k8s-cli:
+        substitution:
+          name: project-id
+          pattern: serviceAccount:PROJECT_ID.svc.id.goog[istio-system/asm-galley-service-account]
+          values:
+          - marker: PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+    io.k8s.cli.substitutions.k8s-galley-service-account:
+      x-k8s-cli:
+        substitution:
+          name: project-id
+          pattern: asm-galley-service-account@PROJECT_ID.iam.gserviceaccount.com
+          values:
+          - marker: PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+    io.k8s.cli.substitutions.neg-service-account:
+      x-k8s-cli:
+        substitution:
+          name: project-id
+          pattern: serviceAccount:PROJECT_ID.svc.id.goog[kube-system/neg-controller]
+          values:
+          - marker: PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+    io.k8s.cli.substitutions.k8s-neg-service-account:
+      x-k8s-cli:
+        substitution:
+          name: project-id
+          pattern: neg-service-account@PROJECT_ID.iam.gserviceaccount.com
+          values:
+          - marker: PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+    io.k8s.cli.substitutions.projectpath:
+      x-k8s-cli:
+        substitution:
+          name: project-id
+          pattern: projects/PROJECT_ID
+          values:
+          - marker: PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+    io.k8s.cli.setters.gcloud.compute.zone:
+      x-k8s-cli:
+        setter:
+          name: gcloud.compute.zone
+          value: us-central1-c
+    io.k8s.cli.setters.cluster-name:
+      x-k8s-cli:
+        setter:
+          name: cluster-name
+          value: asm-free-trial
+    io.k8s.cli.setters.cloudrun-config-disabled:
+      x-k8s-cli:
+        setter:
+          name: cloudrun-config-disabled
+          value: true
+    io.k8s.cli.substitutions.gcp-metadata:
+      x-k8s-cli:
+        substitution:
+          name: gce-metadata
+          pattern: "PROJECT_ID|PROJECT_NUMBER|CLUSTERNAME|LOCATION"
+          values:
+          - marker: PROJECT_NUMBER
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.core.projectNumber'
+          - marker: PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+          - marker: LOCATION
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.zone'
+          - marker: CLUSTERNAME
+            ref: '#/definitions/io.k8s.cli.setters.cluster-name'
+    io.k8s.cli.substitutions.mesh-id:
+      x-k8s-cli:
+        substitution:
+          name: mesh-id
+          pattern: "proj-PROJECT_NUMBER"
+          values:
+          - marker: PROJECT_NUMBER
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.core.projectNumber'
+    io.k8s.cli.substitutions.gcp-project-number:
+      x-k8s-cli:
+        substitution:
+          name: project-number
+          pattern: "PROJECT_NUMBER"
+          values:
+          - marker: PROJECT_NUMBER
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.core.projectNumber'
+    io.k8s.cli.substitutions.p4sa:
+      x-k8s-cli:
+        substitution:
+          name: p4sa
+          pattern: "service-PROJECT_NUMBER@gcp-sa-meshdataplane.iam.gserviceaccount.com"
+          values:
+          - marker: PROJECT_NUMBER
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.core.projectNumber'
+    io.k8s.cli.substitutions.gke-cluster-url:
+      x-k8s-cli:
+        substitution:
+          name: gke-cluster-url
+          pattern: https://container.googleapis.com/v1/projects/PROJECT_ID/locations/LOCATION/clusters/CLUSTERNAME
+          values:
+          - marker: PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+          - marker: LOCATION
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.zone'
+          - marker: CLUSTERNAME
+            ref: '#/definitions/io.k8s.cli.setters.cluster-name'
+    io.k8s.cli.substitutions.full-cluster-name:
+      x-k8s-cli:
+        substitution:
+          name: full-cluster-name
+          pattern: PROJECTID/LOCATION/CLUSTERNAME
+          values:
+          - marker: CLUSTERNAME
+            ref: '#/definitions/io.k8s.cli.setters.cluster-name'
+          - marker: LOCATION
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.zone'
+          - marker: PROJECTID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+    io.k8s.cli.substitutions.anthos-svc-account:
+      x-k8s-cli:
+        substitution:
+          name: anthos-svc-account
+          pattern: anthos-svc-account@PROJECTID.iam.gserviceaccount.com
+          values:
+          - marker: PROJECTID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+    io.k8s.cli.setters.replicas:
+      x-k8s-cli:
+        setter:
+          name: replicas
+          value: "4"
+    io.k8s.cli.setters.gcloud.project.projectNumber:
+      x-k8s-cli:
+        setter:
+          name: projectNumber
+          value: "4"
+    io.k8s.cli.setters.galley-image:
+      x-k8s-cli:
+        setter:
+          name: galley-image
+          value: 'gcr.io/asm-testing/galley:release-1.5-asm-7'
+    io.k8s.cli.substitutions.galley-image:
+      x-k8s-cli:
+        substitution:
+          name: galley-image
+          pattern: IMAGE
+          values:
+          - marker: IMAGE
+            ref: '#/definitions/io.k8s.cli.setters.galley-image'
+    io.k8s.cli.setters.istiod-image:
+      x-k8s-cli:
+        setter:
+          name: istiod-image
+          value: 'gcr.io/asm-testing/pilot:release-1.5-asm-7'
+    io.k8s.cli.substitutions.istiod-image:
+      x-k8s-cli:
+        substitution:
+          name: istiod-image
+          pattern: IMAGE
+          values:
+          - marker: IMAGE
+            ref: '#/definitions/io.k8s.cli.setters.istiod-image'
+    io.k8s.cli.setters.proxy-image:
+      x-k8s-cli:
+        setter:
+          name: proxy-image
+          value: 'gcr.io/asm-testing/proxyv2:release-1.5-asm-7'
+    io.k8s.cli.substitutions.proxy-image:
+      x-k8s-cli:
+        substitution:
+          name: proxy-image
+          pattern: IMAGE
+          values:
+          - marker: IMAGE
+            ref: '#/definitions/io.k8s.cli.setters.proxy-image'            
