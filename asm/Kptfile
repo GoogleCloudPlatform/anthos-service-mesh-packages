@@ -63,11 +63,6 @@ openAPI:
         setter:
           name: gcloud.core.project
           value: '[PROJECT_ID]'
-    io.k8s.cli.setters.gcloud.project.core.projectNumber:
-      x-k8s-cli:
-        setter:
-          name: gcloud.project.core.projectNumber
-          value: '[PROJECT_NUMBER]'
     io.k8s.cli.substitutions.gcloud.core.project:
       x-k8s-cli:
         substitution:
@@ -146,7 +141,7 @@ openAPI:
           pattern: "PROJECT_ID|PROJECT_NUMBER|CLUSTERNAME|LOCATION"
           values:
           - marker: PROJECT_NUMBER
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.core.projectNumber'
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.projectNumber'
           - marker: PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
           - marker: LOCATION
@@ -160,7 +155,7 @@ openAPI:
           pattern: "proj-PROJECT_NUMBER"
           values:
           - marker: PROJECT_NUMBER
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.core.projectNumber'
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.projectNumber'
     io.k8s.cli.substitutions.gcp-project-number:
       x-k8s-cli:
         substitution:
@@ -168,7 +163,7 @@ openAPI:
           pattern: "PROJECT_NUMBER"
           values:
           - marker: PROJECT_NUMBER
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.core.projectNumber'
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.projectNumber'
     io.k8s.cli.substitutions.p4sa:
       x-k8s-cli:
         substitution:
@@ -176,7 +171,7 @@ openAPI:
           pattern: "service-PROJECT_NUMBER@gcp-sa-meshdataplane.iam.gserviceaccount.com"
           values:
           - marker: PROJECT_NUMBER
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.core.projectNumber'
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.projectNumber'
     io.k8s.cli.substitutions.gke-cluster-url:
       x-k8s-cli:
         substitution:
@@ -223,7 +218,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: projectNumber
-          value: "4"
+          value: "[PROJECT_NUMBER]"
     io.k8s.cli.setters.galley-image:
       x-k8s-cli:
         setter:
