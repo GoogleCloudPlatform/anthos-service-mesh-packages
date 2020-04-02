@@ -209,11 +209,16 @@ openAPI:
           values:
           - marker: PROJECTID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
-    io.k8s.cli.setters.replicas:
+    io.k8s.cli.setters.minNodeCount:
       x-k8s-cli:
         setter:
-          name: replicas
+          name: minNodeCount
           value: "4"
+    io.k8s.cli.setters.maxNodeCount:
+      x-k8s-cli:
+        setter:
+          name: maxNodeCount
+          value: "8"
     io.k8s.cli.setters.gcloud.project.projectNumber:
       x-k8s-cli:
         setter:

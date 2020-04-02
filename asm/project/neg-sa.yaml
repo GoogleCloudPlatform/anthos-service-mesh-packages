@@ -32,28 +32,3 @@ metadata:
   namespace: kube-system
   annotations:
     iam.gke.io/gcp-service-account: "neg-service-account@[PROJECT_ID].iam.gserviceaccount.com" # {"$ref":"#/definitions/io.k8s.cli.substitutions.k8s-neg-service-account"}
-#---
-# TODO: Convert NEG configmap to kpt
-## Neg Configmap
-#apiVersion: v1
-#kind: ConfigMap
-#metadata:
-#  name: gce-config
-#  namespace: kube-system
-#data:
-#  gce.conf: |
-#    [global]
-#    token-url = nil
-#    # Your cluster's project
-#    project-id = ${PROJECT_ID}
-#    # Your cluster's network
-#    network-name =  ${NETWORK_NAME}
-#    # Your cluster's subnetwork
-#    subnetwork-name = ${SUBNETWORK_NAME}
-#    # Prefix for your cluster's IG
-#    node-instance-prefix = gke-${CLUSTER_NAME}
-#    # Network tags for your cluster's IG
-#    node-tags = ${NETWORK_TAGS}
-#    # Zone the cluster lives in
-#    ${NEGZONE}
-

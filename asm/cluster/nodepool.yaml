@@ -7,8 +7,8 @@ metadata:
 spec:
   initialNodeCount: 2
   autoscaling:
-    minNodeCount: 2
-    maxNodeCount: 4 # {"$ref":"#/definitions/io.k8s.cli.setters.replicas"}
+    minNodeCount: 4 # {"$ref":"#/definitions/io.k8s.cli.setters.minNodeCount"}
+    maxNodeCount: 8 # {"$ref":"#/definitions/io.k8s.cli.setters.maxNodeCount"}
   nodeConfig:
     diskSizeGb: 100
     diskType: pd-standard
