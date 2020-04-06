@@ -4,11 +4,11 @@ metadata:
   name: asm
 openAPI:
   definitions:
-    io.k8s.cli.setters.gcloud.compute.zone:
+    io.k8s.cli.setters.gcloud.compute.location:
       type: string
       x-k8s-cli:
         setter:
-          name: gcloud.compute.zone
+          name: gcloud.compute.location
           value: us-central1-c
     io.k8s.cli.setters.gcloud.container.cluster:
       type: string
@@ -57,7 +57,7 @@ openAPI:
           - marker: asm-cluster
             ref: '#/definitions/io.k8s.cli.setters.gcloud.container.cluster'
           - marker: us-central1-c
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.zone'
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.location'
     io.k8s.cli.substitutions.trust-domain:
       type: string
       x-k8s-cli:
@@ -79,7 +79,7 @@ openAPI:
           - marker: asm-cluster
             ref: '#/definitions/io.k8s.cli.setters.gcloud.container.cluster'
           - marker: us-central1-c
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.zone'
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.location'
     io.k8s.cli.substitutions.cluster-name:
       type: string
       x-k8s-cli:
@@ -90,6 +90,6 @@ openAPI:
           - marker: PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
           - marker: us-central1-c
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.zone'
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.location'
           - marker: asm-cluster
             ref: '#/definitions/io.k8s.cli.setters.gcloud.container.cluster'
