@@ -48,6 +48,9 @@ function fetchCloudKey {
     if ! kubectl -n kube-system get secret google-cloud-key >/dev/null 2>&1 || ! kubectl -n istio-system get secret google-cloud-key > /dev/null 2>&1; then
       file="${TMPDIR}/${CLUSTER_NAME}/${CLUSTER_NAME}-${serviceaccount}-cloudkey.json"
       gcloud iam service-accounts keys create "${file}" --iam-account="${serviceaccount}"@"${PROJECT_ID}".iam.gserviceaccount.com
+      if [[ ! -f "${file}" ]]; then
+        fatal "Error creating SA key '${file}' for account ${serviceaccount}@${PROJECT_ID}.iam.gserviceaccount.com -- exiting."
+      fi
       # Read from the named pipe into the cloudkey variable
       cloudkey="$(cat "${file}")"
       # Clean up
@@ -131,7 +134,7 @@ if ! kubectl get ns istio-system > /dev/null; then
   kubectl create ns istio-system
 fi
 if ! kubectl -n istio-system get secret google-cloud-key > /dev/null 2>&1; then
-  kubectl -n istio-system create secret generic google-cloud-key  --from-file key.json=<(fetchCloudKey asm-galley)
+  kubectl -n istio-system create secret generic google-cloud-key  --from-file key.json=<(fetchCloudKey asm-galley-service-account)
 fi
 
 gcloud projects add-iam-policy-binding ${PROJECT_ID} \
