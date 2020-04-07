@@ -36,4 +36,4 @@ spec:
   network: default  # {"type":"string","x-kustomize":{"setter":{"name":"gcloud.compute.network"}}}
   subnetwork: default # {"type":"string","x-kustomize":{"setter":{"name":"gcloud.compute.subnetwork"}}}
   releaseChannel:
-    channel: REGULAR
+    channel: REGULAR # {"type":"string","x-kustomize":{"setter":{"name":"gcloud.container.cluster.releaseChannel"}}}
