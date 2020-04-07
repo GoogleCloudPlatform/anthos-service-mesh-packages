@@ -8,21 +8,21 @@ spec:
   displayName: Service Account for NEG controller
   projectRoles:
   - roles/compute.admin
----
-apiVersion: iam.cnrm.cloud.google.com/v1alpha1
-kind: IAMPolicy
-metadata:
-  name: neg-iam-policy
-  namespace: "[PROJECT_ID]"
-spec:
-  resourceRef:
-    apiVersion: iam.cnrm.cloud.google.com/v1alpha1
-    kind: IAMServiceAccount
-    name: neg-service-account
-  bindings:
-  - role: roles/iam.workloadIdentityUser
-    members:
-    - serviceAccount:[PROJECT_ID].svc.id.goog[kube-system/neg-controller] # {"$ref":"#/definitions/io.k8s.cli.substitutions.neg-service-account"}
+#---
+#apiVersion: iam.cnrm.cloud.google.com/v1alpha1
+#kind: IAMPolicy
+#metadata:
+#  name: neg-iam-policy
+#  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gcloud.core.project"}
+#spec:
+#  resourceRef:
+#    apiVersion: iam.cnrm.cloud.google.com/v1alpha1
+#    kind: IAMServiceAccount
+#    name: neg-service-account
+#  bindings:
+#  - role: roles/iam.workloadIdentityUser
+#    members:
+#    - serviceAccount:[PROJECT_ID].svc.id.goog[kube-system/neg-controller] # {"$ref":"#/definitions/io.k8s.cli.substitutions.neg-service-account"}
 ---
 # Added to neg-sa file
 apiVersion: v1
