@@ -217,7 +217,7 @@ openAPI:
     io.k8s.cli.setters.gcloud.project.projectNumber:
       x-k8s-cli:
         setter:
-          name: projectNumber
+          name: gcloud.project.projectNumber
           value: "[PROJECT_NUMBER]"
     io.k8s.cli.setters.galley-image:
       x-k8s-cli:
@@ -267,7 +267,7 @@ openAPI:
       x-k8s-cli:
         substitution:
           name: trace-id
-          pattern: "- --sinkMeta=project_id=$(PROJECT_ID),sds_path=$(SDSPATH),trace=TRACEID"
+          pattern: "--sinkMeta=project_id=$(PROJECT_ID),sds_path=$(SDSPATH),trace=TRACEID"
           values:
           - marker: TRACEID
             ref: '#/definitions/io.k8s.cli.setters.trace-id'
