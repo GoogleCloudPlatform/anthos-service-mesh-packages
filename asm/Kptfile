@@ -258,3 +258,16 @@ openAPI:
           values:
           - marker: IMAGE
             ref: '#/definitions/io.k8s.cli.setters.proxy-image'            
+    io.k8s.cli.setters.trace-id:
+      x-k8s-cli:
+        setter:
+          name: trace-id
+          value: '123456placeholder'
+    io.k8s.cli.substitutions.sink-meta:
+      x-k8s-cli:
+        substitution:
+          name: trace-id
+          pattern: "- --sinkMeta=project_id=$(PROJECT_ID),sds_path=$(SDSPATH),trace=TRACEID"
+          values:
+          - marker: TRACEID
+            ref: '#/definitions/io.k8s.cli.setters.trace-id'

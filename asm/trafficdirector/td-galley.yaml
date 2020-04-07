@@ -57,7 +57,7 @@ spec:
           - --validation-port=9443
           - --sinkAuthMode=$(SINKAUTHMODE)
           - --sinkAddress=$(SINKADDRESS)
-          - --sinkMeta=project_id=$(PROJECT_ID),sds_path=$(SDSPATH)
+          - --sinkMeta=project_id=$(PROJECT_ID),sds_path=$(SDSPATH),trace=123456placeholder # {"$ref":"#/definitions/io.k8s.cli.substitutions.sink-meta"}
           - --excludedResourceKinds=Pod,Node,Endpoints
           - --enableServiceDiscovery
           volumeMounts:

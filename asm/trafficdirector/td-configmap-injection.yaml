@@ -117,15 +117,15 @@ data:
         #- name: GRPC_VERBOSITY
         #  value: DEBUG
         - name: JWT_POLICY
-          value: third-party-jwt
+          value: "third-party-jwt"
         - name: PILOT_CERT_PROVIDER
-          value: kubernetes
+          value: "kubernetes"
         - name: CA_ADDR
-          value: {{ env "MESHCAADDRESS" "" }}
+          value: "{{ env "MESHCAADDRESS" "" }}"
         - name: ISTIO_BOOTSTRAP
-          value: /var/lib/istio/envoy/gcp_envoy_bootstrap_tmpl.json
+          value: "/var/lib/istio/envoy/gcp_envoy_bootstrap_tmpl.json"
         - name: ISTIO_META_TRAFFICDIRECTOR_GCP_PROJECT_NUMBER
-          value: {{ env "ISTIO_META_TRAFFICDIRECTOR_GCP_PROJECT_NUMBER" "" }}
+          value: "{{ env "ISTIO_META_TRAFFICDIRECTOR_GCP_PROJECT_NUMBER" "" }}"
         - name: ISTIO_META_TRAFFICDIRECTOR_INTERCEPTION_PORT
           value: "15001"
         - name: ISTIO_META_TRAFFICDIRECTOR_ENABLE_ISTIO_STACKDRIVER_TELEMETRY
@@ -133,23 +133,23 @@ data:
         - name: ISTIO_META_TRAFFICDIRECTOR_INBOUND_INTERCEPTION_PORT
           value: "15006"
         - name: ISTIO_META_TRAFFICDIRECTOR_ACCESS_LOG_PATH
-          value: /dev/stdout
+          value: "/dev/stdout"
         - name: ISTIO_META_TRAFFICDIRECTOR_INBOUND_BACKEND_PORTS
           value: "{{ annotation .ObjectMeta `traffic.sidecar.istio.io/includeInboundPorts` (applicationPorts .Spec.Containers) }}"
         - name: ISTIO_META_TRAFFICDIRECTOR_WORKLOAD_NAME
-          value: csm-auth-{{ .DeploymentMeta.Namespace }}
+          value: "csm-auth-{{ .DeploymentMeta.Namespace }}"
         - name: ISTIO_META_MESH_ID
-          value: {{ env "ISTIO_META_MESH_ID" "" }}
+          value: "{{ env "ISTIO_META_MESH_ID" "" }}"
         - name: TRUST_DOMAIN
-          value: {{ env "trustDomain" "" }}
+          value: "{{ env "trustDomain" "" }}"
         - name: GKE_CLUSTER_URL
-          value: {{ env "gkeClusterUrl" "" }}
+          value: "{{ env "gkeClusterUrl" "" }}"
         - name: CA_PROVIDER
           value: "GoogleCA"
         - name: PLUGINS
           value: "GoogleTokenExchange"
         - name: GCP_METADATA
-          value: {{ env "GCP_METADATA" "" }}
+          value: "{{ env "GCP_METADATA" "" }}"
         - name: POD_NAME
           valueFrom:
             fieldRef:
@@ -220,7 +220,7 @@ data:
           value: "/etc/istio/custom-bootstrap/custom_bootstrap.json"
         {{- end }}
         - name: ISTIO_META_MESH_ID
-          value: {{ env "ISTIO_META_MESH_ID" "" }}
+          value: "{{ env "ISTIO_META_MESH_ID" "" }}"
         imagePullPolicy: "Always"
         {{ if ne (annotation .ObjectMeta `status.sidecar.istio.io/port` "15020") `0` }}
         readinessProbe:
