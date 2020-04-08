@@ -262,7 +262,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: trace-id
-          value: '123456placeholder'
+          value: '0'
     io.k8s.cli.substitutions.sink-meta:
       x-k8s-cli:
         substitution:
