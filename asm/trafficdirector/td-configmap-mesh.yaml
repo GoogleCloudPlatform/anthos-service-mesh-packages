@@ -70,8 +70,6 @@ data:
 
     enableSdsTokenMount:               false
 
-    trustDomain:                       "cluster.local"
-
     outboundTrafficPolicy:
       mode: ALLOW_ANY
 

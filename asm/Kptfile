@@ -32,19 +32,19 @@ openAPI:
           values:
           - marker: TRAFFICDIRECTOR
             ref: '#/definitions/io.k8s.cli.setters.trafficdirector-address'
-    io.k8s.cli.setters.sink-address:
+    io.k8s.cli.setters.meshconfig-address:
       x-k8s-cli:
         setter:
-          name: sink-address
+          name: meshconfig-address
           value: meshconfig.googleapis.com:443
-    io.k8s.cli.substitutions.sink-address:
+    io.k8s.cli.substitutions.meshconfig-address:
       x-k8s-cli:
         substitution:
-          name: sink-address
+          name: meshconfig-address
           pattern: SINKADDR
           values:
           - marker: SINKADDR
-            ref: '#/definitions/io.k8s.cli.setters.sink-address'
+            ref: '#/definitions/io.k8s.cli.setters.meshconfig-address'
     io.k8s.cli.setters.sink-auth-mode:
       x-k8s-cli:
         setter:
@@ -223,7 +223,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: galley-image
-          value: 'gcr.io/asm-testing/galley:release-1.5-asm-7'
+          value: 'gcr.io/asm-testing/galley:release-1.5-asm-8'
     io.k8s.cli.substitutions.galley-image:
       x-k8s-cli:
         substitution:
@@ -236,7 +236,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: istiod-image
-          value: 'gcr.io/asm-testing/pilot:release-1.5-asm-7'
+          value: 'gcr.io/asm-testing/pilot:release-1.5-asm-8'
     io.k8s.cli.substitutions.istiod-image:
       x-k8s-cli:
         substitution:
@@ -249,7 +249,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: proxy-image
-          value: 'gcr.io/asm-testing/proxyv2:release-1.5-asm-7'
+          value: 'gcr.io/asm-testing/proxyv2:release-1.5-asm-8'
     io.k8s.cli.substitutions.proxy-image:
       x-k8s-cli:
         substitution:

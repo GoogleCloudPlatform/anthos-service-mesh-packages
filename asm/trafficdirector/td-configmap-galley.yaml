@@ -6,7 +6,7 @@ metadata:
 data:
   TRAFFICDIRECTORADDRESS: "trafficdirector.googleapis.com:443" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trafficdirector-address"}
   MESHCAADDRESS: "meshca.googleapis.com:443" # {"$ref":"#/definitions/io.k8s.cli.substitutions.meshca-address"}
-  SINKADDRESS: "meshconfig.googleapis.com:443" # {"$ref":"#/definitions/io.k8s.cli.substitutions.sink-address"}
+  SINKADDRESS: "meshconfig.googleapis.com:443" # {"$ref":"#/definitions/io.k8s.cli.substitutions.meshconfig-address"}
   SINKAUTHMODE: "GOOGLE" # {"$ref":"#/definitions/io.k8s.cli.substitutions.sink-auth-mode"}
   SDSPATH: "unix:/etc/istio/proxy/SDS"
   PROJECT_ID: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gcloud.core.project"}
