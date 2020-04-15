@@ -125,8 +125,6 @@ gcloud container clusters get-credentials "${CLUSTER_NAME}" --zone "${ZONE}"
 kubectl -n kube-system apply -f <(echo "${CONFIGMAP_NEG}")
 if ! kubectl -n kube-system get secret google-cloud-key > /dev/null 2>&1; then
   kubectl -n kube-system create secret generic google-cloud-key  --from-file key.json=<(fetchCloudKey neg-service-account)
-  kubectl -n kube-system delete pod -lk8s-app=gcp-lb-controller
-  kubectl -n kube-system annotate cm ingress-gce-lock control-plane.alpha.kubernetes.io/leader-
   kubectl -n kube-system delete pod -lk8s-app=gcp-lb-controller --wait=false
 fi
 
