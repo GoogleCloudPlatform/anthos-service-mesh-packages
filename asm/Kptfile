@@ -10,6 +10,18 @@ openAPI:
         setter:
           name: gcloud.compute.location
           value: us-central1-c
+    io.k8s.cli.setters.gcloud.compute.network:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: gcloud.compute.network
+          value: default
+    io.k8s.cli.setters.gcloud.compute.subnetwork:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: gcloud.compute.subnetwork
+          value: default
     io.k8s.cli.setters.gcloud.container.cluster:
       type: string
       x-k8s-cli:
