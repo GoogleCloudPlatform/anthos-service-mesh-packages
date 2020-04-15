@@ -13,73 +13,57 @@
 # limitations under the License.
 
 # Stackdriver
-apiVersion: cnrm.cloud.google.com/v1alpha1
-kind: CloudService
+apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
+kind: Service
 metadata:
-  name: stackdriver
   namespace: "PROJECT_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
-spec:
-  service: stackdriver.googleapis.com
+  name: stackdriver.googleapis.com
 ---
 # GCE
-apiVersion: cnrm.cloud.google.com/v1alpha1
-kind: CloudService
+apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
+kind: Service
 metadata:
-  name: compute
   namespace: "PROJECT_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
-spec:
-  service: compute.googleapis.com
+  name: compute.googleapis.com
 ---
 # GKE
-apiVersion: cnrm.cloud.google.com/v1alpha1
-kind: CloudService
+apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
+kind: Service
 metadata:
-  name: gke
   namespace: "PROJECT_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
-spec:
-  service: container.googleapis.com
+  name: container.googleapis.com
 ---
 # Short lived iam credentials for workload identity
-apiVersion: cnrm.cloud.google.com/v1alpha1
-kind: CloudService
+apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
+kind: Service
 metadata:
-  name: iamcredentials
   namespace: "PROJECT_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
-spec:
-  service: iamcredentials.googleapis.com
+  name: iamcredentials.googleapis.com
 ---
 # Mesh Certificate Authority
-apiVersion: cnrm.cloud.google.com/v1alpha1
-kind: CloudService
+apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
+kind: Service
 metadata:
-  name: meshca
   namespace: "PROJECT_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
-spec:
-  service: meshca.googleapis.com
+  name: meshca.googleapis.com
 ---
 # Mesh Telemetry
-apiVersion: cnrm.cloud.google.com/v1alpha1
-kind: CloudService
+apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
+kind: Service
 metadata:
-  name: meshtelemetry
   namespace: "PROJECT_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
-spec:
-  service: meshtelemetry.googleapis.com
+  name: meshtelemetry.googleapis.com
 ---
 # Mesh Config
-apiVersion: cnrm.cloud.google.com/v1alpha1
-kind: CloudService
+apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
+kind: Service
 metadata:
-  name: meshconfig
   namespace: "PROJECT_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
-spec:
-  service: meshconfig.googleapis.com
+  name: meshconfig.googleapis.com
 ---
 # Anthos
-apiVersion: cnrm.cloud.google.com/v1alpha1
-kind: CloudService
+apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
+kind: Service
 metadata:
-  name: anthos
   namespace: "PROJECT_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
-spec:
-  service: anthos.googleapis.com
+  name: anthos.googleapis.com
