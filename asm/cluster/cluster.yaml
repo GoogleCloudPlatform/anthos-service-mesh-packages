@@ -36,4 +36,4 @@ spec:
   network: default  # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.compute.network"}
   subnetwork: default # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.compute.subnetwork"}
   releaseChannel:
-    channel: REGULAR
+    channel: REGULAR # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.releaseChannel"}
