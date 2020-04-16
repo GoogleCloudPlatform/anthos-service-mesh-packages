@@ -1,5 +1,5 @@
 #!/bin/bash
-  set -euo pipefail
+set -euo pipefail
 
 # Helper functions and run environment setup
 TMPDIR="$(mktemp -d -t tmp.XXXXX)"
@@ -61,6 +61,15 @@ function fetchCloudKey {
   echo ${cloudkey}
 }
 
+function getLocationFlag {
+  location=$1
+  if (isRegion $location); then
+      echo "--region=${LOCATION}"
+  else
+      echo "--zone=${ZONE}"
+  fi
+}
+
 # Runtime Checks
 if [[ "" == "$(which gcloud)" ]]; then
   fatal "No gcloud found, exiting."
@@ -71,15 +80,15 @@ PROJECT_ID="${PROJECT_ID?Environment variable PROJECT_ID is required}"
 CLUSTER_NAME="${CLUSTER_NAME:-asm-free-trial}"
 LOCATION="${LOCATION:-us-central1-c}"
 ZONE="$(getZone "${LOCATION}")"
-NETWORK_NAME=$(basename "$(gcloud container clusters describe "${CLUSTER_NAME}" --project "${PROJECT_ID}" --zone="${ZONE}" \
+NETWORK_NAME=$(basename "$(gcloud container clusters describe "${CLUSTER_NAME}" --project "${PROJECT_ID}" $(getLocationFlag "${LOCATION}") \
     --format='value(networkConfig.network)')")
 SUBNETWORK_NAME=$(basename "$(gcloud container clusters describe "${CLUSTER_NAME}" --project "${PROJECT_ID}" \
-    --zone="${ZONE}" --format='value(networkConfig.subnetwork)')")
+    $(getLocationFlag "${LOCATION}") --format='value(networkConfig.subnetwork)')")
 
 # Getting network tags is painful. Get the instance groups, map to an instance,
 # and get the node tag from it (they should be the same across all nodes -- we don't
 # know how to handle it, otherwise).
-INSTANCE_GROUP=$(gcloud container clusters describe "${CLUSTER_NAME}" --project "${PROJECT_ID}" --zone="${ZONE}" --format='flattened(nodePools[].instanceGroupUrls[].scope().segment())' |  cut -d ':' -f2 | head -n1 | sed -e 's/^[[:space:]]*//' -e 's/::space:]]*$//')
+INSTANCE_GROUP=$(gcloud container clusters describe "${CLUSTER_NAME}" --project "${PROJECT_ID}" $(getLocationFlag "${LOCATION}") --format='flattened(nodePools[].instanceGroupUrls[].scope().segment())' |  cut -d ':' -f2 | head -n1 | sed -e 's/^[[:space:]]*//' -e 's/::space:]]*$//')
 INSTANCE_GROUP_ZONE=$(gcloud compute instance-groups list --filter="name=(${INSTANCE_GROUP})" --format="value(zone)" | sed 's|^.*/||g')
 sleep 1
 INSTANCE=$(gcloud compute instance-groups list-instances "${INSTANCE_GROUP}" --project "${PROJECT_ID}" \
@@ -119,7 +128,7 @@ EOF
 )
 
 export KUBECONFIG="${TMPDIR}/${CLUSTER_NAME}/kube.yaml"
-gcloud container clusters get-credentials "${CLUSTER_NAME}" --zone "${ZONE}"
+gcloud container clusters get-credentials "${CLUSTER_NAME}" $(getLocationFlag "${LOCATION}")
 
 # Update the cluster with the GCP-specific configmaps
 kubectl -n kube-system apply -f <(echo "${CONFIGMAP_NEG}")
