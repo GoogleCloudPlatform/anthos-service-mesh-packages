@@ -69,8 +69,8 @@ fi
 # Environment Variables
 PROJECT_ID="${PROJECT_ID?Environment variable PROJECT_ID is required}"
 CLUSTER_NAME="${CLUSTER_NAME:-asm-free-trial}"
-CLUSTER_ZONE="${CLUSTER_ZONE:-us-central1-c}"
-ZONE="$(getZone "${CLUSTER_ZONE}")"
+LOCATION="${LOCATION:-us-central1-c}"
+ZONE="$(getZone "${LOCATION}")"
 NETWORK_NAME=$(basename "$(gcloud container clusters describe "${CLUSTER_NAME}" --project "${PROJECT_ID}" --zone="${ZONE}" \
     --format='value(networkConfig.network)')")
 SUBNETWORK_NAME=$(basename "$(gcloud container clusters describe "${CLUSTER_NAME}" --project "${PROJECT_ID}" \
@@ -87,10 +87,10 @@ INSTANCE=$(gcloud compute instance-groups list-instances "${INSTANCE_GROUP}" --p
 NETWORK_TAGS=$(gcloud compute instances describe "${INSTANCE}" --zone="${INSTANCE_GROUP_ZONE}" --project "${PROJECT_ID}" --format="value(tags.items)")
 
 NEGZONE=""
-if isRegion "${CLUSTER_ZONE}"; then
-  NEGZONE="region = ${CLUSTER_ZONE}"
+if isRegion "${LOCATION}"; then
+  NEGZONE="region = ${LOCATION}"
 else
-  NEGZONE="local-zone = ${CLUSTER_ZONE}"
+  NEGZONE="local-zone = ${LOCATION}"
 fi
 
 CONFIGMAP_NEG=$(cat <<EOF

@@ -119,10 +119,10 @@ openAPI:
           values:
           - marker: PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
-    io.k8s.cli.setters.gcloud.compute.zone:
+    io.k8s.cli.setters.location:
       x-k8s-cli:
         setter:
-          name: gcloud.compute.zone
+          name: location
           value: us-central1-c
     io.k8s.cli.setters.cluster-name:
       x-k8s-cli:
@@ -145,7 +145,7 @@ openAPI:
           - marker: PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
           - marker: LOCATION
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.zone'
+            ref: '#/definitions/io.k8s.cli.setters.location'
           - marker: CLUSTERNAME
             ref: '#/definitions/io.k8s.cli.setters.cluster-name'
     io.k8s.cli.substitutions.mesh-id:
@@ -181,7 +181,7 @@ openAPI:
           - marker: PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
           - marker: LOCATION
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.zone'
+            ref: '#/definitions/io.k8s.cli.setters.location'
           - marker: CLUSTERNAME
             ref: '#/definitions/io.k8s.cli.setters.cluster-name'
     io.k8s.cli.substitutions.full-cluster-name:
@@ -193,7 +193,7 @@ openAPI:
           - marker: CLUSTERNAME
             ref: '#/definitions/io.k8s.cli.setters.cluster-name'
           - marker: LOCATION
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.zone'
+            ref: '#/definitions/io.k8s.cli.setters.location'
           - marker: PROJECTID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
     io.k8s.cli.substitutions.anthos-svc-account:

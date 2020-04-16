@@ -12,7 +12,7 @@ metadata:
   name: asm-free-trial # {"$ref":"#/definitions/io.k8s.cli.setters.cluster-name"}
   namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gcloud.core.project"}
 spec:
-  location: us-central1-c # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.compute.zone"}
+  location: us-central1-c # {"$ref":"#/definitions/io.k8s.cli.setters.location"}
   workloadIdentity:
     identityNamespace: default
   labels:
