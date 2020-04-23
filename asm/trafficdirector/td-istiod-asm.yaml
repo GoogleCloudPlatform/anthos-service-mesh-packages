@@ -85,7 +85,7 @@ spec:
       serviceAccountName: asm-td-service-account
       containers:
         - name: discovery
-          image: gcr.io/asm-testing/pilot:release-1.5-asm-8 # {"$ref":"#/definitions/io.k8s.cli.substitutions.pilot-image"}
+          image: gcr.io/asm-testing/pilot:release-1.5-asm-10 # {"$ref":"#/definitions/io.k8s.cli.substitutions.pilot-image"}
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -131,11 +131,11 @@ spec:
             - name: PILOT_EXTERNAL_GALLEY
               value: "false"
             - name: PROXY_IMAGE
-              value: gcr.io/asm-testing/proxyv2:release-1.5-asm-8 # { "$ref": "#/definitions/io.k8s.cli.subsstitutions.proxy-image" }
+              value: gcr.io/asm-testing/proxyv2:release-1.5-asm-10 # { "$ref": "#/definitions/io.k8s.cli.subsstitutions.proxy-image" }
           resources:
             requests:
-              cpu: 800m
-              memory: 2048Mi
+              cpu: 100m
+              memory: 64Mi
           volumeMounts:
             # For backward compat, if secrets already exists. Currently not used/implemented
             # Instead shifting traffic to istiod
