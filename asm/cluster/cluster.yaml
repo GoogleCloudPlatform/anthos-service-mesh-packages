@@ -19,6 +19,8 @@ spec:
     mesh_id: "proj-[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh-id"}
   loggingService: logging.googleapis.com/kubernetes
   monitoringService: monitoring.googleapis.com/kubernetes
+  ipAllocationPolicy:
+    useIpAliases: true
   addonsConfig:
     horizontalPodAutoscaling:
       disabled: false
