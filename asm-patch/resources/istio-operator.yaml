@@ -15,7 +15,7 @@
 apiVersion: install.istio.io/v1alpha2
 kind: IstioControlPlane
 metadata:
-  clusterName: "PROJECT_ID/us-central1-c/asm-cluster" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.core.project","value":"PROJECT_ID"},{"name":"cluster-name","value":"asm-cluster"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
+  clusterName: "PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster"}
   name: default-istio-control-plane
 spec:
   profile: asm
@@ -23,14 +23,14 @@ spec:
   tag: 1.4.7-asm.0
   values:
     global:
-      meshID: "proj-PROJECT_NUMBER" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.project.projectNumber","value":"PROJECT_NUMBER"}]}}
-      trustDomain: "PROJECT_ID.svc.id.goog" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.core.project","value":"PROJECT_ID"}]}}
+      meshID: "proj-PROJECT_NUMBER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh_id"}
+      trustDomain: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.workload_identity"}
       sds:
         token:
-          aud: "PROJECT_ID.svc.id.goog" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.core.project","value":"PROJECT_ID"}]}}
+          aud: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.workload_identity"}
       proxy:
         env:
-          GCP_METADATA: "PROJECT_ID|PROJECT_NUMBER|asm-cluster|us-central1-c" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.core.project","value":"PROJECT_ID"},{"name":"gcloud.project.projectNumber","value":"PROJECT_NUMBER"},{"name":"cluster-name","value":"asm-cluster"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
+          GCP_METADATA: "PROJECT_ID|PROJECT_NUMBER|asm-cluster|us-central1-c"
     nodeagent:
       env:
-        GKE_CLUSTER_URL: "https://container.googleapis.com/v1/projects/PROJECT_ID/locations/us-central1-c/clusters/asm-cluster" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.core.project","value":"PROJECT_ID"},{"name":"cluster-name","value":"asm-cluster"},{"name":"gcloud.compute.zone","value":"us-central1-c"}]}}
+        GKE_CLUSTER_URL: "https://container.googleapis.com/v1/projects/PROJECT_ID/locations/us-central1-c/clusters/asm-cluster"
