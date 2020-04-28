@@ -1,0 +1,61 @@
+apiVersion: kpt.dev/v1alpha1
+kind: Kptfile
+metadata:
+  name: .
+packageMetadata:
+  shortDescription: sample description
+openAPI:
+  definitions:
+    io.k8s.cli.setters.gcloud.core.project:
+      x-k8s-cli:
+        setter:
+          name: gcloud.core.project
+          value: PROJECT_ID
+    io.k8s.cli.setters.cluster-name:
+      x-k8s-cli:
+        setter:
+          name: cluster-name
+          value: asm-cluster
+    io.k8s.cli.setters.base-dir:
+      x-k8s-cli:
+        setter:
+          name: base-dir
+          value: base
+    io.k8s.cli.setters.gcloud.project.projectNumber:
+      x-k8s-cli:
+        setter:
+          name: gcloud.project.projectNumber
+          value: PROJECT_NUMBER
+    io.k8s.cli.setters.gcloud.compute.zone:
+      x-k8s-cli:
+        setter:
+          name: gcloud.compute.zone
+          value: us-central1-c
+    io.k8s.cli.substitutions.cluster:
+      x-k8s-cli:
+        substitution:
+          name: cluster
+          pattern: PROJECT/ZONE/CLUSTER
+          values:
+          - marker: PROJECT
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+          - marker: ZONE
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.zone'
+          - marker: CLUSTER
+            ref: '#/definitions/io.k8s.cli.setters.cluster-name'
+    io.k8s.cli.substitutions.mesh_id:
+      x-k8s-cli:
+        substitution:
+          name: mesh_id
+          pattern: proj-PROJECTNO
+          values:
+          - marker: PROJECTNO
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.projectNumber'
+    io.k8s.cli.substitutions.workload_identity:
+      x-k8s-cli:
+        substitution:
+          name: workload_identity
+          pattern: PROJECT.svc.id.goog
+          values:
+          - marker: PROJECT
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
