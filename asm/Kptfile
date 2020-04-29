@@ -172,12 +172,19 @@ openAPI:
           values:
           - marker: PROJECT_NUMBER
             ref: '#/definitions/io.k8s.cli.setters.gcloud.project.projectNumber'
+    io.k8s.cli.setters.gcloud.api_endpoint_overrides.container:
+      x-k8s-cli:
+        setter:
+          name: gcloud.api_endpoint_overrides.container
+          value: "https://container.googleapis.com"
     io.k8s.cli.substitutions.gke-cluster-url:
       x-k8s-cli:
         substitution:
           name: gke-cluster-url
-          pattern: https://container.googleapis.com/v1/projects/PROJECT_ID/locations/LOCATION/clusters/CLUSTERNAME
+          pattern: CONTAINER_ENDPOINT/v1/projects/PROJECT_ID/locations/LOCATION/clusters/CLUSTERNAME
           values:
+          - marker: CONTAINER_ENDPOINT
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.api_endpoint_overrides.container'
           - marker: PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
           - marker: LOCATION
@@ -223,7 +230,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: galley-image
-          value: 'gcr.io/asm-testing/galley:release-1.5-asm-8'
+          value: 'gcr.io/asm-testing/galley:release-1.5-asm-10'
     io.k8s.cli.substitutions.galley-image:
       x-k8s-cli:
         substitution:
@@ -236,7 +243,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: istiod-image
-          value: 'gcr.io/asm-testing/pilot:release-1.5-asm-8'
+          value: 'gcr.io/asm-testing/pilot:release-1.5-asm-10'
     io.k8s.cli.substitutions.istiod-image:
       x-k8s-cli:
         substitution:
@@ -249,7 +256,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: proxy-image
-          value: 'gcr.io/asm-testing/proxyv2:release-1.5-asm-8'
+          value: 'gcr.io/asm-testing/proxyv2:release-1.5-asm-10'
     io.k8s.cli.substitutions.proxy-image:
       x-k8s-cli:
         substitution:
@@ -257,17 +264,24 @@ openAPI:
           pattern: IMAGE
           values:
           - marker: IMAGE
-            ref: '#/definitions/io.k8s.cli.setters.proxy-image'            
+            ref: '#/definitions/io.k8s.cli.setters.proxy-image'
     io.k8s.cli.setters.trace-id:
       x-k8s-cli:
         setter:
           name: trace-id
           value: '0'
+    io.k8s.cli.setters.enable-security-beta:
+      x-k8s-cli:
+        setter:
+          name: enable-security-beta
+          value: "false"
     io.k8s.cli.substitutions.sink-meta:
       x-k8s-cli:
         substitution:
           name: trace-id
-          pattern: "--sinkMeta=project_id=$(PROJECT_ID),sds_path=$(SDSPATH),trace=TRACEID"
+          pattern: "--sinkMeta=project_id=$(PROJECT_ID),sds_path=$(SDSPATH),trace=TRACEID,enable_security_beta=ENABLE_SECURITY_BETA"
           values:
           - marker: TRACEID
             ref: '#/definitions/io.k8s.cli.setters.trace-id'
+          - marker: ENABLE_SECURITY_BETA
+            ref: '#/definitions/io.k8s.cli.setters.enable-security-beta'
