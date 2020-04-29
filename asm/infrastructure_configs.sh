@@ -102,6 +102,9 @@ else
   NEGZONE="local-zone = ${LOCATION}"
 fi
 
+COMPUTE_API_ENDPOINT="${COMPUTE_API_ENDPOINT:-}"
+CONTAINER_API_ENDPOINT="${CONTAINER_API_ENDPOINT:-}"
+
 CONFIGMAP_NEG=$(cat <<EOF
 apiVersion: v1
 kind: ConfigMap
@@ -124,6 +127,10 @@ data:
     node-tags = ${NETWORK_TAGS}
     # Zone the cluster lives in
     ${NEGZONE}
+    # GCE compute API endpoint to use. If this is blank, then the default endpoint is used.
+    api-endpoint = "${COMPUTE_API_ENDPOINT}"
+    # GCE container API endpoint to use. If this is blank, then the default endpoint is used.
+    container-api-endpoint = "${CONTAINER_API_ENDPOINT}"
 EOF
 )
 
