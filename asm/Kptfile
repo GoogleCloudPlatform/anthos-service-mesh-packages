@@ -47,6 +47,16 @@ openAPI:
         setter:
           name: subnetwork
           value: default
+    io.k8s.cli.setters.anthos.servicemesh.hub:
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.hub
+          value: gcr.io/gke-release/asm
+    io.k8s.cli.setters.anthos.servicemesh.tag:
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.tag
+          value: 1.4.7-asm.0
     io.k8s.cli.substitutions.cluster:
       x-k8s-cli:
         substitution:
