@@ -52,6 +52,16 @@ openAPI:
         setter:
           name: gcloud.project.projectNumber
           value: PROJECT_NUMBER
+    io.k8s.cli.setters.anthos.servicemesh.hub:
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.hub
+          value: gcr.io/istio-testing
+    io.k8s.cli.setters.anthos.servicemesh.tag:
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.tag
+          value: 1.5-dev
     io.k8s.cli.substitutions.mesh-id:
       type: string
       x-k8s-cli:
