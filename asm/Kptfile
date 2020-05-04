@@ -79,46 +79,6 @@ openAPI:
           values:
           - marker: PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
-    io.k8s.cli.substitutions.galley-service-account:
-      x-k8s-cli:
-        substitution:
-          name: project-id
-          pattern: serviceAccount:PROJECT_ID.svc.id.goog[istio-system/asm-galley-service-account]
-          values:
-          - marker: PROJECT_ID
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
-    io.k8s.cli.substitutions.k8s-galley-service-account:
-      x-k8s-cli:
-        substitution:
-          name: project-id
-          pattern: asm-galley-service-account@PROJECT_ID.iam.gserviceaccount.com
-          values:
-          - marker: PROJECT_ID
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
-    io.k8s.cli.substitutions.neg-service-account:
-      x-k8s-cli:
-        substitution:
-          name: project-id
-          pattern: serviceAccount:PROJECT_ID.svc.id.goog[kube-system/neg-controller]
-          values:
-          - marker: PROJECT_ID
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
-    io.k8s.cli.substitutions.k8s-neg-service-account:
-      x-k8s-cli:
-        substitution:
-          name: project-id
-          pattern: neg-service-account@PROJECT_ID.iam.gserviceaccount.com
-          values:
-          - marker: PROJECT_ID
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
-    io.k8s.cli.substitutions.projectpath:
-      x-k8s-cli:
-        substitution:
-          name: project-id
-          pattern: projects/PROJECT_ID
-          values:
-          - marker: PROJECT_ID
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
     io.k8s.cli.setters.location:
       x-k8s-cli:
         setter:
@@ -129,11 +89,6 @@ openAPI:
         setter:
           name: cluster-name
           value: asm-free-trial
-    io.k8s.cli.setters.cloudrun-config-disabled:
-      x-k8s-cli:
-        setter:
-          name: cloudrun-config-disabled
-          value: true
     io.k8s.cli.substitutions.gcp-metadata:
       x-k8s-cli:
         substitution:
@@ -164,14 +119,7 @@ openAPI:
           values:
           - marker: PROJECT_NUMBER
             ref: '#/definitions/io.k8s.cli.setters.gcloud.project.projectNumber'
-    io.k8s.cli.substitutions.p4sa:
-      x-k8s-cli:
-        substitution:
-          name: p4sa
-          pattern: "service-PROJECT_NUMBER@gcp-sa-meshdataplane.iam.gserviceaccount.com"
-          values:
-          - marker: PROJECT_NUMBER
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.projectNumber'
+
     io.k8s.cli.setters.gcloud.api_endpoint_overrides.container:
       x-k8s-cli:
         setter:
@@ -191,36 +139,6 @@ openAPI:
             ref: '#/definitions/io.k8s.cli.setters.location'
           - marker: CLUSTERNAME
             ref: '#/definitions/io.k8s.cli.setters.cluster-name'
-    io.k8s.cli.substitutions.full-cluster-name:
-      x-k8s-cli:
-        substitution:
-          name: full-cluster-name
-          pattern: PROJECTID/LOCATION/CLUSTERNAME
-          values:
-          - marker: CLUSTERNAME
-            ref: '#/definitions/io.k8s.cli.setters.cluster-name'
-          - marker: LOCATION
-            ref: '#/definitions/io.k8s.cli.setters.location'
-          - marker: PROJECTID
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
-    io.k8s.cli.substitutions.anthos-svc-account:
-      x-k8s-cli:
-        substitution:
-          name: anthos-svc-account
-          pattern: anthos-svc-account@PROJECTID.iam.gserviceaccount.com
-          values:
-          - marker: PROJECTID
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
-    io.k8s.cli.setters.minNodeCount:
-      x-k8s-cli:
-        setter:
-          name: minNodeCount
-          value: "4"
-    io.k8s.cli.setters.maxNodeCount:
-      x-k8s-cli:
-        setter:
-          name: maxNodeCount
-          value: "8"
     io.k8s.cli.setters.gcloud.project.projectNumber:
       x-k8s-cli:
         setter:
@@ -285,3 +203,19 @@ openAPI:
             ref: '#/definitions/io.k8s.cli.setters.trace-id'
           - marker: ENABLE_SECURITY_BETA
             ref: '#/definitions/io.k8s.cli.setters.enable-security-beta'
+    io.k8s.cli.substitutions.k8s-galley-service-account:
+      x-k8s-cli:
+        substitution:
+          name: project-id
+          pattern: asm-galley-service-account@PROJECT_ID.iam.gserviceaccount.com
+          values:
+          - marker: PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+    io.k8s.cli.substitutions.k8s-neg-service-account:
+      x-k8s-cli:
+        substitution:
+          name: project-id
+          pattern: neg-service-account@PROJECT_ID.iam.gserviceaccount.com
+          values:
+          - marker: PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'

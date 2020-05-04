@@ -21,4 +21,4 @@ webhooks:
     failurePolicy: Fail
     namespaceSelector:
       matchLabels:
-        istio-env: asm-td
+        istio.io/rev: asm-td

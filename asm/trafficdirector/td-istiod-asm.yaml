@@ -84,7 +84,7 @@ spec:
       serviceAccountName: asm-td-service-account
       containers:
       - name: discovery
-        image: gcr.io/asm-testing/pilot:release-1.5-asm-10 # {"$ref":"#/definitions/io.k8s.cli.substitutions.pilot-image"}
+        image: gcr.io/asm-testing/pilot:release-1.5-asm-10 # {"$ref":"#/definitions/io.k8s.cli.substitutions.istiod-image"}
         imagePullPolicy: Always
         ports:
         - containerPort: 8080

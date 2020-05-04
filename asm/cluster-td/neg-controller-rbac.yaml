@@ -1,9 +1,11 @@
-# Added to neg-sa file
-# apiVersion: v1
-# kind: ServiceAccount
-# metadata:
-#   name: neg-controller
-#   namespace: kube-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: neg-controller
+  namespace: kube-system
+  annotations:
+    iam.gke.io/gcp-service-account: "neg-service-account@[PROJECT_ID].iam.gserviceaccount.com" # {"$ref":"#/definitions/io.k8s.cli.substitutions.k8s-neg-service-account"}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole

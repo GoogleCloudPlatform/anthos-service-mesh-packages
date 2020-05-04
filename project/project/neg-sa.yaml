@@ -23,12 +23,3 @@ spec:
 #  - role: roles/iam.workloadIdentityUser
 #    members:
 #    - serviceAccount:[PROJECT_ID].svc.id.goog[kube-system/neg-controller] # {"$ref":"#/definitions/io.k8s.cli.substitutions.neg-service-account"}
----
-# Added to neg-sa file
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: neg-controller
-  namespace: kube-system
-  annotations:
-    iam.gke.io/gcp-service-account: "neg-service-account@[PROJECT_ID].iam.gserviceaccount.com" # {"$ref":"#/definitions/io.k8s.cli.substitutions.k8s-neg-service-account"}

@@ -1,0 +1,42 @@
+apiVersion: kpt.dev/v1alpha1
+kind: Kptfile
+metadata:
+  name: asm-istiod-15
+packageMetadata:
+  shortDescription: ASM Networking 1.5
+openAPI:
+  definitions:
+    io.k8s.cli.setters.gcloud.core.project:
+      x-k8s-cli:
+        setter:
+          name: gcloud.core.project
+          value: '[PROJECT_ID]'
+    io.k8s.cli.substitutions.gcloud.core.project:
+      x-k8s-cli:
+        substitution:
+          name: project-id
+          pattern: PROJECT_ID
+          values:
+          - marker: PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+    io.k8s.cli.substitutions.galley-service-account:
+      x-k8s-cli:
+        substitution:
+          name: project-id
+          pattern: serviceAccount:PROJECT_ID.svc.id.goog[istio-system/asm-galley-service-account]
+          values:
+          - marker: PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+    io.k8s.cli.substitutions.neg-service-account:
+      x-k8s-cli:
+        substitution:
+          name: project-id
+          pattern: serviceAccount:PROJECT_ID.svc.id.goog[kube-system/neg-controller]
+          values:
+          - marker: PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+    io.k8s.cli.setters.gcloud.project.projectNumber:
+      x-k8s-cli:
+        setter:
+          name: gcloud.project.projectNumber
+          value: "[PROJECT_NUMBER]"

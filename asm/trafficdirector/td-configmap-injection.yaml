@@ -8,7 +8,6 @@ metadata:
 data:
   config: |
     policy: enabled
-
     template: |
       rewriteAppHTTPProbe: true
       initContainers:
