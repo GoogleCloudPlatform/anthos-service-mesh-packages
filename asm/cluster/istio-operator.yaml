@@ -22,7 +22,7 @@ spec:
   tag: 1.4.7-asm.0
   values:
     global:
-      meshID: "proj-PROJECT_NUMBER" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.project.projectNumber","value":"PROJECT_NUMBER"}]}}
+      meshID: "ISTIO_MESH_ID" # {"type":"string","x-kustomize":{"setter":{"name":"anthos.istio.mesh_id"}}}
       trustDomain: "PROJECT_ID.svc.id.goog" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.core.project","value":"PROJECT_ID"}]}}
       sds:
         token:
