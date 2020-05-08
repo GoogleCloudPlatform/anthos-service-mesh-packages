@@ -38,7 +38,6 @@ const (
 )
 
 var supportedReleaseChannels = []string{"REGULAR", "RAPID", "STABLE"}
-var nodeVersionRegex = regexp.MustCompile(`(\d+).(\d+).(\d+)-gke.(\d+)`)
 var n1CustomMachineTypeRegex = regexp.MustCompile(`(\w+)-(\d+)-(\d+)`)
 var customMachineTypeRegex = regexp.MustCompile(`(\w+)-(\w+)-(\d+)-(\d+)`)
 var machineTypeRegex = regexp.MustCompile(`(\w+)-(\w+)-(\d+)`)
@@ -107,11 +106,6 @@ func validate(r *yaml.RNode) []error {
 
 		// validate release channel
 		if err := validateReleaseChannel(r, meta, supportedReleaseChannels, "spec", "releaseChannel", "channel"); err != nil {
-			errList = append(errList, err)
-		}
-
-		// validate master node version
-		if err := validateMasterNodeVersion(r, meta); err != nil {
 			errList = append(errList, err)
 		}
 
@@ -254,62 +248,6 @@ func validateReleaseChannel(r *yaml.RNode, meta yaml.ResourceMeta, expected []st
 
 }
 
-func validateMasterNodeVersion(r *yaml.RNode, meta yaml.ResourceMeta) error {
-	node, err := validateNodeExists(r, meta, "status", "masterVersion")
-	if err != nil {
-		return err
-	}
-	value, err := node.String()
-	value = strings.TrimSpace(value)
-	if err != nil {
-		s, _ := r.String()
-		return fmt.Errorf("%v: %s", err, s)
-	}
-
-	version := nodeVersionRegex.FindStringSubmatch(value)
-	if len(version) < 5 {
-		return fmt.Errorf("unknown masterVersion format: %s in %s %s (%s [%s])",
-			value, meta.Kind, meta.Name,
-			meta.Annotations[kioutil.PathAnnotation],
-			meta.Annotations[kioutil.IndexAnnotation])
-	}
-
-	g2, err := strconv.Atoi(version[2])
-	if err != nil {
-		s, _ := r.String()
-		return fmt.Errorf("%v: %s", err, s)
-	}
-	g3, err := strconv.Atoi(version[3])
-	if err != nil {
-		s, _ := r.String()
-		return fmt.Errorf("%v: %s", err, s)
-	}
-	g4, err := strconv.Atoi(version[4])
-	if err != nil {
-		s, _ := r.String()
-		return fmt.Errorf("%v: %s", err, s)
-	}
-
-	switch g2 {
-	case 13:
-		if g3 < 11 || (g3 == 11 && g4 < 14) {
-			return unsupportedGKEVersionError(value, meta)
-		}
-	case 14:
-		if g3 < 8 || (g3 == 8 && g4 < 18) {
-			return unsupportedGKEVersionError(value, meta)
-		}
-	case 15:
-		if g3 < 4 || (g3 == 4 && g4 < 15) {
-			return unsupportedGKEVersionError(value, meta)
-		}
-	default:
-		return unsupportedGKEVersionError(value, meta)
-	}
-	return nil
-
-}
-
 func validateMachineType(r *yaml.RNode, meta yaml.ResourceMeta) error {
 	node, err := validateNodeExists(r, meta, "spec", "nodeConfig", "machineType")
 	if err != nil {
@@ -365,14 +303,6 @@ func unsupportedMachineTypeError(value string, meta yaml.ResourceMeta) error {
 	return fmt.Errorf("unsupported machine type: %s in %s %s (%s [%s]). The minimum machine type is n1-standard-4, "+
 		"which has four vCPUs. If the machine type for your cluster doesn't have at least four vCPUs, "+
 		"change the machine type as described here https://bit.ly/2V0KPdu", value, meta.Kind, meta.Name,
-		meta.Annotations[kioutil.PathAnnotation],
-		meta.Annotations[kioutil.IndexAnnotation])
-}
-
-func unsupportedGKEVersionError(version string, meta yaml.ResourceMeta) error {
-	return fmt.Errorf("unsupported GKE version %s in %s %s (%s [%s]). If you need to upgrade "+
-		"your cluster to a supported version (https://bit.ly/2XsilLq), see https://bit.ly/34vygKy",
-		version, meta.Kind, meta.Name,
 		meta.Annotations[kioutil.PathAnnotation],
 		meta.Annotations[kioutil.IndexAnnotation])
 }
