@@ -42,6 +42,7 @@ var nodeVersionRegex = regexp.MustCompile(`(\d+).(\d+).(\d+)-gke.(\d+)`)
 var n1CustomMachineTypeRegex = regexp.MustCompile(`(\w+)-(\d+)-(\d+)`)
 var customMachineTypeRegex = regexp.MustCompile(`(\w+)-(\w+)-(\d+)-(\d+)`)
 var machineTypeRegex = regexp.MustCompile(`(\w+)-(\w+)-(\d+)`)
+var valueWithComment = regexp.MustCompile(`\s*(\S+)(\s+#.*)?`)
 
 func main() {
 	rw := &kio.ByteReadWriter{Reader: os.Stdin, Writer: os.Stdout, KeepReaderAnnotations: true}
@@ -105,7 +106,7 @@ func validate(r *yaml.RNode) []error {
 		}
 
 		// validate release channel
-		if err := validateNodeValueIn(r, meta, supportedReleaseChannels, "spec", "releaseChannel", "channel"); err != nil {
+		if err := validateReleaseChannel(r, meta, supportedReleaseChannels, "spec", "releaseChannel", "channel"); err != nil {
 			errList = append(errList, err)
 		}
 
@@ -138,17 +139,16 @@ func validateNodeValue(r *yaml.RNode, meta yaml.ResourceMeta, expected string, p
 	if err != nil {
 		return err
 	}
-	value, err := node.String()
-	value = strings.TrimSpace(value)
+	pathString := strings.Join(path, ".")
+	value, err := stripValueComment(node, r, meta, pathString)
 	if err != nil {
-		s, _ := r.String()
-		return fmt.Errorf("%v: %s", err, s)
+		return err
 	}
+
 	if value != expected {
 		return fmt.Errorf(
 			"unsupported %s value in %s %s (%s [%s]), expected: %s, actual: %s",
-			strings.Join(path, "."),
-			meta.Kind, meta.Name,
+			pathString, meta.Kind, meta.Name,
 			meta.Annotations[kioutil.PathAnnotation],
 			meta.Annotations[kioutil.IndexAnnotation],
 			expected,
@@ -174,29 +174,20 @@ func validateNodeExists(r *yaml.RNode, meta yaml.ResourceMeta, path ...string) (
 	return node, nil
 }
 
-func validateNodeValueIn(r *yaml.RNode, meta yaml.ResourceMeta, expected []string, path ...string) error {
-	node, err := validateNodeExists(r, meta, path...)
-	if err != nil {
-		return err
-	}
+func stripValueComment(node *yaml.RNode, r *yaml.RNode, meta yaml.ResourceMeta, path string) (string, error) {
 	value, err := node.String()
-	value = strings.TrimSpace(value)
 	if err != nil {
 		s, _ := r.String()
-		return fmt.Errorf("%v: %s", err, s)
+		return "", fmt.Errorf("%v: %s", err, s)
 	}
-
-	if contains(expected, value) {
-		return nil
+	group := valueWithComment.FindStringSubmatch(value)
+	if len(group) < 3 {
+		return "", fmt.Errorf("unknown format of %s: %s in %s %s (%s [%s])",
+			path, value, meta.Kind, meta.Name,
+			meta.Annotations[kioutil.PathAnnotation],
+			meta.Annotations[kioutil.IndexAnnotation])
 	}
-	return fmt.Errorf(
-		"unsupported %s value in %s %s (%s [%s]), expected: %s, actual: %s",
-		strings.Join(path, "."),
-		meta.Kind, meta.Name,
-		meta.Annotations[kioutil.PathAnnotation],
-		meta.Annotations[kioutil.IndexAnnotation],
-		strings.Join(expected, ","),
-		value)
+	return group[1], nil
 }
 
 func contains(s []string, e string) bool {
@@ -235,6 +226,32 @@ func validateNodeValueGreaterThan(r *yaml.RNode, meta yaml.ResourceMeta, min int
 			errorInfo)
 	}
 	return nil
+}
+
+func validateReleaseChannel(r *yaml.RNode, meta yaml.ResourceMeta, expected []string, path ...string) error {
+
+	node, err := validateNodeExists(r, meta, path...)
+	if err != nil {
+		return err
+	}
+	pathString := strings.Join(path, ".")
+	value, err := stripValueComment(node, r, meta, pathString)
+	if err != nil {
+		return err
+	}
+
+	if contains(expected, value) {
+		return nil
+	}
+	return fmt.Errorf(
+		"unsupported %s value in %s %s (%s [%s]), expected: %s, actual: %s",
+		strings.Join(path, "."),
+		meta.Kind, meta.Name,
+		meta.Annotations[kioutil.PathAnnotation],
+		meta.Annotations[kioutil.IndexAnnotation],
+		strings.Join(expected, ","),
+		value)
+
 }
 
 func validateMasterNodeVersion(r *yaml.RNode, meta yaml.ResourceMeta) error {
