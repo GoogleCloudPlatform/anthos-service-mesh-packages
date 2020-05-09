@@ -15,7 +15,7 @@
 apiVersion: install.istio.io/v1alpha1
 kind: IstioOperator
 metadata:
-  clusterName: "PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
+  clusterName: "PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gcloud.container.cluster"}
 spec:
   profile: asm
   hub: gcr.io/istio-testing # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}

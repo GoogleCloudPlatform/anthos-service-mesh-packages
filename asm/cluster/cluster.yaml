@@ -22,7 +22,7 @@ spec: {}
 apiVersion: container.cnrm.cloud.google.com/v1alpha2
 kind: ContainerCluster
 metadata:
-  clusterName: "PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
+  clusterName: "PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gcloud.container.cluster"}
   name: "asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster"}
   namespace: "PROJECT_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
 spec:
