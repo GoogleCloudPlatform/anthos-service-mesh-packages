@@ -32,7 +32,7 @@ In additional to the existing kpt config setters (e.g. gcloud.container.cluster,
     |------------------------------|-------------|---------------------|--------|-------|-------|
     | base-dir                     | ''          | ../your-cluster     | string | 1     |       |
     | gcloud.container.cluster     | ''          | your-cluster        | string | 5     |       |
-    | gcloud.compute.zone          | ''          | us-central1-c       | string | 3     | kpt   |
+    | gcloud.compute.location      | ''          | us-central1-c       | string | 3     | kpt   |
     | gcloud.core.project          | ''          | your-project        | string | 15    | kpt   |
     | gcloud.project.projectNumber | ''          | your-project-number | string | 3     | kpt   |
 
