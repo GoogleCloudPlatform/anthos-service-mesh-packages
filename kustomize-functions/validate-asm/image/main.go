@@ -116,7 +116,7 @@ func validate(r *yaml.RNode) []error {
 	}
 
 	if strings.HasPrefix(meta.ApiVersion, apiGroup) && meta.Kind == containerNodePoolKind {
-		if err := validateNodeValueGreaterThan(r, meta, 3, "ASM requires at least four nodes. If you need to add nodes, see https://bit.ly/2RnVL2T", "spec", "nodeCount"); err != nil {
+		if err := validateNodeCountAtLeast(r, meta, 4, "ASM requires at least four nodes. If you need to add nodes, see https://bit.ly/2RnVL2T"); err != nil {
 			errList = append(errList, err)
 		}
 
@@ -193,33 +193,44 @@ func contains(s []string, e string) bool {
 	return false
 }
 
-func validateNodeValueGreaterThan(r *yaml.RNode, meta yaml.ResourceMeta, min int, errorInfo string, path ...string) error {
-	node, err := validateNodeExists(r, meta, path...)
-	if err != nil {
+func validateNodeCountAtLeast(r *yaml.RNode, meta yaml.ResourceMeta, min int, errorInfo string) error {
+	nodeCountAbsent, err := nodeAbsentOrAtLeast(r, meta, min, errorInfo, "spec", "nodeCount")
+	if nodeCountAbsent {
+		if _, err := nodeAbsentOrAtLeast(r, meta, min, errorInfo, "spec", "initialNodeCount"); err != nil {
+			return err
+		}
+
+	} else if err != nil {
 		return err
 	}
-	value, err := node.String()
-	value = strings.TrimSpace(value)
+	return nil
+}
+
+func nodeAbsentOrAtLeast(r *yaml.RNode, meta yaml.ResourceMeta, min int, errorInfo string, path ...string) (absent bool, err error) {
+	node, err := validateNodeExists(r, meta, path...)
 	if err != nil {
-		s, _ := r.String()
-		return fmt.Errorf("%v: %s", err, s)
+		return true, err
+	}
+
+	pathString := strings.Join(path, ".")
+	value, err := stripValueComment(node, r, meta, pathString)
+	if err != nil {
+		return false, err
 	}
 	count, err := strconv.Atoi(value)
 	if err != nil {
 		s, _ := r.String()
-		return fmt.Errorf("%v: %s", err, s)
+		return false, fmt.Errorf("%v: %s", err, s)
 	}
-	if count <= min {
-		return fmt.Errorf(
+	if count < min {
+		return false, fmt.Errorf(
 			"%s is %d in %s %s (%s [%s]). %s",
-			strings.Join(path, "."),
-			count,
-			meta.Kind, meta.Name,
+			pathString, count, meta.Kind, meta.Name,
 			meta.Annotations[kioutil.PathAnnotation],
 			meta.Annotations[kioutil.IndexAnnotation],
 			errorInfo)
 	}
-	return nil
+	return false, nil
 }
 
 func validateReleaseChannel(r *yaml.RNode, meta yaml.ResourceMeta, expected []string, path ...string) error {
