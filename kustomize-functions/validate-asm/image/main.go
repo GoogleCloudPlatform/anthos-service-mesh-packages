@@ -110,7 +110,7 @@ func validate(r *yaml.RNode) []error {
 		}
 
 		// validate machine type
-		if err := validateMachineType(r, meta); err != nil {
+		if err := validateMachineType(r, meta, false); err != nil {
 			errList = append(errList, err)
 		}
 	}
@@ -121,7 +121,7 @@ func validate(r *yaml.RNode) []error {
 		}
 
 		// validate machine type
-		if err := validateMachineType(r, meta); err != nil {
+		if err := validateMachineType(r, meta, true); err != nil {
 			errList = append(errList, err)
 		}
 	}
@@ -248,10 +248,14 @@ func validateReleaseChannel(r *yaml.RNode, meta yaml.ResourceMeta, expected []st
 
 }
 
-func validateMachineType(r *yaml.RNode, meta yaml.ResourceMeta) error {
+func validateMachineType(r *yaml.RNode, meta yaml.ResourceMeta, mustExist bool) error {
 	node, err := validateNodeExists(r, meta, "spec", "nodeConfig", "machineType")
 	if err != nil {
-		return err
+		if mustExist {
+			return err
+		} else {
+			return nil
+		}
 	}
 	value, err := node.String()
 	value = strings.TrimSpace(value)
