@@ -58,6 +58,30 @@ func main() {
 // filter implements kio.Filter
 type filter struct{}
 
+type Severity int
+
+func (s Severity) String() string {
+	severities := [...]string {
+		"Warning",
+		"Error",
+	}
+	return severities[s]
+}
+
+const (
+	Warning Severity = iota
+	Error
+)
+
+type ValidationError struct {
+	severity Severity
+	err error
+}
+
+func (e ValidationError) Error() string {
+	return fmt.Sprintf("%s - %s", e.severity, e.err.Error())
+}
+
 // Filter injects new filters into container cluster and nodepool.
 func (filter) Filter(in []*yaml.RNode) ([]*yaml.RNode, error) {
 	var errList []error
@@ -80,7 +104,7 @@ func validate(r *yaml.RNode) []error {
 
 	meta, err := r.GetMeta()
 	if err != nil {
-		errList = append(errList, err)
+		errList = append(errList, ValidationError{Error, err})
 		return errList
 	}
 
@@ -88,41 +112,41 @@ func validate(r *yaml.RNode) []error {
 
 		// validate if Cloud Monitoring and Logging are enabled
 		if err := validateNodeValue(r, meta, loggingServiceValue, "spec", "loggingService"); err != nil {
-			errList = append(errList, err)
+			errList = append(errList, ValidationError{Error, err})
 		}
 		if err := validateNodeValue(r, meta, monitoringServiceValue, "spec", "monitoringService"); err != nil {
-			errList = append(errList, err)
+			errList = append(errList, ValidationError{Error, err})
 		}
 
 		// validate if Workload Identity is enabled
 		if _, err := validateNodeExists(r, meta, "spec", "workloadIdentity", "identityNamespace"); err != nil {
-			errList = append(errList, err)
+			errList = append(errList, ValidationError{Error, err})
 		}
 
-		// validate if mesh_id lable is set
+		// validate if mesh_id label is set
 		if _, err := validateNodeExists(r, meta, "spec", "labels", "mesh_id"); err != nil {
-			errList = append(errList, err)
+			errList = append(errList, ValidationError{Error, err})
 		}
 
 		// validate release channel
 		if err := validateReleaseChannel(r, meta, supportedReleaseChannels, "spec", "releaseChannel", "channel"); err != nil {
-			errList = append(errList, err)
+			errList = append(errList, ValidationError{Error, err})
 		}
 
 		// validate machine type
 		if err := validateMachineType(r, meta, false); err != nil {
-			errList = append(errList, err)
+			errList = append(errList, ValidationError{Error, err})
 		}
 	}
 
 	if strings.HasPrefix(meta.ApiVersion, apiGroup) && meta.Kind == containerNodePoolKind {
 		if err := validateNodeCountAtLeast(r, meta, 4, "ASM requires at least four nodes. If you need to add nodes, see https://bit.ly/2RnVL2T"); err != nil {
-			errList = append(errList, err)
+			errList = append(errList, ValidationError{Warning, err})
 		}
 
 		// validate machine type
 		if err := validateMachineType(r, meta, true); err != nil {
-			errList = append(errList, err)
+			errList = append(errList, ValidationError{Error, err})
 		}
 	}
 	return errList
