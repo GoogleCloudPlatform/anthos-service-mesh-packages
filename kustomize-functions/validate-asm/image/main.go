@@ -23,7 +23,6 @@ import (
 	"strconv"
 	"strings"
 
-	multierr "github.com/hashicorp/go-multierror"
 	"sigs.k8s.io/kustomize/kyaml/kio"
 	"sigs.k8s.io/kustomize/kyaml/kio/kioutil"
 	"sigs.k8s.io/kustomize/kyaml/yaml"
@@ -82,25 +81,62 @@ func (e ValidationError) Error() string {
 	return fmt.Sprintf("%s - %s", e.severity, e.err.Error())
 }
 
+type ValidationErrors struct {
+	errors []error
+	warnings []error
+}
+
+func (e ValidationErrors) Error() string {
+	warnings := make([]string, len(e.warnings))
+	errors := make([]string, len(e.errors))
+	for i, w := range e.warnings {
+		warnings[i] = fmt.Sprintf("* %s", w)
+	}
+	for i, e := range e.errors {
+		errors[i] = fmt.Sprintf("* %s", e)
+	}
+	if len(warnings) == 0 && len(errors) == 0 {
+		return fmt.Sprintf("no warnings/errors occurred")
+	}
+	if len(warnings) == 0 {
+		return fmt.Sprintf("%d error(s) occurred:\n\t%s\n\n",
+			len(errors), strings.Join(errors, "\n\t"))
+	}
+	if len(errors) == 0 {
+		return fmt.Sprintf("%d warning(s) occurred:\n\t%s\n\n",
+			len(warnings), strings.Join(warnings, "\n\t"))
+	}
+	return fmt.Sprintf("%d warning(s) occurred:\n\t%s\n\n%d error(s) occurred:\n\t%s\n\n",
+		len(warnings), strings.Join(warnings, "\n\t"),
+		len(errors), strings.Join(errors, "\n\t"))
+}
+
 // Filter injects new filters into container cluster and nodepool.
 func (filter) Filter(in []*yaml.RNode) ([]*yaml.RNode, error) {
 	var errList []error
+	var warningList []error
 
 	for _, r := range in {
 		if errs := validate(r); len(errs) != 0 {
-			errList = append(errList, errs...)
+			for _, e := range errs {
+				if e.severity == Warning {
+					warningList = append(warningList, e)
+				} else {
+					errList = append(errList, e)
+				}
+			}
 		}
 	}
-	if errs := multierr.Append(nil, errList...); errs != nil {
-		return nil, errs
+	if len(errList) == 0 && len(warningList) == 0 {
+		return nil, nil
 	}
-	return in, nil
+	return nil, ValidationErrors{errors: errList, warnings: warningList}
 }
 
 // https://cloud.google.com/service-mesh/docs/gke-install-existing-cluster#setting_up_your_project
-func validate(r *yaml.RNode) []error {
+func validate(r *yaml.RNode) []ValidationError {
 
-	var errList []error
+	var errList []ValidationError
 
 	meta, err := r.GetMeta()
 	if err != nil {
