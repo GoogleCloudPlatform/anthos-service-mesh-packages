@@ -41,18 +41,6 @@ openAPI:
         setter:
           name: anthos.servicemesh.tag
           value: 1.5-dev
-    io.k8s.cli.substitutions.cluster-name:
-      x-k8s-cli:
-        substitution:
-          name: cluster-name
-          pattern: PROJECT/ZONE/CLUSTER
-          values:
-          - marker: PROJECT
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
-          - marker: ZONE
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.location'
-          - marker: CLUSTER
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.container.cluster'
     io.k8s.cli.substitutions.mesh-id:
       type: string
       x-k8s-cli:
