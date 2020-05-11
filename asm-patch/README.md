@@ -31,7 +31,7 @@ In additional to the existing kpt config setters (e.g. gcloud.container.cluster,
     | NAME                         | DESCRIPTION | VALUE               | TYPE   | COUNT | SETBY |
     |------------------------------|-------------|---------------------|--------|-------|-------|
     | base-dir                     | ''          | ../your-cluster     | string | 1     |       |
-    | gcloud.compute.cluster       | ''          | your-cluster        | string | 5     |       |
+    | gcloud.container.cluster       | ''          | your-cluster        | string | 5     |       |
     | gcloud.compute.location      | ''          | us-central1-c       | string | 3     | kpt   |
     | gcloud.core.project          | ''          | your-project        | string | 15    | kpt   |
     | gcloud.project.projectNumber | ''          | your-project-number | string | 3     | kpt   |
@@ -42,7 +42,7 @@ In additional to the existing kpt config setters (e.g. gcloud.container.cluster,
    ```bash
    # The cluster name must contain only lowercase alphanumerics and '-', must start with a letter and end with an alphanumeric, and must be no longer than 40 characters.
    kpt cfg set asm-patch [SETTER_NAME] [SETTER_VALUE]
-   # For example, `kpt cfg set asm-patch gcloud.compute.cluster [YOUR_CLUSTER_NAME]`
+   # For example, `kpt cfg set asm-patch gcloud.container.cluster [YOUR_CLUSTER_NAME]`
    ```
 
 6. Apply the Anthos Service Mesh patches on the existing cluster:
