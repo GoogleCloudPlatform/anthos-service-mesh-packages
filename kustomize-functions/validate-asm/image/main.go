@@ -38,10 +38,10 @@ const (
 )
 
 var supportedReleaseChannels = []string{"REGULAR", "RAPID", "STABLE"}
-var nodeVersionRegex = regexp.MustCompile(`(\d+).(\d+).(\d+)-gke.(\d+)`)
 var n1CustomMachineTypeRegex = regexp.MustCompile(`(\w+)-(\d+)-(\d+)`)
 var customMachineTypeRegex = regexp.MustCompile(`(\w+)-(\w+)-(\d+)-(\d+)`)
 var machineTypeRegex = regexp.MustCompile(`(\w+)-(\w+)-(\d+)`)
+var valueWithComment = regexp.MustCompile(`\s*(\S+)(\s+#.*)?`)
 
 func main() {
 	rw := &kio.ByteReadWriter{Reader: os.Stdin, Writer: os.Stdout, KeepReaderAnnotations: true}
@@ -57,6 +57,30 @@ func main() {
 
 // filter implements kio.Filter
 type filter struct{}
+
+type Severity int
+
+func (s Severity) String() string {
+	severities := [...]string {
+		"Warning",
+		"Error",
+	}
+	return severities[s]
+}
+
+const (
+	Warning Severity = iota
+	Error
+)
+
+type ValidationError struct {
+	severity Severity
+	err error
+}
+
+func (e ValidationError) Error() string {
+	return fmt.Sprintf("%s - %s", e.severity, e.err.Error())
+}
 
 // Filter injects new filters into container cluster and nodepool.
 func (filter) Filter(in []*yaml.RNode) ([]*yaml.RNode, error) {
@@ -80,7 +104,7 @@ func validate(r *yaml.RNode) []error {
 
 	meta, err := r.GetMeta()
 	if err != nil {
-		errList = append(errList, err)
+		errList = append(errList, ValidationError{Error, err})
 		return errList
 	}
 
@@ -88,46 +112,41 @@ func validate(r *yaml.RNode) []error {
 
 		// validate if Cloud Monitoring and Logging are enabled
 		if err := validateNodeValue(r, meta, loggingServiceValue, "spec", "loggingService"); err != nil {
-			errList = append(errList, err)
+			errList = append(errList, ValidationError{Error, err})
 		}
 		if err := validateNodeValue(r, meta, monitoringServiceValue, "spec", "monitoringService"); err != nil {
-			errList = append(errList, err)
+			errList = append(errList, ValidationError{Error, err})
 		}
 
 		// validate if Workload Identity is enabled
 		if _, err := validateNodeExists(r, meta, "spec", "workloadIdentity", "identityNamespace"); err != nil {
-			errList = append(errList, err)
+			errList = append(errList, ValidationError{Error, err})
 		}
 
-		// validate if mesh_id lable is set
+		// validate if mesh_id label is set
 		if _, err := validateNodeExists(r, meta, "spec", "labels", "mesh_id"); err != nil {
-			errList = append(errList, err)
+			errList = append(errList, ValidationError{Error, err})
 		}
 
 		// validate release channel
-		if err := validateNodeValueIn(r, meta, supportedReleaseChannels, "spec", "releaseChannel", "channel"); err != nil {
-			errList = append(errList, err)
-		}
-
-		// validate master node version
-		if err := validateMasterNodeVersion(r, meta); err != nil {
-			errList = append(errList, err)
+		if err := validateReleaseChannel(r, meta, supportedReleaseChannels, "spec", "releaseChannel", "channel"); err != nil {
+			errList = append(errList, ValidationError{Error, err})
 		}
 
 		// validate machine type
-		if err := validateMachineType(r, meta); err != nil {
-			errList = append(errList, err)
+		if err := validateMachineType(r, meta, false); err != nil {
+			errList = append(errList, ValidationError{Error, err})
 		}
 	}
 
 	if strings.HasPrefix(meta.ApiVersion, apiGroup) && meta.Kind == containerNodePoolKind {
-		if err := validateNodeValueGreaterThan(r, meta, 3, "ASM requires at least four nodes. If you need to add nodes, see https://bit.ly/2RnVL2T", "spec", "nodeCount"); err != nil {
-			errList = append(errList, err)
+		if err := validateNodeCountAtLeast(r, meta, 4, "ASM requires at least four nodes. If you need to add nodes, see https://bit.ly/2RnVL2T"); err != nil {
+			errList = append(errList, ValidationError{Warning, err})
 		}
 
 		// validate machine type
-		if err := validateMachineType(r, meta); err != nil {
-			errList = append(errList, err)
+		if err := validateMachineType(r, meta, true); err != nil {
+			errList = append(errList, ValidationError{Error, err})
 		}
 	}
 	return errList
@@ -138,17 +157,16 @@ func validateNodeValue(r *yaml.RNode, meta yaml.ResourceMeta, expected string, p
 	if err != nil {
 		return err
 	}
-	value, err := node.String()
-	value = strings.TrimSpace(value)
+	pathString := strings.Join(path, ".")
+	value, err := stripValueComment(node, r, meta, pathString)
 	if err != nil {
-		s, _ := r.String()
-		return fmt.Errorf("%v: %s", err, s)
+		return err
 	}
+
 	if value != expected {
 		return fmt.Errorf(
 			"unsupported %s value in %s %s (%s [%s]), expected: %s, actual: %s",
-			strings.Join(path, "."),
-			meta.Kind, meta.Name,
+			pathString, meta.Kind, meta.Name,
 			meta.Annotations[kioutil.PathAnnotation],
 			meta.Annotations[kioutil.IndexAnnotation],
 			expected,
@@ -174,16 +192,81 @@ func validateNodeExists(r *yaml.RNode, meta yaml.ResourceMeta, path ...string) (
 	return node, nil
 }
 
-func validateNodeValueIn(r *yaml.RNode, meta yaml.ResourceMeta, expected []string, path ...string) error {
+func stripValueComment(node *yaml.RNode, r *yaml.RNode, meta yaml.ResourceMeta, path string) (string, error) {
+	value, err := node.String()
+	if err != nil {
+		s, _ := r.String()
+		return "", fmt.Errorf("%v: %s", err, s)
+	}
+	group := valueWithComment.FindStringSubmatch(value)
+	if len(group) < 3 {
+		return "", fmt.Errorf("unknown format of %s: %s in %s %s (%s [%s])",
+			path, value, meta.Kind, meta.Name,
+			meta.Annotations[kioutil.PathAnnotation],
+			meta.Annotations[kioutil.IndexAnnotation])
+	}
+	return group[1], nil
+}
+
+func contains(s []string, e string) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
+}
+
+func validateNodeCountAtLeast(r *yaml.RNode, meta yaml.ResourceMeta, min int, errorInfo string) error {
+	nodeCountAbsent, err := nodeAbsentOrAtLeast(r, meta, min, errorInfo, "spec", "nodeCount")
+	if nodeCountAbsent {
+		if _, err := nodeAbsentOrAtLeast(r, meta, min, errorInfo, "spec", "initialNodeCount"); err != nil {
+			return err
+		}
+
+	} else if err != nil {
+		return err
+	}
+	return nil
+}
+
+func nodeAbsentOrAtLeast(r *yaml.RNode, meta yaml.ResourceMeta, min int, errorInfo string, path ...string) (absent bool, err error) {
+	node, err := validateNodeExists(r, meta, path...)
+	if err != nil {
+		return true, err
+	}
+
+	pathString := strings.Join(path, ".")
+	value, err := stripValueComment(node, r, meta, pathString)
+	if err != nil {
+		return false, err
+	}
+	count, err := strconv.Atoi(value)
+	if err != nil {
+		s, _ := r.String()
+		return false, fmt.Errorf("%v: %s", err, s)
+	}
+	if count < min {
+		return false, fmt.Errorf(
+			"%s is %d in %s %s (%s [%s]). %s",
+			pathString, count, meta.Kind, meta.Name,
+			meta.Annotations[kioutil.PathAnnotation],
+			meta.Annotations[kioutil.IndexAnnotation],
+			errorInfo)
+	}
+	return false, nil
+}
+
+func validateReleaseChannel(r *yaml.RNode, meta yaml.ResourceMeta, expected []string, path ...string) error {
+
 	node, err := validateNodeExists(r, meta, path...)
 	if err != nil {
 		return err
 	}
-	value, err := node.String()
-	value = strings.TrimSpace(value)
+	pathString := strings.Join(path, ".")
+	value, err := stripValueComment(node, r, meta, pathString)
 	if err != nil {
-		s, _ := r.String()
-		return fmt.Errorf("%v: %s", err, s)
+		return err
 	}
 
 	if contains(expected, value) {
@@ -197,106 +280,17 @@ func validateNodeValueIn(r *yaml.RNode, meta yaml.ResourceMeta, expected []strin
 		meta.Annotations[kioutil.IndexAnnotation],
 		strings.Join(expected, ","),
 		value)
-}
-
-func contains(s []string, e string) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
-	}
-	return false
-}
-
-func validateNodeValueGreaterThan(r *yaml.RNode, meta yaml.ResourceMeta, min int, errorInfo string, path ...string) error {
-	node, err := validateNodeExists(r, meta, path...)
-	if err != nil {
-		return err
-	}
-	value, err := node.String()
-	value = strings.TrimSpace(value)
-	if err != nil {
-		s, _ := r.String()
-		return fmt.Errorf("%v: %s", err, s)
-	}
-	count, err := strconv.Atoi(value)
-	if err != nil {
-		s, _ := r.String()
-		return fmt.Errorf("%v: %s", err, s)
-	}
-	if count <= min {
-		return fmt.Errorf(
-			"%s is %d in %s %s (%s [%s]). %s",
-			strings.Join(path, "."),
-			count,
-			meta.Kind, meta.Name,
-			meta.Annotations[kioutil.PathAnnotation],
-			meta.Annotations[kioutil.IndexAnnotation],
-			errorInfo)
-	}
-	return nil
-}
-
-func validateMasterNodeVersion(r *yaml.RNode, meta yaml.ResourceMeta) error {
-	node, err := validateNodeExists(r, meta, "status", "masterVersion")
-	if err != nil {
-		return err
-	}
-	value, err := node.String()
-	value = strings.TrimSpace(value)
-	if err != nil {
-		s, _ := r.String()
-		return fmt.Errorf("%v: %s", err, s)
-	}
-
-	version := nodeVersionRegex.FindStringSubmatch(value)
-	if len(version) < 5 {
-		return fmt.Errorf("unknown masterVersion format: %s in %s %s (%s [%s])",
-			value, meta.Kind, meta.Name,
-			meta.Annotations[kioutil.PathAnnotation],
-			meta.Annotations[kioutil.IndexAnnotation])
-	}
-
-	g2, err := strconv.Atoi(version[2])
-	if err != nil {
-		s, _ := r.String()
-		return fmt.Errorf("%v: %s", err, s)
-	}
-	g3, err := strconv.Atoi(version[3])
-	if err != nil {
-		s, _ := r.String()
-		return fmt.Errorf("%v: %s", err, s)
-	}
-	g4, err := strconv.Atoi(version[4])
-	if err != nil {
-		s, _ := r.String()
-		return fmt.Errorf("%v: %s", err, s)
-	}
-
-	switch g2 {
-	case 13:
-		if g3 < 11 || (g3 == 11 && g4 < 14) {
-			return unsupportedGKEVersionError(value, meta)
-		}
-	case 14:
-		if g3 < 8 || (g3 == 8 && g4 < 18) {
-			return unsupportedGKEVersionError(value, meta)
-		}
-	case 15:
-		if g3 < 4 || (g3 == 4 && g4 < 15) {
-			return unsupportedGKEVersionError(value, meta)
-		}
-	default:
-		return unsupportedGKEVersionError(value, meta)
-	}
-	return nil
 
 }
 
-func validateMachineType(r *yaml.RNode, meta yaml.ResourceMeta) error {
+func validateMachineType(r *yaml.RNode, meta yaml.ResourceMeta, mustExist bool) error {
 	node, err := validateNodeExists(r, meta, "spec", "nodeConfig", "machineType")
 	if err != nil {
-		return err
+		if mustExist {
+			return err
+		} else {
+			return nil
+		}
 	}
 	value, err := node.String()
 	value = strings.TrimSpace(value)
@@ -348,14 +342,6 @@ func unsupportedMachineTypeError(value string, meta yaml.ResourceMeta) error {
 	return fmt.Errorf("unsupported machine type: %s in %s %s (%s [%s]). The minimum machine type is n1-standard-4, "+
 		"which has four vCPUs. If the machine type for your cluster doesn't have at least four vCPUs, "+
 		"change the machine type as described here https://bit.ly/2V0KPdu", value, meta.Kind, meta.Name,
-		meta.Annotations[kioutil.PathAnnotation],
-		meta.Annotations[kioutil.IndexAnnotation])
-}
-
-func unsupportedGKEVersionError(version string, meta yaml.ResourceMeta) error {
-	return fmt.Errorf("unsupported GKE version %s in %s %s (%s [%s]). If you need to upgrade "+
-		"your cluster to a supported version (https://bit.ly/2XsilLq), see https://bit.ly/34vygKy",
-		version, meta.Kind, meta.Name,
 		meta.Annotations[kioutil.PathAnnotation],
 		meta.Annotations[kioutil.IndexAnnotation])
 }
