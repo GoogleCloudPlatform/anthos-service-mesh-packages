@@ -12,25 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-apiVersion: install.istio.io/v1alpha2
-kind: IstioControlPlane
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
 metadata:
   clusterName: "PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
-  name: default-istio-control-plane
 spec:
   profile: asm
-  hub: gcr.io/gke-release/asm
-  tag: 1.4.7-asm.0
+  hub: gcr.io/istio-testing # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}
+  tag: 1.5-dev # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
+  meshConfig:
+    defaultConfig:
+      proxyMetadata:
+        GCP_METADATA: "PROJECT_ID|PROJECT_NUMBER|asm-cluster|us-central1-c" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-metadata"}
+        TRUST_DOMAIN: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
+        GKE_CLUSTER_URL: "https://container.googleapis.com/v1/projects/PROJECT_ID/locations/us-central1-c/clusters/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cluster-url"}
   values:
+    gateways:
+      istio-ingressgateway:
+        env:
+          GCP_METADATA: "PROJECT_ID|PROJECT_NUMBER|asm-cluster|us-central1-c" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-metadata"}
+          TRUST_DOMAIN: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
+          GKE_CLUSTER_URL: "https://container.googleapis.com/v1/projects/PROJECT_ID/locations/us-central1-c/clusters/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cluster-url"}
     global:
-      meshID: "proj-PROJECT_NUMBER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh_id"}
-      trustDomain: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.workload_identity"}
+      meshID: "proj-PROJECT_NUMBER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh-id"}
+      trustDomain: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
+      # Enable SDS
       sds:
         token:
-          aud: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.workload_identity"}
-      proxy:
-        env:
-          GCP_METADATA: "PROJECT_ID|PROJECT_NUMBER|asm-cluster|us-central1-c"
-    nodeagent:
-      env:
-        GKE_CLUSTER_URL: "https://container.googleapis.com/v1/projects/PROJECT_ID/locations/us-central1-c/clusters/asm-cluster"
+          aud: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
