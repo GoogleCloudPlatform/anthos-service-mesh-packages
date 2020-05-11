@@ -24,4 +24,4 @@ spec:
   workloadIdentity:
     identityNamespace: default
   labels:
-    mesh_id: "proj-PROJECT_NUMBER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh_id"}
+    mesh_id: "proj-PROJECT_NUMBER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh-id"}
