@@ -2,7 +2,7 @@
 
 The asm-patch package contains [kustomize](https://github.com/kubernetes-sigs/kustomize) configurations to enable ASM feature on an existing cluster.
 It includes a root kustomization.yaml file, a patch folder for cluster and nodepool patches, and additional resources.
-In additional to the existing kpt config setters (e.g. cluster-name, max-nodes, gcloud.core.project, and etc.), it adds a new one, base-dir, which sets the base directory of the configurations of an existing cluster.
+In additional to the existing kpt config setters (e.g. gcloud.container.cluster, gcloud.core.project, and etc.), it adds a new one, base-dir, which sets the base directory of the configurations of an existing cluster.
 
 ## Instructions on how to apply the patches
 
@@ -31,8 +31,8 @@ In additional to the existing kpt config setters (e.g. cluster-name, max-nodes, 
     | NAME                         | DESCRIPTION | VALUE               | TYPE   | COUNT | SETBY |
     |------------------------------|-------------|---------------------|--------|-------|-------|
     | base-dir                     | ''          | ../your-cluster     | string | 1     |       |
-    | cluster-name                 | ''          | your-cluster        | string | 5     |       |
-    | gcloud.compute.zone          | ''          | us-central1-c       | string | 3     | kpt   |
+    | gcloud.compute.cluster       | ''          | your-cluster        | string | 5     |       |
+    | gcloud.compute.location      | ''          | us-central1-c       | string | 3     | kpt   |
     | gcloud.core.project          | ''          | your-project        | string | 15    | kpt   |
     | gcloud.project.projectNumber | ''          | your-project-number | string | 3     | kpt   |
 
@@ -42,7 +42,7 @@ In additional to the existing kpt config setters (e.g. cluster-name, max-nodes, 
    ```bash
    # The cluster name must contain only lowercase alphanumerics and '-', must start with a letter and end with an alphanumeric, and must be no longer than 40 characters.
    kpt cfg set asm-patch [SETTER_NAME] [SETTER_VALUE]
-   # For example, `kpt cfg set asm-patch cluster-name [YOUR_CLUSTER_NAME]`
+   # For example, `kpt cfg set asm-patch gcloud.compute.cluster [YOUR_CLUSTER_NAME]`
    ```
 
 6. Apply the Anthos Service Mesh patches on the existing cluster:

@@ -17,7 +17,7 @@ kind: ContainerCluster
 metadata:
   annotations:
     cnrm.cloud.google.com/project-id: "PROJECT_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
-  name: asm-cluster # {"$ref":"#/definitions/io.k8s.cli.setters.cluster-name"}
+  name: asm-cluster # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster"}
 spec:
   loggingService: logging.googleapis.com/kubernetes
   monitoringService: monitoring.googleapis.com/kubernetes

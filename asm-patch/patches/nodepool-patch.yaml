@@ -20,7 +20,7 @@ metadata:
   name: default-pool
 spec:
   clusterRef:
-    name: asm-cluster # {"$ref":"#/definitions/io.k8s.cli.setters.cluster-name"}
+    name: asm-cluster # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster"}
   nodeConfig:
     workloadMetadataConfig:
       nodeMetadata: GKE_METADATA_SERVER
