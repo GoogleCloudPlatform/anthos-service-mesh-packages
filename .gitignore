@@ -1,0 +1,12 @@
+.idea
+*.iml
+.vscode
+
+# Editor temp files
+# emacs temp files: foo~
+*~
+# emacs temp files: #foo#
+\#*\#
+
+# Ignore dist output directory
+dist/
