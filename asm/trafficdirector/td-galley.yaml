@@ -59,7 +59,7 @@ spec:
         - --sinkAddress=$(SINKADDRESS)
         - --sinkMeta=project_id=$(PROJECT_ID),sds_path=$(SDSPATH),trace=0,enable_security_beta=false # {"$ref":"#/definitions/io.k8s.cli.substitutions.sink-meta"}
         - --excludedResourceKinds=Pod,Node,Endpoints
-        - --
+        - --enableServiceDiscovery
         env:
         - name: ENABLE_JWKS_TRANSFORMER
           value: "true"
