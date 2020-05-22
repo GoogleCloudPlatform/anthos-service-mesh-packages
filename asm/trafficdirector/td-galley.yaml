@@ -27,7 +27,7 @@ spec:
       serviceAccountName: asm-galley-service-account
       containers:
       - name: galley
-        image: gcr.io/asm-testing/galley:release-1.5-asm-10 # {"$ref":"#/definitions/io.k8s.cli.substitutions.galley-image"}
+        image: gcr.io/asm-testing/galley:release-1.5-asm-10 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.images.galley"}
         imagePullPolicy: "Always"
         ports:
         - containerPort: 9443

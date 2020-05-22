@@ -3,7 +3,7 @@ apiVersion: iam.cnrm.cloud.google.com/v1alpha1
 kind: IAMServiceAccount
 metadata:
   name: asm-galley-service-account
-  namespace: "[PROJECT_ID]"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.gcloud.core.project"}
+  namespace: "[PROJECT_ID]"  # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
 spec:
   displayName: Istio galley credentials
   projectRoles:

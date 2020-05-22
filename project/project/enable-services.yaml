@@ -5,7 +5,7 @@ metadata:
   annotations:
     cnrm.cloud.google.com/deletion-policy: "abandon"
     cnrm.cloud.google.com/disable-dependent-services: "false"
-  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gcloud.core.project"}
+  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
   name: monitoring.googleapis.com
 ---
 # GCE
@@ -15,7 +15,7 @@ metadata:
   annotations:
     cnrm.cloud.google.com/deletion-policy: "abandon"
     cnrm.cloud.google.com/disable-dependent-services: "false"
-  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gcloud.core.project"}
+  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
   name: compute.googleapis.com
 ---
 # GKE
@@ -25,7 +25,7 @@ metadata:
   annotations:
     cnrm.cloud.google.com/deletion-policy: "abandon"
     cnrm.cloud.google.com/disable-dependent-services: "false"
-  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gcloud.core.project"}
+  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
   name: container.googleapis.com
 ---
 # Short lived iam credentials for workload identity
@@ -35,7 +35,7 @@ metadata:
   annotations:
     cnrm.cloud.google.com/deletion-policy: "abandon"
     cnrm.cloud.google.com/disable-dependent-services: "false"
-  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gcloud.core.project"}
+  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
   name: iamcredentials.googleapis.com
 ---
 # Mesh Certificate Authority
@@ -45,7 +45,7 @@ metadata:
   annotations:
     cnrm.cloud.google.com/deletion-policy: "abandon"
     cnrm.cloud.google.com/disable-dependent-services: "false"
-  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gcloud.core.project"}
+  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
   name: meshca.googleapis.com
 ---
 # Mesh Telemetry
@@ -55,7 +55,7 @@ metadata:
   annotations:
     cnrm.cloud.google.com/deletion-policy: "abandon"
     cnrm.cloud.google.com/disable-dependent-services: "false"
-  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gcloud.core.project"}
+  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
   name: meshtelemetry.googleapis.com
 ---
 # Mesh Config
@@ -65,7 +65,7 @@ metadata:
   annotations:
     cnrm.cloud.google.com/deletion-policy: "abandon"
     cnrm.cloud.google.com/disable-dependent-services: "false"
-  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gcloud.core.project"}
+  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
   name: meshconfig.googleapis.com
 ---
 # Traffic Director
@@ -75,7 +75,7 @@ metadata:
   annotations:
     cnrm.cloud.google.com/deletion-policy: "abandon"
     cnrm.cloud.google.com/disable-dependent-services: "false"
-  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gcloud.core.project"}
+  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
   name: trafficdirector.googleapis.com
 ---
 # Traffic Director
@@ -85,5 +85,5 @@ metadata:
   annotations:
     cnrm.cloud.google.com/deletion-policy: "abandon"
     cnrm.cloud.google.com/disable-dependent-services: "false"
-  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gcloud.core.project"}
+  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
   name: anthos.googleapis.com

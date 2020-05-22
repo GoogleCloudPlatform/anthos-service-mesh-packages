@@ -1,4 +1,4 @@
-# ASM MCP
+# ASM Managed Control Plane (ASM MCP)
 
 This repository contains a blueprint repository for installing the ASM MCP
 client-side components in an ASM-MCP compliant cluster and GCP project.
@@ -63,8 +63,8 @@ kpt pkg get https://github.com/GoogleCloudPlatform/anthos-service-mesh-packages.
 kpt pkg get https://github.com/GoogleCloudPlatform/anthos-service-mesh-packages.git/cluster@asm-networking cluster
 
 # To set tunables, use `kpt cfg set`. To see all tunables, run `kpt cfg list-setters <folder>`
-kpt cfg set asm location ${LOCATION}
-kpt cfg set asm cluster-name ${CLUSTER_NAME}
+kpt cfg set asm gcloud.compute.location ${LOCATION}
+kpt cfg set asm gcloud.compute.cluster ${CLUSTER_NAME}
 kpt cfg set asm gcloud.core.project ${PROJECT_ID}
 
 kpt cfg set cluster location ${LOCATION}

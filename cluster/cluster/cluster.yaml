@@ -2,17 +2,17 @@ apiVersion: identity.cnrm.cloud.google.com/v1alpha2
 kind: IdentityNamespace
 metadata:
   name: default
-  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gcloud.core.project"}
+  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
 spec: {}
 ---
 apiVersion: container.cnrm.cloud.google.com/v1alpha2
 kind: ContainerCluster
 metadata:
   clusterName: "[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.full-cluster-name"}
-  name: asm-free-trial # {"$ref":"#/definitions/io.k8s.cli.setters.cluster-name"}
-  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gcloud.core.project"}
+  name: asm-free-trial # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster"}
+  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
 spec:
-  location: us-central1-c # {"$ref":"#/definitions/io.k8s.cli.setters.location"}
+  location: us-central1-c # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.compute.location"}
   workloadIdentity:
     identityNamespace: default
   labels:
@@ -43,12 +43,12 @@ kind: ContainerNodePool
 metadata:
   clusterName: "[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.full-cluster-name"}
   name: default-pool
-  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gcloud.core.project"}
+  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
 spec:
   initialNodeCount: 2
   autoscaling:
-    minNodeCount: 4 # {"$ref":"#/definitions/io.k8s.cli.setters.minNodeCount"}
-    maxNodeCount: 8 # {"$ref":"#/definitions/io.k8s.cli.setters.maxNodeCount"}
+    minNodeCount: 4 # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.nodepool.min-nodes"}
+    maxNodeCount: 8 # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.nodepool.max-nodes"}
   nodeConfig:
     diskSizeGb: 100
     diskType: pd-standard
@@ -69,5 +69,5 @@ spec:
     autoRepair: true
     autoUpgrade: true
   clusterRef:
-    name: asm-free-trial # {"$ref":"#/definitions/io.k8s.cli.setters.cluster-name"}
+    name: asm-free-trial # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster"}
 

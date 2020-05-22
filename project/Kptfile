@@ -11,14 +11,6 @@ openAPI:
         setter:
           name: gcloud.core.project
           value: '[PROJECT_ID]'
-    io.k8s.cli.substitutions.gcloud.core.project:
-      x-k8s-cli:
-        substitution:
-          name: project-id
-          pattern: PROJECT_ID
-          values:
-          - marker: PROJECT_ID
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
     io.k8s.cli.substitutions.galley-service-account:
       x-k8s-cli:
         substitution:

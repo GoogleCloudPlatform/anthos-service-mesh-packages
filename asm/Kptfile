@@ -6,71 +6,31 @@ packageMetadata:
   shortDescription: ASM Networking 1.5
 openAPI:
   definitions:
-    io.k8s.cli.setters.meshca-address:
+    io.k8s.cli.setters.anthos.servicemesh.endpoint.meshca-address:
       x-k8s-cli:
         setter:
-          name: meshca-address
+          name: anthos.servicemesh.endpoint.meshca-address
           value: meshca.googleapis.com:443
-    io.k8s.cli.substitutions.meshca-address:
-      x-k8s-cli:
-        substitution:
-          name: meshca-address
-          pattern: MESHCA
-          values:
-          - marker: MESHCA
-            ref: '#/definitions/io.k8s.cli.setters.meshca-address'
-    io.k8s.cli.setters.trafficdirector-address:
+    io.k8s.cli.setters.anthos.servicemesh.endpoint.trafficdirector-address:
       x-k8s-cli:
         setter:
-          name: trafficdirector-address
+          name: anthos.servicemesh.endpoint.trafficdirector-address
           value: trafficdirector.googleapis.com:443
-    io.k8s.cli.substitutions.trafficdirector-address:
-      x-k8s-cli:
-        substitution:
-          name: trafficdirector-address
-          pattern: TRAFFICDIRECTOR
-          values:
-          - marker: TRAFFICDIRECTOR
-            ref: '#/definitions/io.k8s.cli.setters.trafficdirector-address'
-    io.k8s.cli.setters.meshconfig-address:
+    io.k8s.cli.setters.anthos.serivcemesh.meshconfig-address:
       x-k8s-cli:
         setter:
-          name: meshconfig-address
+          name: anthos.servicemesh.endpoint.meshconfig-address
           value: meshconfig.googleapis.com:443
-    io.k8s.cli.substitutions.meshconfig-address:
-      x-k8s-cli:
-        substitution:
-          name: meshconfig-address
-          pattern: SINKADDR
-          values:
-          - marker: SINKADDR
-            ref: '#/definitions/io.k8s.cli.setters.meshconfig-address'
-    io.k8s.cli.setters.sink-auth-mode:
+    io.k8s.cli.setters.anthos.servicemesh.sink-auth-mode:
       x-k8s-cli:
         setter:
-          name: sink-auth-mode
+          name: anthos.servicemesh.sink-auth-mode
           value: GOOGLE
-    io.k8s.cli.substitutions.sink-auth-mode:
-      x-k8s-cli:
-        substitution:
-          name: sink-auth-mode
-          pattern: SINKAUTHMODE
-          values:
-          - marker: SINKAUTHMODE
-            ref: '#/definitions/io.k8s.cli.setters.sink-auth-mode'
     io.k8s.cli.setters.gcloud.core.project:
       x-k8s-cli:
         setter:
           name: gcloud.core.project
           value: '[PROJECT_ID]'
-    io.k8s.cli.substitutions.gcloud.core.project:
-      x-k8s-cli:
-        substitution:
-          name: project-id
-          pattern: PROJECT_ID
-          values:
-          - marker: PROJECT_ID
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
     io.k8s.cli.substitutions.trust-domain:
       x-k8s-cli:
         substitution:
@@ -79,15 +39,15 @@ openAPI:
           values:
           - marker: PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
-    io.k8s.cli.setters.location:
+    io.k8s.cli.setters.gcloud.compute.location:
       x-k8s-cli:
         setter:
-          name: location
+          name: gcloud.compute.location
           value: us-central1-c
-    io.k8s.cli.setters.cluster-name:
+    io.k8s.cli.setters.gcloud.container.cluster:
       x-k8s-cli:
         setter:
-          name: cluster-name
+          name: gcloud.container.cluster
           value: asm-free-trial
     io.k8s.cli.substitutions.gcp-metadata:
       x-k8s-cli:
@@ -100,9 +60,9 @@ openAPI:
           - marker: PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
           - marker: LOCATION
-            ref: '#/definitions/io.k8s.cli.setters.location'
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.location'
           - marker: CLUSTERNAME
-            ref: '#/definitions/io.k8s.cli.setters.cluster-name'
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.container.cluster'
     io.k8s.cli.substitutions.mesh-id:
       x-k8s-cli:
         substitution:
@@ -136,73 +96,49 @@ openAPI:
           - marker: PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
           - marker: LOCATION
-            ref: '#/definitions/io.k8s.cli.setters.location'
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.location'
           - marker: CLUSTERNAME
-            ref: '#/definitions/io.k8s.cli.setters.cluster-name'
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.container.cluster'
     io.k8s.cli.setters.gcloud.project.projectNumber:
       x-k8s-cli:
         setter:
           name: gcloud.project.projectNumber
           value: "[PROJECT_NUMBER]"
-    io.k8s.cli.setters.galley-image:
+    io.k8s.cli.setters.anthos.servicemesh.images.galley:
       x-k8s-cli:
         setter:
-          name: galley-image
+          name: anthos.servicemesh.images.galley
           value: 'gcr.io/asm-testing/galley:release-1.5-asm-10'
-    io.k8s.cli.substitutions.galley-image:
-      x-k8s-cli:
-        substitution:
-          name: galley-image
-          pattern: IMAGE
-          values:
-          - marker: IMAGE
-            ref: '#/definitions/io.k8s.cli.setters.galley-image'
-    io.k8s.cli.setters.istiod-image:
+    io.k8s.cli.setters.anthos.servicemesh.images.istiod:
       x-k8s-cli:
         setter:
-          name: istiod-image
+          name: anthos.servicemesh.images.istiod
           value: 'gcr.io/asm-testing/pilot:release-1.5-asm-10'
-    io.k8s.cli.substitutions.istiod-image:
-      x-k8s-cli:
-        substitution:
-          name: istiod-image
-          pattern: IMAGE
-          values:
-          - marker: IMAGE
-            ref: '#/definitions/io.k8s.cli.setters.istiod-image'
-    io.k8s.cli.setters.proxy-image:
+    io.k8s.cli.setters.anthos.servicemesh.images.proxy:
       x-k8s-cli:
         setter:
-          name: proxy-image
+          name: anthos.servicemesh.images.proxy
           value: 'gcr.io/asm-testing/proxyv2:release-1.5-asm-10'
-    io.k8s.cli.substitutions.proxy-image:
-      x-k8s-cli:
-        substitution:
-          name: proxy-image
-          pattern: IMAGE
-          values:
-          - marker: IMAGE
-            ref: '#/definitions/io.k8s.cli.setters.proxy-image'
-    io.k8s.cli.setters.trace-id:
+    io.k8s.cli.setters.anthos.servicemesh.debug.trace-id:
       x-k8s-cli:
         setter:
-          name: trace-id
+          name: anthos.servicemesh.debug.trace-id
           value: '0'
-    io.k8s.cli.setters.enable-security-beta:
+    io.k8s.cli.setters.anthos.servicemesh.enable-security-beta:
       x-k8s-cli:
         setter:
-          name: enable-security-beta
+          name: anthos.servicemesh.enable-security-beta
           value: "false"
     io.k8s.cli.substitutions.sink-meta:
       x-k8s-cli:
         substitution:
-          name: trace-id
+          name: anthos.servicemesh.debug.trace-id
           pattern: "--sinkMeta=project_id=$(PROJECT_ID),sds_path=$(SDSPATH),trace=TRACEID,enable_security_beta=ENABLE_SECURITY_BETA"
           values:
           - marker: TRACEID
-            ref: '#/definitions/io.k8s.cli.setters.trace-id'
+            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.debug.trace-id'
           - marker: ENABLE_SECURITY_BETA
-            ref: '#/definitions/io.k8s.cli.setters.enable-security-beta'
+            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.enable-security-beta'
     io.k8s.cli.substitutions.k8s-galley-service-account:
       x-k8s-cli:
         substitution:

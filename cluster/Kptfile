@@ -21,33 +21,25 @@ openAPI:
         setter:
           name: gcloud.core.project
           value: '[PROJECT_ID]'
-    io.k8s.cli.substitutions.gcloud.core.project:
-      x-k8s-cli:
-        substitution:
-          name: project-id
-          pattern: PROJECT_ID
-          values:
-          - marker: PROJECT_ID
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
-    io.k8s.cli.setters.cluster-name:
+    io.k8s.cli.setters.gcloud.container.cluster:
       x-k8s-cli:
         setter:
           name: cluster-name
           value: asm-free-trial
-    io.k8s.cli.setters.location:
+    io.k8s.cli.setters.gcloud.compute.location:
       x-k8s-cli:
         setter:
-          name: location
+          name: gcloud.compute.location
           value: us-central1-c
-    io.k8s.cli.setters.maxNodeCount:
+    io.k8s.cli.setters.gcloud.container.nodepool.max-nodes:
       x-k8s-cli:
         setter:
-          name: maxNodeCount
+          name: gcloud.container.nodepool.max-nodes
           value: "8"
-    io.k8s.cli.setters.minNodeCount:
+    io.k8s.cli.setters.gcloud.container.nodepool.min-nodes:
       x-k8s-cli:
         setter:
-          name: minNodeCount
+          name: gcloud.container.nodepool.min-nodes
           value: "4"
     io.k8s.cli.substitutions.full-cluster-name:
       x-k8s-cli:
@@ -56,9 +48,9 @@ openAPI:
           pattern: PROJECTID/LOCATION/CLUSTERNAME
           values:
           - marker: CLUSTERNAME
-            ref: '#/definitions/io.k8s.cli.setters.cluster-name'
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.container.cluster'
           - marker: LOCATION
-            ref: '#/definitions/io.k8s.cli.setters.location'
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.location'
           - marker: PROJECTID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
     io.k8s.cli.substitutions.mesh-id:
