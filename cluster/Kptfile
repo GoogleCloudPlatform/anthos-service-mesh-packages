@@ -24,7 +24,7 @@ openAPI:
     io.k8s.cli.setters.gcloud.container.cluster:
       x-k8s-cli:
         setter:
-          name: cluster-name
+          name: gcloud.container.cluster
           value: asm-free-trial
     io.k8s.cli.setters.gcloud.compute.location:
       x-k8s-cli:
