@@ -1,0 +1,25 @@
+---
+# This is an empty 1.4 control plane, used to force creation of p4sa
+apiVersion: install.istio.io/v1alpha2
+kind: IstioControlPlane
+metadata:
+  namespace: istio-operator
+  name: example-istiocontrolplane
+spec:
+  profile: minimal
+  trafficManagement:
+    enabled: false
+  policy:
+    enabled: false
+  telemetry:
+    enabled: false
+  security:
+    enabled: false
+  configManagement:
+    enabled: false
+  gateways:
+    enabled: false
+  autoInjection:
+    enabled: false
+  coreDNS:
+    enabled: false

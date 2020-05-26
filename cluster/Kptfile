@@ -1,0 +1,63 @@
+apiVersion: kpt.dev/v1alpha1
+kind: Kptfile
+metadata:
+  name: asm-istiod-15
+packageMetadata:
+  shortDescription: ASM Networking 1.5
+openAPI:
+  definitions:
+    io.k8s.cli.setters.cloudrun-config-disabled:
+      x-k8s-cli:
+        setter:
+          name: cloudrun-config-disabled
+          value: "true"
+    io.k8s.cli.setters.gcloud.project.projectNumber:
+      x-k8s-cli:
+        setter:
+          name: gcloud.project.projectNumber
+          value: "[PROJECT_NUMBER]"
+    io.k8s.cli.setters.gcloud.core.project:
+      x-k8s-cli:
+        setter:
+          name: gcloud.core.project
+          value: '[PROJECT_ID]'
+    io.k8s.cli.setters.gcloud.container.cluster:
+      x-k8s-cli:
+        setter:
+          name: gcloud.container.cluster
+          value: asm-free-trial
+    io.k8s.cli.setters.gcloud.compute.location:
+      x-k8s-cli:
+        setter:
+          name: gcloud.compute.location
+          value: us-central1-c
+    io.k8s.cli.setters.gcloud.container.nodepool.max-nodes:
+      x-k8s-cli:
+        setter:
+          name: gcloud.container.nodepool.max-nodes
+          value: "8"
+    io.k8s.cli.setters.gcloud.container.nodepool.min-nodes:
+      x-k8s-cli:
+        setter:
+          name: gcloud.container.nodepool.min-nodes
+          value: "4"
+    io.k8s.cli.substitutions.full-cluster-name:
+      x-k8s-cli:
+        substitution:
+          name: full-cluster-name
+          pattern: PROJECTID/LOCATION/CLUSTERNAME
+          values:
+          - marker: CLUSTERNAME
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.container.cluster'
+          - marker: LOCATION
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.location'
+          - marker: PROJECTID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+    io.k8s.cli.substitutions.mesh-id:
+      x-k8s-cli:
+        substitution:
+          name: mesh-id
+          pattern: "proj-PROJECT_NUMBER"
+          values:
+          - marker: PROJECT_NUMBER
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.projectNumber'

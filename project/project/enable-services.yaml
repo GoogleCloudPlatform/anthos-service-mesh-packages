@@ -1,0 +1,89 @@
+---
+apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
+kind: Service
+metadata:
+  annotations:
+    cnrm.cloud.google.com/deletion-policy: "abandon"
+    cnrm.cloud.google.com/disable-dependent-services: "false"
+  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
+  name: monitoring.googleapis.com
+---
+# GCE
+apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
+kind: Service
+metadata:
+  annotations:
+    cnrm.cloud.google.com/deletion-policy: "abandon"
+    cnrm.cloud.google.com/disable-dependent-services: "false"
+  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
+  name: compute.googleapis.com
+---
+# GKE
+apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
+kind: Service
+metadata:
+  annotations:
+    cnrm.cloud.google.com/deletion-policy: "abandon"
+    cnrm.cloud.google.com/disable-dependent-services: "false"
+  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
+  name: container.googleapis.com
+---
+# Short lived iam credentials for workload identity
+apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
+kind: Service
+metadata:
+  annotations:
+    cnrm.cloud.google.com/deletion-policy: "abandon"
+    cnrm.cloud.google.com/disable-dependent-services: "false"
+  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
+  name: iamcredentials.googleapis.com
+---
+# Mesh Certificate Authority
+apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
+kind: Service
+metadata:
+  annotations:
+    cnrm.cloud.google.com/deletion-policy: "abandon"
+    cnrm.cloud.google.com/disable-dependent-services: "false"
+  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
+  name: meshca.googleapis.com
+---
+# Mesh Telemetry
+apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
+kind: Service
+metadata:
+  annotations:
+    cnrm.cloud.google.com/deletion-policy: "abandon"
+    cnrm.cloud.google.com/disable-dependent-services: "false"
+  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
+  name: meshtelemetry.googleapis.com
+---
+# Mesh Config
+apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
+kind: Service
+metadata:
+  annotations:
+    cnrm.cloud.google.com/deletion-policy: "abandon"
+    cnrm.cloud.google.com/disable-dependent-services: "false"
+  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
+  name: meshconfig.googleapis.com
+---
+# Traffic Director
+apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
+kind: Service
+metadata:
+  annotations:
+    cnrm.cloud.google.com/deletion-policy: "abandon"
+    cnrm.cloud.google.com/disable-dependent-services: "false"
+  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
+  name: trafficdirector.googleapis.com
+---
+# Traffic Director
+apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
+kind: Service
+metadata:
+  annotations:
+    cnrm.cloud.google.com/deletion-policy: "abandon"
+    cnrm.cloud.google.com/disable-dependent-services: "false"
+  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
+  name: anthos.googleapis.com

@@ -1,0 +1,209 @@
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: asm-td
+  namespace: istio-system
+  labels:
+    release: asm-td
+spec:
+  maxReplicas: 1
+  minReplicas: 1
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: asm-td
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      targetAverageUtilization: 80
+---
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  name: asm-td
+  namespace: istio-system
+  labels:
+    release: asm-td
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: asm-td
+      release: asm-td
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: asm-td
+  namespace: istio-system
+  labels:
+    release: asm-td
+spec:
+  ports:
+  - port: 443
+    name: https-inject
+    targetPort: 15017
+  - port: 15010
+    name: http2-xds # direct
+  - port: 15011
+    name: https-xds-spifeecert # mTLS
+  - port: 15012
+    name: https-xds-dnscert # mTLS
+  - port: 8080
+    name: http-legacy-discovery # direct
+  - port: 15014
+    name: http-monitoring
+  selector:
+    app: asm-td
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: asm-td
+  namespace: istio-system
+  labels:
+    app: asm-td
+    release: asm-td
+spec:
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: asm-td
+  template:
+    metadata:
+      labels:
+        app: asm-td
+        istio: pilot
+      annotations:
+        sidecar.istio.io/inject: "false"
+    spec:
+      serviceAccountName: asm-td-service-account
+      containers:
+      - name: discovery
+        image: gcr.io/asm-testing/pilot:release-1.5-asm-10 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.images.istiod"}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+        - containerPort: 15010
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 30
+          timeoutSeconds: 5
+        # Args used by pilot - istiod doesn't use args.
+        args:
+        - "discovery"
+        # TODO: make them default if istiod mode is enabled (ISTIOD_ADDR set)
+        - --secureGrpcAddr
+        - ""
+        - --namespace
+        - "istio-system"
+        # CRDs are created early, no need to hold RBAC permission
+        - --disable-install-crds=true
+        envFrom:
+        - configMapRef:
+            name: istio-galley-config-td
+            optional: false
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: CONFIG_NAMESPACE
+          value: istio-system
+        - name: ISTIOD_ADDR
+          value: asm-td.istio-system.svc:15012
+        - name: INJECTION_WEBHOOK_CONFIG_NAME
+          value: asm-td
+        - name: PILOT_EXTERNAL_GALLEY
+          value: "false"
+        - name: PROXY_IMAGE
+          value: gcr.io/asm-testing/proxyv2:release-1.5-asm-10 # { "$ref": "#/definitions/io.k8s.cli.setters.anthos.servicemesh.images.proxy" }
+        resources:
+          requests:
+            cpu: 101m
+            memory: 64Mi
+        volumeMounts:
+        - # Instead shifting traffic to istiod
+          name: istio-certs # For backward compat, if secrets already exists. Currently not used/implemented
+          mountPath: /var/run/secrets/istio
+          readOnly: true
+        - # Should be removed after everything works.
+          name: istio-token # Technically not needed on this pod - but it helps debugging/testing SDS
+          mountPath: /var/run/secrets/tokens
+          readOnly: true
+        - name: local-certs
+          mountPath: /var/run/secrets/istio-dns
+        - name: cacerts
+          mountPath: /etc/cacerts
+          readOnly: true
+        - name: mesh
+          mountPath: /etc/istio/config
+          readOnly: true
+        - name: inject
+          mountPath: /var/lib/istio/inject
+          readOnly: true
+        - name: asm-td
+          mountPath: /var/lib/istio/local
+          readOnly: true
+        - mountPath: /var/secrets/google
+          name: google-cloud-key
+        - mountPath: /var/lib/istio/galley
+          name: asm-td
+      securityContext:
+        # Temp, for debugging (need to install tools, etc)
+        runAsUser: 0
+        runAsGroup: 1337
+      volumes:
+      - emptyDir:
+          medium: Memory
+        name: local-certs
+      - name: istio-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              audience: "[PROJECT_ID].svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
+              expirationSeconds: 43200
+              path: istio-token
+      - name: istio-certs
+        secret:
+          secretName: istio.istio-pilot-service-account
+          optional: true
+      - name: asm-td
+        configMap:
+          name: istio-galley-config-td
+          optional: false
+      - name: google-cloud-key
+        secret:
+          secretName: google-cloud-key
+          optional: true
+      # Optional: user-generated root
+      - name: cacerts
+        secret:
+          secretName: cacerts
+          optional: true
+      # Optional - image should have
+      - name: inject
+        configMap:
+          name: istio-sidecar-injector-td
+          optional: true
+      - name: mesh
+        configMap:
+          name: istio-mesh-td
+          optional: false
+      - name: galley
+        configMap:
+          name: istio-galley-config-td
+          optional: false

@@ -1,0 +1,338 @@
+---
+# Source: istio-discovery/templates/serviceaccount.yaml
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: istiod-service-account
+  namespace: istio-system
+  labels:
+    app: istiod
+    release: asm-istio
+---
+
+
+---
+# Source: istio-discovery/templates/clusterrole-galley-disable-webhook.yaml
+
+
+
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: istio-galley-istio-system
+  labels:
+    release: asm-istio
+rules:
+  # For reading Istio resources
+  - apiGroups: [
+    "authentication.istio.io",
+    "config.istio.io",
+    "networking.istio.io",
+    "rbac.istio.io",
+    "security.istio.io"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch"]
+    # For updating Istio resource statuses
+  - apiGroups: [
+    "authentication.istio.io",
+    "config.istio.io",
+    "networking.istio.io",
+    "rbac.istio.io",
+    "security.istio.io"]
+    resources: ["*/status"]
+    verbs: ["update"]
+
+    # Remove galley's permissions to reconcile the validation config when istiod is present.
+    # Notably missing here is the permission to modify webhooks.
+
+  - apiGroups: ["extensions","apps"]
+    resources: ["deployments"]
+    resourceNames: ["istio-galley"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["pods", "nodes", "services", "endpoints", "namespaces"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["extensions"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["extensions"]
+    resources: ["deployments/finalizers"]
+    resourceNames: ["istio-galley"]
+    verbs: ["update"]
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles"]
+    verbs: ["get", "list", "watch"]
+---
+
+---
+# Source: istio-discovery/templates/clusterrole.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: istio-pilot-istio-system
+  labels:
+    app: pilot
+    release: asm-istio
+rules:
+- apiGroups: ["config.istio.io", "rbac.istio.io", "security.istio.io", "networking.istio.io", "authentication.istio.io"]
+  verbs: ["get", "watch", "list"]
+  resources: ["*"]
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["get", "watch", "list"]
+- apiGroups: ["extensions"]
+  resources: ["ingresses"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["extensions"]
+  resources: ["ingresses/status"]
+  verbs: ["*"]
+  # TODO: remove, too broad permission, should be namespace only
+- apiGroups: [""]
+  resources: ["configmaps"]
+  # Create and update needed for ingress election
+  verbs: ["get", "list", "watch", "create", "update"]
+- apiGroups: [""]
+  resources: ["endpoints", "pods", "services", "namespaces", "nodes", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create", "get", "watch", "list", "update", "delete"]
+- apiGroups: ["certificates.k8s.io"]
+  resources:
+    - "certificatesigningrequests"
+    - "certificatesigningrequests/approval"
+    - "certificatesigningrequests/status"
+  verbs: ["update", "create", "get", "delete", "watch"]
+- apiGroups: ["discovery.k8s.io"]
+  resources: ["endpointslices"]
+  verbs: ["get", "list", "watch"]
+---
+# Dedicated cluster role - istiod will use fewer dangerous permissions ( secret access in particular ).
+# TODO: separate cluster role with the minimal set of permissions needed for a 'tenant' Istiod
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: istiod-istio-system
+  labels:
+    app: istiod
+    release: asm-istio
+rules:
+  # Remove permissions to reconcile webhook configuration. This address the downgrade case
+  # where istiod will be uninstalled. Removing the permissions reduces
+  # the likelihood that istiod will reconcile something it shouldn't.
+
+  # sidecar injection controller
+  - apiGroups: ["admissionregistration.k8s.io"]
+    resources: ["mutatingwebhookconfigurations"]
+    verbs: ["get", "list", "watch", "patch"]
+
+  # configuration validation webhook controller
+  - apiGroups: ["admissionregistration.k8s.io"]
+    resources: ["validatingwebhookconfigurations"]
+    verbs: ["get", "list", "watch", "update"]
+
+
+  # permissions to verify the webhook is ready and rejecting
+  # invalid config. We use --server-dry-run so no config is persisted.
+  - apiGroups: ["networking.istio.io"]
+    verbs: ["create"]
+    resources: ["gateways"]
+
+  # istio configuration
+  - apiGroups: ["config.istio.io", "rbac.istio.io", "security.istio.io", "networking.istio.io", "authentication.istio.io"]
+    verbs: ["get", "watch", "list"]
+    resources: ["*"]
+
+  # auto-detect installed CRD definitions
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch"]
+
+  # discovery and routing
+  - apiGroups: ["extensions","apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods", "nodes", "services", "namespaces", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get", "list", "watch"]
+
+  # ingress controller
+  - apiGroups: ["extensions"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["extensions"]
+    resources: ["ingresses/status"]
+    verbs: ["*"]
+
+  # required for CA's namespace controller
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["create", "get", "list", "watch", "update"]
+
+  # Istiod and bootstrap.
+  - apiGroups: ["certificates.k8s.io"]
+    resources:
+      - "certificatesigningrequests"
+      - "certificatesigningrequests/approval"
+      - "certificatesigningrequests/status"
+    verbs: ["update", "create", "get", "delete", "watch"]
+  # Used by Istiod to verify the JWT tokens
+  - apiGroups: ["authentication.k8s.io"]
+    resources: ["tokenreviews"]
+    verbs: ["create"]
+
+  # TODO: remove, no longer needed at cluster
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "get", "watch", "list", "update", "delete"]
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["get", "watch", "list"]
+
+---
+# Source: istio-discovery/templates/clusterrolebinding.yaml
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: istio-pilot-istio-system
+  labels:
+    app: pilot
+    release: asm-istio
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: istio-pilot-istio-system
+subjects:
+  - kind: ServiceAccount
+    name: istiod-service-account
+    namespace: istio-system
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: istiod-istio-system
+  labels:
+    app: istiod
+    release: asm-istio
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: istiod-istio-system
+subjects:
+  - kind: ServiceAccount
+    name: istiod-service-account
+    namespace: istio-system
+
+---
+
+
+
+---
+# Source: istio-discovery/templates/autoscale.yaml
+
+
+---
+# Source: istio-discovery/templates/configmap-envoy.yaml
+
+
+---
+# Source: istio-discovery/templates/configmap-jwks.yaml
+
+
+---
+# Source: istio-discovery/templates/configmap.yaml
+
+
+---
+# Source: istio-discovery/templates/deployment.yaml
+
+
+---
+# Source: istio-discovery/templates/enable-mesh-mtls.yaml
+
+
+
+---
+# Source: istio-discovery/templates/istiod-injector-configmap.yaml
+
+
+---
+# Source: istio-discovery/templates/mutatingwebhook.yaml
+# Installed for each revision - not installed for cluster resources ( cluster roles, bindings, crds)
+---
+# Source: istio-discovery/templates/poddisruptionbudget.yaml
+
+
+---
+# Source: istio-discovery/templates/service.yaml
+
+
+---
+# Source: istio-discovery/templates/telemetryv2_1.4.yaml
+
+
+---
+# Source: istio-discovery/templates/telemetryv2_1.5.yaml
+
+
+---
+# Source: istio-discovery/templates/validatingwebhookconfiguration.yaml
+
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: istiod-istio-system
+  labels:
+    app: istiod
+    release: asm-istio
+    istio: istiod
+webhooks:
+  - name: validation.istio.io
+    clientConfig:
+      service:
+        name: istiod
+        namespace: istio-system
+        path: "/validate"
+      caBundle: "" # patched at runtime when the webhook is ready.
+    rules:
+      - operations:
+        - CREATE
+        - UPDATE
+        apiGroups:
+        - config.istio.io
+        - rbac.istio.io
+        - security.istio.io
+        - authentication.istio.io
+        - networking.istio.io
+        apiVersions:
+        - "*"
+        resources:
+        - "*"
+    # Fail open until the validation webhook is ready. The webhook controller
+    # will update this to `Fail` and patch in the `caBundle` when the webhook
+    # endpoint is ready.
+    failurePolicy: Ignore
+    sideEffects: None
+---
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: istio-galley
+  labels:
+    app: galley
+    release: asm-istio
+    istio: galley
+webhooks:
+---
+

@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- ./crd-all.gen.yaml
+- ./td-configmap-mesh.yaml
+- ./td-istiod-asm-rbac.yaml
+- ./td-galley-rbac.yaml
+- ./td-configmap-injection.yaml
+- ./td-istiod-asm.yaml
+- ./td-configmap-galley.yaml
+- ./td-mutatingwebhook.yaml
+- ./td-galley.yaml

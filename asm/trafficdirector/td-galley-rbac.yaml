@@ -1,0 +1,76 @@
+---
+# Added to galley-sa file
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: asm-galley-service-account
+  namespace: istio-system
+  annotations:
+    iam.gke.io/gcp-service-account: "asm-galley-service-account@[PROJECT_ID].iam.gserviceaccount.com" # {"$ref":"#/definitions/io.k8s.cli.substitutions.k8s-galley-service-account"}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: asm-galley-binding
+  labels:
+    app: asm-galley
+    release: asm-galley
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: asm-galley
+subjects:
+- kind: ServiceAccount
+  name: asm-galley-service-account
+  namespace: istio-system
+---
+# Source: istio-discovery/templates/clusterrole-galley-disable-webhook.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: asm-galley
+  labels:
+    release: asm-galley
+rules:
+# For reading Istio resources
+- apiGroups: [
+  "authentication.istio.io",
+  "config.istio.io",
+  "networking.istio.io",
+  "rbac.istio.io",
+  "security.istio.io"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+  # For updating Istio resource statuses
+- apiGroups: [
+  "authentication.istio.io",
+  "config.istio.io",
+  "networking.istio.io",
+  "rbac.istio.io",
+  "security.istio.io"]
+  resources: ["*/status"]
+  verbs: ["update"]
+
+  # Remove galley's permissions to reconcile the validation config when istiod is present.
+  # Notably missing here is the permission to modify webhooks.
+
+- apiGroups: ["extensions","apps"]
+  resources: ["deployments"]
+  resourceNames: ["istio-galley"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["pods", "nodes", "services", "endpoints", "namespaces"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["extensions"]
+  resources: ["ingresses"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["extensions"]
+  resources: ["deployments/finalizers"]
+  resourceNames: ["istio-galley"]
+  verbs: ["update"]
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["clusterroles"]
+  verbs: ["get", "list", "watch"]
