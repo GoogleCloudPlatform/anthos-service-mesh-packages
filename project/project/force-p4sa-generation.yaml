@@ -1,10 +1,10 @@
 ---
-# This is an empty 1.4 control plane, used to force creation of p4sa
+# This is an empty istio control plane, used to force creation of p4sa
 apiVersion: install.istio.io/v1alpha2
-kind: IstioControlPlane
+kind: IstioOperator
 metadata:
-  namespace: istio-operator
-  name: example-istiocontrolplane
+  annotations:
+    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
 spec:
   profile: minimal
   trafficManagement:

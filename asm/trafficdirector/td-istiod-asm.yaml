@@ -3,6 +3,8 @@ kind: HorizontalPodAutoscaler
 metadata:
   name: asm-td
   namespace: istio-system
+  annotations:
+    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
   labels:
     release: asm-td
 spec:
@@ -23,6 +25,8 @@ kind: PodDisruptionBudget
 metadata:
   name: asm-td
   namespace: istio-system
+  annotations:
+    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
   labels:
     release: asm-td
 spec:
@@ -37,6 +41,8 @@ kind: Service
 metadata:
   name: asm-td
   namespace: istio-system
+  annotations:
+    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
   labels:
     release: asm-td
 spec:
@@ -62,6 +68,8 @@ kind: Deployment
 metadata:
   name: asm-td
   namespace: istio-system
+  annotations:
+    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
   labels:
     app: asm-td
     release: asm-td
