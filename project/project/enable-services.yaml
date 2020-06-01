@@ -3,7 +3,7 @@ apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
 kind: Service
 metadata:
   annotations:
-    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+    gke.io/cluster: "bootstrap://"
     cnrm.cloud.google.com/deletion-policy: "abandon"
     cnrm.cloud.google.com/disable-dependent-services: "false"
   namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
@@ -14,7 +14,7 @@ apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
 kind: Service
 metadata:
   annotations:
-    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+    gke.io/cluster: "bootstrap://"
     cnrm.cloud.google.com/deletion-policy: "abandon"
     cnrm.cloud.google.com/disable-dependent-services: "false"
   namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
@@ -25,7 +25,7 @@ apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
 kind: Service
 metadata:
   annotations:
-    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+    gke.io/cluster: "bootstrap://"
     cnrm.cloud.google.com/deletion-policy: "abandon"
     cnrm.cloud.google.com/disable-dependent-services: "false"
   namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
@@ -36,7 +36,7 @@ apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
 kind: Service
 metadata:
   annotations:
-    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+    gke.io/cluster: "bootstrap://"
     cnrm.cloud.google.com/deletion-policy: "abandon"
     cnrm.cloud.google.com/disable-dependent-services: "false"
   namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
@@ -47,7 +47,7 @@ apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
 kind: Service
 metadata:
   annotations:
-    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+    gke.io/cluster: "bootstrap://"
     cnrm.cloud.google.com/deletion-policy: "abandon"
     cnrm.cloud.google.com/disable-dependent-services: "false"
   namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
@@ -58,7 +58,7 @@ apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
 kind: Service
 metadata:
   annotations:
-    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+    gke.io/cluster: "bootstrap://"
     cnrm.cloud.google.com/deletion-policy: "abandon"
     cnrm.cloud.google.com/disable-dependent-services: "false"
   namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
@@ -69,7 +69,7 @@ apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
 kind: Service
 metadata:
   annotations:
-    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+    gke.io/cluster: "bootstrap://"
     cnrm.cloud.google.com/deletion-policy: "abandon"
     cnrm.cloud.google.com/disable-dependent-services: "false"
   namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
@@ -80,7 +80,7 @@ apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
 kind: Service
 metadata:
   annotations:
-    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+    gke.io/cluster: "bootstrap://"
     cnrm.cloud.google.com/deletion-policy: "abandon"
     cnrm.cloud.google.com/disable-dependent-services: "false"
   namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
@@ -91,7 +91,7 @@ apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
 kind: Service
 metadata:
   annotations:
-    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+    gke.io/cluster: "bootstrap://"
     cnrm.cloud.google.com/deletion-policy: "abandon"
     cnrm.cloud.google.com/disable-dependent-services: "false"
   namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
