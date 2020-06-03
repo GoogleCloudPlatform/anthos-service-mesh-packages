@@ -26,6 +26,11 @@ openAPI:
         setter:
           name: anthos.servicemesh.sink-auth-mode
           value: GOOGLE
+    io.k8s.cli.setters.anthos.servicemesh.jwks-transformer-interval:
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.jwks-transformer-interval
+          value: 20m
     io.k8s.cli.setters.gcloud.core.project:
       x-k8s-cli:
         setter:
