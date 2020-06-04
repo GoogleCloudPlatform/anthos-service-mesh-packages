@@ -6,12 +6,15 @@ metadata:
   name: asm-galley-service-account
   namespace: istio-system
   annotations:
+    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
     iam.gke.io/gcp-service-account: "asm-galley-service-account@[PROJECT_ID].iam.gserviceaccount.com" # {"$ref":"#/definitions/io.k8s.cli.substitutions.k8s-galley-service-account"}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: asm-galley-binding
+  annotations:
+    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
   labels:
     app: asm-galley
     release: asm-galley
@@ -29,6 +32,8 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: asm-galley
+  annotations:
+    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
   labels:
     release: asm-galley
 rules:

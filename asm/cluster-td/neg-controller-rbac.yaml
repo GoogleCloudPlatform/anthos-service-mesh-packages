@@ -5,12 +5,15 @@ metadata:
   name: neg-controller
   namespace: kube-system
   annotations:
+    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
     iam.gke.io/gcp-service-account: "neg-service-account@[PROJECT_ID].iam.gserviceaccount.com" # {"$ref":"#/definitions/io.k8s.cli.substitutions.k8s-neg-service-account"}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: system:controller:neg-controller
+  annotations:
+    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
 rules:
 - apiGroups: [""]
   resources: ["secrets"]
@@ -59,6 +62,8 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: system:controller:neg-controller
+  annotations:
+    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
