@@ -5,6 +5,7 @@ metadata:
   name: l7-lb-controller
   namespace: kube-system
   annotations:
+    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
     scheduler.alpha.kubernetes.io/critical-pod: ''
   labels:
     k8s-app: gcp-lb-controller
