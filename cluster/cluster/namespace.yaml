@@ -1,6 +1,8 @@
 apiVersion: v1
 kind: Namespace
 metadata:
+  annotations:
+    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
   name: istio-system
   labels:
     istio-operator-managed: Reconcile

@@ -64,13 +64,15 @@ kpt pkg get https://github.com/GoogleCloudPlatform/anthos-service-mesh-packages.
 
 # To set tunables, use `kpt cfg set`. To see all tunables, run `kpt cfg list-setters <folder>`
 kpt cfg set asm gcloud.compute.location ${LOCATION}
-kpt cfg set asm gcloud.compute.cluster ${CLUSTER_NAME}
+kpt cfg set asm gcloud.container.cluster ${CLUSTER_NAME}
 kpt cfg set asm gcloud.core.project ${PROJECT_ID}
 
-kpt cfg set cluster location ${LOCATION}
-kpt cfg set cluster cluster-name ${CLUSTER_NAME}
+kpt cfg set cluster gcloud.compute.location ${LOCATION}
+kpt cfg set cluster gcloud.container.cluster ${CLUSTER_NAME}
 kpt cfg set cluster gcloud.core.project ${PROJECT_ID}
 
+kpt cfg set project gcloud.compute.location ${LOCATION}
+kpt cfg set project gcloud.container.cluster ${CLUSTER_NAME}
 kpt cfg set project gcloud.core.project ${PROJECT_ID}
 
 # Optional: commit state to git

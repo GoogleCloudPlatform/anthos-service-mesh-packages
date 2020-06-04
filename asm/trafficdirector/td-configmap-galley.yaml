@@ -1,21 +1,27 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  annotations:
+    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
   name: istio-galley-config-td
   namespace: istio-system
 data:
   TRAFFICDIRECTORADDRESS: "trafficdirector.googleapis.com:443" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.endpoint.trafficdirector-address"}
   MESHCAADDRESS: "meshca.googleapis.com:443" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.endpoint.meshca-address"}
+  CA_ADDR: "meshca.googleapis.com:443" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.endpoint.meshca-address"}
   SINKADDRESS: "meshconfig.googleapis.com:443" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.serivcemesh.meshconfig-address"}
-  SINKAUTHMODE: "GOOGLE" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.sink-auth-mode"}
+  SINKAUTHMODE: "GOOGLE-STS" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.sink-auth-mode"}
   SDSPATH: "unix:/etc/istio/proxy/SDS"
   PROJECT_ID: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
   GOOGLE_APPLICATION_CREDENTIALS: /var/secrets/google/key.json
   AUDIENCE: "[PROJECT_ID].svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
   trustDomain: "[PROJECT_ID].svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
   TRUST_DOMAIN: "[PROJECT_ID].svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
+  GCP_GKE_CLUSTER_URL: https://container.googleapis.com/v1/projects/[PROJECT_ID]/locations/us-central1-c/clusters/asm-free-trial # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cluster-url"}
+  GKE_CLUSTER_URL: https://container.googleapis.com/v1/projects/[PROJECT_ID]/locations/us-central1-c/clusters/asm-free-trial # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cluster-url"}
   gkeClusterUrl: https://container.googleapis.com/v1/projects/[PROJECT_ID]/locations/us-central1-c/clusters/asm-free-trial # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cluster-url"}
   GCP_METADATA: "[PROJECT_ID]|[PROJECT_NUMBER]|asm-free-trial|us-central1-c" # { "$ref": "#/definitions/io.k8s.cli.substitutions.gcp-metadata" }
+  GCP_PROJECT_NUMBER: "[PROJECT_NUMBER]" # { "$ref": "#/definitions/io.k8s.cli.substitutions.gcp-project-number" }
   ISTIO_META_MESH_ID: "proj-[PROJECT_NUMBER]" # { "$ref": "#/definitions/io.k8s.cli.substitutions.mesh-id" }
   ISTIO_META_TRAFFICDIRECTOR_GCP_PROJECT_NUMBER: "[PROJECT_NUMBER]" # { "$ref": "#/definitions/io.k8s.cli.substitutions.gcp-project-number" }
   ENABLE_JWKS_TRANSFORMER: "true"

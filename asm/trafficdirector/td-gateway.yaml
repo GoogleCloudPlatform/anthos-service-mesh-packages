@@ -1,0 +1,331 @@
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  annotations:
+    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+  labels:
+    app: asm-td-ingressgateway
+    istio: ingressgateway
+    release: istio
+  name: asm-td-ingressgateway
+  namespace: istio-system
+spec:
+  maxReplicas: 5
+  metrics:
+    - resource:
+        name: cpu
+        targetAverageUtilization: 80
+      type: Resource
+  minReplicas: 1
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: asm-td-ingressgateway
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+  labels:
+    app: asm-td-ingressgateway
+    istio: ingressgateway
+  name: asm-td-ingressgateway
+  namespace: istio-system
+spec:
+  selector:
+    matchLabels:
+      app: asm-td-ingressgateway
+      istio: ingressgateway
+  strategy:
+    rollingUpdate:
+      maxSurge: 100%
+      maxUnavailable: 25%
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+      labels:
+        app: asm-td-ingressgateway
+        chart: gateways
+        heritage: Tiller
+        istio: ingressgateway
+        release: istio
+        service.istio.io/canonical-name: asm-td-ingressgateway
+        service.istio.io/canonical-revision: "1.5"
+    spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - preference:
+                matchExpressions:
+                  - key: beta.kubernetes.io/arch
+                    operator: In
+                    values:
+                      - amd64
+              weight: 2
+            - preference:
+                matchExpressions:
+                  - key: beta.kubernetes.io/arch
+                    operator: In
+                    values:
+                      - ppc64le
+              weight: 2
+            - preference:
+                matchExpressions:
+                  - key: beta.kubernetes.io/arch
+                    operator: In
+                    values:
+                      - s390x
+              weight: 2
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: beta.kubernetes.io/arch
+                    operator: In
+                    values:
+                      - amd64
+                      - ppc64le
+                      - s390x
+      containers:
+        - args:
+            - proxy
+            - router
+            - --domain
+            - $(POD_NAMESPACE).svc.cluster.local
+            - --drainDuration
+            - 45s
+            - --parentShutdownDuration
+            - 1m0s
+            - --discoveryAddress
+            - trafficdirector.googleapis.com:443
+            - --stsPort=15463
+            - --proxyLogLevel=trace
+            - --proxyComponentLogLevel=misc:error
+            - --log_output_level=default:info
+            - --connectTimeout
+            - 10s
+            - --proxyAdminPort
+            - "15000"
+            - --dnsRefreshRate
+            - 300s
+            - --controlPlaneAuthPolicy
+            - NONE
+            - --trust-domain=$(TRUST_DOMAIN)
+            - --serviceCluster
+            - asm-td-ingressgateway
+          envFrom:
+          - configMapRef:
+              name: istio-galley-config-td
+              optional: false
+          env:
+          - name: JWT_POLICY
+            value: third-party-jwt
+          - name: PILOT_CERT_PROVIDER
+            value: kubernetes
+          - name: ISTIO_BOOTSTRAP
+            value: /var/lib/istio/envoy/gcp_envoy_bootstrap_tmpl.json
+          - name: ISTIO_META_TRAFFICDIRECTOR_ENABLE_ISTIO_STACKDRIVER_TELEMETRY
+            value: "true"
+          - name: ISTIO_META_TRAFFICDIRECTOR_ACCESS_LOG_PATH
+            value: /dev/stdout
+          - name: ISTIO_META_TRAFFICDIRECTOR_WORKLOAD_NAME
+            value: csm-auth-default
+          - name: CA_PROVIDER
+            value: GoogleCA
+          - name: PLUGINS
+            value: GoogleTokenExchange
+          - name: ISTIO_KUBE_APP_PROBERS
+            value: '{}'
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: spec.nodeName
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+          - name: INSTANCE_IP
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: status.podIP
+          - name: HOST_IP
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: status.hostIP
+          - name: SERVICE_ACCOUNT
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.serviceAccountName
+          - name: ISTIO_META_WORKLOAD_NAME
+            value: asm-td-ingressgateway
+          - name: ISTIO_META_OWNER
+            value: kubernetes://apis/apps/v1/namespaces/istio-system/deployments/asm-td-ingressgateway
+          - name: ISTIO_META_POD_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+          - name: ISTIO_META_istio
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.labels['istio']
+          - name: ISTIO_META_CONFIG_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: ISTIO_META_CLUSTER_ID
+            value: Kubernetes
+          image: gcr.io/ymzhu-istio/proxyv2:ymzhu-asm-1.5 ## TODO: Fixme
+          imagePullPolicy: IfNotPresent
+          name: istio-proxy
+          volumeMounts:
+            - mountPath: /var/run/secrets/tokens
+              name: istio-token
+              readOnly: true
+            - mountPath: /var/run/ingress_gateway
+              name: ingressgatewaysdsudspath
+            - mountPath: /etc/istio/pod
+              name: podinfo
+            - mountPath: /etc/istio/ingressgateway-certs
+              name: ingressgateway-certs
+              readOnly: true
+            - mountPath: /etc/istio/ingressgateway-ca-certs
+              name: ingressgateway-ca-certs
+              readOnly: true
+      serviceAccountName: asm-td-ingressgateway-service-account
+      volumes:
+        - downwardAPI:
+            items:
+              - fieldRef:
+                  fieldPath: metadata.labels
+                path: labels
+              - fieldRef:
+                  fieldPath: metadata.annotations
+                path: annotations
+          name: podinfo
+        - emptyDir: {}
+          name: ingressgatewaysdsudspath
+        - name: istio-token
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  audience: "[PROJECT_ID].svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
+                  expirationSeconds: 43200
+                  path: istio-token
+        - name: ingressgateway-certs
+          secret:
+            optional: true
+            secretName: asm-td-ingressgateway-certs
+        - name: ingressgateway-ca-certs
+          secret:
+            optional: true
+            secretName: asm-td-ingressgateway-ca-certs
+
+---
+
+apiVersion: policy/v1beta1
+kind: PodDisruptionBudget
+metadata:
+  annotations:
+    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+  name: ingressgateway
+  namespace: istio-system
+  labels:
+    app: asm-td-ingressgateway
+    istio: ingressgateway
+
+    release: istio
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: asm-td-ingressgateway
+      istio: ingressgateway
+
+      release: istio
+---
+
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  annotations:
+    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+  name: asm-td-ingressgateway-sds
+  namespace: istio-system
+  labels:
+    release: istio
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "watch", "list"]
+---
+
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  annotations:
+    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+  name: asm-td-ingressgateway-sds
+  namespace: istio-system
+  labels:
+    release: istio
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: asm-td-ingressgateway-sds
+subjects:
+  - kind: ServiceAccount
+    name: asm-td-ingressgateway-service-account
+---
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+  labels:
+    app: asm-td-ingressgateway
+    istio: ingressgateway
+    release: istio
+  name: asm-td-ingressgateway
+  namespace: istio-system
+spec:
+  ports:
+    - name: http2
+      port: 80
+      targetPort: 80
+  selector:
+    app: asm-td-ingressgateway
+    istio: ingressgateway
+  type: LoadBalancer
+
+---
+
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+  name: asm-td-ingressgateway-service-account
+  namespace: istio-system
+  labels:
+    app: asm-td-ingressgateway
+    istio: ingressgateway
+
+    release: istio
+---
