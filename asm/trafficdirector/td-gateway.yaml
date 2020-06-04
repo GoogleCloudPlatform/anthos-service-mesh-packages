@@ -246,9 +246,7 @@ metadata:
     release: istio
 spec:
   selector:
-    app: asm-td-ingressgateway
     istio: ingressgateway
-
   servers:
     - port:
         number: 80

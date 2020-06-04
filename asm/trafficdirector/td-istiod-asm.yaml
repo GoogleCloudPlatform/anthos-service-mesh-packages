@@ -92,7 +92,7 @@ spec:
       serviceAccountName: asm-td-service-account
       containers:
       - name: discovery
-        image: gcr.io/asm-testing/pilot:release-1.5-asm-10 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.images.istiod"}
+        image: gcr.io/gke-release/asm/pilot:1.5.4-asm.2 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.images.istiod"}
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
@@ -138,7 +138,7 @@ spec:
         - name: PILOT_EXTERNAL_GALLEY
           value: "false"
         - name: PROXY_IMAGE
-          value: gcr.io/asm-testing/proxyv2:release-1.5-asm-10 # { "$ref": "#/definitions/io.k8s.cli.setters.anthos.servicemesh.images.proxy" }
+          value: gcr.io/gke-release/asm/proxyv2:1.5.4-asm.2 # { "$ref": "#/definitions/io.k8s.cli.setters.anthos.servicemesh.images.proxy" }
         resources:
           requests:
             cpu: 101m

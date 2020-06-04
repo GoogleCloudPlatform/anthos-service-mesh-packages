@@ -27,9 +27,11 @@ spec:
         sidecar.istio.io/inject: "false"
     spec:
       serviceAccountName: asm-galley-service-account
+      securityContext:
+        fsGroup: 1337
       containers:
       - name: galley
-        image: gcr.io/asm-testing/galley:release-1.5-asm-10 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.images.galley"}
+        image: gcr.io/gke-release/asm/galley:1.5.4-asm.2 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.images.galley"}
         imagePullPolicy: "Always"
         ports:
         - containerPort: 9443
@@ -69,12 +71,17 @@ spec:
         - name: mesh-config
           mountPath: /etc/mesh-config
           readOnly: true
-        - mountPath: /var/secrets/google
-          name: google-cloud-key
+        - mountPath: /var/run/secrets/tokens
+          name: istio-token
       volumes:
-      - name: google-cloud-key
-        secret:
-          secretName: google-cloud-key
+      - name: istio-token
+        projected:
+          defaultMode: 77
+          sources:
+          - serviceAccountToken:
+              audience: "[PROJECT_ID].svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
+              expirationSeconds: 43200
+              path: istio-token
       - name: config
         # Should be created at cluster creation time, include info about the cluster and vendor-specific options.
         configMap:
