@@ -234,30 +234,6 @@ spec:
 
 ---
 
-
-apiVersion: networking.istio.io/v1alpha3
-kind: Gateway
-metadata:
-  annotations:
-    gke.io/cluster: "gke://[PROJECT_ID]/us-central1-c/asm-free-trial" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
-  name: asm-td-ingressgateway
-  namespace: istio-system
-  labels:
-    release: istio
-spec:
-  selector:
-    istio: ingressgateway
-  servers:
-    - port:
-        number: 80
-        name: http
-        protocol: HTTP
-      hosts:
-        - "*"
-      # Additional ports in gateaway for the ingressPorts - apps using dedicated port instead of hostname
----
-
-
 apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
 metadata:
