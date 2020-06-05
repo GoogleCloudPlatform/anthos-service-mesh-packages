@@ -19,7 +19,7 @@ metadata:
 spec:
   profile: asm
   hub: gcr.io/gke-release/asm
-  tag: 1.4.7-asm.0
+  tag: 1.4.9-asm.1
   values:
     global:
       meshID: "ISTIO_MESH_ID" # {"type":"string","x-kustomize":{"setter":{"name":"anthos.istio.mesh_id"}}}
