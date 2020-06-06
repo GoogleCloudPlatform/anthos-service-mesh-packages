@@ -9,7 +9,7 @@ data:
   TRAFFICDIRECTORADDRESS: "trafficdirector.googleapis.com:443" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.endpoint.trafficdirector-address"}
   MESHCAADDRESS: "meshca.googleapis.com:443" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.endpoint.meshca-address"}
   CA_ADDR: "meshca.googleapis.com:443" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.endpoint.meshca-address"}
-  SINKADDRESS: "meshconfig.googleapis.com:443" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.serivcemesh.meshconfig-address"}
+  SINKADDRESS: "meshconfig.googleapis.com:443" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.endpoint.meshconfig-address"}
   SINKAUTHMODE: "GOOGLE-STS" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.sink-auth-mode"}
   SDSPATH: "unix:/etc/istio/proxy/SDS"
   PROJECT_ID: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
