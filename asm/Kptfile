@@ -56,7 +56,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.tag
-          value: 1.4.7-asm.0
+          value: 1.4.10-asm.1
     io.k8s.cli.substitutions.cluster:
       x-k8s-cli:
         substitution:
