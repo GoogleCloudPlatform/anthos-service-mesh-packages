@@ -20,7 +20,7 @@ metadata:
 spec:
   profile: asm
   hub: gcr.io/gke-release/asm # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}
-  tag: 1.5.4-asm.2 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
+  tag: 1.5.5-asm.0 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
   meshConfig:
     defaultConfig:
       proxyMetadata:
