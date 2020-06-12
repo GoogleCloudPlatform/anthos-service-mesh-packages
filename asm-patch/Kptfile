@@ -35,12 +35,12 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.hub
-          value: gcr.io/gke-release/asm
+          value: docker.io/selfind
     io.k8s.cli.setters.anthos.servicemesh.tag:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.tag
-          value: 1.5.4-asm.2
+          value: taohe
     io.k8s.cli.substitutions.mesh-id:
       type: string
       x-k8s-cli:
