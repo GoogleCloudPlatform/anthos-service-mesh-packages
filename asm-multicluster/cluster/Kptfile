@@ -11,7 +11,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.tag
-          value: 1.5.4-asm.2
+          value: 1.6.2-asm.0
     io.k8s.cli.setters.gcloud.compute.location:
       type: string
       x-k8s-cli:
