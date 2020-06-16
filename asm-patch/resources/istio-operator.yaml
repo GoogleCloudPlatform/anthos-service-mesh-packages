@@ -19,8 +19,8 @@ metadata:
   name: default-istio-operator
 spec:
   profile: asm
-  hub: docker.io/selfind # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}
-  tag: taohe # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
+  hub: gcr.io/gke-release/asm # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}
+  tag: 1.6.2-asm.0 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
   meshConfig:
     defaultConfig:
       proxyMetadata:

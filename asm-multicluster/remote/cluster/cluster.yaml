@@ -33,7 +33,7 @@ spec:
     mesh_id: "proj-PROJECT_NUMBER" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.project.projectNumber","value":"PROJECT_NUMBER"}]}}
   loggingService: logging.googleapis.com/kubernetes
   monitoringService: monitoring.googleapis.com/kubernetes
-  network: default  # {"type":"string","x-kustomize":{"setter":{"name":"gcloud.compute.network"}}}
+  network: default # {"type":"string","x-kustomize":{"setter":{"name":"gcloud.compute.network"}}}
   subnetwork: default # {"type":"string","x-kustomize":{"setter":{"name":"gcloud.compute.subnetwork"}}}
   releaseChannel:
     channel: REGULAR # {"type":"string","x-kustomize":{"setter":{"name":"gcloud.container.cluster.releaseChannel"}}}
