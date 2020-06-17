@@ -44,3 +44,12 @@ spec:
       sds:
         token:
           aud: "PROJECT_ID.svc.id.goog" # {"type":"string","x-kustomize":{"partialSetters":[{"name":"gcloud.core.project","value":"PROJECT_ID"}]}}
+  components:
+    pilot:
+      k8s:
+        resources:
+          requests:
+            cpu: 500m
+        hpaSpec:
+          minReplicas: 1
+        replicaCount: 1
