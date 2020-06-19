@@ -121,3 +121,8 @@ openAPI:
             ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.location'
           - marker: asm-cluster
             ref: '#/definitions/io.k8s.cli.setters.gcloud.container.cluster'
+    io.k8s.cli.setters.anthos.servicemesh.profile:
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.profile
+          value: asm-gcp
