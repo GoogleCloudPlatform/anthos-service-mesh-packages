@@ -17,7 +17,7 @@ kind: IstioOperator
 metadata:
   clusterName: "PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
 spec:
-  profile: asm-gcp
+  profile: asm-gcp # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.profile"}
   hub: gcr.io/gke-release/asm # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}
   tag: 1.6.2-asm.0 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
   meshConfig:
@@ -34,3 +34,6 @@ spec:
       sds:
         token:
           aud: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
+      multiCluster:
+        # Provided to ensure a human readable name rather than a UUID.
+        clusterName: "PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
