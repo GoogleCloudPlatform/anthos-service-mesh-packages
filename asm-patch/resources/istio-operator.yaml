@@ -38,3 +38,6 @@ spec:
       multiCluster:
         # Provided to ensure a human readable name rather than a UUID.
         clusterName: "PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
+      enableTracing: true
+      proxy:
+        tracer: stackdriver
