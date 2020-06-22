@@ -38,8 +38,6 @@ spec:
       multiCluster:
         # Provided to ensure a human readable name rather than a UUID.
         clusterName: "PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
-      # Enables Tracing through Stackdriver. Default sampling of traces is set to 1%.
-      # Sampling can be configured using pilot.traceSampling config. Ref: https://istio.io/latest/docs/tasks/observability/distributed-tracing/configurability/#trace-sampling
       enableTracing: true
       proxy:
         tracer: stackdriver
