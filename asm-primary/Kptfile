@@ -126,3 +126,11 @@ openAPI:
         setter:
           name: anthos.servicemesh.profile
           value: asm-gcp
+    io.k8s.cli.substitutions.spiffe-bundle-endpoints:
+      x-k8s-cli:
+        substitution:
+          name: spiffe-bundle-endpoints
+          pattern: PROJECT_ID.svc.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json
+          values:
+          - marker: PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
