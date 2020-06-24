@@ -14,19 +14,19 @@ spec:
     mesh_id: "proj-[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh-id"}
   loggingService: logging.googleapis.com/kubernetes
   monitoringService: monitoring.googleapis.com/kubernetes
-  # ipAllocationPolicy:
-  #   useIpAliases: true
   addonsConfig:
     horizontalPodAutoscaling:
       disabled: false
     httpLoadBalancing:
-      disabled: true
+      disabled: true # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.addon.disableHttpLoadBalancing"}
     cloudrunConfig:
       disabled: true # {"$ref":"#/definitions/io.k8s.cli.setters.cloudrun-config-disabled"}
   network: default
   networkPolicy:
     enabled: true
-  minMasterVersion: "1.15.11-gke.13"
+  minMasterVersion: "1.15.11-gke.13" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.min-master-version" }
+  releaseChannel:
+    channel: "REGULAR" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.release-channel"}
   nodeConfig:
     metadata:
       disable-legacy-endpoints: "true"

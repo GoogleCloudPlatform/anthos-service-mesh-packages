@@ -46,3 +46,11 @@ openAPI:
         setter:
           name: gcloud.compute.location
           value: us-central1-c
+    io.k8s.cli.substitutions.iam-policy-member-project:
+      x-k8s-cli:
+        substitution:
+          name: iam-policy-member-project
+          pattern: PROJECTID
+          values:
+          - marker: PROJECTID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
