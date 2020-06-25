@@ -32,6 +32,17 @@ spec:
         GCP_METADATA: "PROJECT_ID|PROJECT_NUMBER|asm-cluster|us-central1-c" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-metadata"}
         TRUST_DOMAIN: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
         GKE_CLUSTER_URL: "https://container.googleapis.com/v1/projects/PROJECT_ID/locations/us-central1-c/clusters/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cluster-url"}
+      tracing:
+        customTags:
+          service.istio.io/canonical-name:
+            environment:
+              name: CANONICAL_SERVICE
+              default_value: ""
+          service.istio.io/canonical-revision:
+            environment:
+              name: CANONICAL_REVISION
+              default_value: ""
+    enableTracing: true
   values:
     global:
       meshID: "proj-PROJECT_NUMBER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh-id"}
@@ -43,3 +54,5 @@ spec:
       multiCluster:
         # Provided to ensure a human readable name rather than a UUID.
         clusterName: "PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
+      proxy:
+        tracer: "stackdriver"
