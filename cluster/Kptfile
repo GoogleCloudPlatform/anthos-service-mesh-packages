@@ -6,6 +6,21 @@ packageMetadata:
   shortDescription: ASM Networking 1.5
 openAPI:
   definitions:
+    io.k8s.cli.setters.gcloud.container.cluster.min-master-version:
+      x-k8s-cli:
+        setter:
+          name: gcloud.container.cluster.min-master-version
+          value: "1.15.11-gke.13"
+    io.k8s.cli.setters.gcloud.container.cluster.addon.disableHttpLoadBalancing:
+      x-k8s-cli:
+        setter:
+          name: gcloud.container.cluster.addon.disableHttpLoadBalancing
+          value: "true"
+    io.k8s.cli.setters.gcloud.container.cluster.release-channel:
+      x-k8s-cli:
+        setter:
+          name: gcloud.container.cluster.release-channel
+          value: "REGULAR"
     io.k8s.cli.setters.cloudrun-config-disabled:
       x-k8s-cli:
         setter:

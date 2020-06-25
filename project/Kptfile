@@ -19,15 +19,6 @@ openAPI:
           values:
           - marker: PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
-    io.k8s.cli.substitutions.neg-service-account:
-      x-k8s-cli:
-        substitution:
-          name: project-id
-          pattern: serviceAccount:PROJECT_ID.svc.id.goog[kube-system/neg-controller]
-          values:
-          - marker: PROJECT_ID
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
-
     io.k8s.cli.setters.gcloud.project.projectNumber:
       x-k8s-cli:
         setter:
@@ -55,3 +46,11 @@ openAPI:
         setter:
           name: gcloud.compute.location
           value: us-central1-c
+    io.k8s.cli.substitutions.iam-policy-member-project:
+      x-k8s-cli:
+        substitution:
+          name: iam-policy-member-project
+          pattern: PROJECTID
+          values:
+          - marker: PROJECTID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'

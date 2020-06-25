@@ -1,0 +1,43 @@
+apiVersion: kpt.dev/v1alpha1
+kind: Kptfile
+metadata:
+  name: asm-istiod-15
+packageMetadata:
+  shortDescription: ASM Networking 1.5
+openAPI:
+  definitions:
+    io.k8s.cli.setters.gcloud.compute.location:
+      x-k8s-cli:
+        setter:
+          name: gcloud.compute.location
+          value: us-central1-c
+    io.k8s.cli.setters.gcloud.container.cluster:
+      x-k8s-cli:
+        setter:
+          name: gcloud.container.cluster
+          value: asm-free-trial
+    io.k8s.cli.setters.gcloud.core.project:
+      x-k8s-cli:
+        setter:
+          name: gcloud.core.project
+          value: '[PROJECT_ID]'
+    io.k8s.cli.substitutions.k8s-neg-service-account:
+      x-k8s-cli:
+        substitution:
+          name: project-id
+          pattern: neg-service-account@PROJECT_ID.iam.gserviceaccount.com
+          values:
+          - marker: PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+    io.k8s.cli.substitutions.gkeio-cluster:
+      x-k8s-cli:
+        substitution:
+          name: gkeio-cluster
+          pattern: gke://PROJECTID/LOCATION/CLUSTERNAME
+          values:
+          - marker: CLUSTERNAME
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.container.cluster'
+          - marker: LOCATION
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.location'
+          - marker: PROJECTID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'

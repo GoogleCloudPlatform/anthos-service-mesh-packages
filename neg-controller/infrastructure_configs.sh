@@ -143,12 +143,3 @@ if ! kubectl -n kube-system get secret google-cloud-key > /dev/null 2>&1; then
   kubectl -n kube-system create secret generic google-cloud-key  --from-file key.json=<(fetchCloudKey neg-service-account)
   kubectl -n kube-system delete pod -lk8s-app=gcp-lb-controller --wait=false
 fi
-
-if ! kubectl get ns istio-system > /dev/null; then
-  kubectl create ns istio-system
-fi
-
-gcloud projects add-iam-policy-binding ${PROJECT_ID} \
-    --member serviceAccount:service-$(gcloud projects list --filter="project_id=${PROJECT_ID}" --format='value(project_number)')@gcp-sa-meshdataplane.iam.gserviceaccount.com \
-    --role roles/compute.networkViewer
-
