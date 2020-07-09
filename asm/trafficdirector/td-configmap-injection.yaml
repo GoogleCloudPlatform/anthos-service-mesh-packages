@@ -8,10 +8,10 @@ metadata:
   labels:
     release: istiod
 data:
-  config: |
+  config: |-
     policy: enabled
     template: |
-      rewriteAppHTTPProbe: true
+      rewriteAppHTTPProbe: true      
       initContainers:
       - name: istio-init
       {{- if contains "/" (annotation .ObjectMeta `sidecar.istio.io/proxyImage` ``) }}
@@ -21,6 +21,7 @@ data:
         imagePullPolicy: "Always"
       {{- end }}
         command:
+        - pilot-agent
         - istio-iptables
         - "-p"
         - 15001
@@ -72,45 +73,21 @@ data:
           name: http-envoy-prom
         args:
         - proxy
-        - sidecar
-        - --domain
-        - $(POD_NAMESPACE).svc.cluster.local
-        - --configPath
-        - "/etc/istio/proxy"
-        - --binaryPath
-        - "/usr/local/bin/envoy"
+        - --domain=$(POD_NAMESPACE).svc.cluster.local
         - --serviceCluster
         {{ if ne "" (index .ObjectMeta.Labels "app") -}}
         - "{{ index .ObjectMeta.Labels `app` }}.$(POD_NAMESPACE)"
         {{ else -}}
         - "{{ valueOrDefault .DeploymentMeta.Name `istio-proxy` }}.{{ valueOrDefault .DeploymentMeta.Namespace `default` }}"
         {{ end -}}
-        - --drainDuration
-        - "{{ formatDuration .ProxyConfig.DrainDuration }}"
-        - --parentShutdownDuration
-        - "{{ formatDuration .ProxyConfig.ParentShutdownDuration }}"
-        - --discoveryAddress
-        - {{ env "TRAFFICDIRECTORADDRESS" "" }}
+        - --discoveryAddress={{- env "TRAFFICDIRECTORADDRESS" "" }}
+        - --trust-domain={{- env "TRUST_DOMAIN" "" }}
         - --stsPort=15463
         - --proxyLogLevel={{ annotation .ObjectMeta `sidecar.istio.io/logLevel` ""}}
         - --proxyComponentLogLevel={{ annotation .ObjectMeta `sidecar.istio.io/componentLogLevel` "misc:error" }}
-        - --connectTimeout
-        - "{{ formatDuration .ProxyConfig.ConnectTimeout }}"
-        - --proxyAdminPort
-        - "{{ .ProxyConfig.ProxyAdminPort }}"
         {{ if gt .ProxyConfig.Concurrency 0 -}}
-        - --concurrency
-        - "{{ .ProxyConfig.Concurrency }}"
+        - --concurrency={{ .ProxyConfig.Concurrency }}
         {{ end -}}
-        - --dnsRefreshRate
-        - {{ annotation .ObjectMeta `sidecar.istio.io/dnsRefreshRate` "300s" }}
-      {{- if (ne (annotation .ObjectMeta "status.sidecar.istio.io/port" "15020") "0") }}
-        - --statusPort
-        - "{{ annotation .ObjectMeta `status.sidecar.istio.io/port` "15020" }}"
-        - --applicationPorts
-        - "{{ annotation .ObjectMeta `readiness.status.sidecar.istio.io/applicationPorts` (applicationPorts .Spec.Containers) }}"
-      {{- end }}
-        - --trust-domain={{ env "trustDomain" "" }}
         - --log_output_level=debug
         env:
         #- name: GRPC_TRACE
@@ -151,6 +128,9 @@ data:
           value: "GoogleTokenExchange"
         - name: GCP_METADATA
           value: "{{ env "GCP_METADATA" "" }}"
+        - name: PROXY_CONFIG
+          value: |
+                 {{ protoToJSON .ProxyConfig }}
         - name: POD_NAME
           valueFrom:
             fieldRef:

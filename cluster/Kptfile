@@ -15,7 +15,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: gcloud.container.cluster.addon.disableHttpLoadBalancing
-          value: "true"
+          value: "false"
     io.k8s.cli.setters.gcloud.container.cluster.release-channel:
       x-k8s-cli:
         setter:
