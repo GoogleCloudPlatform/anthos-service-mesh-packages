@@ -96,3 +96,25 @@ metadata:
     cnrm.cloud.google.com/disable-dependent-services: "false"
   namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
   name: anthos.googleapis.com
+---
+# Network Security APIs
+apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
+kind: Service
+metadata:
+  annotations:
+    gke.io/cluster: "bootstrap://"
+    cnrm.cloud.google.com/deletion-policy: "abandon"
+    cnrm.cloud.google.com/disable-dependent-services: "false"
+  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
+  name: networksecurity.googleapis.com
+---
+# Network Service APIs
+apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
+kind: Service
+metadata:
+  annotations:
+    gke.io/cluster: "bootstrap://"
+    cnrm.cloud.google.com/deletion-policy: "abandon"
+    cnrm.cloud.google.com/disable-dependent-services: "false"
+  namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
+  name: networkservices.googleapis.com
