@@ -28,7 +28,8 @@ spec:
           value: "PROJECT_ID.svc.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json" # {"$ref":"#/definitions/io.k8s.cli.substitutions.spiffe-bundle-endpoints"}
         resources:
           requests:
-            cpu: 500m
+            cpu: 50m
+            memory: 0.15G
   meshConfig:
     defaultConfig:
       proxyMetadata:
