@@ -29,7 +29,7 @@ spec:
         resources:
           requests:
             cpu: 50m
-            memory: 0.15G
+            memory: 150Mi
   meshConfig:
     defaultConfig:
       proxyMetadata:
