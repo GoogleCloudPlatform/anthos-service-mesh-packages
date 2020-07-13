@@ -107,9 +107,6 @@ spec:
         # Args used by pilot - istiod doesn't use args.
         args:
         - "discovery"
-        # TODO: make them default if istiod mode is enabled (ISTIOD_ADDR set)
-        - --secureGrpcAddr
-        - ""
         - --namespace
         - "istio-system"
         # CRDs are created early, no need to hold RBAC permission

@@ -18,13 +18,12 @@ spec:
     horizontalPodAutoscaling:
       disabled: false
     httpLoadBalancing:
-      disabled: true # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.addon.disableHttpLoadBalancing"}
+      disabled: false # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.addon.disableHttpLoadBalancing"}
     cloudrunConfig:
       disabled: true # {"$ref":"#/definitions/io.k8s.cli.setters.cloudrun-config-disabled"}
   network: default
   networkPolicy:
     enabled: true
-  minMasterVersion: "1.15.11-gke.13" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.min-master-version" }
   releaseChannel:
     channel: "REGULAR" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.release-channel"}
   nodeConfig:

@@ -132,7 +132,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.enable-security-beta
-          value: "false"
+          value: "true"
     io.k8s.cli.substitutions.sink-meta:
       x-k8s-cli:
         substitution:

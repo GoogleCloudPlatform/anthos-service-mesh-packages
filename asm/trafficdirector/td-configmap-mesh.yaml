@@ -78,7 +78,7 @@ data:
     dnsRefreshRate:                    5s
     protocolDetectionTimeout:          100ms
 
-    enableAutoMtls: false
+    enableAutoMtls: true
 
     # Extra
     authPolicy: NONE
