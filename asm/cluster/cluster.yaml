@@ -12,23 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-apiVersion: identity.cnrm.cloud.google.com/v1alpha2
-kind: IdentityNamespace
-metadata:
-  name: default
-  namespace: "PROJECT_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
-spec: {}
----
-apiVersion: container.cnrm.cloud.google.com/v1alpha2
+apiVersion: container.cnrm.cloud.google.com/v1beta1
 kind: ContainerCluster
 metadata:
-  clusterName: "PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
+  annotations:
+    gke.io/cluster: "bootstrap://"
   name: "asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster"}
   namespace: "PROJECT_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
 spec:
   location: us-central1-c # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.compute.location"}
-  workloadIdentity:
-    identityNamespace: default
+  workloadIdentityConfig:
+    identityNamespace: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
   labels:
     mesh_id: "proj-PROJECT_NUMBER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh-id"}
   loggingService: logging.googleapis.com/kubernetes
