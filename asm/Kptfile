@@ -35,7 +35,6 @@ openAPI:
           name: gcloud.container.cluster
           value: asm-cluster
     io.k8s.cli.setters.gcloud.container.nodepool.max-nodes:
-      type: int
       x-k8s-cli:
         setter:
           name: gcloud.container.nodepool.max-nodes
