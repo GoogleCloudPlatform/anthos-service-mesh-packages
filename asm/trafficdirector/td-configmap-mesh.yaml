@@ -10,48 +10,37 @@ metadata:
 data:
 
   mesh: |
-    # Default config. Will be included in the image/deb.
-    # User config will replace it via a volume mount.
+    # See https://istio.io/latest/docs/reference/config/istio.mesh.v1alpha1/#MeshConfig
 
-    # This file has all the defaults from the code, but adjusted to include more stable prod settings.
-
-    # TODO: merge this with a user-mesh.yaml with overrides ?
-
-    #localityLbSettings:
-
-    # By default use the built-in MCP server.
-    #configSources:
-    #  - address: localhost:15901
-
-
-    # Set enableTracing to false to disable request tracing.
-    # Off by default. Should be enabled only if a tracer is installed, and ideally configured
-    # for specific workloads.
+    # Disable envoy tracing
     enableTracing:                     false
 
-    ###  Defaults
-
+    # Envoy access log settings.
     # Set accessLogFile to empty string to disable access log.
     accessLogFile:                     "/dev/stdout"
     accessLogEncoding:                 TEXT
     accessLogFormat: ""
     enableEnvoyAccessLogService: false
 
+    # Connection timeout for Envoy.
     connectTimeout:                    1s
 
+    # Export services/virtual services/destination rules to all namespaces.
     defaultServiceExportTo:            ["*"]
     defaultVirtualServiceExportTo:     ["*"]
     defaultDestinationRuleExportTo:    ["*"]
 
-    # Assume Mixerv2 or telemetry lite will be used by default.
+    # Disable Mixer functionality. Assume Mixerv2 or telemetry lite will be used by default.
     mixerCheckServer: ""
     mixerReportServer: ""
     disablePolicyChecks: true
     policyCheckFailOpen:               false
     sidecarToTelemetrySessionAffinity: false
 
+    # Upgrade to http2 if possible (https://istio.io/latest/docs/reference/config/istio.mesh.v1alpha1/#MeshConfig-H2UpgradePolicy)
     h2UpgradePolicy: UPGRADE
 
+    # Kubernetes namespace where cluster-side components are installed
     rootNamespace:                     "istio-system"
 
     # If set then set SO_KEEPALIVE on the socket to enable TCP Keepalives.
@@ -59,19 +48,16 @@ data:
       probes: 9
       time: 7200s
       interval: 75s
-
+      
+    # Port on which Envoy should listen for incoming connections from other services.
     proxyListenPort:                   15001
 
     # This is the k8s ingress service name, update if you used a different name
-    ingressService:                    "istio-ingressgateway"
+    ingressService:                    "asm-td-ingressgateway"
     ingressControllerMode: DEFAULT
     ingressClass: "istio"
 
-    # Temp
-    sdsUdsPath:                        "unix:/etc/istio/proxy/SDS"
-
-    enableSdsTokenMount:               false
-
+    # Enable all outbound pod traffic by default
     outboundTrafficPolicy:
       mode: ALLOW_ANY
 
@@ -110,8 +96,6 @@ data:
       proxyAdminPort: 15000
 
       interceptionMode: REDIRECT
-
-      #customConfigFile: "conf/sidecar/envoy_bootstrap_v2.json"
 
       concurrency: 0
 
