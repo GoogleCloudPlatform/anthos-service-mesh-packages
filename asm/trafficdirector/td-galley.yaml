@@ -31,7 +31,7 @@ spec:
         fsGroup: 1337
       containers:
       - name: galley
-        image: gcr.io/gke-release/asm/galley:1.5.4-asm.2 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.images.galley"}
+        image: gcr.io/gke-release/asm/galley:1.5.8-asm.7 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.images.galley"}
         imagePullPolicy: "Always"
         ports:
         - containerPort: 9443

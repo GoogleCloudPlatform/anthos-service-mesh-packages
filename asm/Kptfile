@@ -122,17 +122,17 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.images.galley
-          value: 'gcr.io/gke-release/asm/galley:1.5.4-asm.2'
+          value: 'gcr.io/gke-release/asm/galley:1.5.8-asm.7'
     io.k8s.cli.setters.anthos.servicemesh.images.istiod:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.images.istiod
-          value: 'gcr.io/gke-release/asm/pilot:1.5.4-asm.2'
+          value: 'gcr.io/gke-release/asm/pilot:1.6.5-asm.7'
     io.k8s.cli.setters.anthos.servicemesh.images.proxy:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.images.proxy
-          value: 'gcr.io/gke-release/asm/proxyv2:1.5.4-asm.2'
+          value: 'gcr.io/gke-release/asm/proxyv2:1.6.5-asm.7'
     io.k8s.cli.setters.anthos.servicemesh.debug.trace-id:
       x-k8s-cli:
         setter:
