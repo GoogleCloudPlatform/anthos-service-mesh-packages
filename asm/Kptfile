@@ -147,7 +147,7 @@ openAPI:
       x-k8s-cli:
         substitution:
           name: anthos.servicemesh.debug.trace-id
-          pattern: "--sinkMeta=project_id=$(PROJECT_ID),location=$(GCP_LOCATION),network=projects/NETWORK_PROJECT_ID/global/networks/NETWORK_NAME,sds_path=$(SDSPATH),trace=TRACEID,enable_security_beta=ENABLE_SECURITY_BETA"
+          pattern: "--sinkMeta=project=$(PROJECT_ID),location=$(GCP_LOCATION),network=projects/NETWORK_PROJECT_ID/global/networks/NETWORK_NAME,sds_path=$(SDSPATH),trace=TRACEID,enable_security_beta=ENABLE_SECURITY_BETA"
           values:
           - marker: TRACEID
             ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.debug.trace-id'
