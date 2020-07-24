@@ -185,7 +185,7 @@ spec:
                 fieldPath: metadata.namespace
           - name: ISTIO_META_CLUSTER_ID
             value: Kubernetes
-          image: gcr.io/gke-release/asm/proxyv2:1.5.4-asm.2 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.images.proxy"}
+          image: gcr.io/gke-release/asm/proxyv2:1.6.5-asm.7 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.images.proxy"}
           imagePullPolicy: IfNotPresent
           name: istio-proxy
           volumeMounts:

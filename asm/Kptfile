@@ -31,6 +31,16 @@ openAPI:
         setter:
           name: anthos.servicemesh.jwks-transformer-interval
           value: 20m
+    io.k8s.cli.setters.anthos.servicemesh.network-project-id:
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.network-project-id
+          value: "$(PROJECT_ID)"
+    io.k8s.cli.setters.anthos.servicemesh.network-name:
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.network-name
+          value: 'default'
     io.k8s.cli.setters.gcloud.core.project:
       x-k8s-cli:
         setter:
@@ -112,17 +122,17 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.images.galley
-          value: 'gcr.io/gke-release/asm/galley:1.5.4-asm.2'
+          value: 'gcr.io/gke-release/asm/galley:1.5.8-asm.7'
     io.k8s.cli.setters.anthos.servicemesh.images.istiod:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.images.istiod
-          value: 'gcr.io/gke-release/asm/pilot:1.5.4-asm.2'
+          value: 'gcr.io/gke-release/asm/pilot:1.6.5-asm.7'
     io.k8s.cli.setters.anthos.servicemesh.images.proxy:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.images.proxy
-          value: 'gcr.io/gke-release/asm/proxyv2:1.5.4-asm.2'
+          value: 'gcr.io/gke-release/asm/proxyv2:1.6.5-asm.7'
     io.k8s.cli.setters.anthos.servicemesh.debug.trace-id:
       x-k8s-cli:
         setter:
@@ -132,17 +142,22 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.enable-security-beta
-          value: "true"
+          value: "false"
     io.k8s.cli.substitutions.sink-meta:
       x-k8s-cli:
         substitution:
           name: anthos.servicemesh.debug.trace-id
-          pattern: "--sinkMeta=project_id=$(PROJECT_ID),sds_path=$(SDSPATH),trace=TRACEID,enable_security_beta=ENABLE_SECURITY_BETA"
+          pattern: "--sinkMeta=project=$(PROJECT_ID),location=$(GCP_LOCATION),network=projects/NETWORK_PROJECT_ID/global/networks/NETWORK_NAME,sds_path=$(SDSPATH),trace=TRACEID,enable_security_beta=ENABLE_SECURITY_BETA"
           values:
           - marker: TRACEID
             ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.debug.trace-id'
           - marker: ENABLE_SECURITY_BETA
             ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.enable-security-beta'
+          - marker: NETWORK_PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.network-project-id'
+          - marker: NETWORK_NAME
+            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.network-name'
+
     io.k8s.cli.substitutions.k8s-galley-service-account:
       x-k8s-cli:
         substitution:

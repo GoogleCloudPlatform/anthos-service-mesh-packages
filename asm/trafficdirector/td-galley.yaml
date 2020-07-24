@@ -31,7 +31,7 @@ spec:
         fsGroup: 1337
       containers:
       - name: galley
-        image: gcr.io/gke-release/asm/galley:1.5.4-asm.2 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.images.galley"}
+        image: gcr.io/gke-release/asm/galley:1.5.8-asm.7 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.images.galley"}
         imagePullPolicy: "Always"
         ports:
         - containerPort: 9443
@@ -61,7 +61,7 @@ spec:
         - --validation-port=9443
         - --sinkAuthMode=$(SINKAUTHMODE)
         - --sinkAddress=$(SINKADDRESS)
-        - --sinkMeta=project_id=$(PROJECT_ID),sds_path=$(SDSPATH),trace=0,enable_security_beta=false # {"$ref":"#/definitions/io.k8s.cli.substitutions.sink-meta"}
+        - --sinkMeta=project=$(PROJECT_ID),location=$(GCP_LOCATION),network=projects/$(PROJECT_ID)/global/networks/default,sds_path=$(SDSPATH),trace=0,enable_security_beta=false # {"$ref":"#/definitions/io.k8s.cli.substitutions.sink-meta"}
         - --excludedResourceKinds=Pod,Node,Endpoints
         - --enableServiceDiscovery
         volumeMounts:

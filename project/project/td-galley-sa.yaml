@@ -5,7 +5,7 @@ metadata:
   name: asm-galley-iam-policy
   namespace: "[PROJECT_ID]"  # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
   annotations:
-    gke.io/cluster: "bootstrap://" 
+    gke.io/cluster: "bootstrap://" # {"$ref":"#/definitions/io.k8s.cli.substitutions.bootstrap-cluster"}
 spec:
   member: serviceAccount:[PROJECT_ID].svc.id.goog[istio-system/asm-galley-service-account] # {"$ref":"#/definitions/io.k8s.cli.substitutions.galley-service-account"}
   role: roles/meshconfig.writer 
