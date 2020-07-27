@@ -129,8 +129,6 @@ spec:
             value: "true"
           - name: ISTIO_META_TRAFFICDIRECTOR_ACCESS_LOG_PATH
             value: /dev/stdout
-          - name: ISTIO_META_TRAFFICDIRECTOR_WORKLOAD_NAME
-            value: csm-auth-default
           - name: CA_PROVIDER
             value: GoogleCA
           - name: PLUGINS
