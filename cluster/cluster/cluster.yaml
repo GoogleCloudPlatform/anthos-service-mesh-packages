@@ -38,7 +38,7 @@ metadata:
   name: default-pool
   namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
 spec:
-  initialNodeCount: 5
+  initialNodeCount: 5 # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.nodepool.initial-node-count"}
   autoscaling:
     minNodeCount: 5 # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.nodepool.min-nodes"}
     maxNodeCount: 10 # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.nodepool.max-nodes"}

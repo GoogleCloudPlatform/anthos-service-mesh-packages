@@ -41,6 +41,11 @@ openAPI:
         setter:
           name: gcloud.compute.location
           value: us-central1-c
+    io.k8s.cli.setters.gcloud.container.nodepool.initial-node-count:
+      x-k8s-cli:
+        setter:
+          name: gcloud.container.nodepool.initial-node-count
+          value: "5"
     io.k8s.cli.setters.gcloud.container.nodepool.max-nodes:
       x-k8s-cli:
         setter:
