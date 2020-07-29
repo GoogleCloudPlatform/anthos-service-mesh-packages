@@ -45,12 +45,12 @@ openAPI:
       x-k8s-cli:
         setter:
           name: gcloud.container.nodepool.max-nodes
-          value: "8"
+          value: "10"
     io.k8s.cli.setters.gcloud.container.nodepool.min-nodes:
       x-k8s-cli:
         setter:
           name: gcloud.container.nodepool.min-nodes
-          value: "4"
+          value: "5"
     io.k8s.cli.substitutions.full-cluster-name:
       x-k8s-cli:
         substitution:

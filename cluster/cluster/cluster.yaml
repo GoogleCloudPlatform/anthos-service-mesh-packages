@@ -38,10 +38,10 @@ metadata:
   name: default-pool
   namespace: "[PROJECT_ID]" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
 spec:
-  initialNodeCount: 2
+  initialNodeCount: 5
   autoscaling:
-    minNodeCount: 4 # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.nodepool.min-nodes"}
-    maxNodeCount: 8 # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.nodepool.max-nodes"}
+    minNodeCount: 5 # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.nodepool.min-nodes"}
+    maxNodeCount: 10 # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.nodepool.max-nodes"}
   nodeConfig:
     diskSizeGb: 100
     diskType: pd-standard
