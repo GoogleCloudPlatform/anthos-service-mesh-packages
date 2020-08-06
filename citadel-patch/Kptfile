@@ -1,0 +1,11 @@
+apiVersion: kpt.dev/v1alpha1
+kind: Kptfile
+metadata:
+  name: citadel-patch
+openAPI:
+  definitions:
+    io.k8s.cli.setters.base-dir:
+      x-k8s-cli:
+        setter:
+          name: base-dir
+          value: ../asm/cluster
