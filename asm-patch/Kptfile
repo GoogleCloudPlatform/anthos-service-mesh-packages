@@ -125,3 +125,12 @@ openAPI:
             ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.location'
           - marker: PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+    io.k8s.cli.substitutions.citadel-patch-base-dir:
+      type: string
+      x-k8s-cli:
+        substitution:
+          name: citadel-patch-base-dir
+          pattern: "../base-dir"
+          values:
+          - marker: base-dir
+            ref: '#/definitions/io.k8s.cli.setters.base-dir'
