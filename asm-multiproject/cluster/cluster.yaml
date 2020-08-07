@@ -37,7 +37,7 @@ spec:
   subnetwork: default # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.compute.subnetwork"}
   ipAllocationPolicy:
     properties:
-      clusterSecondaryRangeName: ""  # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.compute.network.clusterSecondaryRange"}
-      servicesSecondaryRangeName: ""  # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.compute.network.servicesSecondaryRange"}
+      clusterSecondaryRangeName: ""  # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.clusterSecondaryRange"}
+      servicesSecondaryRangeName: ""  # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.servicesSecondaryRange"}
   releaseChannel:
     channel: REGULAR # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.releaseChannel"}
