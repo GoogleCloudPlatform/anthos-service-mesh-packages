@@ -38,6 +38,6 @@ spec:
   ipAllocationPolicy:
     properties:
       clusterSecondaryRangeName: ""  # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.clusterSecondaryRange"}
-      servicesSecondaryRangeName: ""  # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.servicesSecondaryRange"}
+      servicesSecondaryRangeName: ""  # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.serviceSecondaryRange"}
   releaseChannel:
     channel: REGULAR # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.releaseChannel"}
