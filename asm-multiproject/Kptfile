@@ -49,6 +49,18 @@ openAPI:
         setter:
           name: gcloud.compute.subnetwork
           value: default
+    io.k8s.cli.setters.gcloud.compute.network.clusterSecondaryRange:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: gcloud.compute.network.clusterSecondaryRange
+          value: ""
+    io.k8s.cli.setters.gcloud.compute.network.servicesSecondaryRange:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: gcloud.compute.network.servicesSecondaryRange
+          value: ""
     io.k8s.cli.setters.gcloud.container.cluster:
       type: string
       x-k8s-cli:
