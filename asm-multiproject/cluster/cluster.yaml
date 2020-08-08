@@ -27,8 +27,10 @@ spec:
     mesh_id: "proj-PROJECT_NUMBER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh-id"}
   loggingService: logging.googleapis.com/kubernetes
   monitoringService: monitoring.googleapis.com/kubernetes
-  network: default # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.compute.network"}
-  subnetwork: default # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.compute.subnetwork"}
+  networkRef: 
+    external: default # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.compute.network"}
+  subnetworkRef: 
+    external: default # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.compute.subnetwork"}
   releaseChannel:
     channel: REGULAR # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.releaseChannel"}
   ipAllocationPolicy:
