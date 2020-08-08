@@ -55,11 +55,11 @@ openAPI:
         setter:
           name: gcloud.container.cluster.clusterSecondaryRange
           value: ""
-    io.k8s.cli.setters.gcloud.container.cluster.serviceSecondaryRange:
+    io.k8s.cli.setters.gcloud.container.cluster.servicesSecondaryRange:
       type: string
       x-k8s-cli:
         setter:
-          name: gcloud.container.cluster.serviceSecondaryRange
+          name: gcloud.container.cluster.servicesSecondaryRange
           value: ""
     io.k8s.cli.setters.gcloud.container.cluster:
       type: string
