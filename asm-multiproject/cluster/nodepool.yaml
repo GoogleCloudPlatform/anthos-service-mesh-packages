@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-apiVersion: container.cnrm.cloud.google.com/v1alpha2
+apiVersion: container.cnrm.cloud.google.com/v1beta1
 kind: ContainerNodePool
 metadata:
-  clusterName: "PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
+  annotations:
+    gke.io/cluster: "bootstrap://"
   name: default-pool
   namespace: "PROJECT_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
 spec:

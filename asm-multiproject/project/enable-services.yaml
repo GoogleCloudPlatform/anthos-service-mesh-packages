@@ -16,6 +16,10 @@
 apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
 kind: Service
 metadata:
+  annotations:
+    gke.io/cluster: "bootstrap://"
+    cnrm.cloud.google.com/deletion-policy: "abandon"
+    cnrm.cloud.google.com/disable-dependent-services: "false"
   namespace: "PROJECT_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
   name: compute.googleapis.com
 ---
@@ -23,6 +27,10 @@ metadata:
 apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
 kind: Service
 metadata:
+  annotations:
+    gke.io/cluster: "bootstrap://"
+    cnrm.cloud.google.com/deletion-policy: "abandon"
+    cnrm.cloud.google.com/disable-dependent-services: "false"
   namespace: "PROJECT_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
   name: container.googleapis.com
 ---
@@ -30,6 +38,10 @@ metadata:
 apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
 kind: Service
 metadata:
+  annotations:
+    gke.io/cluster: "bootstrap://"
+    cnrm.cloud.google.com/deletion-policy: "abandon"
+    cnrm.cloud.google.com/disable-dependent-services: "false"
   namespace: "PROJECT_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
   name: iamcredentials.googleapis.com
 ---
@@ -37,6 +49,10 @@ metadata:
 apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
 kind: Service
 metadata:
+  annotations:
+    gke.io/cluster: "bootstrap://"
+    cnrm.cloud.google.com/deletion-policy: "abandon"
+    cnrm.cloud.google.com/disable-dependent-services: "false"
   namespace: "PROJECT_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
   name: meshca.googleapis.com
 ---
@@ -44,6 +60,10 @@ metadata:
 apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
 kind: Service
 metadata:
+  annotations:
+    gke.io/cluster: "bootstrap://"
+    cnrm.cloud.google.com/deletion-policy: "abandon"
+    cnrm.cloud.google.com/disable-dependent-services: "false"
   namespace: "PROJECT_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
   name: meshtelemetry.googleapis.com
 ---
@@ -51,6 +71,10 @@ metadata:
 apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
 kind: Service
 metadata:
+  annotations:
+    gke.io/cluster: "bootstrap://"
+    cnrm.cloud.google.com/deletion-policy: "abandon"
+    cnrm.cloud.google.com/disable-dependent-services: "false"
   namespace: "PROJECT_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
   name: meshconfig.googleapis.com
 ---
@@ -58,5 +82,9 @@ metadata:
 apiVersion: serviceusage.cnrm.cloud.google.com/v1beta1
 kind: Service
 metadata:
+  annotations:
+    gke.io/cluster: "bootstrap://"
+    cnrm.cloud.google.com/deletion-policy: "abandon"
+    cnrm.cloud.google.com/disable-dependent-services: "false"
   namespace: "PROJECT_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
   name: anthos.googleapis.com
