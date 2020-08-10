@@ -2,26 +2,50 @@ apiVersion: kpt.dev/v1alpha1
 kind: Kptfile
 metadata:
   name: .
-packageMetadata:
-  shortDescription: sample description
 openAPI:
   definitions:
-    io.k8s.cli.setters.gcloud.core.project:
-      x-k8s-cli:
-        setter:
-          name: gcloud.core.project
-          value: PROJECT_ID
-    io.k8s.cli.setters.gcloud.container.cluster:
-      x-k8s-cli:
-        setter:
-          name: gcloud.container.cluster
-          value: asm-cluster
     io.k8s.cli.setters.base-dir:
       x-k8s-cli:
         setter:
           name: base-dir
           value: base
+    io.k8s.cli.setters.gcloud.compute.network:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: gcloud.compute.network
+          value: default
+    io.k8s.cli.setters.gcloud.compute.subnetwork:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: gcloud.compute.subnetwork
+          value: default
+    io.k8s.cli.setters.gcloud.container.cluster.releaseChannel:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: gcloud.container.cluster.releaseChannel
+          value: REGULAR
+    io.k8s.cli.setters.gcloud.container.cluster:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: gcloud.container.cluster
+          value: asm-cluster
+    io.k8s.cli.setters.gcloud.container.nodepool.max-nodes:
+      x-k8s-cli:
+        setter:
+          name: gcloud.container.nodepool.max-nodes
+          value: "4"
+    io.k8s.cli.setters.gcloud.core.project:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: gcloud.core.project
+          value: PROJECT_ID
     io.k8s.cli.setters.gcloud.project.projectNumber:
+      type: string
       x-k8s-cli:
         setter:
           name: gcloud.project.projectNumber
