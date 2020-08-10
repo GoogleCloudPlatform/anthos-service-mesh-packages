@@ -113,3 +113,9 @@ openAPI:
           values:
           - marker: PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+    io.k8s.cli.substitutions.enable-control-plane-stackdriver-monitoring:
+      type: string
+      x-k8s-cli:
+        substitution:
+          name: enable-control-plane-stackdriver-monitoring
+          value: "true"
