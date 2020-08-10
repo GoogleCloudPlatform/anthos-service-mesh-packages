@@ -145,3 +145,9 @@ openAPI:
             ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.location'
           - marker: PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+    io.k8s.cli.setters.anthos.servicemesh.controlplane.monitoring.enabled:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.controlplane.monitoring.enabled
+          value: "true"
