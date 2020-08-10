@@ -4,9 +4,9 @@ resources:
 - base # {"$ref":"#/definitions/io.k8s.cli.setters.base-dir"}
 - resources
 patches:
-- path: patches/cluster-patch.yaml
+- path: cluster-patches/cluster-patch.yaml
   target:
     kind: ContainerCluster
-- path: patches/nodepool-patch.yaml
+- path: cluster-patches/nodepool-patch.yaml
   target:
     kind: ContainerNodePool
