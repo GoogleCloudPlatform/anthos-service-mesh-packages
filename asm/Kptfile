@@ -1,15 +1,14 @@
 apiVersion: kpt.dev/v1alpha1
 kind: Kptfile
 metadata:
-  name: asm
+  name: .
 openAPI:
   definitions:
-    io.k8s.cli.setters.gcloud.compute.location:
-      type: string
+    io.k8s.cli.setters.base-dir:
       x-k8s-cli:
         setter:
-          name: gcloud.compute.location
-          value: us-central1-c
+          name: base-dir
+          value: base
     io.k8s.cli.setters.gcloud.compute.network:
       type: string
       x-k8s-cli:
@@ -51,6 +50,11 @@ openAPI:
         setter:
           name: gcloud.project.projectNumber
           value: PROJECT_NUMBER
+    io.k8s.cli.setters.gcloud.compute.location:
+      x-k8s-cli:
+        setter:
+          name: gcloud.compute.location
+          value: us-central1-c
     io.k8s.cli.setters.anthos.servicemesh.hub:
       x-k8s-cli:
         setter:
