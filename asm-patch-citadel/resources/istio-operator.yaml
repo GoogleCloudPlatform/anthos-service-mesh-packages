@@ -20,7 +20,7 @@ metadata:
 spec:
   profile: asm-gcp # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.profile"}
   hub: gcr.io/gke-release/asm # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}
-  tag: 1.6.5-asm.7 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
+  tag: 1.6.8-asm.0 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
   components:
     pilot:
       k8s:
@@ -29,6 +29,8 @@ spec:
           value: ""
         - name: ENABLE_STACKDRIVER_MONITORING
           value: "true" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.controlplane.monitoring.enabled"}
+        - name: TOKEN_AUDIENCES
+          value: "istio-ca,PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.token-audiencesn"}
   meshConfig:
     defaultConfig:
       proxyMetadata:
@@ -46,9 +48,7 @@ spec:
       # Enable SDS
       sds:
         token:
-          aud: "istio-ca"
+          aud: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
       multiCluster:
         # Provided to ensure a human readable name rather than a UUID.
         clusterName: "PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
-      sts:
-        servicePort: 0
