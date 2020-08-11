@@ -13,5 +13,5 @@ all:
 	cp -rf cluster istio-multiproject project Kptfile ../asm-multiproject
 
 	# Update asm-multiproject-patch/
-	cp -rf cluster-patches Kptfile ../asm-patch/
-	cp -rf istio-multiproject project ../asm-patch/resources/
+	cp -rf cluster-patches Kptfile ../asm-multiproject-patch/
+	cp -rf istio-multiproject project ../asm-multiproject-patch/resources/
