@@ -20,17 +20,9 @@ metadata:
   name: "asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster"}
   namespace: "PROJECT_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.core.project"}
 spec:
-  location: us-central1-c # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.compute.location"}
   workloadIdentityConfig:
     identityNamespace: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
   labels:
     mesh_id: "proj-PROJECT_NUMBER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh-id"}
   loggingService: logging.googleapis.com/kubernetes
   monitoringService: monitoring.googleapis.com/kubernetes
-  network: default # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.compute.network"}
-  subnetwork: default # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.compute.subnetwork"}
-  releaseChannel:
-    channel: REGULAR # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.releaseChannel"}
-  ipAllocationPolicy:
-    clusterSecondaryRangeName: "" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.clusterSecondaryRange"}
-    servicesSecondaryRangeName: "" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.servicesSecondaryRange"}
