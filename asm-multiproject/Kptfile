@@ -155,7 +155,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.profile
-          value: asm-gcp
+          value: asm-gcp-multiproject
     io.k8s.cli.substitutions.spiffe-bundle-endpoints:
       x-k8s-cli:
         substitution:
