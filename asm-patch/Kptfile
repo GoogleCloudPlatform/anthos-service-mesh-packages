@@ -41,6 +41,28 @@ openAPI:
         setter:
           name: anthos.servicemesh.tag
           value: 1.6.5-asm.7
+    io.k8s.cli.setters.gcloud.container.cluster.clusterSecondaryRange:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: gcloud.container.cluster.clusterSecondaryRange
+          value: ""
+    io.k8s.cli.setters.gcloud.container.cluster.servicesSecondaryRange:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: gcloud.container.cluster.servicesSecondaryRange
+          value: ""
+    io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases:
+      items:
+        pattern: '[a-z0-9\-].svc.id.goog'
+        type: string
+      minItems: 1
+      type: array
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.trustDomainAliases
+          listValues:
     io.k8s.cli.substitutions.mesh-id:
       type: string
       x-k8s-cli:
