@@ -22,12 +22,34 @@ openAPI:
         setter:
           name: gcloud.compute.subnetwork
           value: default
+    io.k8s.cli.setters.gcloud.container.cluster.clusterSecondaryRange:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: gcloud.container.cluster.clusterSecondaryRange
+          value: ""
+    io.k8s.cli.setters.gcloud.container.cluster.servicesSecondaryRange:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: gcloud.container.cluster.servicesSecondaryRange
+          value: ""
     io.k8s.cli.setters.gcloud.container.cluster.releaseChannel:
       type: string
       x-k8s-cli:
         setter:
           name: gcloud.container.cluster.releaseChannel
           value: REGULAR
+    io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases:
+      items:
+        pattern: '[a-z0-9\-].svc.id.goog'
+        type: string
+      minItems: 1
+      type: array
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.trustDomainAliases
+          listValues:
     io.k8s.cli.setters.gcloud.container.cluster:
       type: string
       x-k8s-cli:

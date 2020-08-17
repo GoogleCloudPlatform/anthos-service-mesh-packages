@@ -33,6 +33,8 @@ spec:
         GCP_METADATA: "PROJECT_ID|PROJECT_NUMBER|asm-cluster|us-central1-c" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-metadata"}
         TRUST_DOMAIN: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
         GKE_CLUSTER_URL: "https://container.googleapis.com/v1/projects/PROJECT_ID/locations/us-central1-c/clusters/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cluster-url"}
+    trustDomainAliases: # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases"}
+    - "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
   values:
     global:
       meshID: "proj-PROJECT_NUMBER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh-id"}

@@ -41,6 +41,16 @@ openAPI:
         setter:
           name: anthos.servicemesh.tag
           value: 1.6.8-asm.0
+    io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases:
+      items:
+        pattern: '[a-z0-9\-].svc.id.goog'
+        type: string
+      minItems: 1
+      type: array
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.trustDomainAliases
+          listValues:
     io.k8s.cli.substitutions.mesh-id:
       type: string
       x-k8s-cli:
