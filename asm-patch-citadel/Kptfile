@@ -41,6 +41,16 @@ openAPI:
         setter:
           name: anthos.servicemesh.tag
           value: 1.6.8-asm.0
+    io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases:
+      items:
+        pattern: '[a-z0-9\-].svc.id.goog'
+        type: string
+      minItems: 1
+      type: array
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.trustDomainAliases
+          listValues:
     io.k8s.cli.substitutions.mesh-id:
       type: string
       x-k8s-cli:
@@ -128,3 +138,15 @@ openAPI:
         setter:
           name: anthos.servicemesh.controlplane.monitoring.enabled
           value: "true"
+    io.k8s.cli.substitutions.gkeio-cluster:
+      x-k8s-cli:
+        substitution:
+          name: gkeio-cluster
+          pattern: "gke://PROJECT_ID/us-central1-c/asm-cluster"
+          values:
+          - marker: asm-cluster
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.container.cluster'
+          - marker: us-central1-c
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.location'
+          - marker: PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
