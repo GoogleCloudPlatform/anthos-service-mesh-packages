@@ -40,16 +40,6 @@ openAPI:
         setter:
           name: gcloud.container.cluster.releaseChannel
           value: REGULAR
-    io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases:
-      items:
-        pattern: '[a-z0-9\-].svc.id.goog'
-        type: string
-      minItems: 1
-      type: array
-      x-k8s-cli:
-        setter:
-          name: anthos.servicemesh.trustDomainAliases
-          listValues:
     io.k8s.cli.setters.gcloud.container.cluster:
       type: string
       x-k8s-cli:
