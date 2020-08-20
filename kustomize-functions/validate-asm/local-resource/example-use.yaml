@@ -82,11 +82,6 @@ spec:
     channel: UNSPECIFIED
   subnetworkRef:
     external: projects/test-project-id/regions/us-central1/subnetworks/default
-    # uncomment these to pass validation
-#  workloadIdentity:
-#    identityNamespace: test-project-id.svc.id.goog
-#  labels:
-#    mesh_id: test-project-id_us-central1-c_cluster-without-monitoring
 status:
   endpoint: 35.188.113.157
   instanceGroupUrls:
