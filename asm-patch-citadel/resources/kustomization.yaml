@@ -4,3 +4,4 @@ resources:
 - namespace.yaml
 - istio-operator.yaml
 - enable-services.yaml
+- canonical-service/controller.yaml

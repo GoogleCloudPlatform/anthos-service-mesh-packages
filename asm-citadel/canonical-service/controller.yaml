@@ -199,26 +199,6 @@ rules:
   - list
   - watch
 ---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: canonical-service-proxy-role
-  annotations:
-    gke.io/cluster: "gke://PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
-rules:
-- apiGroups:
-  - authentication.k8s.io
-  resources:
-  - tokenreviews
-  verbs:
-  - create
-- apiGroups:
-  - authorization.k8s.io
-  resources:
-  - subjectaccessreviews
-  verbs:
-  - create
----
 apiVersion: rbac.authorization.k8s.io/v1beta1
 kind: ClusterRole
 metadata:
@@ -230,6 +210,14 @@ rules:
   - /metrics
   verbs:
   - get
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: canonical-service-account
+  namespace: asm-system
+  annotations:
+    gke.io/cluster: "gke://PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -244,7 +232,7 @@ roleRef:
   name: canonical-service-leader-election-role
 subjects:
 - kind: ServiceAccount
-  name: default
+  name: canonical-service-account
   namespace: asm-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -259,7 +247,7 @@ roleRef:
   name: canonical-service-manager-role
 subjects:
 - kind: ServiceAccount
-  name: default
+  name: canonical-service-account
   namespace: asm-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -274,7 +262,7 @@ roleRef:
   name: canonical-service-proxy-role
 subjects:
 - kind: ServiceAccount
-  name: default
+  name: canonical-service-account
   namespace: asm-system
 ---
 apiVersion: v1
@@ -313,6 +301,7 @@ spec:
       labels:
         control-plane: controller-manager
     spec:
+      serviceAccountName: canonical-service-account
       containers:
       - args:
         - --secure-listen-address=0.0.0.0:8443
@@ -329,7 +318,7 @@ spec:
         - --enable-leader-election
         command:
         - /manager
-        image: gcr.io/gke-release-staging/asm/canonical-service-controller:1.6.8-asm.2
+        image: gcr.io/gke-release/canonical-service-controller:1.6.8-asm.6 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.canonicalServiceHub"}
         name: manager
         resources:
           limits:
