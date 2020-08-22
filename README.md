@@ -1,4 +1,4 @@
-# Anthos Service Mesh packages
+# Anthos Service Mesh Config Packages
 
 This repository contains packaged configuration for setting up a GKE cluster
 with [Anthos Service Mesh] features enabled.
