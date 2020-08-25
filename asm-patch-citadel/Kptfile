@@ -26,6 +26,12 @@ openAPI:
         setter:
           name: gcloud.project.projectNumber
           value: PROJECT_NUMBER
+    io.k8s.cli.setters.gcloud.project.environProjectNumber:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: gcloud.project.environProjectNumber
+          value: PROJECT_NUMBER
     io.k8s.cli.setters.gcloud.compute.location:
       x-k8s-cli:
         setter:
@@ -54,7 +60,7 @@ openAPI:
           pattern: "proj-PROJECT_NUMBER"
           values:
           - marker: PROJECT_NUMBER
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.projectNumber'
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectNumber'
     io.k8s.cli.substitutions.gke-metadata:
       type: string
       x-k8s-cli:
