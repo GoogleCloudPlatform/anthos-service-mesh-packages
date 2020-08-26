@@ -77,7 +77,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.canonicalServiceHub
-          value: gcr.io/gke-release/canonical-service-controller:1.6.8-asm.6          
+          value: gcr.io/gke-release/asm/canonical-service-controller:1.6.8-asm.9          
     io.k8s.cli.substitutions.mesh-id:
       type: string
       x-k8s-cli:
