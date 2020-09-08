@@ -44,7 +44,7 @@ spec:
     global:
       meshID: "proj-PROJECT_NUMBER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh-id"}
       trustDomain: "cluster.local"
-      caAddress: "istiod.istio-system.svc:15012"
+      caAddress: ""
       pilotCertProvider: "istiod"
       # Enable SDS
       sds:
