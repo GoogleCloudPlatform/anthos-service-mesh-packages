@@ -153,7 +153,7 @@ openAPI:
       x-k8s-cli:
         substitution:
           name: cluster-name
-          pattern: "PROJECT_ID/us-central1-c/asm-cluster"
+          pattern: "cn-PROJECT_ID_us-central1-c_asm-cluster"
           values:
           - marker: PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'

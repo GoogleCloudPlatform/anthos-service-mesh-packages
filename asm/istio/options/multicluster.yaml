@@ -18,5 +18,5 @@ spec:
   values:
     global:
       multiCluster:
-        # Provided to ensure a human readable name rather than a UUID.
-        clusterName: "PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
+        # Provided to ensure a human readable name rather than a UUID. gke_PROJECT_ID_us-central1-c_asm-cluster
+        clusterName: "cn-PROJECT_ID_us-central1-c_asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
