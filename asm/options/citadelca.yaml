@@ -14,14 +14,10 @@
 
 apiVersion: install.istio.io/v1alpha1
 kind: IstioOperator
-metadata:
-  annotations:
-    gke.io/cluster: "gke://PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
-  name: default-istio-operator
 spec:
   profile: asm-gcp # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.profile"}
   hub: gcr.io/gke-release/asm # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}
-  tag: 1.6.5-asm.7 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
+  tag: 1.6.8-asm.9 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
   components:
     pilot:
       k8s:
@@ -38,18 +34,13 @@ spec:
         TRUST_DOMAIN: "cluster.local"
         CA_PROVIDER: "Citadel"
         PLUGINS: ""
-        GCP_METADATA: "PROJECT_ID|PROJECT_NUMBER|asm-cluster|us-central1-c" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-metadata"}
-        GKE_CLUSTER_URL: "https://container.googleapis.com/v1/projects/PROJECT_ID/locations/us-central1-c/clusters/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cluster-url"}
+        GCE_METADATA_HOST: "metadata.google.internal"
   values:
     global:
-      meshID: "proj-PROJECT_NUMBER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh-id"}
       trustDomain: "cluster.local"
-      caAddress: "istiod.istio-system.svc:15012"
+      caAddress: ""
       pilotCertProvider: "istiod"
       # Enable SDS
       sds:
         token:
           aud: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
-      multiCluster:
-        # Provided to ensure a human readable name rather than a UUID.
-        clusterName: "PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
