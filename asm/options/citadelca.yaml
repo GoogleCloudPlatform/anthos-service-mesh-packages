@@ -15,9 +15,6 @@
 apiVersion: install.istio.io/v1alpha1
 kind: IstioOperator
 spec:
-  profile: asm-gcp # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.profile"}
-  hub: gcr.io/gke-release/asm # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}
-  tag: 1.6.8-asm.9 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
   components:
     pilot:
       k8s:
@@ -34,13 +31,8 @@ spec:
         TRUST_DOMAIN: "cluster.local"
         CA_PROVIDER: "Citadel"
         PLUGINS: ""
-        GCE_METADATA_HOST: "metadata.google.internal"
   values:
     global:
       trustDomain: "cluster.local"
       caAddress: ""
       pilotCertProvider: "istiod"
-      # Enable SDS
-      sds:
-        token:
-          aud: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
