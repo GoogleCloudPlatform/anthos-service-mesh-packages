@@ -41,7 +41,7 @@ openAPI:
           value: REGULAR
     io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases:
       items:
-        pattern: '[a-z0-9\-].svc.id.goog'
+        pattern: '[a-z0-9\-].(svc|hub).id.goog'
         type: string
       minItems: 1
       type: array
@@ -78,6 +78,12 @@ openAPI:
         setter:
           name: gcloud.project.environProjectNumber
           value: PROJECT_NUMBER
+    io.k8s.cli.setters.gcloud.project.environProjectID:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: gcloud.project.environProjectID
+          value: ENVIRON_PROJECT_ID
     io.k8s.cli.setters.gcloud.compute.location:
       x-k8s-cli:
         setter:
@@ -97,7 +103,13 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.canonicalServiceHub
-          value: gcr.io/gke-release/asm/canonical-service-controller:1.6.8-asm.9          
+          value: gcr.io/gke-release/asm/canonical-service-controller:1.6.8-asm.9
+    io.k8s.cli.setters.anthos.servicemesh.hubMembershipID:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.hubMembershipID
+          value: MEMBERSHIP_ID
     io.k8s.cli.substitutions.mesh-id:
       type: string
       x-k8s-cli:
@@ -197,3 +209,31 @@ openAPI:
         setter:
           name: anthos.servicemesh.controlplane.monitoring.enabled
           value: "true"
+    io.k8s.cli.substitutions.spiffe-bundle-endpoints-hub:
+      x-k8s-cli:
+        substitution:
+          name: spiffe-bundle-endpoints-hub
+          pattern: ENVIRON_PROJECT_ID.hub.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json
+          values:
+          - marker: ENVIRON_PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectID'
+    io.k8s.cli.substitutions.hub-idp-url:
+      type: string
+      x-k8s-cli:
+        substitution:
+          name: hub-idp-url
+          pattern: "https://gkehub.googleapis.com/projects/ENVIRON_PROJECT_ID/locations/global/memberships/MEMBERSHIP_ID"
+          values:
+          - marker: ENVIRON_PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectID'
+          - marker: MEMBERSHIP_ID
+            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.hubMembershipID'
+    io.k8s.cli.substitutions.trust-domain-hub:
+      type: string
+      x-k8s-cli:
+        substitution:
+          name: trust-domain-hub
+          pattern: "ENVIRON_PROJECT_ID.hub.id.goog"
+          values:
+          - marker: ENVIRON_PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectID'
