@@ -1,0 +1,37 @@
+#!/bin/bash
+
+if [[ "${*}" == *"get-credentials"* ]]; then
+  echo "this_should_pass"
+  echo "${*}" >| "${KUBECONFIG}"
+  exit 0
+fi
+if [[ "${*}" == *"this_should_fail"* ]]; then
+  exit 1
+fi
+if [[ "${*}" == *"services list --enabled"*"this_should_pass" ]]; then
+  cat <<EOF
+container.googleapis.com
+compute.googleapis.com
+monitoring.googleapis.com
+logging.googleapis.com
+cloudtrace.googleapis.com
+meshca.googleapis.com
+meshtelemetry.googleapis.com
+meshconfig.googleapis.com
+iamcredentials.googleapis.com
+gkeconnect.googleapis.com
+gkehub.googleapis.com
+cloudresourcemanager.googleapis.com
+EOF
+exit 0
+fi
+if [[ "${*}" == *"this_should_pass"* ]]; then
+  echo "this_should_pass"
+  exit 0
+fi
+if [[ "${*}" == *"core/account"* ]]; then
+  echo "this_should_pass"
+  exit 0
+fi
+
+exit 1
