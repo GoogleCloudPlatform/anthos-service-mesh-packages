@@ -1,0 +1,264 @@
+#!/bin/bash
+set -CeEu
+set -o pipefail
+
+SPATH="$(readlink -f "$0")"
+SDIR="$(dirname "${SPATH}")"; export SDIR;
+
+# shellcheck source=common.sh
+. "${SDIR}/common.sh"
+
+cd "${SDIR}"
+pwd
+
+# We want to not need to create clusters, which means no calling then with
+# gcloud and kubectl. So we remove the call to "main" in install_asm, remove the
+# "readonly" keywords, and then source the file so all of the functions are
+# available. We can then overwrite kubectl and gcloud with functions that point
+# to the fake scripts in this directory, and voila! We can mock binaries in the
+# script.
+
+head ../install_asm -n -1 | sed -e 's/readonly.*$//g' >| ./fake_install_asm
+trap 'rm ./fake_install_asm' ERR EXIT
+
+. ./fake_install_asm
+
+KUBE="$(readlink -f ./fake_kubectl)"
+GCL="$(readlink -f ./fake_gcloud)"
+
+clear_variables() {
+  PROJECT_ID=""; export PROJECT_ID;
+  CLUSTER_NAME=""; export CLUSTER_NAME;
+  CLUSTER_LOCATION=""; export CLUSTER_LOCATION;
+  MODE=""; export MODE;
+  CA=""; export CA;
+
+  OPERATOR_OVERLAY=""; export OPERATOR_OVERLAY;
+  ENABLE_APIS=""; export ENABLE_APIS;
+  SERVICE_ACCOUNT=""; export SERVICE_ACCOUNT;
+  KEY_FILE=""; export KEY_FILE;
+
+  DRY_RUN=""; export DRY_RUN;
+  ONLY_VALIDATE=""; export ONLY_VALIDATE;
+  VERBOSE=""; export VERBOSE;
+}
+
+kubectl() {
+  local RETVAL; RETVAL=0;
+  "${KUBE}" ${@} || RETVAL="${?}"
+  return "${RETVAL}"
+}
+
+gcloud() {
+  local RETVAL; RETVAL=0;
+  "${GCL}" ${@} || RETVAL="${?}"
+  return "${RETVAL}"
+}
+
+test_main() {
+  # Mock out gcloud/kubectl
+
+  local FAILURES; FAILURES=0;
+
+  #################
+  # This should pass
+  #################
+
+  local CMD
+  CMD="-l this_should_pass"
+  CMD="${CMD} -n this_should_pass"
+  CMD="${CMD} -p this_should_pass"
+  CMD="${CMD} -m install"
+  CMD="${CMD} -c citadel"
+  CMD="${CMD} -e --only_validate"
+
+  RETVAL=0
+  clear_variables
+  _="$(main ${CMD})" || RETVAL="${?}"
+
+  if [[ "${RETVAL}" -eq 0 ]]; then
+    echo "Passes on good case: PASS"
+  else
+    echo "Passes on good case: FAIL"
+    ((++FAILURES))
+  fi
+
+  #################
+  # Should fail on non-existing project
+  #################
+
+  CMD="-l this_should_pass"
+  CMD="${CMD} -n this_should_pass"
+  CMD="${CMD} -p this_should_fail"
+  CMD="${CMD} -m install"
+  CMD="${CMD} -c citadel"
+  CMD="${CMD} -e --only-validate"
+
+  RETVAL=0
+  clear_variables
+  _="$(main ${CMD})" || RETVAL="${?}"
+
+  if [[ "${RETVAL}" -ne 0 ]]; then
+    echo "Fails on nonexisting projects: PASS"
+  else
+    echo "Fails on nonexisting projects: FAIL"
+    ((++FAILURES))
+  fi
+
+
+  #################
+  # Should fail on non-existing cluster
+  #################
+
+  CMD="-l this_should_pass"
+  CMD="${CMD} -n this_should_fail"
+  CMD="${CMD} -p this_should_pass"
+  CMD="${CMD} -m install"
+  CMD="${CMD} -c citadel"
+  CMD="${CMD} -e --only-validate"
+
+  RETVAL=0
+  clear_variables
+  _="$(main ${CMD})" || RETVAL="${?}"
+
+  if [[ "${RETVAL}" -ne 0 ]]; then
+    echo "Fails on nonexisting clusters: PASS"
+  else
+    echo "Fails on nonexisting clusters: FAIL"
+    ((++FAILURES))
+  fi
+
+  #################
+  # Should fail on bad CA or MODE
+  #################
+
+  CMD="-l this_should_pass"
+  CMD="${CMD} -n this_should_pass"
+  CMD="${CMD} -p this_should_pass"
+  CMD="${CMD} -m this_should_fail"
+  CMD="${CMD} -c citadel"
+  CMD="${CMD} -e --only_validate"
+
+  RETVAL=0
+  clear_variables
+  _="$(main ${CMD})" || RETVAL="${?}"
+
+  if [[ "${RETVAL}" -ne 0 ]]; then
+    echo "Fails on bad mode: PASS"
+  else
+    echo "Fails on bad mode: FAIL"
+    ((++FAILURES))
+  fi
+
+
+  CMD="-l this_should_pass"
+  CMD="${CMD} -n this_should_pass"
+  CMD="${CMD} -p this_should_pass"
+  CMD="${CMD} -m migrate"
+  CMD="${CMD} -c this_should_fail"
+  CMD="${CMD} -e --only_validate"
+
+  RETVAL=0
+  clear_variables
+  _="$(main ${CMD})" || RETVAL="${?}"
+
+  if [[ "${RETVAL}" -ne 0 ]]; then
+    echo "Fails on bad CA: PASS"
+  else
+    echo "Fails on bad CA: FAIL"
+    ((++FAILURES))
+  fi
+
+  #################
+  # Should fail on with only one of key/service account
+  #################
+
+  CMD="-l this_should_pass"
+  CMD="${CMD} -n this_should_pass"
+  CMD="${CMD} -p this_should_pass"
+  CMD="${CMD} -m install"
+  CMD="${CMD} -c citadel"
+  CMD="${CMD} -s service-account"
+  CMD="${CMD} -e --only_validate"
+
+  RETVAL=0
+  clear_variables
+  _="$(main ${CMD})" || RETVAL="${?}"
+
+  if [[ "${RETVAL}" -ne 0 ]]; then
+    echo "Fails on only SA: PASS"
+  else
+    echo "Fails on only SA: FAIL"
+    ((++FAILURES))
+  fi
+
+
+  CMD="-l this_should_pass"
+  CMD="${CMD} -n this_should_pass"
+  CMD="${CMD} -p this_should_pass"
+  CMD="${CMD} -m install"
+  CMD="${CMD} -c citadel"
+  CMD="${CMD} -k keyfile"
+  CMD="${CMD} -e --only_validate"
+
+  RETVAL=0
+  clear_variables
+  _="$(main ${CMD})" || RETVAL="${?}"
+
+  if [[ "${RETVAL}" -ne 0 ]]; then
+    echo "Fails on only key: PASS"
+  else
+    echo "Fails on only key: FAIL"
+    ((++FAILURES))
+  fi
+
+  #################
+  # Should fail to install if Istio installed
+  #################
+
+  CMD="-l this_should_pass_has_istio_right_namespace"
+  CMD="${CMD} -n this_should_pass"
+  CMD="${CMD} -p this_should_pass"
+  CMD="${CMD} -m install"
+  CMD="${CMD} -c citadel"
+  CMD="${CMD} -e --only_validate"
+
+  RETVAL=0
+  clear_variables
+  _="$(main ${CMD})" || RETVAL="${?}"
+
+  if [[ "${RETVAL}" -ne 0 ]]; then
+    echo "Fails on installing with Istio: PASS"
+  else
+    echo "Fails on installing with Istio: FAIL"
+    ((++FAILURES))
+  fi
+
+  #################
+  # Should fail to do anything if it's in the wrong namespace
+  #################
+
+  CMD="-l this_should_pass_has_istio_wrong_namespace"
+  CMD="${CMD} -n this_should_pass"
+  CMD="${CMD} -p this_should_pass"
+  CMD="${CMD} -m migrate"
+  CMD="${CMD} -c citadel"
+  CMD="${CMD} -e --only_validate"
+
+  RETVAL=0
+  clear_variables
+  _="$(main ${CMD})" || RETVAL="${?}"
+
+  if [[ "${RETVAL}" -ne 0 ]]; then
+    echo "Fails on migrating with Istio outside of istio-system: PASS"
+  else
+    echo "Fails on migrating with Istio outside of istio-system: FAIL"
+    ((++FAILURES))
+  fi
+
+  #################
+  echo "There were ${FAILURES} failures."
+  exit "${FAILURES}"
+}
+
+test_main "$@"
