@@ -111,7 +111,7 @@ retry() {
       return 1
     fi
     { "${@}" && return 0; } || true
-    warn "Failed, retrying...(${i} of ${MAX_TRIES})"
+    warn "Failed, retrying...($((i+1)) of ${MAX_TRIES})"
     sleep 2
     if [[ "$1" == "gcloud" || "$1" == "kubectl" ]]; then
       configure_kubectl
@@ -407,11 +407,11 @@ cleanup_local_workspace() {
 ### Environment validation functions ###
 validate_dependencies() {
   validate_cli_dependencies
+  validate_gcp_resources
   # configure kubectl does have side effects but we've generated a temprorary
   # kubeconfig so we're not breaking the promise that --only_validate gives
   configure_kubectl
   validate_packages_fetchable
-  validate_gcp_resources
   validate_expected_control_plane
   if [[ "${MODE}" = "migrate" ]]; then
     validate_istio_version
