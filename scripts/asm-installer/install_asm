@@ -207,7 +207,7 @@ EOF
 }
 
 arg_required() {
-  if [[ ! "${2}" || "${2:0:1}" = '-' ]]; then
+  if [[ ! "${2:-}" || "${2:0:1}" = '-' ]]; then
     fatal "Option ${1} requires an argument."
   fi
 }
@@ -288,7 +288,7 @@ parse_args() {
 
 validate_args() {
   if [[ "${MODE}" == "install" && -z "${CA}" ]]; then
-    MODE="mesh_ca"
+    CA="mesh_ca"
   fi
 
   # shellcheck disable=SC2064
