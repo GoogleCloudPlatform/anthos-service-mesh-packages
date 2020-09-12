@@ -845,20 +845,33 @@ install_asm(){
   PARAMS="${PARAMS} --set revision=${REVISION_LABEL}"
   PARAMS="${PARAMS} -c ${KUBECONFIG}"
 
+  info "Installing ASM control plane..."
   # shellcheck disable=SC2086
   retry 5 run ./istio-"${RELEASE}"/bin/istioctl install $PARAMS
 
   # Prevent the stderr buffer from ^ messing up the terminal output below
   sleep 1
-  info "...installation complete!"
+  info "...done!"
+
+  outro
+}
+
+outro() {
+  info ""
+  info "*****************************"
+  info "The ASM control plane installation is now complete."
 
   if [[ "${MODE}" = "migrate" ]]; then
     info "Please verify the new control plane and then: 1) migrate your workloads 2) remove old control plane."
+    info "For more information, see:"
+    info "https://cloud.google.com/service-mesh/docs/upgrading-gke#redeploying_workloads"
+  elif [[ "${MODE}" = "install" ]]; then
+    info "To finish the installation, enable Istio sidecar injection and restart your workloads."
+    info "For more information, see:"
+    info "https://cloud.google.com/service-mesh/docs/proxy-injection"
   fi
 
-  if [[ "${MODE}" = "install" ]]; then
-    info "Next, enable Istio sidecar injection and restart your workloads."
-  fi
+  info "*****************************"
 }
 
 main "${@}"
