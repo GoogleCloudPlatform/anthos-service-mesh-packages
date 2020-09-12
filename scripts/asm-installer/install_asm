@@ -485,13 +485,13 @@ validate_gcp_resources() {
 validate_project() {
   local RESULT; RESULT=""
 
-  info "Checking for ${PROJECT_ID}..."
+  info "Checking for project ${PROJECT_ID}..."
   RESULT=$(gcloud projects list \
     --filter="project_id=${PROJECT_ID}" \
     --format="value(project_id)" || true)
 
   if [[ -z "${RESULT}" ]]; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Unable to find project ${PROJECT_ID}. Please verify the spelling and try
 again. To see a list of your projects, run:
   gcloud projects list --format='value(project_id)'
@@ -509,7 +509,7 @@ validate_cluster() {
     --filter="name = ${CLUSTER_NAME} and location = ${CLUSTER_LOCATION}" \
     --format="value(name)" || true)"
   if [[ -z "${RESULT}" ]]; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Unable to find cluster ${CLUSTER_LOCATION}/${CLUSTER_NAME}.
 Please verify the spelling and try again. To see a list of your clusters, in
 this project, run:
@@ -550,7 +550,7 @@ validate_node_pool() {
 
   info "Confirming node pool requirements..."
   if [[ -z "$(list_valid_pools "${NODE_REQ}" "${CPU_REQ}")" ]]; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 ASM requires at least one node pool in a cluster to be at least 4 nodes,
 and use machine types with at least 4 vCPUs.
 ${CLUSTER_LOCATION}/${CLUSTER_NAME}
@@ -575,7 +575,7 @@ check_no_istiod_outside_of_istio_system_namespace() {
   local IN_ANY_NAMESPACE; IN_ANY_NAMESPACE="$(kubectl get deployment -A --ignore-not-found=true | grep -c istiod || true)";
   local IN_NAMESPACE; IN_NAMESPACE="$(kubectl get deployment -n istio-system --ignore-not-found=true | grep -c istiod || true)";
   if [ "$IN_ANY_NAMESPACE" -gt "$IN_NAMESPACE" ]; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 found istiod deployment outside of istio-system namespace. This installer
 does not support that configuration.
 EOF
@@ -725,7 +725,7 @@ EOF
     for api in $(echo "${NOTFOUND}" | tr ' ' '\n'); do
       warn "API not enabled - ${api}"
     done
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 One or more APIs are not enabled. Please enable them and retry, or
 re-run the script with the '--enable_apis' flag to allow the script to enable
 them on your behalf.
