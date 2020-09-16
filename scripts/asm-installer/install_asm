@@ -166,12 +166,12 @@ OPTIONS:
   -p|--project_id        <ID>         The GCP project ID
   -m|--mode              <MODE>       The type of installation to perform.
                                       Allowed values for <MODE> are
-                                      {install|migrate}. Choose MODE=install
-                                      for a new ASM installation or MODE=migrate
-                                      for an existing OSS installation to be
-                                      migrated to ASM. MODE=install defaults to
-                                      using Mesh CA as the certificate
-                                      authority.
+                                      {install|migrate}. Choose --mode install
+                                      for a new ASM installation or --mode
+                                      migrate for an existing OSS installation
+                                      to be migrated to ASM. --mode install
+                                      defaults to using Mesh CA as the
+                                      certificate authority.
 
   -c|--ca                <CA>         (optional) The type of certificate
                                       authority to be used. Allowed values for
@@ -197,8 +197,8 @@ OPTIONS:
 
 EXAMPLE:
 The following invocation will install ASM to a cluster named "my_cluster" in
-project "my_project" in region "us-central1-c" using "mesh_ca" as certificate
-authority:
+project "my_project" in region "us-central1-c" using the default "mesh_ca" as
+certificate authority:
   $> ${SCRIPT_NAME} \\
       -n my_cluster \\
       -p my_project \\
