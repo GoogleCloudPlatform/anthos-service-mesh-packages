@@ -166,16 +166,18 @@ OPTIONS:
   -p|--project_id        <ID>         The GCP project ID
   -m|--mode              <MODE>       The type of installation to perform.
                                       Allowed values for <MODE> are
-                                      {install|migrate}. Choose --mode=install
-                                      for a new ASM installation or
-                                      --mode=migrate for an existing OSS
-                                      installation to be migrated to ASM.
-                                      MODE=install defaults to using Mesh CA
-                                      as the certificate authority.
-  -c|--ca                <CA>         The type of certificate authority to be
-                                      used. Allowed values for <CA> are
-                                      {citadel|mesh_ca}.
+                                      {install|migrate}. Choose --mode install
+                                      for a new ASM installation or --mode
+                                      migrate for an existing OSS installation
+                                      to be migrated to ASM. --mode install
+                                      defaults to using Mesh CA as the
+                                      certificate authority.
 
+  -c|--ca                <CA>         (optional) The type of certificate
+                                      authority to be used. Allowed values for
+                                      <CA> are {citadel|mesh_ca}. Defaults to
+                                      using Mesh CA for --mode install. Required
+                                      for --mode migrate.
   -e|--enable_apis                    (optional) Allow this script to enable
                                       necessary APIs on your behalf. Without
                                       this flag, it will abort if APIs are not
@@ -195,14 +197,13 @@ OPTIONS:
 
 EXAMPLE:
 The following invocation will install ASM to a cluster named "my_cluster" in
-project "my_project" in region "us-central1-c" using "mesh_ca" as certificate
-authority:
+project "my_project" in region "us-central1-c" using the default "mesh_ca" as
+certificate authority:
   $> ${SCRIPT_NAME} \\
       -n my_cluster \\
       -p my_project \\
       -l us-central1-c \\
-      -m install \\
-      -c mesh_ca
+      -m install
 EOF
 }
 
