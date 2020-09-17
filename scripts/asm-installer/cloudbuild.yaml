@@ -74,6 +74,22 @@ steps:
     --project "${PROJECT_ID}" \
     --format='value[separator="|"](name,createTime,zone)')
     EOF
+
+    while read -r LB_NAME; do
+      gcloud compute \
+        --project "${PROJECT_ID}" \
+        forwarding-rules delete -q "$${LB_NAME}" \
+        --region "${_CLUSTER_LOCATION:0:-2}" || true
+      gcloud compute \
+        --project "${PROJECT_ID}" \
+        target-pools delete -q "$${LB_NAME}" \
+        --region "${_CLUSTER_LOCATION:0:-2}" || true
+    done <<EOF
+    $(gcloud compute forwarding-rules list \
+    --project="${PROJECT_ID}" \
+    --format='get(name)' \
+    --filter='((description:istio OR description:frontend-external) AND creationTimestamp<-PT3H)')
+    EOF
   waitFor:
   - 'fetch-secrets'
 

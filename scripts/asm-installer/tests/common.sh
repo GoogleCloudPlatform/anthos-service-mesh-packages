@@ -225,6 +225,67 @@ create_working_cluster() {
     --zone="${CLUSTER_LOCATION}"
 }
 
+cleanup() {
+  # remove traps so we don't infinite loop here
+  trap - ERR
+
+  local PROJECT_ID; PROJECT_ID="$1"
+  local CLUSTER_NAME; CLUSTER_NAME="$2"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$3"
+  local NAMESPACE; NAMESPACE="$4"
+
+  # first we need the ingress IPs to query against
+  local KUBE_INGRESS; KUBE_INGRESS="$(kube_ingress "${NAMESPACE}")"
+  local ISTIO_INGRESS; ISTIO_INGRESS="$(istio_ingress)"
+
+  # next we need the info of the load balancer components
+  local KUBE_LB_INFO; KUBE_LB_INFO="$(\
+    gcloud compute \
+    forwarding-rules list \
+    --project="${PROJECT_ID}" \
+    --format="get(name, region)" \
+    --filter="IPAddress = ${KUBE_INGRESS}"
+  )"
+  local KUBE_LB_NAME; KUBE_LB_NAME="$(echo "${KUBE_LB_INFO}" | cut -f 1)"
+  local REGION; REGION="$(echo "${KUBE_LB_INFO}" | sed 's|.*/||')"
+  local ISTIO_LB_NAME; ISTIO_LB_NAME="$(\
+    gcloud compute \
+    forwarding-rules list \
+    --project="${PROJECT_ID}" \
+    --format="get(name)" \
+    --filter="IPAddress = ${ISTIO_INGRESS}"
+  )"
+
+  # we don't care if any if the below fail, since a periodic cleanup script will
+  # get them. they do seem to fail sporadically as sometimes load balancer
+  # configurations will get deleted with resources and sometimes they don't.
+
+  # delete the namespaces to get rid of the ingress objects
+  remove_ns "${NAMESPACE}" || true
+  remove_ns istio-system || true
+
+  # remove the GCP load balancer components if they're still around
+  gcloud compute forwarding-rules delete \
+    --project="${PROJECT_ID}" \
+    --region="${REGION}" \
+    "${KUBE_LB_NAME}" -q || true
+  gcloud compute target-pools delete \
+    --project="${PROJECT_ID}" \
+    --region="${REGION}" \
+    "${KUBE_LB_NAME}" -q || true
+  gcloud compute forwarding-rules delete \
+    --project="${PROJECT_ID}" \
+    --region="${REGION}" \
+    "${ISTIO_LB_NAME}" -q || true
+  gcloud compute target-pools delete \
+    --project="${PROJECT_ID}" \
+    --region="${REGION}" \
+    "${ISTIO_LB_NAME}" -q || true
+
+  # all of the resources are now deleted except for the cluster
+  delete_cluster "${PROJECT_ID}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}"
+}
+
 delete_cluster() {
   # if this is running in CI delete async all of the time to keep it short
   if [[ "${IS_LOCAL}" -eq 1 ]]; then
