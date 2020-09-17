@@ -79,11 +79,11 @@ steps:
       gcloud compute \
         --project "${PROJECT_ID}" \
         forwarding-rules delete -q "$${LB_NAME}" \
-        --region "${_CLUSTER_LOCATION:0:-2}" || true
+        --region "$${CLUSTER_LOCATION:0:-2}" || true
       gcloud compute \
         --project "${PROJECT_ID}" \
         target-pools delete -q "$${LB_NAME}" \
-        --region "${_CLUSTER_LOCATION:0:-2}" || true
+        --region "$${CLUSTER_LOCATION:0:-2}" || true
     done <<EOF
     $(gcloud compute forwarding-rules list \
     --project="${PROJECT_ID}" \
@@ -92,6 +92,8 @@ steps:
     EOF
   waitFor:
   - 'fetch-secrets'
+  env:
+  - 'CLUSTER_LOCATION=${_CLUSTER_LOCATION}'
 
 - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
   dir: 'scripts/asm-installer'
