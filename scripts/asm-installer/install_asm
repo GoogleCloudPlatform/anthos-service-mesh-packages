@@ -161,44 +161,44 @@ All options can also be passed via environment variables by using the ALL_CAPS
 name. Options specified via flags take precedence over environment variables.
 
 OPTIONS:
-  -l|--cluster_location  <LOCATION>   The GCP location of the target cluster
-  -n|--cluster_name      <NAME>       The name of the target cluster
-  -p|--project_id        <ID>         The GCP project ID
+  -l|--cluster_location  <LOCATION>   The GCP location of the target cluster.
+  -n|--cluster_name      <NAME>       The name of the target cluster.
+  -p|--project_id        <ID>         The GCP project ID.
   -m|--mode              <MODE>       The type of installation to perform.
-                                      Allowed values for <MODE> are
-                                      {install|migrate}. Choose --mode install
-                                      for a new ASM installation or --mode
-                                      migrate for an existing OSS installation
-                                      to be migrated to ASM. --mode install
-                                      defaults to using Mesh CA as the
-                                      certificate authority.
+                                      Passing --mode install will attempt a
+                                      new ASM installation. Passing --mode
+                                      migrate will attempt to migrate an Istio
+                                      installation to ASM. Allowed values for
+                                      <MODE> are {install|migrate}.
+  -c|--ca                <CA>         The type of certificate authority to be
+                                      used. Defaults to "mesh_ca" for --mode
+                                      install. Specifying the CA is required
+                                      for --mode migrate.  Allowed values for
+                                      <CA> are {citadel|mesh_ca}.
+  -o|--operator_overlay  <FILE PATH>  The location of a YAML file to overlay on
+                                      the ASM IstioOperator. This option can be
+                                      omitted if not installing optional
+                                      features.
+  -s|--service_account   <ACCOUNT>    The name of a service account used to
+                                      install ASM. If not specified, the gcloud
+                                      user currently configured will be used.
+  -k|--key_file          <FILE PATH>  The key file for a service account. This
+                                      option can be omitted if not using a
+                                      service account.
 
-  -c|--ca                <CA>         (optional) The type of certificate
-                                      authority to be used. Allowed values for
-                                      <CA> are {citadel|mesh_ca}. Defaults to
-                                      using Mesh CA for --mode install. Required
-                                      for --mode migrate.
-  -e|--enable_apis                    (optional) Allow this script to enable
-                                      necessary APIs on your behalf. Without
-                                      this flag, it will abort if APIs are not
-                                      already enabled.
-  -o|--operator_overlay  <FILE PATH>  (optional) The location of a YAML file to
-                                      overlay over the ASM IstioOperator.
-  -s|--service_account   <ACCOUNT>    (optional) The name of a service account
-                                      used to install ASM
-  -k|--key_file          <FILE PATH>  (optional) The key file for a service
-                                      account. Required if --service_account is
-                                      passed.
-
+FLAGS:
+  -e|--enable_apis                    Allow this script to enable necessary APIs
+                                      on your behalf. Without this flag, it will
+                                      abort if APIs are not already enabled.
   -v|--verbose                        Print commands before and after execution.
-     --dry_run                        Print commands, don't execute them.
-     --only_validate                  Run validation but don't install
+     --dry_run                        Print commands, but don't execute them.
+     --only_validate                  Run validation, but don't install.
   -h|--help                           Show this message and exit.
 
 EXAMPLE:
 The following invocation will install ASM to a cluster named "my_cluster" in
 project "my_project" in region "us-central1-c" using the default "mesh_ca" as
-certificate authority:
+the certificate authority:
   $> ${SCRIPT_NAME} \\
       -n my_cluster \\
       -p my_project \\
