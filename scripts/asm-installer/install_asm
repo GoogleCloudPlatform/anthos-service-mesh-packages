@@ -524,20 +524,17 @@ list_valid_pools() {
     --project="${PROJECT_ID}" \
     --region "${CLUSTER_LOCATION}" \
     --cluster "${CLUSTER_NAME}" \
-    --filter "$(valid_pool_query "${1}" "${2}")"\
-    --format=list
+    --filter "$(valid_pool_query "${1}")"\
+    --format=json
 }
 
 #######
-# valid_pool_query takes two integer arguments. $1 is the minimum node
-# requirement for a cluster, and $2 is the minimum vCPU requirement. It outputs
-# to stdout a query for `gcloud container node-pools list`
+# valid_pool_query takes an integer argument: the minimum vCPU requirement.
+# It outputs to stdout a query for `gcloud container node-pools list`
 #######
 valid_pool_query() {
   cat <<EOF | tr '\n' ' '
-(initialNodeCount >= $1
-  OR (autoscaling.enabled = True AND autoscaling.maxNodeCount >= $1))
-AND config.machineType.split(sep="-").slice(-1:) >= $2
+    config.machineType.split(sep="-").slice(-1:) >= $1
 EOF
 }
 
@@ -546,17 +543,24 @@ EOF
 # requirements
 #######
 validate_node_pool() {
-  local NODE_REQ; NODE_REQ=4; readonly NODE_REQ;
-  local CPU_REQ; CPU_REQ=4; readonly CPU_REQ;
+  local MACHINE_CPU_REQ; MACHINE_CPU_REQ=4; readonly MACHINE_CPU_REQ;
+  local TOTAL_CPU_REQ; TOTAL_CPU_REQ=8; readonly TOTAL_CPU_REQ;
 
   info "Confirming node pool requirements..."
-  if [[ -z "$(list_valid_pools "${NODE_REQ}" "${CPU_REQ}")" ]]; then
+  local ACTUAL_CPU
+  ACTUAL_CPU="$(list_valid_pools "${MACHINE_CPU_REQ}" | \
+      jq '.[] |
+        (if .autoscaling.enabled then .autoscaling.maxNodeCount else .initialNodeCount end)
+        *
+        (.config.machineType / "-" | .[-1] | tonumber)
+      ' )"
+
+  if ! [[ "$ACTUAL_CPU" -ge "$TOTAL_CPU_REQ" ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-ASM requires at least one node pool in a cluster to be at least 4 nodes,
-and use machine types with at least 4 vCPUs.
-${CLUSTER_LOCATION}/${CLUSTER_NAME}
-does not have any node pools that meet these requirements. Please retry with a
-cluster that meets resource requirements.
+ASM requires you to have at least ${TOTAL_CPU_REQ} vCPUs in node pools whose
+machine type is at least ${MACHINE_CPU_REQ} vCPUs.
+${CLUSTER_LOCATION}/${CLUSTER_NAME} does not meet this requirement. Please retry
+with a cluster that meets resource requirements.
 EOF
   fi
 }
