@@ -57,6 +57,15 @@ main() {
   verify_demo_app "${GATEWAY}"
 
   # Test starts here
+
+  # Send persistent traffic to demo app to test any downtime.
+  echo "Start sending traffic to demo app"
+  send_persistent_traffic "${GATEWAY}" &
+  local SEND_TRAFFIC_CMD_PID="${!}"
+  if ! ps -p "${SEND_TRAFFIC_CMD_PID}" > /dev/null; then
+    fatal "Failed to fork child process to send traffic."
+  fi
+
   echo "Installing ASM with Citadel..."
   if [[ -n "${SERVICE_ACCOUNT}" ]]; then
     echo "../install_asm \
@@ -88,6 +97,14 @@ main() {
       -p "${PROJECT_ID}" \
       -m migrate \
       -c citadel -v
+  fi
+
+  if ps -p "${SEND_TRAFFIC_CMD_PID}" > /dev/null; then
+    kill "${SEND_TRAFFIC_CMD_PID}"
+  else
+    # gcloud update can cause down time.
+    # Failing the test upon receiving unexpected response can make the test very flaky.
+    warn "Downtime detected during migration"
   fi
 
   sleep 5
