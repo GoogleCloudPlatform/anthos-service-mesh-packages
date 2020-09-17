@@ -9,7 +9,7 @@ ENV KEY_FILE path_to_a_key_file_goes_here
 # install script dependencies
 RUN apt-get install google-cloud-sdk-kpt jq kubectl -y
 # install test dependencies
-RUN apt-get install shellcheck posh bc -y
+RUN apt-get install shellcheck posh bc procps -y
 # copy source files into WORKDIR
 COPY install_asm ./
 COPY tests ./tests/

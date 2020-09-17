@@ -190,6 +190,17 @@ verify_demo_app() {
     return 0
   fi
 }
+
+send_persistent_traffic() {
+  local IP; IP="$1"
+  local PAGE
+  local COUNT
+  while true; do
+    PAGE="$(curl "${IP}" -L -N -s || echo "")"
+    COUNT="$(echo "${PAGE}" | grep -c Hipster || true)"
+    { [[ "${COUNT}" -eq 0 ]] && echo -e "Receive unexpected response from demo app:\n${PAGE}" && exit 1; } || sleep 1
+  done
+}
 #
 ### functions for manipulating GKE clusters
 create_working_cluster() {
