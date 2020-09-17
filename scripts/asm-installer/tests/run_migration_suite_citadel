@@ -27,7 +27,7 @@ main() {
   echo "Creating cluster ${CLUSTER_NAME}..."
   create_working_cluster "${PROJECT_ID}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}"
   # this trap isn't tested for all circumstances so caveat emptor
-  trap 'delete_cluster_async "${PROJECT_ID}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}"; exit 1;' ERR
+  trap 'cleanup "${PROJECT_ID}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}" "${NAMESPACE}"; exit 1;' ERR
 
   # Demo app setup
   echo "Installing and verifying demo app..."
@@ -103,8 +103,8 @@ main() {
   set -e
 
   # Cluster teardown
-  echo "Deleting cluster ${CLUSTER_NAME}..."
-  delete_cluster "${PROJECT_ID}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}"
+  echo "Deleting cluster ${CLUSTER_NAME} and associated resources..."
+  cleanup "${PROJECT_ID}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}" "${NAMESPACE}"
   exit "$SUCCESS"
 }
 
