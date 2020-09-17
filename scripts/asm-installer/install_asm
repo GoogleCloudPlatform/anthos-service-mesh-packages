@@ -548,7 +548,12 @@ validate_node_pool() {
 
   info "Confirming node pool requirements..."
   local ACTUAL_CPU
-  ACTUAL_CPU="$(list_valid_pools "${MACHINE_CPU_REQ}" | jq '.[] | (if .autoscaling.enabled then .autoscaling.maxNodeCount else .initialNodeCount end) * (.config.machineType / "-" | .[-1] | tonumber)' )"
+  ACTUAL_CPU="$(list_valid_pools "${MACHINE_CPU_REQ}" | \
+      jq '.[] |
+        (if .autoscaling.enabled then .autoscaling.maxNodeCount else .initialNodeCount end)
+        *
+        (.config.machineType / "-" | .[-1] | tonumber)
+      ' )"
 
   if ! [[ "$ACTUAL_CPU" -ge "$TOTAL_CPU_REQ" ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true

@@ -1,5 +1,19 @@
 #!/bin/bash
 
+if [[ "${*}" == *"machineType"* ]]; then
+  cat <<EOF
+[
+  {
+    "config": {
+      "machineType": "e2-standard-4"
+    },
+    "initialNodeCount": 4,
+    "name": "default-pool"
+  }
+]
+EOF
+  exit 0
+fi
 if [[ "${*}" == *"get-credentials"* ]]; then
   echo "this_should_pass"
   echo "${*}" >| "${KUBECONFIG}"
