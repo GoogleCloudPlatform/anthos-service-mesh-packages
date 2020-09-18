@@ -299,17 +299,6 @@ validate_args() {
     CA="mesh_ca"
   fi
 
-  # shellcheck disable=SC2064
-  case "${MODE}" in
-    install | migrate);;
-    *) fatal "MODE must be one of 'install', 'migrate'";;
-  esac
-
-  case "${CA}" in
-    citadel | mesh_ca);;
-    *) fatal "CA must be one of 'citadel', 'mesh_ca'";;
-  esac
-
   local MISSING_ARGS=0
   while read -r REQUIRED_ARG; do
     if [[ -z "${!REQUIRED_ARG}" ]]; then
@@ -328,6 +317,17 @@ EOF
   if [[ "${MISSING_ARGS}" -ne 0 ]]; then
     fatal_with_usage "Missing one or more required options."
   fi
+
+  # shellcheck disable=SC2064
+  case "${MODE}" in
+    install | migrate);;
+    *) fatal "MODE must be one of 'install', 'migrate'";;
+  esac
+
+  case "${CA}" in
+    citadel | mesh_ca);;
+    *) fatal "CA must be one of 'citadel', 'mesh_ca'";;
+  esac
 
   while read -r FLAG; do
     if [[ "${!FLAG}" -ne 0 && "${!FLAG}" -ne 1 ]]; then
