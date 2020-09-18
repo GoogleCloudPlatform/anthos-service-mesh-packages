@@ -41,6 +41,7 @@ CA="${CA:=}"
 
 OPERATOR_OVERLAY="${OPERATOR_OVERLAY:=}"
 ENABLE_APIS="${ENABLE_APIS:=0}"
+DISABLE_CANONICAL_SERVICE="${DISABLE_CANONICAL_SERVICE:=0}"
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT:=}"
 KEY_FILE="${KEY_FILE:=}"
 OUTPUT_DIR="${OUTPUT_DIR:=}"
@@ -195,6 +196,9 @@ OPTIONS:
                                       directory already contains the necessary
                                       files, they will be used instead of
                                       downloading them again.
+  --disable_canonical_service         Do not install the CanonicalService
+                                      controller. This is required for ASM UI to
+                                      support various features.
 
 FLAGS:
   -e|--enable_apis                    Allow this script to enable necessary APIs
@@ -262,6 +266,10 @@ parse_args() {
         ;;
       -e | --enable_apis | --enable-apis)
         ENABLE_APIS=1
+        shift 1
+        ;;
+      --disable_canonical_service | --disable-canonical-service)
+        DISABLE_CANONICAL_SERVICE=1
         shift 1
         ;;
       -s | --service_account | --service-account)
@@ -345,6 +353,7 @@ EOF
   done <<EOF
 DRY_RUN
 ENABLE_APIS
+DISABLE_CANONICAL_SERVICE
 ONLY_VALIDATE
 VERBOSE
 EOF
@@ -886,9 +895,11 @@ install_asm(){
   sleep 1
   info "...done!"
 
-  info "Installing ASM CanonicalService controller..."
-  retry 3 run kubectl apply -f asm/canonical-service/controller.yaml
-  info "...done!"
+  if [[ "$DISABLE_CANONICAL_SERVICE" != 1 ]]; then
+    info "Installing ASM CanonicalService controller..."
+    retry 3 run kubectl apply -f asm/canonical-service/controller.yaml
+    info "...done!"
+  fi
 
   outro
 }
