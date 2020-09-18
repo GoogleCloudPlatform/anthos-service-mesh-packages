@@ -213,7 +213,6 @@ create_working_cluster() {
     clusters create "${CLUSTER_NAME}" \
     --zone "${CLUSTER_LOCATION}" \
     --no-enable-basic-auth \
-    --cluster-version "1.16.13-gke.1" \
     --release-channel "regular" \
     --machine-type "e2-standard-4" \
     --image-type "COS" \

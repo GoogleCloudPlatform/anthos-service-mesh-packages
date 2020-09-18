@@ -22,6 +22,8 @@ unset MAJOR; unset MINOR; unset POINT; unset REV;
 readonly RELEASE
 readonly RELEASE_LINE
 readonly REVISION_LABEL
+ISTIOCTL_REL_PATH="istio-${RELEASE}/bin/istioctl"
+readonly ISTIOCTL_REL_PATH
 
 SCRIPT_NAME="${0##*/}"
 
@@ -52,7 +54,7 @@ main() {
   validate_args
   set_up_local_workspace
 
-  if [[ -n "${SERVICE_ACCOUNT}" ]]; then
+  if is_sa; then
     auth_service_account
   fi
 
@@ -149,6 +151,11 @@ fatal_with_usage() {
 success() {
   cleanup_local_workspace
   return 0
+}
+
+is_sa() {
+  [[ -n "${SERVICE_ACCOUNT}" ]] && return 0
+  return 1
 }
 
 ### CLI/initial setup functions ###
@@ -402,7 +409,9 @@ set_up_local_workspace() {
 cleanup_local_workspace() {
   run rm "${KUBECONFIG}"
   run popd
-  run rm -r "${WORKSPACE_DIR}"
+  if is_sa; then
+    run rm -r "${WORKSPACE_DIR}"
+  fi
 }
 
 ### Environment validation functions ###
@@ -653,7 +662,7 @@ set_up_project(){
 bind_user_to_iam_policy(){
   local ACCOUNT_TYPE
   ACCOUNT_TYPE="user"
-  if [[ -n "${SERVICE_ACCOUNT}" ]]; then
+  if is_sa; then
     ACCOUNT_TYPE="serviceAccount"
   fi
   info "Getting account information..."
@@ -852,7 +861,7 @@ install_asm(){
 
   info "Installing ASM control plane..."
   # shellcheck disable=SC2086
-  retry 5 run ./istio-"${RELEASE}"/bin/istioctl install $PARAMS
+  retry 5 run ./"${ISTIOCTL_REL_PATH}" install $PARAMS
 
   # Prevent the stderr buffer from ^ messing up the terminal output below
   sleep 1
@@ -874,6 +883,12 @@ outro() {
     info "To finish the installation, enable Istio sidecar injection and restart your workloads."
     info "For more information, see:"
     info "https://cloud.google.com/service-mesh/docs/proxy-injection"
+  fi
+  if ! is_sa; then
+    info "The ASM package used for installation can be found at:"
+    info "${WORKSPACE_DIR}/asm"
+    info "The version of istioctl that matches the installation can be found at:"
+    info "${WORKSPACE_DIR}/${ISTIOCTL_REL_PATH}"
   fi
 
   info "*****************************"
