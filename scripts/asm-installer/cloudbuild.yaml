@@ -59,6 +59,7 @@ steps:
 
     NOW="$(date +%s)"
 
+    # clusters
     while IFS='|' read -r CLUSTER_NAME CREATE_TIME ZONE; do
       CREATE_TIME="$(date -d "$${CREATE_TIME}" +%s)"
       SEC_DIFF="$(echo "$${NOW} - $${CREATE_TIME}" | bc)"
@@ -75,6 +76,7 @@ steps:
     --format='value[separator="|"](name,createTime,zone)')
     EOF
 
+    # ingress resources
     while read -r LB_NAME; do
       gcloud compute \
         --project "${PROJECT_ID}" \
@@ -86,6 +88,18 @@ steps:
         --region "$${CLUSTER_LOCATION:0:-2}" || true
     done <<EOF
     $(gcloud compute forwarding-rules list \
+    --project="${PROJECT_ID}" \
+    --format='get(name)' \
+    --filter='((description:istio OR description:frontend-external) AND creationTimestamp<-PT3H)')
+    EOF
+
+    # firewall rules
+    while read -r RULE_NAME; do
+      gcloud compute \
+        --project "${PROJECT_ID}" \
+        firewall-rules delete -q "$${RULE_NAME}" || true
+    done <<EOF
+    $(gcloud compute firewall-rules list \
     --project="${PROJECT_ID}" \
     --format='get(name)' \
     --filter='((description:istio OR description:frontend-external) AND creationTimestamp<-PT3H)')
