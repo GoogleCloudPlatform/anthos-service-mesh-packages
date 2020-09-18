@@ -898,6 +898,9 @@ install_asm(){
   if [[ "$DISABLE_CANONICAL_SERVICE" != 1 ]]; then
     info "Installing ASM CanonicalService controller..."
     retry 3 run kubectl apply -f asm/canonical-service/controller.yaml
+    info "Waiting for deployment..."
+    retry 3 run kubectl wait --for=condition=available --timeout=600s \
+        deployment/canonical-service-controller-manager -n asm-system
     info "...done!"
   fi
 
