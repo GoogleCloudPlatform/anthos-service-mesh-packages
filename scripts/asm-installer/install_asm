@@ -684,6 +684,7 @@ bind_user_to_iam_policy(){
     --role=roles/gkehub.admin
 }
 
+# [START required_apis]
 required_apis() {
     cat << EOF
 container.googleapis.com
@@ -700,6 +701,7 @@ gkehub.googleapis.com
 cloudresourcemanager.googleapis.com
 EOF
 }
+# [END required_apis]
 
 enable_gcloud_apis(){
   info "Enabling required APIs..."
