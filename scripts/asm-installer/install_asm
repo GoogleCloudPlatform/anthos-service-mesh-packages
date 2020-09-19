@@ -19,18 +19,17 @@ RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
 RELEASE_LINE="${MAJOR}.${MINOR}."
 REVISION_LABEL="asm-${MAJOR}${MINOR}${POINT}-${REV}"
 unset MAJOR; unset MINOR; unset POINT; unset REV;
-readonly RELEASE
-readonly RELEASE_LINE
-readonly REVISION_LABEL
-ISTIOCTL_REL_PATH="istio-${RELEASE}/bin/istioctl"
-readonly ISTIOCTL_REL_PATH
+readonly RELEASE; readonly RELEASE_LINE; readonly REVISION_LABEL;
+
+### File related constants ###
+ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
+ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
+OPERATOR_MANIFEST="asm/cluster/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
 
 SCRIPT_NAME="${0##*/}"
 
-WORKSPACE_DIR=""
 PROJECT_NUMBER=""
 KPT_URL=""
-KPT_GH_URL=""
 KUBECONFIG=""
 
 ### Option variables ###
@@ -44,6 +43,7 @@ OPERATOR_OVERLAY="${OPERATOR_OVERLAY:=}"
 ENABLE_APIS="${ENABLE_APIS:=0}"
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT:=}"
 KEY_FILE="${KEY_FILE:=}"
+OUTPUT_DIR="${OUTPUT_DIR:=}"
 
 DRY_RUN="${DRY_RUN:=0}"
 ONLY_VALIDATE="${ONLY_VALIDATE:=0}"
@@ -53,10 +53,6 @@ main() {
   parse_args "${@}"
   validate_args
   set_up_local_workspace
-
-  if is_sa; then
-    auth_service_account
-  fi
 
   validate_dependencies
 
@@ -192,6 +188,13 @@ OPTIONS:
   -k|--key_file          <FILE PATH>  The key file for a service account. This
                                       option can be omitted if not using a
                                       service account.
+  -D|--output_dir        <DIR PATH>   The directory where this script will place
+                                      downloaded ASM packages and configuration.
+                                      If not specified, a temporary directory
+                                      will be created. If specified and the
+                                      directory already contains the necessary
+                                      files, they will be used instead of
+                                      downloading them again.
 
 FLAGS:
   -e|--enable_apis                    Allow this script to enable necessary APIs
@@ -271,6 +274,11 @@ parse_args() {
         KEY_FILE="${2}"
         shift 2
         ;;
+      -D | --output_dir | --output-dir)
+        arg_required "${@}"
+        OUTPUT_DIR="${2}"
+        shift 2
+        ;;
       --dry_run | --dry-run)
         DRY_RUN=1
         shift 1
@@ -348,16 +356,16 @@ EOF
   # since we cd to a tmp directory, we need the absolute path for the key file
   # and yaml file
   if [[ -f "${KEY_FILE}" ]]; then
-    KEY_FILE="$(readlink -f "$KEY_FILE")"
+    KEY_FILE="$(readlink -f "${KEY_FILE}")"
     readonly KEY_FILE
   elif [[ -n "${KEY_FILE}" ]]; then
     fatal "Couldn't find key file ${KEY_FILE}."
   fi
 
   if [[ -f "${OPERATOR_OVERLAY}" ]]; then
-    OPERATOR_OVERLAY="$(readlink -f "$OPERATOR_OVERLAY")"
+    OPERATOR_OVERLAY="$(readlink -f "${OPERATOR_OVERLAY}")"
     readonly OPERATOR_OVERLAY
-  elif [[ -f "${OPERATOR_OVERLAY}" ]]; then
+  elif [[ -n "${OPERATOR_OVERLAY}" ]]; then
     fatal "Couldn't find yaml file ${OPERATOR_OVERLAY}."
   fi
 
@@ -371,11 +379,9 @@ set_kpt_package_url() {
   if [[ "${CA}" = "citadel" ]]; then
     CA_OPT="-citadel"
   fi
-  local URL_PREFIX
-  URL_PREFIX="https://github.com/GoogleCloudPlatform/anthos-service-mesh-packages"
-  KPT_GH_URL="${URL_PREFIX}/tree/release-1.6-asm/asm${CA_OPT}"
-  KPT_URL="${URL_PREFIX}.git/asm${CA_OPT}@release-1.6-asm"
-  readonly KPT_URL; readonly KPT_GH_URL;
+  KPT_URL="https://github.com/GoogleCloudPlatform/anthos-service-mesh-packages"
+  KPT_URL="${KPT_URL}.git/asm${CA_OPT}@release-1.6-asm"
+  readonly KPT_URL;
 }
 
 auth_service_account() {
@@ -391,12 +397,17 @@ auth_service_account() {
 # polluting the environment or current working directory
 #######
 set_up_local_workspace() {
-  info "Setting up a temporary workspace..."
-  WORKSPACE_DIR="$(mktemp -d)"
-  if [[ -z "${WORKSPACE_DIR}" ]]; then
-    fatal "Encountered error when running mktemp -d!"
+  info "Setting up necessary files..."
+  if [[ -z "${OUTPUT_DIR}" ]]; then
+    info "Creating temp directory..."
+    OUTPUT_DIR="$(mktemp -d)"
+    if [[ -z "${OUTPUT_DIR}" ]]; then
+      fatal "Encountered error when running mktemp -d!"
+    fi
+  else
+    OUTPUT_DIR="$(readlink -f "${OUTPUT_DIR}")"
   fi
-  pushd "$WORKSPACE_DIR" > /dev/null
+  pushd "$OUTPUT_DIR" > /dev/null
 
   info "Generating a new kubeconfig..."
   KUBECONFIG="$(mktemp)"
@@ -409,19 +420,20 @@ set_up_local_workspace() {
 cleanup_local_workspace() {
   run rm "${KUBECONFIG}"
   run popd
-  if is_sa; then
-    run rm -r "${WORKSPACE_DIR}"
-  fi
 }
 
 ### Environment validation functions ###
 validate_dependencies() {
   validate_cli_dependencies
+
+  if is_sa; then
+    auth_service_account
+  fi
+
   validate_gcp_resources
   # configure kubectl does have side effects but we've generated a temprorary
   # kubeconfig so we're not breaking the promise that --only_validate gives
   configure_kubectl
-  validate_packages_fetchable
   validate_expected_control_plane
   if [[ "${MODE}" = "migrate" ]]; then
     validate_istio_version
@@ -474,15 +486,24 @@ EOF
     *     ) fatal "$(uname) is not a supported OS.";;
   esac
 
-  info "Downloading ASM.."
-  curl -L "https://storage.googleapis.com/gke-release/asm/istio-${RELEASE}-${OS}.tar.gz" \
-    | tar xz
+  if ! necessary_files_exist; then
+    info "Downloading ASM.."
+    curl -L "https://storage.googleapis.com/gke-release/asm/istio-${RELEASE}-${OS}.tar.gz" \
+      | tar xz
+
+    info "Downloading ASM kpt package..."
+    retry 3 run kpt pkg get "${KPT_URL}" asm
+  fi
 }
 
-validate_packages_fetchable () {
-  if ! curl -LI "${KPT_GH_URL}" -o /dev/null --fail 2>/dev/null; then
-    fatal "Couldn't connect to KPT package location, please verify connectivity to GitHub."
+necessary_files_exist() {
+  if [[ ! -f "${OUTPUT_DIR}/${ISTIOCTL_REL_PATH}" ]]; then
+    return 1
   fi
+  if [[ ! -f "${OUTPUT_DIR}/${OPERATOR_MANIFEST}" ]]; then
+    return 1
+  fi
+  return 0
 }
 
 validate_gcp_resources() {
@@ -829,16 +850,12 @@ ensure_istio_namespace_exists(){
 
 ### Installation functions ###
 install_asm(){
-  OPERATOR_MANIFEST="asm/cluster/istio-operator.yaml"
-  readonly OPERATOR_MANIFEST
 
   local CA_OPT
   CA_OPT=""
   if [[ "${CA}" = "citadel" ]]; then
     CA_OPT="-citadel"
   fi
-  info "Downloading ASM kpt package..."
-  retry 3 run kpt pkg get "${KPT_URL}" asm
 
   # temporary workaround for citadel
   if [[ "${CA}" = "citadel" ]]; then
@@ -855,7 +872,7 @@ install_asm(){
 
   local PARAMS
   PARAMS="-f ${OPERATOR_MANIFEST}"
-  if [[ "$OPERATOR_OVERLAY" ]]; then
+  if [[  -f "$OPERATOR_OVERLAY" ]]; then
     PARAMS="${PARAMS} -f ${OPERATOR_OVERLAY}"
   fi
   PARAMS="${PARAMS} --set revision=${REVISION_LABEL}"
@@ -888,9 +905,9 @@ outro() {
   fi
   if ! is_sa; then
     info "The ASM package used for installation can be found at:"
-    info "${WORKSPACE_DIR}/asm"
+    info "${OUTPUT_DIR}/asm"
     info "The version of istioctl that matches the installation can be found at:"
-    info "${WORKSPACE_DIR}/${ISTIOCTL_REL_PATH}"
+    info "${OUTPUT_DIR}/${ISTIOCTL_REL_PATH}"
   fi
 
   info "*****************************"
