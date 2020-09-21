@@ -196,14 +196,14 @@ OPTIONS:
                                       directory already contains the necessary
                                       files, they will be used instead of
                                       downloading them again.
-  --disable_canonical_service         Do not install the CanonicalService
-                                      controller. This is required for ASM UI to
-                                      support various features.
 
 FLAGS:
   -e|--enable_apis                    Allow this script to enable necessary APIs
                                       on your behalf. Without this flag, it will
                                       abort if APIs are not already enabled.
+     --disable_canonical_service      Do not install the CanonicalService
+                                      controller. This is required for ASM UI to
+                                      support various features.
   -v|--verbose                        Print commands before and after execution.
      --dry_run                        Print commands, but don't execute them.
      --only_validate                  Run validation, but don't install.
