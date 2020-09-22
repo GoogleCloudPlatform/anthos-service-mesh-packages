@@ -15,9 +15,9 @@ fi
 
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"
-MINOR="${MINOR:=6}"
-POINT="${POINT:=8}"
-REV="${REV:=9}"
+MINOR="${MINOR:=7}"
+POINT="${POINT:=1}"
+REV="${REV:=0}"
 RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
 RELEASE_LINE="${MAJOR}.${MINOR}."
 REVISION_LABEL="asm-${MAJOR}${MINOR}${POINT}-${REV}"
@@ -34,7 +34,7 @@ _CI_ASM_PKG_LOCATION="${_CI_ASM_PKG_LOCATION:=}"
 ### File related constants ###
 ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
 ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
-OPERATOR_MANIFEST="asm/cluster/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
+OPERATOR_MANIFEST="asm/istio/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
 
 SCRIPT_NAME="${0##*/}"
 
