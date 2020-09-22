@@ -890,13 +890,6 @@ install_asm(){
     CA_OPT="-citadel"
   fi
 
-  # temporary workaround for citadel
-  if [[ "${CA}" = "citadel" ]]; then
-    run sed -i \
-      's/istiod.istio-system.svc:15012/istiod-'"${REVISION_LABEL}"'.istio-system.svc:15012/g' \
-      "${OPERATOR_MANIFEST}"
-  fi
-
   info "Configuring kpt package..."
   run kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
   run kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
