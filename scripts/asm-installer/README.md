@@ -56,7 +56,7 @@ disable them or 1 to enable them.
 There are five required options: CLUSTER\_NAME, CLUSTER\_LOCATION, PROJECT\_ID,
 CA, and MODE. Use the first three to specify the cluster where to install
 Anthos Service Mesh. Set MODE to `install` for a new installation, or `migrate`
-to migrate an Istio 1.6 control plane to Anthos Service Mesh.  Set `CA` to
+to migrate an Istio 1.7 control plane to Anthos Service Mesh.  Set `CA` to
 specify the Certificate Authority. [Mesh CA] is supported only on new
 installations. Citadel is supported during migrations to help migrate workloads
 safely. Google recommends migrating to Mesh CA when possible.

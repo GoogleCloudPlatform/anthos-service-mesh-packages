@@ -55,9 +55,15 @@ gcloud() {
   return "${RETVAL}"
 }
 
-test_main() {
-  # Mock out gcloud/kubectl
+curl() {
+  return 0
+}
 
+tar() {
+  return 0
+}
+
+test_main() {
   local FAILURES; FAILURES=0;
 
   #################

@@ -411,9 +411,9 @@ install_oss_istio() {
   TMPDIR="$(mktemp -d)"
   pushd "${TMPDIR}"
   curl -L "https://github.com/istio/istio/releases/download/\
-1.6.8/istio-1.6.8-linux-amd64.tar.gz" | tar xz
+1.7.1/istio-1.7.1-linux-amd64.tar.gz" | tar xz
 
-  ./istio-1.6.8/bin/istioctl operator init
+  ./istio-1.7.1/bin/istioctl operator init
   popd
   rm -r "${TMPDIR}"
 
