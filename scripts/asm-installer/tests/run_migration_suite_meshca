@@ -102,6 +102,19 @@ main() {
   verify_demo_app "${GATEWAY}" || SUCCESS=1
   set -e
 
+  if [[ "${SUCCESS}" -eq 1 ]]; then
+    echo "Failed to verify, restarting and trying again..."
+    roll "${NAMESPACE}"
+
+    echo "Getting istio ingress IP..."
+    GATEWAY="$(istio_ingress)"
+    echo "Got ${GATEWAY}"
+    echo "Verifying demo app via Istio ingress..."
+    set +e
+    verify_demo_app "${GATEWAY}" || SUCCESS=1
+    set -e
+  fi
+
   # Cluster teardown
   echo "Deleting cluster ${CLUSTER_NAME} and associated resources..."
   cleanup "${PROJECT_ID}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}" "${NAMESPACE}"
