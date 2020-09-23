@@ -140,6 +140,8 @@ steps:
   env:
   - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
   - 'KEY_FILE=${_KEY_FILE}'
+  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
+  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
   timeout: 2400s # 40 mins
 
 - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
@@ -158,6 +160,8 @@ steps:
   env:
   - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
   - 'KEY_FILE=${_KEY_FILE}'
+  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
+  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
   timeout: 2400s # 40 mins
 
 - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
@@ -176,6 +180,8 @@ steps:
   env:
   - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
   - 'KEY_FILE=${_KEY_FILE}'
+  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
+  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
   timeout: 2400s # 40 mins
 
 - name: 'gcr.io/cloud-builders/gcloud'
