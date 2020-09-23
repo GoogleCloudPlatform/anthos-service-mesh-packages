@@ -34,7 +34,8 @@ _CI_ASM_PKG_LOCATION="${_CI_ASM_PKG_LOCATION:=}"
 ### File related constants ###
 ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
 ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
-OPERATOR_MANIFEST="asm/istio/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
+PACKAGE_DIRECTORY="asm/istio"; readonly PACKAGE_DIRECTORY;
+OPERATOR_MANIFEST="${PACKAGE_DIRECTORY}/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
 
 SCRIPT_NAME="${0##*/}"
 
@@ -393,13 +394,8 @@ EOF
 }
 
 set_kpt_package_url() {
-  local CA_OPT
-  CA_OPT=""
-  if [[ "${CA}" = "citadel" ]]; then
-    CA_OPT="-citadel"
-  fi
   KPT_URL="https://github.com/GoogleCloudPlatform/anthos-service-mesh-packages"
-  KPT_URL="${KPT_URL}.git/asm${CA_OPT}@${KPT_BRANCH}"
+  KPT_URL="${KPT_URL}.git/asm@${KPT_BRANCH}"
   readonly KPT_URL;
 }
 
@@ -884,12 +880,6 @@ ensure_istio_namespace_exists(){
 ### Installation functions ###
 install_asm(){
 
-  local CA_OPT
-  CA_OPT=""
-  if [[ "${CA}" = "citadel" ]]; then
-    CA_OPT="-citadel"
-  fi
-
   info "Configuring kpt package..."
   run kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
   run kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
@@ -902,6 +892,9 @@ install_asm(){
 
   local PARAMS
   PARAMS="-f ${OPERATOR_MANIFEST}"
+  if [[ "${CA}" = "citadel" ]]; then
+    PARAMS="${PARAMS} -f ${PACKAGE_DIRECTORY}/options/citadel-ca.yaml"
+  fi
   if [[  -f "$OPERATOR_OVERLAY" ]]; then
     PARAMS="${PARAMS} -f ${OPERATOR_OVERLAY}"
   fi
