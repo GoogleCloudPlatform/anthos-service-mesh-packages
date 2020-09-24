@@ -42,6 +42,7 @@ SCRIPT_NAME="${0##*/}"
 PROJECT_NUMBER=""
 KPT_URL=""
 KUBECONFIG=""
+ABS_OVERLAYS=""
 
 ### Option variables ###
 PROJECT_ID="${PROJECT_ID:=}"
@@ -193,7 +194,8 @@ OPTIONS:
   -o|--operator_overlay  <FILE PATH>  The location of a YAML file to overlay on
                                       the ASM IstioOperator. This option can be
                                       omitted if not installing optional
-                                      features.
+                                      features. To add multiple files, specify
+                                      them with multiple options one at a time.
   -s|--service_account   <ACCOUNT>    The name of a service account used to
                                       install ASM. If not specified, the gcloud
                                       user currently configured will be used.
@@ -272,7 +274,7 @@ parse_args() {
         ;;
       -o | --operator_overlay | --operator-overlay)
         arg_required "${@}"
-        OPERATOR_OVERLAY="${2}"
+        OPERATOR_OVERLAY="${2},${OPERATOR_OVERLAY}"
         shift 2
         ;;
       -e | --enable_apis | --enable-apis)
@@ -382,12 +384,19 @@ EOF
     fatal "Couldn't find key file ${KEY_FILE}."
   fi
 
-  if [[ -f "${OPERATOR_OVERLAY}" ]]; then
-    OPERATOR_OVERLAY="$(readlink -f "${OPERATOR_OVERLAY}")"
-    readonly OPERATOR_OVERLAY
-  elif [[ -n "${OPERATOR_OVERLAY}" ]]; then
-    fatal "Couldn't find yaml file ${OPERATOR_OVERLAY}."
+  while read -d ',' -r yaml_file; do
+    if [[ -f "${yaml_file}" ]]; then
+      ABS_OVERLAYS="$(readlink -f "${yaml_file}"),${ABS_OVERLAYS}"
+    elif [[ -n "${yaml_file}" ]]; then
+      fatal "Couldn't find yaml file ${yaml_file}."
+    fi
+  done <<EOF
+${OPERATOR_OVERLAY}
+EOF
+  if [[ "${CA}" = "citadel" ]]; then
+    ABS_OVERLAYS="${PACKAGE_DIRECTORY}/options/citadel-ca.yaml,${ABS_OVERLAYS}"
   fi
+  OPERATOR_OVERLAY="${ABS_OVERLAYS}"; readonly OPERATOR_OVERLAY;
 
   set_kpt_package_url
   WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"
@@ -892,12 +901,12 @@ install_asm(){
 
   local PARAMS
   PARAMS="-f ${OPERATOR_MANIFEST}"
-  if [[ "${CA}" = "citadel" ]]; then
-    PARAMS="${PARAMS} -f ${PACKAGE_DIRECTORY}/options/citadel-ca.yaml"
-  fi
-  if [[  -f "$OPERATOR_OVERLAY" ]]; then
-    PARAMS="${PARAMS} -f ${OPERATOR_OVERLAY}"
-  fi
+  while read -d ',' -r yaml_file; do
+    PARAMS="${PARAMS} -f ${yaml_file}"
+  done <<EOF
+${OPERATOR_OVERLAY}
+EOF
+
   PARAMS="${PARAMS} --set revision=${REVISION_LABEL}"
   PARAMS="${PARAMS} -c ${KUBECONFIG}"
 
