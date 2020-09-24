@@ -54,6 +54,7 @@ CA="${CA:=}"
 OPERATOR_OVERLAY="${OPERATOR_OVERLAY:=}"
 ENABLE_APIS="${ENABLE_APIS:=0}"
 DISABLE_CANONICAL_SERVICE="${DISABLE_CANONICAL_SERVICE:=0}"
+PRINT_CONFIG="${PRINT_CONFIG:=0}"
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT:=}"
 KEY_FILE="${KEY_FILE:=}"
 OUTPUT_DIR="${OUTPUT_DIR:=}"
@@ -64,6 +65,11 @@ VERBOSE="${VERBOSE:=0}"
 
 main() {
   parse_args "${@}"
+  # make sure to redirect stdout as soon as possible if we're dumping the config
+  if [[ "${PRINT_CONFIG}" -eq 1 ]]; then
+    exec 3>&1
+    exec 1>&2
+  fi
   validate_args
   set_up_local_workspace
 
@@ -77,10 +83,15 @@ main() {
 
   set_up_project
   set_up_cluster
-  install_asm
-
-  info "Successfully installed ASM."
-  success
+  configure_package
+  if [[ "${PRINT_CONFIG}" -eq 1 ]]; then
+    print_config
+    success
+  else
+    install_asm
+    info "Successfully installed ASM."
+    success
+  fi
   return 0
 }
 
@@ -214,6 +225,11 @@ FLAGS:
   -e|--enable_apis                    Allow this script to enable necessary APIs
                                       on your behalf. Without this flag, it will
                                       abort if APIs are not already enabled.
+     --print_config                   Instead of installing ASM, print all of
+                                      the compiled YAML to stdout. All other
+                                      output will be written to stderr, even if
+                                      it would normally go to stdout. Skip all
+                                      validations and setup.
      --disable_canonical_service      Do not install the CanonicalService
                                       controller. This is required for ASM UI to
                                       support various features.
@@ -283,6 +299,10 @@ parse_args() {
         ;;
       --disable_canonical_service | --disable-canonical-service)
         DISABLE_CANONICAL_SERVICE=1
+        shift 1
+        ;;
+      --print_config | --print-config)
+        PRINT_CONFIG=1
         shift 1
         ;;
       -s | --service_account | --service-account)
@@ -449,6 +469,9 @@ cleanup_local_workspace() {
 ### Environment validation functions ###
 validate_dependencies() {
   validate_cli_dependencies
+  if [[ "${PRINT_CONFIG}" -eq 1 ]]; then
+    return 0
+  fi
 
   validate_gcp_resources
   # configure kubectl does have side effects but we've generated a temprorary
@@ -705,6 +728,10 @@ validate_istio_version() {
 
 ### Project functions ###
 set_up_project(){
+  if [[ "${PRINT_CONFIG}" -eq 1 ]]; then
+    return 0
+  fi
+
   bind_user_to_iam_policy
 
   # This if statement should always trigger, but just in case we should be
@@ -821,6 +848,9 @@ EOF
 
 ### Cluster functions ###
 set_up_cluster(){
+  if [[ "${PRINT_CONFIG}" -eq 1 ]]; then
+    return 0
+  fi
   add_cluster_labels
   enable_workload_identity
   enable_stackdriver_kubernetes
@@ -887,9 +917,9 @@ ensure_istio_namespace_exists(){
 }
 
 ### Installation functions ###
-install_asm(){
-
+configure_package() {
   info "Configuring kpt package..."
+
   run kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
   run kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
   run kpt cfg set asm gcloud.project.environProjectNumber "${PROJECT_NUMBER}"
@@ -898,6 +928,29 @@ install_asm(){
     run kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
     run kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
   fi
+}
+
+print_config() {
+  echo "---" >&3
+  sanitize_file "${OPERATOR_MANIFEST}" >&3
+  while read -d ',' -r yaml_file; do
+    echo "---" >&3
+    sanitize_file "${yaml_file}" >&3
+  done <<EOF
+${OPERATOR_OVERLAY}
+EOF
+exit
+}
+
+# Strip comments, empty lines, trailing whitespace
+sanitize_file() {
+  sed -e 's/#.*$//g' \
+    -e '/^[[:space:]]*$/d' \
+    -e 's/[[:space:]]*$//g' \
+    "${1}"
+}
+
+install_asm() {
 
   local PARAMS
   PARAMS="-f ${OPERATOR_MANIFEST}"
