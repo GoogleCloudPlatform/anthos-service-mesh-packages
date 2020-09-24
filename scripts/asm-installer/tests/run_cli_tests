@@ -75,7 +75,7 @@ test_main() {
   CMD="${CMD} -n this_should_pass"
   CMD="${CMD} -p this_should_pass"
   CMD="${CMD} -m install"
-  CMD="${CMD} -c citadel"
+  CMD="${CMD} -c mesh_ca"
   CMD="${CMD} -e --only_validate"
 
   RETVAL=0
@@ -97,7 +97,7 @@ test_main() {
   CMD="${CMD} -n this_should_pass"
   CMD="${CMD} -p this_should_fail"
   CMD="${CMD} -m install"
-  CMD="${CMD} -c citadel"
+  CMD="${CMD} -c mesh_ca"
   CMD="${CMD} -e --only-validate"
 
   RETVAL=0
@@ -120,7 +120,7 @@ test_main() {
   CMD="${CMD} -n this_should_fail"
   CMD="${CMD} -p this_should_pass"
   CMD="${CMD} -m install"
-  CMD="${CMD} -c citadel"
+  CMD="${CMD} -c mesh_ca"
   CMD="${CMD} -e --only-validate"
 
   RETVAL=0
@@ -142,7 +142,7 @@ test_main() {
   CMD="${CMD} -n this_should_pass"
   CMD="${CMD} -p this_should_pass"
   CMD="${CMD} -m this_should_fail"
-  CMD="${CMD} -c citadel"
+  CMD="${CMD} -c mesh_ca"
   CMD="${CMD} -e --only_validate"
 
   RETVAL=0
@@ -183,7 +183,7 @@ test_main() {
   CMD="${CMD} -n this_should_pass"
   CMD="${CMD} -p this_should_pass"
   CMD="${CMD} -m install"
-  CMD="${CMD} -c citadel"
+  CMD="${CMD} -c mesh_ca"
   CMD="${CMD} -s service-account"
   CMD="${CMD} -e --only_validate"
 
@@ -203,7 +203,7 @@ test_main() {
   CMD="${CMD} -n this_should_pass"
   CMD="${CMD} -p this_should_pass"
   CMD="${CMD} -m install"
-  CMD="${CMD} -c citadel"
+  CMD="${CMD} -c mesh_ca"
   CMD="${CMD} -k keyfile"
   CMD="${CMD} -e --only_validate"
 
@@ -226,7 +226,7 @@ test_main() {
   CMD="${CMD} -n this_should_pass"
   CMD="${CMD} -p this_should_pass"
   CMD="${CMD} -m install"
-  CMD="${CMD} -c citadel"
+  CMD="${CMD} -c mesh_ca"
   CMD="${CMD} -e --only_validate"
 
   RETVAL=0
@@ -248,7 +248,7 @@ test_main() {
   CMD="${CMD} -n this_should_pass"
   CMD="${CMD} -p this_should_pass"
   CMD="${CMD} -m migrate"
-  CMD="${CMD} -c citadel"
+  CMD="${CMD} -c mesh_ca"
   CMD="${CMD} -e --only_validate"
 
   RETVAL=0
