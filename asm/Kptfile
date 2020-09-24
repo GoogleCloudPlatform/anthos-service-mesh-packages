@@ -102,7 +102,7 @@ openAPI:
           pattern: "proj-PROJECT_NUMBER"
           values:
           - marker: PROJECT_NUMBER
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectNumber'
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.projectNumber'
     io.k8s.cli.substitutions.gke-metadata:
       type: string
       x-k8s-cli:
