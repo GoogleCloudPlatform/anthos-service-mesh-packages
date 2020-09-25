@@ -732,15 +732,19 @@ bind_user_to_iam_policy(){
     --format="value(account)")"
 
   info "Binding ${GCLOUD_MEMBER} to required IAM roles..."
+  while read -r role; do
   retry 3 run gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
     --member "${ACCOUNT_TYPE}":"${GCLOUD_MEMBER}" \
-    --role=roles/editor \
-    --role=roles/compute.admin \
-    --role=roles/container.admin \
-    --role=roles/resourcemanager.projectIamAdmin \
-    --role=roles/iam.serviceAccountAdmin \
-    --role=roles/iam.serviceAccountKeyAdmin \
-    --role=roles/gkehub.admin
+    --role=roles/"${role}" >/dev/null
+  done <<EOF
+editor
+compute.admin
+container.admin
+resourcemanager.projectIamAdmin
+iam.serviceAccountAdmin
+iam.serviceAccountKeyAdmin
+gkehub.admin
+EOF
 }
 
 # [START required_apis]
