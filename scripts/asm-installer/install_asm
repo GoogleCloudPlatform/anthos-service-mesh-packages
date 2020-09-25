@@ -136,6 +136,17 @@ configure_kubectl(){
   retry 2 run gcloud container clusters get-credentials "${CLUSTER_NAME}" \
     --project="${PROJECT_ID}" \
     --zone="${CLUSTER_LOCATION}"
+
+  info "Verifying connectivity (20s)..."
+  local RETVAL; RETVAL=0;
+  kubectl cluster-info --request-timeout='20s' 1>/dev/null 2>/dev/null || RETVAL=$?
+  if [[ "${RETVAL}" -ne 0 ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Couldn't connect to ${CLUSTER_NAME}.
+If this is a private cluster, verify that the correct firewall rules are applied.
+https://cloud.google.com/service-mesh/docs/gke-install-overview#requirements
+EOF
+  fi
 }
 
 warn() {
@@ -621,7 +632,7 @@ validate_node_pool() {
         (if .autoscaling.enabled then .autoscaling.maxNodeCount else .initialNodeCount end)
         *
         (.config.machineType / "-" | .[-1] | tonumber)
-      ' )"
+      ' 2>/dev/null)" || true
 
   if ! [[ "$ACTUAL_CPU" -ge "$TOTAL_CPU_REQ" ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
