@@ -1,0 +1,15 @@
+#!/bin/bash
+
+FAKE_CONFIG="$(cat "${KUBECONFIG}")"
+
+if [[ "${FAKE_CONFIG}" == *"has_istio"*"right_namespace"*  ]]; then
+  echo "istiod"
+  exit 0
+fi
+if [[ "${FAKE_CONFIG}" == *"has_istio"*"wrong_namespace"* ]]; then
+  if [[ "${*}" == *"istio-system"* ]]; then
+    exit 0
+  fi
+  echo "istiod"
+  exit 0
+fi

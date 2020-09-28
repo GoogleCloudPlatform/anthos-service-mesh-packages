@@ -1,0 +1,218 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  dir: 'scripts/asm-installer'
+  id: 'build-tester-image'
+  args: ['build', '-t', 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}', '.']
+  waitFor: ['-']
+- name: 'gcr.io/cloud-builders/docker'
+  dir: 'scripts/asm-installer'
+  id: 'publish-tester-image'
+  args: ['push', 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}']
+  waitFor: ['build-tester-image']
+
+- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
+  dir: 'scripts/asm-installer'
+  id: 'lint-with-shellcheck'
+  entrypoint: 'shellcheck'
+  args:
+  - '${_SCRIPT_NAME}'
+  waitFor:
+  - 'publish-tester-image'
+- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
+  dir: 'scripts/asm-installer'
+  id: 'check-posh-compatibility'
+  entrypoint: 'posh'
+  args: ['-n', '${_SCRIPT_NAME}']
+  waitFor:
+  - 'publish-tester-image'
+
+- name: 'gcr.io/cloud-builders/gcloud'
+  dir: 'scripts/asm-installer'
+  id: 'fetch-secrets'
+  entrypoint: '/bin/bash'
+  args:
+  - '-c'
+  - >
+    gcloud secrets versions access latest
+    --secret="${_SECRET_NAME}"
+    --format='get(payload.data)'
+    --project="${PROJECT_ID}"
+    | tr '_-' '/+'
+    | base64 -d > "${_KEY_FILE}"
+  waitFor:
+  - 'lint-with-shellcheck'
+  - 'check-posh-compatibility'
+
+- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
+  dir: 'scripts/asm-installer'
+  id: 'clean-up-old-clusters'
+  entrypoint: '/bin/bash'
+  args:
+  - '-c'
+  - |
+    set -e
+    # This will delete all clusters older than 3 hours old
+
+    gcloud auth activate-service-account \
+      "${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com" \
+      --key-file="${_KEY_FILE}"
+
+    NOW="$(date +%s)"
+
+    # clusters
+    while IFS='|' read -r CLUSTER_NAME CREATE_TIME ZONE; do
+      CREATE_TIME="$(date -d "$${CREATE_TIME}" +%s)"
+      SEC_DIFF="$(echo "$${NOW} - $${CREATE_TIME}" | bc)"
+      if [[ "$${SEC_DIFF}" -gt 7200 ]]; then
+        gcloud beta container \
+          --project "${PROJECT_ID}" \
+          clusters delete -q "$${CLUSTER_NAME}" \
+          --zone "$${ZONE}" \
+          --async || true
+      fi
+    done <<EOF
+    $(gcloud container clusters list \
+    --project "${PROJECT_ID}" \
+    --format='value[separator="|"](name,createTime,zone)')
+    EOF
+
+    # ingress resources
+    while read -r LB_NAME; do
+      gcloud compute \
+        --project "${PROJECT_ID}" \
+        forwarding-rules delete -q "$${LB_NAME}" \
+        --region "$${CLUSTER_LOCATION:0:-2}" || true
+      gcloud compute \
+        --project "${PROJECT_ID}" \
+        target-pools delete -q "$${LB_NAME}" \
+        --region "$${CLUSTER_LOCATION:0:-2}" || true
+    done <<EOF
+    $(gcloud compute forwarding-rules list \
+    --project="${PROJECT_ID}" \
+    --format='get(name)' \
+    --filter='((description:istio OR description:frontend-external) AND creationTimestamp<-PT3H)')
+    EOF
+
+    # firewall rules
+    while read -r RULE_NAME; do
+      gcloud compute \
+        --project "${PROJECT_ID}" \
+        firewall-rules delete -q "$${RULE_NAME}" || true
+    done <<EOF
+    $(gcloud compute firewall-rules list \
+    --project="${PROJECT_ID}" \
+    --format='get(name)' \
+    --filter='((description:istio OR description:frontend-external) AND creationTimestamp<-PT3H)')
+    EOF
+  waitFor:
+  - 'fetch-secrets'
+  env:
+  - 'CLUSTER_LOCATION=${_CLUSTER_LOCATION}'
+
+- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
+  dir: 'scripts/asm-installer'
+  id: 'run-cli-tests'
+  entrypoint: '/bin/bash'
+  args:
+  - '-c'
+  - >
+    ./tests/run_cli_tests
+  waitFor:
+  - 'fetch-secrets'
+  env:
+  - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
+  - 'KEY_FILE=${_KEY_FILE}'
+  timeout: 2400s # 40 mins
+
+- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
+  dir: 'scripts/asm-installer'
+  id: 'run-basic-suite'
+  entrypoint: '/bin/bash'
+  args:
+  - '-c'
+  - >
+    ./tests/run_basic_suite
+    --PROJECT_ID "${PROJECT_ID}"
+    --BUILD_ID "${BUILD_ID}"
+    --CLUSTER_LOCATION "${_CLUSTER_LOCATION}"
+  waitFor:
+  - 'fetch-secrets'
+  env:
+  - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
+  - 'KEY_FILE=${_KEY_FILE}'
+  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
+  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
+  timeout: 2400s # 40 mins
+
+- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
+  dir: 'scripts/asm-installer'
+  id: 'run-migration-suite-meshca'
+  entrypoint: '/bin/bash'
+  args:
+  - '-c'
+  - >
+    ./tests/run_migration_suite_meshca
+    --PROJECT_ID "${PROJECT_ID}"
+    --BUILD_ID "${BUILD_ID}"
+    --CLUSTER_LOCATION "${_CLUSTER_LOCATION}"
+  waitFor:
+  - 'fetch-secrets'
+  env:
+  - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
+  - 'KEY_FILE=${_KEY_FILE}'
+  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
+  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
+  timeout: 2400s # 40 mins
+
+- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
+  dir: 'scripts/asm-installer'
+  id: 'run-migration-suite-citadel'
+  entrypoint: '/bin/bash'
+  args:
+  - '-c'
+  - >
+    ./tests/run_migration_suite_citadel
+    --PROJECT_ID "${PROJECT_ID}"
+    --BUILD_ID "${BUILD_ID}"
+    --CLUSTER_LOCATION "${_CLUSTER_LOCATION}"
+  waitFor:
+  - 'fetch-secrets'
+  env:
+  - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
+  - 'KEY_FILE=${_KEY_FILE}'
+  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
+  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
+  timeout: 2400s # 40 mins
+
+- name: 'gcr.io/cloud-builders/gcloud'
+  dir: 'scripts/asm-installer'
+  id: 'publish-scripts'
+  entrypoint: '/bin/bash'
+  args:
+  - '-c'
+  - |
+    set -e
+    gcloud auth activate-service-account \
+      "${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com" \
+      --key-file="${_KEY_FILE}"
+
+    sha256sum "${_SCRIPT_NAME}" > "${_SCRIPT_NAME}.sha256"
+
+    gsutil cp "${_SCRIPT_NAME}" "${_SCRIPT_NAME}.sha256" "gs://${_BUCKET_NAME}/"
+
+    gsutil acl ch -u AllUsers:R "gs://${_BUCKET_NAME}/${_SCRIPT_NAME}" \
+      "gs://${_BUCKET_NAME}/${_SCRIPT_NAME}.sha256"
+  waitFor:
+  - 'run-basic-suite'
+  - 'run-migration-suite-meshca'
+  - 'run-migration-suite-citadel'
+
+substitutions:
+  _BUCKET_NAME: my-gcs-bucket
+  _CLUSTER_LOCATION: us-central1-c
+  _IMAGE_NAME: gcloud-with-kpt
+  _SCRIPT_NAME: install_asm
+  _SERVICE_ACCOUNT: asm-installer
+  _SECRET_NAME: asm-installer-creds
+  _KEY_FILE: key.json
+timeout: 3600s # 1 hour

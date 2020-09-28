@@ -1,0 +1,41 @@
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+spec:
+  components:
+    pilot:
+      k8s:
+        env:
+          - name: SPIFFE_BUNDLE_ENDPOINTS
+            value: "ENVIRON_PROJECT_ID.hub.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json" # {"$ref":"#/definitions/io.k8s.cli.substitutions.spiffe-bundle-endpoints-hub"}
+          # Stackdriver is disabled because it does not support Hub IDNS currently.
+          # TODO: Enable Stackdriver monitoring when it supports Hub IDNS
+          - name: ENABLE_STACKDRIVER_MONITORING
+            value: "false" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.controlplane.monitoring.enabled"}
+  meshConfig:
+    defaultConfig:
+      proxyMetadata:
+        TRUST_DOMAIN: "ENVIRON_PROJECT_ID.hub.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain-hub"}
+        GKE_CLUSTER_URL: "https://gkehub.googleapis.com/projects/ENVIRON_PROJECT_ID/locations/global/memberships/MEMBERSHIP_ID" # {"$ref":"#/definitions/io.k8s.cli.substitutions.hub-idp-url"}
+    trustDomainAliases: # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases"}
+      - "ENVIRON_PROJECT_ID.hub.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain-hub"}
+  values:
+    global:
+      trustDomain: "ENVIRON_PROJECT_ID.hub.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain-hub"}
+      # Enable SDS
+      sds:
+        token:
+          aud: "ENVIRON_PROJECT_ID.hub.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain-hub"}
