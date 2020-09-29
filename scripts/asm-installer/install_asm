@@ -16,8 +16,8 @@ fi
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"
 MINOR="${MINOR:=7}"
-POINT="${POINT:=1}"
-REV="${REV:=0}"
+POINT="${POINT:=2}"
+REV="${REV:=3}"
 RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
 RELEASE_LINE="${MAJOR}.${MINOR}."
 REVISION_LABEL="asm-${MAJOR}${MINOR}${POINT}-${REV}"
@@ -657,7 +657,12 @@ validate_node_pool() {
         (.config.machineType / "-" | .[-1] | tonumber)
       ' 2>/dev/null)" || true
 
-  if ! [[ "$ACTUAL_CPU" -ge "$TOTAL_CPU_REQ" ]]; then
+  local MAX_CPU; MAX_CPU=0;
+  for i in ${ACTUAL_CPU}; do
+    MAX_CPU="$(( i > MAX_CPU ? i : MAX_CPU))"
+  done
+
+  if [[ "$MAX_CPU" -lt "$TOTAL_CPU_REQ" ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 ASM requires you to have at least ${TOTAL_CPU_REQ} vCPUs in node pools whose
 machine type is at least ${MACHINE_CPU_REQ} vCPUs.

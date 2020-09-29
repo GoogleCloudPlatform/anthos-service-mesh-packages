@@ -9,6 +9,13 @@ if [[ "${*}" == *"machineType"* ]]; then
     },
     "initialNodeCount": 4,
     "name": "default-pool"
+  },
+  {
+    "config": {
+      "machineType": "e2-medium-1"
+    },
+    "initialNodeCount": 1,
+    "name": "nondefault-pool"
   }
 ]
 EOF
