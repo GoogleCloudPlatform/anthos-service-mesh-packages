@@ -90,6 +90,8 @@ output from other tools that it invokes.
 
 ## Developer notes
 
+### General
+
 You can use the scripts in the tests/ folder to test different scenarios. In
 general, the scripts do the following:
 * Create a 4 node GKE cluster
@@ -103,3 +105,23 @@ but manually verify that all resources are deleted to avoid unexpected costs.
 Warning: The cloudbuild.yaml file is for testing purposes only. Do not use this
 in any project containing production resources. The Cloud Build configuration
 will attempt to delete all GKE clusters older than three hours old.
+
+### Using Custom Images
+
+If you would like to use the script with custom packages or images (e.g. for
+testing pre-release versions), you can do so using environment variables.
+
+`_CI_ASM_PKG_LOCATION` is the name of the Google Cloud Storage bucket containing
+the tarball with the required ASM binaries.
+
+`_CI_ASM_IMAGE_LOCATION` is the location of the Docker images.
+
+So for example, to use gs://super-secret-bucket/asm/istio-2.0.0-asm-9.tar.gz and
+gcr.io/super-secret-repo/asm as your container hub, you can invoke the script
+like this:
+
+```
+_CI_ASM_PKG_LOCATION=super-secret-bucket \
+_CI_ASM_IMAGE_LOCATION=gcr.io/super-secret-repo/asm \
+install_asm --flag --flag...
+```
