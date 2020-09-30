@@ -16,8 +16,8 @@ fi
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"
 MINOR="${MINOR:=6}"
-POINT="${POINT:=8}"
-REV="${REV:=9}"
+POINT="${POINT:=11}"
+REV="${REV:=1}"
 RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
 RELEASE_LINE="${MAJOR}.${MINOR}."
 REVISION_LABEL="asm-${MAJOR}${MINOR}${POINT}-${REV}"
