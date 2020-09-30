@@ -107,15 +107,13 @@ run() {
     warn "Would have executed: ${*}"
     return
   elif [[ "${VERBOSE}" -eq 0 ]]; then
-    "${@}"
+    "${@}" 2>/dev/null
     return "$?"
   fi
   warn "Running: '${*}'"
   warn "-------------"
   local RETVAL;
   { "${@}"; RETVAL="$?"; } || true
-  warn "-------------"
-  warn "Ran: '${*}'"
   return $RETVAL
 }
 
@@ -859,7 +857,7 @@ init_meshca() {
   info "Initializing Mesh CA..."
   local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
   run curl --request POST --fail \
-    --data '' \
+    --data '' -o /dev/null \
     "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
     --header @- <<EOF
 Authorization: Bearer ${TOKEN}
@@ -900,6 +898,7 @@ add_cluster_labels(){
 
 enable_workload_identity(){
   info "Enabling Workload Identity on ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
+  info "(This could take awhile, up to 10 minutes)"
   retry 2 run gcloud container clusters update "${CLUSTER_NAME}" \
     --project="${PROJECT_ID}" \
     --zone="${CLUSTER_LOCATION}" \
