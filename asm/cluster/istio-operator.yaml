@@ -19,7 +19,7 @@ metadata:
 spec:
   profile: asm
   hub: gcr.io/gke-release/asm # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}
-  tag: 1.4.10-asm.15 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
+  tag: 1.4.10-asm.18 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
   values:
     global:
       meshID: "proj-PROJECT_NUMBER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh_id"}
