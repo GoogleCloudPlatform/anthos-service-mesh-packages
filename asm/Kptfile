@@ -88,12 +88,14 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.tag
-          value: 1.6.8-asm.9
+          value: 1.6.11-asm.1
+          isSet: true
     io.k8s.cli.setters.anthos.servicemesh.canonicalServiceHub:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.canonicalServiceHub
-          value: gcr.io/gke-release/asm/canonical-service-controller:1.6.8-asm.9
+          value: gcr.io/gke-release/asm/canonical-service-controller:1.6.11-asm.1
+          isSet: true
     io.k8s.cli.substitutions.mesh-id:
       type: string
       x-k8s-cli:

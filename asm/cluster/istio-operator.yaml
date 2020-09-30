@@ -21,7 +21,7 @@ metadata:
 spec:
   profile: asm-gcp # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.profile"}
   hub: gcr.io/gke-release/asm # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}
-  tag: 1.6.8-asm.9 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
+  tag: 1.6.11-asm.1 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
   components:
     pilot:
       k8s:
@@ -38,7 +38,7 @@ spec:
         GKE_CLUSTER_URL: "https://container.googleapis.com/v1/projects/PROJECT_ID/locations/us-central1-c/clusters/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cluster-url"}
     trustDomainAliases: # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases"}
     - "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
-  values: 
+  values:
     global:
       meshID: "proj-PROJECT_NUMBER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh-id"}
       trustDomain: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
