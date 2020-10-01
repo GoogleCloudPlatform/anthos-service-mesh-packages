@@ -1006,6 +1006,8 @@ outro() {
   info ""
   info "*****************************"
   info "The ASM control plane installation is now complete."
+  info "To enable automatic sidecar injection on a namespace, you can use the following command:"
+  info "kubectl label namespace <NAMESPACE> istio-injection- istio.io/rev=${REVISION_LABEL} --overwrite"
 
   if [[ "${MODE}" = "migrate" ]]; then
     info "Please verify the new control plane and then: 1) migrate your workloads 2) remove old control plane."
