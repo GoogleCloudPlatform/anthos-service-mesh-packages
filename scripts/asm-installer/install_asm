@@ -77,7 +77,6 @@ main() {
 
   info "Successfully validated all requirements to install ASM from this computer."
   if [[ "${ONLY_VALIDATE}" -ne 0 ]]; then
-    success
     return 0
   fi
 
@@ -85,12 +84,11 @@ main() {
   set_up_cluster
   configure_package
   if [[ "${PRINT_CONFIG}" -eq 1 ]]; then
-    print_config
-    success
+    print_config >&3
+    return 0
   else
     install_asm
     info "Successfully installed ASM."
-    success
   fi
   return 0
 }
@@ -175,11 +173,6 @@ fatal_with_usage() {
   warn "${1}"
   usage >&2
   exit 2
-}
-
-success() {
-  cleanup_local_workspace
-  return 0
 }
 
 is_sa() {
@@ -468,11 +461,6 @@ set_up_local_workspace() {
     fatal "Encountered error when running mktemp!"
   fi
   export KUBECONFIG
-}
-
-cleanup_local_workspace() {
-  run rm "${KUBECONFIG}"
-  run popd
 }
 
 ### Environment validation functions ###
@@ -950,15 +938,18 @@ configure_package() {
 }
 
 print_config() {
-  echo "---" >&3
-  sanitize_file "${OPERATOR_MANIFEST}" >&3
+  echo "---"
+  sanitize_file "${OPERATOR_MANIFEST}"
   while read -d ',' -r yaml_file; do
-    echo "---" >&3
-    sanitize_file "${yaml_file}" >&3
+    echo "---"
+    sanitize_file "${yaml_file}"
   done <<EOF
 ${OPERATOR_OVERLAY}
 EOF
-exit
+  if [[ "$DISABLE_CANONICAL_SERVICE" -ne 1 ]]; then
+    echo "---"
+    sanitize_file asm/canonical-service/controller.yaml
+  fi
 }
 
 # Strip comments, empty lines, trailing whitespace
@@ -990,6 +981,12 @@ EOF
   sleep 1
   info "...done!"
 
+  local RAW_YAML; RAW_YAML="${REVISION_LABEL}-manifest-raw.yaml"
+  local EXPANDED_YAML; EXPANDED_YAML="${REVISION_LABEL}-manifest-expanded.yaml"
+  print_config > "${RAW_YAML}"
+  run ./"${ISTIOCTL_REL_PATH}" manifest generate \
+    <"${RAW_YAML}" \
+    >"${EXPANDED_YAML}"
   if [[ "$DISABLE_CANONICAL_SERVICE" -ne 1 ]]; then
     info "Installing ASM CanonicalService controller in asm-system namespace..."
     retry 3 run kubectl apply -f asm/canonical-service/controller.yaml
@@ -1023,6 +1020,10 @@ outro() {
     info "${OUTPUT_DIR}/asm"
     info "The version of istioctl that matches the installation can be found at:"
     info "${OUTPUT_DIR}/${ISTIOCTL_REL_PATH}"
+    info "The combined configuration generated for installation can be found at:"
+    info "${OUTPUT_DIR}/${RAW_YAML}"
+    info "The full, expanded set of kubernetes resources can be found at:"
+    info "${OUTPUT_DIR}/${EXPANDED_YAML}"
   fi
 
   info "*****************************"
