@@ -762,14 +762,27 @@ version_valid_for_upgrade() {
 EOF
   VERSION_POINT="$(echo "$VERSION_POINT" | sed 's/-.*//')"
   VERSION_REV="$(echo "$VERSION_REV" | sed 's/-.*//')"
-  if [[ "$VERSION_MAJOR" -ne 1 || "$VERSION_MINOR" -lt 6 || "$VERSION_MINOR" -ge "$MINOR" || \
-      [[ "$VERSION_MINOR" -eq "$MINOR" && \
-        [[ "$VERSION_POINT" -ge "$POINT" || \
-          [[ "$VERSION_POINT" -eq "$POINT" && "$VERSION_REV" -ge "$REV" ]] ]] ]] ]]; then
+  if [[ is_major_minor_invalid || is_minor_point_rev_invalid ]]; then
     return 1
   else
     return 0
   fi
+}
+
+is_major_minor_invalid() {
+  return [[ "$VERSION_MAJOR" -ne 1 || "$VERSION_MINOR" -lt 6 || "$VERSION_MINOR" -gt "$MINOR" ]]
+}
+
+is_minor_point_rev_invalid() {
+  retrun [[ "$VERSION_MINOR" -eq "$MINOR" && is_point_rev_invalid ]]
+}
+
+is_point_rev_invalid() {
+  return [[ "$VERSION_POINT" -gt "$POINT" || is_rev_invalid ]]
+}
+
+is_rev_invalid() {
+  return [[ "$VERSION_POINT" -eq "$POINT" && "$VERSION_REV" -ge "$REV" ]]
 }
 
 validate_ca_consistency() {
