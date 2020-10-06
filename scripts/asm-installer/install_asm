@@ -758,14 +758,14 @@ version_valid_for_upgrade() {
   # if asm version found, pattern: 1.6.11-asm.1-586f900508ad482ed32b830dd15f6c54b32b93ed
   local VERSION_MAJOR VERSION_MINOR VERSION_POINT VERSION_REV
   IFS="." read -r VERSION_MAJOR VERSION_MINOR VERSION_POINT VERSION_REV <<EOF
-"${VERSION}"
+${VERSION}
 EOF
   VERSION_POINT="$(sed 's/-.*//' <<EOF
-"${VERSION_POINT}"
+${VERSION_POINT}
 EOF
 )"
   VERSION_REV="$(sed 's/-.*//' <<EOF
-"${VERSION_REV}"
+${VERSION_REV}
 EOF
 )"
   if is_major_minor_invalid || is_minor_point_rev_invalid; then
@@ -776,7 +776,9 @@ EOF
 }
 
 is_major_minor_invalid() {
-  [[ "$VERSION_MAJOR" -ne 1 || "$VERSION_MINOR" -lt 6 || "$VERSION_MINOR" -gt "$MINOR" ]] && return 0
+  [[ "$VERSION_MAJOR" -ne 1 ]] && return 0
+  [[ "$VERSION_MINOR" -lt 6  ]] && return 0
+  [[ "$VERSION_MINOR" -gt "$MINOR" ]] && return 0
 }
 
 is_minor_point_rev_invalid() {
@@ -797,7 +799,7 @@ validate_ca_consistency() {
   local INSTALLED_CA; INSTALLED_CA="$(kubectl -n istio-system get pod -l istio=ingressgateway \
     -o jsonpath='{.items[].spec.containers[].env[?(@.name=="CA_ADDR")].value}')"
   if is_ca_meshca_to_citadel || is_ca_citadel_to_meshca; then
-    fatal "CA cannot be switched while performing upgrade. Please use ${CA}."
+    fatal "CA cannot be switched while performing upgrade. Please use ${CA} as the CA."
   fi
 }
 
