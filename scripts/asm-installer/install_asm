@@ -713,9 +713,9 @@ check_istio_not_deployed(){
 
 validate_istio_version() {
   info "Checking existing Istio version(s)..."
-  local OUTPUT; OUTPUT="$(retry 3 ./${ISTIOCTL_REL_PATH} version -o json)"
+  local VERSION_OUTPUT; VERSION_OUTPUT="$(retry 3 ./${ISTIOCTL_REL_PATH} version -o json)"
   local FOUND_VALID_VERSION; FOUND_VALID_VERSION=0
-  for version in $(echo "${OUTPUT}" | jq -r '.meshVersion[].Info.version' -r); do
+  for version in $(echo "${VERSION_OUTPUT}" | jq -r '.meshVersion[].Info.version' -r); do
     if [[ "$version" =~ ^$RELEASE_LINE ]]; then
       info "  $version (suitable for migration)"
       FOUND_VALID_VERSION=1
@@ -733,9 +733,9 @@ validate_istio_version() {
 
 validate_asm_version() {
   info "Checking existing ASM version(s)..."
-  local OUTPUT; OUTPUT="$(retry 3 ./${ISTIOCTL_REL_PATH} version -o json)"
+  local VERSION_OUTPUT; VERSION_OUTPUT="$(retry 3 ./${ISTIOCTL_REL_PATH} version -o json)"
   local FOUND_INVALID_VERSION; FOUND_INVALID_VERSION=0
-  for VERSION in $(echo "${OUTPUT}" | jq -r '.meshVersion[].Info.version'); do
+  for VERSION in $(echo "${VERSION_OUTPUT}" | jq -r '.meshVersion[].Info.version'); do
     if ! [[ "${VERSION}" =~ "asm" ]]; then
       fatal "Cannot upgrade from version ${VERSION}. Only upgrade from ASM distribution is supported."
     fi
