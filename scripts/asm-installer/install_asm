@@ -757,12 +757,18 @@ version_valid_for_upgrade() {
   
   # if asm version found, pattern: 1.6.11-asm.1-586f900508ad482ed32b830dd15f6c54b32b93ed
   local VERSION_MAJOR VERSION_MINOR VERSION_POINT VERSION_REV
-  IFS="." read VERSION_MAJOR VERSION_MINOR VERSION_POINT VERSION_REV <<EOF
+  IFS="." read -r VERSION_MAJOR VERSION_MINOR VERSION_POINT VERSION_REV <<EOF
 "${VERSION}"
 EOF
-  VERSION_POINT="$(echo "$VERSION_POINT" | sed 's/-.*//')"
-  VERSION_REV="$(echo "$VERSION_REV" | sed 's/-.*//')"
-  if [[ is_major_minor_invalid || is_minor_point_rev_invalid ]]; then
+  VERSION_POINT="$(sed 's/-.*//' <<EOF
+"${VERSION_POINT}"
+EOF
+)"
+  VERSION_REV="$(sed 's/-.*//' <<EOF
+"${VERSION_REV}"
+EOF
+)"
+  if is_major_minor_invalid || is_minor_point_rev_invalid; then
     return 1
   else
     return 0
@@ -770,40 +776,41 @@ EOF
 }
 
 is_major_minor_invalid() {
-  return [[ "$VERSION_MAJOR" -ne 1 || "$VERSION_MINOR" -lt 6 || "$VERSION_MINOR" -gt "$MINOR" ]]
+  [[ "$VERSION_MAJOR" -ne 1 || "$VERSION_MINOR" -lt 6 || "$VERSION_MINOR" -gt "$MINOR" ]] && return 0
 }
 
 is_minor_point_rev_invalid() {
-  retrun [[ "$VERSION_MINOR" -eq "$MINOR" && is_point_rev_invalid ]]
+  [[ "$VERSION_MINOR" -eq "$MINOR" ]] && is_point_rev_invalid && return 0
 }
 
 is_point_rev_invalid() {
-  return [[ "$VERSION_POINT" -gt "$POINT" || is_rev_invalid ]]
+  [[ "$VERSION_POINT" -gt "$POINT" ]] && return 0
+  is_rev_invalid && return 0
 }
 
 is_rev_invalid() {
-  return [[ "$VERSION_POINT" -eq "$POINT" && "$VERSION_REV" -ge "$REV" ]]
+  [[ "$VERSION_POINT" -eq "$POINT" && "$VERSION_REV" -ge "$REV" ]] && return 0
 }
 
 validate_ca_consistency() {
   info "Checking existing CA..."
   local INSTALLED_CA; INSTALLED_CA="$(kubectl -n istio-system get pod -l istio=ingressgateway \
     -o jsonpath='{.items[].spec.containers[].env[?(@.name=="CA_ADDR")].value}')"
-  if [[ is_ca_meshca_to_citadel || is_ca_citadel_to_meshca ]]; then
+  if is_ca_meshca_to_citadel || is_ca_citadel_to_meshca; then
     fatal "CA cannot be switched while performing upgrade. Please use ${CA}."
   fi
 }
 
 is_ca_citadel_to_meshca() {
-  return [[ ! is_meshca_installed && "${CA}" == "mesh_ca" ]]
+  ! is_meshca_installed && [[ "${CA}" = "mesh_ca" ]] && return 0
 }
 
 is_ca_meshca_to_citadel() {
-  return [[ is_meshca_installed && "${CA}" == "citadel" ]]
+  is_meshca_installed && [[ "${CA}" = "citadel" ]] && return 0
 }
 
 is_meshca_installed() {
-  return [[ "${INSTALLED_CA}" =~ meshca\.googleapis\.com ]]
+  [[ "${INSTALLED_CA}" =~ meshca\.googleapis\.com ]] && return 0
 }
 
 ### Project functions ###
