@@ -799,8 +799,15 @@ validate_ca_consistency() {
   local INSTALLED_CA; INSTALLED_CA="$(kubectl -n istio-system get pod -l istio=ingressgateway \
     -o jsonpath='{.items[].spec.containers[].env[?(@.name=="CA_ADDR")].value}')"
   
-  is_ca_meshca_to_citadel && fatal "CA cannot be switched while performing upgrade. Please use mesh_ca as the CA."
-  is_ca_citadel_to_meshca && fatal "CA cannot be switched while performing upgrade. Please use citadel as the CA."
+  local CURRENT_CA; CURRENT_CA=citadel
+  if is_meshca_installed; then
+    CURRENT_CA=mesh_ca
+  fi
+  info "CA already in use: ${CURRENT_CA}"
+
+  if is_ca_citadel_to_meshca || is_ca_meshca_to_citadel; then
+    fatal "CA cannot be switched while performing upgrade. Please use ${CURRENT_CA} as the CA."
+  fi
 }
 
 is_ca_citadel_to_meshca() {
