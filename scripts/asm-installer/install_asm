@@ -22,7 +22,6 @@ RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
 RELEASE_LINE="${MAJOR}.${MINOR}."
 REVISION_LABEL="asm-${MAJOR}${MINOR}${POINT}-${REV}"
 KPT_BRANCH="release-${MAJOR}.${MINOR}-asm"
-unset MAJOR; unset MINOR; unset POINT; unset REV;
 readonly RELEASE; readonly RELEASE_LINE; readonly REVISION_LABEL; readonly KPT_BRANCH;
 
 ### These are hooks for Cloud Build to be able to use debug/staging images
@@ -197,8 +196,11 @@ OPTIONS:
                                       Passing --mode install will attempt a
                                       new ASM installation. Passing --mode
                                       migrate will attempt to migrate an Istio
-                                      installation to ASM. Allowed values for
-                                      <MODE> are {install|migrate}.
+                                      installation to ASM. Passing --mode
+                                      upgrade will attempt to upgrade an
+                                      existing ASM installation to a newer
+                                      version. Allowed values for
+                                      <MODE> are {install|migrate|upgrade}.
   -c|--ca                <CA>         The type of certificate authority to be
                                       used. Defaults to "mesh_ca" for --mode
                                       install. Specifying the CA is required
@@ -371,8 +373,8 @@ EOF
 
   # shellcheck disable=SC2064
   case "${MODE}" in
-    install | migrate);;
-    *) fatal "MODE must be one of 'install', 'migrate'";;
+    install | migrate | upgrade);;
+    *) fatal "MODE must be one of 'install', 'migrate', 'upgrade'";;
   esac
 
   case "${CA}" in
@@ -475,9 +477,14 @@ validate_dependencies() {
   # kubeconfig so we're not breaking the promise that --only_validate gives
   configure_kubectl
   validate_expected_control_plane
+  
   if [[ "${MODE}" = "migrate" ]]; then
     validate_istio_version
+  elif [[ "${MODE}" = "upgrade" ]]; then
+    validate_asm_version
+    validate_ca_consistency
   fi
+
   if [[ "${ENABLE_APIS}" -eq 0 || "${ONLY_VALIDATE}" -eq 1 ]]; then
     exit_if_apis_not_enabled
   fi
@@ -661,10 +668,9 @@ EOF
 validate_expected_control_plane(){
   info "Checking Istio installations..."
   check_no_istiod_outside_of_istio_system_namespace
-  if [[ "${MODE}" = "migrate" ]]; then
+  if [[ "${MODE}" = "migrate" || "${MODE}" = "upgrade" ]]; then
     check_istio_deployed
-  fi
-  if [[ "${MODE}" = "install" ]]; then
+  elif [[ "${MODE}" = "install" ]]; then
     check_istio_not_deployed
   fi
 }
@@ -694,7 +700,7 @@ check_istio_deployed(){
   local ISTIOD_COUNT; ISTIOD_COUNT="$(get_istio_deployment_count)";
   info "Found ${ISTIOD_COUNT} deployment(s)."
   if [[ "$ISTIOD_COUNT" -eq 0 ]]; then
-    fatal "Migrate mode specified but no istiod deployment found. (Expected >=1.)"
+    fatal "${MODE} mode specified but no istiod deployment found. (Expected >=1.)"
   fi
 }
 
@@ -715,8 +721,7 @@ validate_istio_version() {
     if [[ "$version" =~ ^$RELEASE_LINE ]]; then
       info "  $version (suitable for migration)"
       FOUND_VALID_VERSION="true"
-    fi
-    if ! [[ "$version" =~ ^$RELEASE_LINE ]]; then
+    else
       info "  $version (not suitable for migration)"
     fi
     if [[ "$version" =~ "asm" ]]; then
@@ -725,6 +730,47 @@ validate_istio_version() {
   done
   if [[ "$FOUND_VALID_VERSION" != "true" ]]; then
     fatal "Migration requires an existing control plane in the ${RELEASE_LINE} line."
+  fi
+}
+
+validate_asm_version() {
+  info "Checking existing ASM version(s)..."
+  local OUTPUT
+  OUTPUT="$(retry 3 ./istio-${RELEASE}/bin/istioctl version -o json)"
+  local FOUND_INVALID_VERSION
+  FOUND_INVALID_VERSION="false"
+  for version in $(echo "${OUTPUT}" | jq -r '.meshVersion[].Info.version'); do
+    if ! [[ "$version" =~ "asm" ]]; then
+      fatal "Cannot upgrade from version $version. Only upgrade from ASM distribution is supported."
+    fi
+
+    # if asm version found, pattern: 1.6.11-asm.1-586f900508ad482ed32b830dd15f6c54b32b93ed
+    local VERSION_MAJOR VERSION_MINOR VERSION_POINT VERSION_REV
+    IFS="." read VERSION_MAJOR VERSION_MINOR VERSION_POINT VERSION_REV <<< "$version"
+    VERSION_POINT="$(echo "$VERSION_POINT" | sed 's/-.*//')"
+    VERSION_REV="$(echo "$VERSION_REV" | sed 's/-.*//')"
+    if [[ "$VERSION_MAJOR" -ne 1 || "$VERSION_MINOR" -lt 6 || "$VERSION_MINOR" -ge "$MINOR" || \
+      ( "$VERSION_MINOR" -eq "$MINOR" && \
+        ( "$VERSION_POINT" -ge "$POINT" || \
+          ("$VERSION_POINT" -eq "$POINT" && "$VERSION_REV" -ge "$REV"))) ]]; then
+      info "  $version (not suitable for migration)"
+      FOUND_INVALID_VERSION="true"
+    else
+      info "  $version (suitable for migration)"
+    fi
+  done
+  if [[ "$FOUND_INVALID_VERSION" = "true" ]]; then
+    fatal "Upgrade requires all existing control planes to be between versions 1.6.0-asm.0 (inclusive) and ${RELEASE} (exclusive)."
+  fi
+}
+
+validate_ca_consistency() {
+  info "Checking existing CA..."
+  local INSTALLED_CA
+  INSTALLED_CA="$(kubectl -n istio-system get pod -l istio=ingressgateway -o jsonpath='{.items[].spec.containers[].env[?(@.name=="CA_ADDR")].value}')"
+  if [[ ("${CA}" = "citadel" && ! "${INSTALLED_CA}" =~ istiod.*istio\-system\.svc) || \
+        ("${CA}" = "mesh_ca" && ! "${INSTALLED_CA}" =~ meshca\.googleapis\.com) ]]; then
+    fatal "CA cannot be switched while performing upgrade. Please use the same CA."
   fi
 }
 
