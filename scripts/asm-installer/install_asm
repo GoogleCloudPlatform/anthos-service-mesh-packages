@@ -713,14 +713,12 @@ check_istio_not_deployed(){
 
 validate_istio_version() {
   info "Checking existing Istio version(s)..."
-  local OUTPUT
-  OUTPUT="$(retry 3 ./istio-${RELEASE}/bin/istioctl version -o json)"
-  local FOUND_VALID_VERSION
-  FOUND_VALID_VERSION="false"
+  local OUTPUT; OUTPUT="$(retry 3 ./${ISTIOCTL_REL_PATH} version -o json)"
+  local FOUND_VALID_VERSION; FOUND_VALID_VERSION=0
   for version in $(echo "${OUTPUT}" | jq -r '.meshVersion[].Info.version' -r); do
     if [[ "$version" =~ ^$RELEASE_LINE ]]; then
       info "  $version (suitable for migration)"
-      FOUND_VALID_VERSION="true"
+      FOUND_VALID_VERSION=1
     else
       info "  $version (not suitable for migration)"
     fi
@@ -728,50 +726,64 @@ validate_istio_version() {
       fatal "Cannot migrate from version $version. Only migration from OSS Istio to the ASM distribution is supported."
     fi
   done
-  if [[ "$FOUND_VALID_VERSION" != "true" ]]; then
+  if [[ "$FOUND_VALID_VERSION" -eq 0 ]]; then
     fatal "Migration requires an existing control plane in the ${RELEASE_LINE} line."
   fi
 }
 
 validate_asm_version() {
   info "Checking existing ASM version(s)..."
-  local OUTPUT
-  OUTPUT="$(retry 3 ./istio-${RELEASE}/bin/istioctl version -o json)"
-  local FOUND_INVALID_VERSION
-  FOUND_INVALID_VERSION="false"
-  for version in $(echo "${OUTPUT}" | jq -r '.meshVersion[].Info.version'); do
-    if ! [[ "$version" =~ "asm" ]]; then
-      fatal "Cannot upgrade from version $version. Only upgrade from ASM distribution is supported."
+  local OUTPUT; OUTPUT="$(retry 3 ./${ISTIOCTL_REL_PATH} version -o json)"
+  local FOUND_INVALID_VERSION; FOUND_INVALID_VERSION=0
+  for VERSION in $(echo "${OUTPUT}" | jq -r '.meshVersion[].Info.version'); do
+    if ! [[ "${VERSION}" =~ "asm" ]]; then
+      fatal "Cannot upgrade from version ${VERSION}. Only upgrade from ASM distribution is supported."
     fi
 
-    # if asm version found, pattern: 1.6.11-asm.1-586f900508ad482ed32b830dd15f6c54b32b93ed
-    local VERSION_MAJOR VERSION_MINOR VERSION_POINT VERSION_REV
-    IFS="." read VERSION_MAJOR VERSION_MINOR VERSION_POINT VERSION_REV <<< "$version"
-    VERSION_POINT="$(echo "$VERSION_POINT" | sed 's/-.*//')"
-    VERSION_REV="$(echo "$VERSION_REV" | sed 's/-.*//')"
-    if [[ "$VERSION_MAJOR" -ne 1 || "$VERSION_MINOR" -lt 6 || "$VERSION_MINOR" -ge "$MINOR" || \
-      ( "$VERSION_MINOR" -eq "$MINOR" && \
-        ( "$VERSION_POINT" -ge "$POINT" || \
-          ("$VERSION_POINT" -eq "$POINT" && "$VERSION_REV" -ge "$REV"))) ]]; then
-      info "  $version (not suitable for migration)"
-      FOUND_INVALID_VERSION="true"
+    if version_valid_for_upgrade "${VERSION}"; then
+      info "  ${VERSION} (suitable for migration)"
     else
-      info "  $version (suitable for migration)"
+      info "  ${VERSION} (not suitable for migration)"
+      FOUND_INVALID_VERSION=1
     fi
   done
-  if [[ "$FOUND_INVALID_VERSION" = "true" ]]; then
+  if [[ "$FOUND_INVALID_VERSION" -eq 1 ]]; then
     fatal "Upgrade requires all existing control planes to be between versions 1.6.0-asm.0 (inclusive) and ${RELEASE} (exclusive)."
+  fi
+}
+
+version_valid_for_upgrade() {
+  local VERSION; VERSION=$1
+  
+  # if asm version found, pattern: 1.6.11-asm.1-586f900508ad482ed32b830dd15f6c54b32b93ed
+  local VERSION_MAJOR VERSION_MINOR VERSION_POINT VERSION_REV
+  IFS="." read VERSION_MAJOR VERSION_MINOR VERSION_POINT VERSION_REV <<EOF
+"${VERSION}"
+EOF
+  VERSION_POINT="$(echo "$VERSION_POINT" | sed 's/-.*//')"
+  VERSION_REV="$(echo "$VERSION_REV" | sed 's/-.*//')"
+  if [[ "$VERSION_MAJOR" -ne 1 || "$VERSION_MINOR" -lt 6 || "$VERSION_MINOR" -ge "$MINOR" || \
+      [[ "$VERSION_MINOR" -eq "$MINOR" && \
+        [[ "$VERSION_POINT" -ge "$POINT" || \
+          [[ "$VERSION_POINT" -eq "$POINT" && "$VERSION_REV" -ge "$REV" ]] ]] ]] ]]; then
+    return 1
+  else
+    return 0
   fi
 }
 
 validate_ca_consistency() {
   info "Checking existing CA..."
-  local INSTALLED_CA
-  INSTALLED_CA="$(kubectl -n istio-system get pod -l istio=ingressgateway -o jsonpath='{.items[].spec.containers[].env[?(@.name=="CA_ADDR")].value}')"
-  if [[ ("${CA}" = "citadel" && ! "${INSTALLED_CA}" =~ istiod.*istio\-system\.svc) || \
-        ("${CA}" = "mesh_ca" && ! "${INSTALLED_CA}" =~ meshca\.googleapis\.com) ]]; then
-    fatal "CA cannot be switched while performing upgrade. Please use the same CA."
+  local INSTALLED_CA; INSTALLED_CA="$(kubectl -n istio-system get pod -l istio=ingressgateway \
+    -o jsonpath='{.items[].spec.containers[].env[?(@.name=="CA_ADDR")].value}')"
+  if [[ [[ is_meshca_installed && "${CA}" == "citadel" ]] || \
+        [[ ! is_meshca_installed && "${CA}" == "mesh_ca" ]] ]]; then
+    fatal "CA cannot be switched while performing upgrade. Please use ${CA}."
   fi
+}
+
+is_meshca_installed() {
+  return [[ "${INSTALLED_CA}" =~ meshca\.googleapis\.com ]]
 }
 
 ### Project functions ###
