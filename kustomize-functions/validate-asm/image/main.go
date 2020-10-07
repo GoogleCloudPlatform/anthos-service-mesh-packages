@@ -34,6 +34,8 @@ const (
 	containerClusterKind   = "ContainerCluster"
 	containerNodePoolKind  = "ContainerNodePool"
 	apiGroup               = "container.cnrm.cloud.google.com"
+	minimumTotalVCPUs      = 8
+	minimumVCPUsPerNode    = 4
 )
 
 var supportedReleaseChannels = []string{"REGULAR", "RAPID", "STABLE"}
@@ -115,9 +117,10 @@ func (e ValidationErrors) Error() string {
 func (filter) Filter(in []*yaml.RNode) ([]*yaml.RNode, error) {
 	var errList []error
 	var warningList []error
+	var totalVCPUCount int
 
 	for _, r := range in {
-		if errs := validate(r); len(errs) != 0 {
+		if errs := validate(r, &totalVCPUCount); len(errs) != 0 {
 			for _, e := range errs {
 				if e.severity == Warning {
 					warningList = append(warningList, e)
@@ -127,14 +130,17 @@ func (filter) Filter(in []*yaml.RNode) ([]*yaml.RNode, error) {
 			}
 		}
 	}
+	if err := validateMinimumVCPUCount(totalVCPUCount); err != nil {
+		warningList = append(warningList, ValidationError{Warning, err})
+	}
 	if len(errList) == 0 && len(warningList) == 0 {
 		return nil, nil
 	}
 	return nil, ValidationErrors{errors: errList, warnings: warningList}
 }
 
-// https://cloud.google.com/service-mesh/docs/gke-install-existing-cluster#setting_up_your_project
-func validate(r *yaml.RNode) []ValidationError {
+// https://cloud.google.com/service-mesh/docs/gke-install-overview#requirements
+func validate(r *yaml.RNode, totalVCPUCount *int) []ValidationError {
 
 	var errList []ValidationError
 
@@ -169,20 +175,22 @@ func validate(r *yaml.RNode) []ValidationError {
 			errList = append(errList, ValidationError{Error, err})
 		}
 
-		// validate machine type
-		if err := validateMachineType(r, meta, false); err != nil {
-			errList = append(errList, ValidationError{Error, err})
+		// validate machine type for the cluster
+		if _, err := validateMachineType(r, meta, false); err != nil {
+			errList = append(errList, ValidationError{Warning, err})
 		}
 	}
 
 	if strings.HasPrefix(meta.ApiVersion, apiGroup) && meta.Kind == containerNodePoolKind {
-		if err := validateNodeCountAtLeast(r, meta, 4, "ASM requires at least four nodes. If you need to add nodes, see https://bit.ly/2RnVL2T"); err != nil {
+		// validate machine type for each nodepool
+		vcpu, err := validateMachineType(r, meta, true)
+		if err != nil {
 			errList = append(errList, ValidationError{Warning, err})
 		}
 
-		// validate machine type
-		if err := validateMachineType(r, meta, true); err != nil {
-			errList = append(errList, ValidationError{Error, err})
+		// aggregate vcpu count for each nodepool
+		if err := aggregateVCPUCount(r, meta, vcpu, totalVCPUCount); err != nil {
+			errList = append(errList, ValidationError{Warning, err})
 		}
 	}
 	return errList
@@ -253,23 +261,35 @@ func contains(s []string, e string) bool {
 	return false
 }
 
-func validateNodeCountAtLeast(r *yaml.RNode, meta yaml.ResourceMeta, min int, errorInfo string) error {
-	nodeCountAbsent, err := nodeAbsentOrAtLeast(r, meta, min, errorInfo, "spec", "nodeCount")
+func aggregateVCPUCount(r *yaml.RNode, meta yaml.ResourceMeta, vcpu int, total *int) error {
+	nodeCountAbsent, err := nodeAbsentOrAggregate(r, meta, vcpu, total, "spec", "nodeCount")
+	if err != nil {
+		return err
+	}
 	if nodeCountAbsent {
-		if _, err := nodeAbsentOrAtLeast(r, meta, min, errorInfo, "spec", "initialNodeCount"); err != nil {
+		if _, err := nodeAbsentOrAggregate(r, meta, vcpu, total, "spec", "initialNodeCount"); err != nil {
 			return err
 		}
-
-	} else if err != nil {
-		return err
 	}
 	return nil
 }
 
-func nodeAbsentOrAtLeast(r *yaml.RNode, meta yaml.ResourceMeta, min int, errorInfo string, path ...string) (absent bool, err error) {
+func validateMinimumVCPUCount(count int) error {
+	if count < minimumTotalVCPUs {
+		return fmt.Errorf("the aggregated vCPU count is %d. " +
+				"Anthos Service Mesh recommends at least %d vCPUs. If you need to add nodes, " +
+				"see https://bit.ly/2RnVL2T", count, minimumTotalVCPUs)
+	}
+	return nil
+}
+
+func nodeAbsentOrAggregate(r *yaml.RNode, meta yaml.ResourceMeta, vcpu int, total *int, path ...string) (bool, error) {
 	node, err := validateNodeExists(r, meta, path...)
 	if err != nil {
-		return true, err
+		if strings.Contains(err.Error(), "missing in") {
+			return true, nil
+		}
+		return false, err
 	}
 
 	pathString := strings.Join(path, ".")
@@ -282,14 +302,7 @@ func nodeAbsentOrAtLeast(r *yaml.RNode, meta yaml.ResourceMeta, min int, errorIn
 		s, _ := r.String()
 		return false, fmt.Errorf("%v: %s", err, s)
 	}
-	if count < min {
-		return false, fmt.Errorf(
-			"%s is %d in %s %s (%s [%s]). %s",
-			pathString, count, meta.Kind, meta.Name,
-			meta.Annotations[kioutil.PathAnnotation],
-			meta.Annotations[kioutil.IndexAnnotation],
-			errorInfo)
-	}
+	*total += count * vcpu
 	return false, nil
 }
 
@@ -319,46 +332,52 @@ func validateReleaseChannel(r *yaml.RNode, meta yaml.ResourceMeta, expected []st
 
 }
 
-func validateMachineType(r *yaml.RNode, meta yaml.ResourceMeta, mustExist bool) error {
+func validateMachineType(r *yaml.RNode, meta yaml.ResourceMeta, mustExist bool) (int, error) {
 	node, err := validateNodeExists(r, meta, "spec", "nodeConfig", "machineType")
 	if err != nil {
 		if mustExist {
-			return err
+			return 0, err
 		} else {
-			return nil
+			return 0, nil
 		}
 	}
 	value, err := node.String()
 	value = strings.TrimSpace(value)
 	if err != nil {
 		s, _ := r.String()
-		return fmt.Errorf("%v: %s", err, s)
+		return 0, fmt.Errorf("%v: %s", err, s)
 	}
+	var vcpu = 0
 
 	// n1 custom
 	if strings.HasPrefix(value, "custom") {
-		if err := validateCustomMachineType(r, meta, n1CustomMachineTypeRegex, value, 4, 2); err != nil {
-			return err
+		if vcpu, err = validateCustomMachineType(r, meta, n1CustomMachineTypeRegex, value, 4, 2); err != nil {
+			return vcpu, err
 		}
-	} else if strings.Contains(value, "custom") { // n2, e2 custom
-		if err := validateCustomMachineType(r, meta, customMachineTypeRegex, value, 5, 3); err != nil {
-			return err
+	} else if strings.Contains(value, "custom") { // n2, e2, n2d custom
+		if vcpu, err = validateCustomMachineType(r, meta, customMachineTypeRegex, value, 5, 3); err != nil {
+			return vcpu, err
 		}
 	} else if strings.Contains(value, "micro") || strings.Contains(value, "small") || strings.Contains(value, "medium") {
-		return unsupportedMachineTypeError(value, meta)
+		if strings.HasPrefix(value, "g1-") {
+			vcpu = 1
+		} else if strings.HasPrefix(value, "e2-") {
+			vcpu = 2
+		}
+		return vcpu, insufficientVCPUs(value, meta)
 	} else {
-		if err := validateCustomMachineType(r, meta, machineTypeRegex, value, 4, 3); err != nil {
-			return err
+		if vcpu, err = validateCustomMachineType(r, meta, machineTypeRegex, value, 4, 3); err != nil {
+			return vcpu, err
 		}
 	}
 
-	return nil
+	return vcpu, nil
 }
 
-func validateCustomMachineType(r *yaml.RNode, meta yaml.ResourceMeta, reg *regexp.Regexp, value string, groupLen, vcpuIndex int) error {
+func validateCustomMachineType(r *yaml.RNode, meta yaml.ResourceMeta, reg *regexp.Regexp, value string, groupLen, vcpuIndex int) (int, error) {
 	machineType := reg.FindStringSubmatch(value)
 	if len(machineType) < groupLen {
-		return fmt.Errorf("invalid machineType format: %s in %s %s (%s [%s])", value, meta.Kind, meta.Name,
+		return 0, fmt.Errorf("invalid machineType format: %s in %s %s (%s [%s])", value, meta.Kind, meta.Name,
 			meta.Annotations[kioutil.PathAnnotation],
 			meta.Annotations[kioutil.IndexAnnotation])
 	}
@@ -366,18 +385,20 @@ func validateCustomMachineType(r *yaml.RNode, meta yaml.ResourceMeta, reg *regex
 	vcpu, err := strconv.Atoi(machineType[vcpuIndex])
 	if err != nil {
 		s, _ := r.String()
-		return fmt.Errorf("%v: %s", err, s)
+		return 0, fmt.Errorf("%v: %s", err, s)
 	}
-	if vcpu < 4 {
-		return unsupportedMachineTypeError(value, meta)
+	if vcpu < minimumVCPUsPerNode {
+		return vcpu, insufficientVCPUs(value, meta)
 	}
-	return nil
+	return vcpu, nil
 }
 
-func unsupportedMachineTypeError(value string, meta yaml.ResourceMeta) error {
-	return fmt.Errorf("unsupported machine type: %s in %s %s (%s [%s]). The minimum machine type is n1-standard-4, "+
-		"which has four vCPUs. If the machine type for your cluster doesn't have at least four vCPUs, "+
-		"change the machine type as described here https://bit.ly/2V0KPdu", value, meta.Kind, meta.Name,
-		meta.Annotations[kioutil.PathAnnotation],
-		meta.Annotations[kioutil.IndexAnnotation])
+func insufficientVCPUs(value string, meta yaml.ResourceMeta) error {
+	return fmt.Errorf("insufficient vCPUs with machine type %q in %s %s (%s [%s]). " +
+			"Anthos Service Mesh recommends a machine type that has at least %d vCPUs, such as e2-standard-4. "+
+			"If the machine type for your cluster doesn't have at least %d vCPUs, "+
+			"consider changing the machine type as described here https://bit.ly/2V0KPdu",
+		value, meta.Kind, meta.Name,
+		meta.Annotations[kioutil.PathAnnotation], meta.Annotations[kioutil.IndexAnnotation],
+		minimumVCPUsPerNode, minimumVCPUsPerNode)
 }
