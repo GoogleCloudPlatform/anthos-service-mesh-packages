@@ -714,6 +714,9 @@ check_istio_not_deployed(){
 validate_istio_version() {
   info "Checking existing Istio version(s)..."
   local VERSION_OUTPUT; VERSION_OUTPUT="$(retry 3 ./${ISTIOCTL_REL_PATH} version -o json)"
+  if [[ -z "${VERSION_OUTPUT}" ]]; then
+    fatal "Couldn't validate existing Istio versions."
+  fi
   local FOUND_VALID_VERSION; FOUND_VALID_VERSION=0
   for version in $(echo "${VERSION_OUTPUT}" | jq -r '.meshVersion[].Info.version' -r); do
     if [[ "$version" =~ ^$RELEASE_LINE ]]; then
@@ -734,10 +737,13 @@ validate_istio_version() {
 validate_asm_version() {
   info "Checking existing ASM version(s)..."
   local VERSION_OUTPUT; VERSION_OUTPUT="$(retry 3 ./${ISTIOCTL_REL_PATH} version -o json)"
+  if [[ -z "${VERSION_OUTPUT}" ]]; then
+    fatal "Couldn't validate existing Istio versions."
+  fi
   local FOUND_INVALID_VERSION; FOUND_INVALID_VERSION=0
   for VERSION in $(echo "${VERSION_OUTPUT}" | jq -r '.meshVersion[].Info.version'); do
     if ! [[ "${VERSION}" =~ "asm" ]]; then
-      fatal "Cannot upgrade from version ${VERSION}. Only upgrade from ASM distribution is supported."
+      fatal "Cannot upgrade from version ${VERSION}. Only upgrades from ASM distributions are supported."
     fi
 
     if version_valid_for_upgrade "${VERSION}"; then
@@ -748,7 +754,7 @@ validate_asm_version() {
     fi
   done
   if [[ "$FOUND_INVALID_VERSION" -eq 1 ]]; then
-    fatal "Upgrade requires all existing control planes to be between versions 1.6.0-asm.0 (inclusive) and ${RELEASE} (exclusive)."
+    fatal "Upgrade requires all existing control planes to be between versions 1.$((MINOR-1)).0 (inclusive) and ${RELEASE} (exclusive)."
   fi
 }
 
@@ -777,7 +783,7 @@ EOF
 
 is_major_minor_invalid() {
   [[ "$VERSION_MAJOR" -ne 1 ]] && return 0
-  [[ "$VERSION_MINOR" -lt 6  ]] && return 0
+  [[ "$VERSION_MINOR" -lt $((MINOR-1))  ]] && return 0
   [[ "$VERSION_MINOR" -gt "$MINOR" ]] && return 0
 }
 
