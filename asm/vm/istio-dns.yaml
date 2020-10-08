@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# The DNS service is created as a GCP Internal Load Balancer to allow proxies
+# that cannot interface with Kubernetes DNS to resolve Kubernetes DNS names.
+
 apiVersion: v1
 kind: Service
 metadata:
