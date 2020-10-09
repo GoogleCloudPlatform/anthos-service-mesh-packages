@@ -63,6 +63,7 @@ OUTPUT_DIR="${OUTPUT_DIR:=}"
 DRY_RUN="${DRY_RUN:=0}"
 ONLY_VALIDATE="${ONLY_VALIDATE:=0}"
 VERBOSE="${VERBOSE:=0}"
+PRINT_HELP=0
 
 main() {
   parse_args "${@}"
@@ -172,7 +173,7 @@ fatal() {
 
 fatal_with_usage() {
   warn "${1}"
-  usage >&2
+  usage_short >&2
   exit 2
 }
 
@@ -182,6 +183,36 @@ is_sa() {
 }
 
 ### CLI/initial setup functions ###
+usage_short() {
+  cat << EOF
+usage: ${SCRIPT_NAME} [OPTION]...
+
+Set up, validate, and install ASM in a Google Cloud environment.
+Use -h|--help with -v|--verbose to show detailed descriptions.
+
+OPTIONS:
+  -l|--cluster_location  <LOCATION>
+  -n|--cluster_name      <NAME>
+  -p|--project_id        <ID>
+  -m|--mode              <MODE>
+  -c|--ca                <CA>
+
+  -o|--operator_overlay  <FILE PATH>
+  -s|--service_account   <ACCOUNT>
+  -k|--key_file          <FILE PATH>
+  -D|--output_dir        <DIR PATH>
+
+FLAGS:
+  -e|--enable_apis
+     --print_config
+     --disable_canonical_service
+  -v|--verbose
+     --dry_run
+     --only_validate
+  -h|--help
+EOF
+}
+
 usage() {
   cat << EOF
 usage: ${SCRIPT_NAME} [OPTION]...
@@ -263,6 +294,11 @@ arg_required() {
 }
 
 parse_args() {
+  if [[ "${@}" = '' ]]; then
+    usage_short >&2
+    exit 2
+  fi
+
   # shellcheck disable=SC2064
   trap "$(shopt -p nocasematch)" RETURN
   shopt -s nocasematch
@@ -339,14 +375,22 @@ parse_args() {
         shift 1
         ;;
       -h | --help)
-        usage
-        exit
+        PRINT_HELP=1
+        shift 1
         ;;
       *)
         fatal_with_usage "Unknown option ${1}"
         ;;
     esac
   done
+  if [[ "${PRINT_HELP}" -eq 1 ]]; then
+    if [[ "${VERBOSE}" -eq 1 ]]; then
+      usage
+    else
+      usage_short
+    fi
+    exit
+  fi
 }
 
 validate_args() {
