@@ -294,7 +294,7 @@ arg_required() {
 }
 
 parse_args() {
-  if [[ "${@}" = '' ]]; then
+  if [[ "${*}" = '' ]]; then
     usage_short >&2
     exit 2
   fi
