@@ -23,6 +23,30 @@ spec:
   hub: gcr.io/gke-release/asm # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}
   tag: 1.6.11-asm.1 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
   components:
+    ingressGateways:
+    - enabled: true
+      name: istio-ingressgateway
+      k8s:
+        service:
+          type: NodePort
+          ports:
+            - name: status-port
+              nodePort: 31223
+              port: 15021
+              protocol: TCP
+              targetPort: 15021
+            - port: 80
+              targetPort: 8080
+              name: http2
+            - port: 443
+              targetPort: 8443
+              name: https
+            - port: 15012
+              targetPort: 15012
+              name: tcp-istiod
+            - port: 15443
+              targetPort: 15443
+              name: tls
     pilot:
       k8s:
         env:
