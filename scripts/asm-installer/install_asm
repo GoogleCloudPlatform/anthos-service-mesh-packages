@@ -34,7 +34,9 @@ _CI_ASM_PKG_LOCATION="${_CI_ASM_PKG_LOCATION:=}"
 ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
 ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
 PACKAGE_DIRECTORY="asm/istio"; readonly PACKAGE_DIRECTORY;
+OPTIONS_DIRECTORY="${PACKAGE_DIRECTORY}/options"; readonly OPTIONS_DIRECTORY;
 OPERATOR_MANIFEST="${PACKAGE_DIRECTORY}/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
+MULTICLUSTER_MANIFEST="${OPTIONS_DIRECTORY}/multicluster.yaml"; readonly MULTICLUSTER_MANIFEST;
 
 SCRIPT_NAME="${0##*/}"
 
@@ -1063,7 +1065,7 @@ sanitize_file() {
 install_asm() {
 
   local PARAMS
-  PARAMS="-f ${OPERATOR_MANIFEST}"
+  PARAMS="-f ${OPERATOR_MANIFEST} -f ${MULTICLUSTER_MANIFEST}"
   while read -d ',' -r yaml_file; do
     PARAMS="${PARAMS} -f ${yaml_file}"
   done <<EOF
