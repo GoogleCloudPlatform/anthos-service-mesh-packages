@@ -60,6 +60,12 @@ SERVICE_ACCOUNT="${SERVICE_ACCOUNT:=}"
 KEY_FILE="${KEY_FILE:=}"
 OUTPUT_DIR="${OUTPUT_DIR:=}"
 
+CUSTOM_CA=0
+CA_CERT="${CA_CERT:=}"
+CA_KEY="${CA_KEY:=}"
+CA_ROOT="${CA_ROOT:=}"
+CA_CHAIN="${CA_CHAIN:=}"
+
 DRY_RUN="${DRY_RUN:=0}"
 ONLY_VALIDATE="${ONLY_VALIDATE:=0}"
 VERBOSE="${VERBOSE:=0}"
@@ -89,6 +95,9 @@ main() {
     print_config >&3
     return 0
   else
+    if [[ "${CUSTOM_CA}" -eq 1 ]]; then
+      install_secrets
+    fi
     install_asm
     info "Successfully installed ASM."
   fi
@@ -202,6 +211,11 @@ OPTIONS:
   -k|--key_file          <FILE PATH>
   -D|--output_dir        <DIR PATH>
 
+  --ca_cert              <FILE PATH>
+  --ca_key               <FILE PATH>
+  --root_cert            <FILE PATH>
+  --cert_chain           <FILE PATH>
+
 FLAGS:
   -e|--enable_apis
      --print_config
@@ -257,6 +271,15 @@ OPTIONS:
                                       directory already contains the necessary
                                       files, they will be used instead of
                                       downloading them again.
+
+  The following four options must be passed together and are only necessary
+  for using a custom certificate for Citadel. Users that aren't sure whether
+  they need this probably don't.
+
+  --ca_cert              <FILE PATH>  The intermediate certificate
+  --ca_key               <FILE PATH>  The key for the intermediate certificate
+  --root_cert            <FILE PATH>  The root certificate
+  --cert_chain           <FILE PATH>  The certificate chain
 
 FLAGS:
   -e|--enable_apis                    Allow this script to enable necessary APIs
@@ -370,6 +393,30 @@ parse_args() {
         ONLY_VALIDATE=1
         shift 1
         ;;
+      --ca_cert | --ca-cert)
+        arg_required "${@}"
+        CA_CERT="${2}"
+        CUSTOM_CA=1
+        shift 2
+        ;;
+      --ca_key | --ca-key)
+        arg_required "${@}"
+        CA_KEY="${2}"
+        CUSTOM_CA=1
+        shift 2
+        ;;
+      --root_cert | --root-cert)
+        arg_required "${@}"
+        CA_ROOT="${2}"
+        CUSTOM_CA=1
+        shift 2
+        ;;
+      --cert_chain | --cert-chain)
+        arg_required "${@}"
+        CA_CHAIN="${2}"
+        CUSTOM_CA=1
+        shift 2
+        ;;
       -v)
         VERBOSE=1
         shift 1
@@ -428,6 +475,10 @@ EOF
     *) fatal "CA must be one of 'citadel', 'mesh_ca'";;
   esac
 
+  if [[ "${CUSTOM_CA}" -eq 1 ]]; then
+    validate_certs
+  fi
+
   while read -r FLAG; do
     if [[ "${!FLAG}" -ne 0 && "${!FLAG}" -ne 1 ]]; then
       fatal "${FLAG} must be 0 (off) or 1 (on) if set via environment variables."
@@ -470,6 +521,60 @@ EOF
 
   set_kpt_package_url
   WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"
+}
+
+validate_certs() {
+  if [[ "${CA}" != "citadel" ]]; then
+    fatal "You must select Citadel as the CA in order to use custom certificates."
+  fi
+  if [[ -z "${CA_ROOT}" || -z "${CA_KEY}" || -z "${CA_CHAIN}" || -z "${CA_CERT}" ]]; then
+    fatal "All four certificate options must be present to use a custom cert."
+  fi
+  while read -r CERT_FILE; do
+    if ! [[ -f "${!CERT_FILE}" ]]; then
+      fatal "Couldn't find file ${!CERT_FILE}."
+    fi
+  done <<EOF
+CA_CERT
+CA_ROOT
+CA_KEY
+CA_CHAIN
+EOF
+
+  CA_CERT="$(readlink -f "${CA_CERT}")"; readonly CA_CERT;
+  CA_KEY="$(readlink -f "${CA_KEY}")"; readonly CA_KEY;
+  CA_CHAIN="$(readlink -f "${CA_CHAIN}")"; readonly CA_CHAIN;
+  CA_ROOT="$(readlink -f "${CA_ROOT}")"; readonly CA_ROOT;
+
+  info "Checking certificate files for consistency..."
+  if ! openssl rsa -in "${CA_KEY}" -check >/dev/null 2>/dev/null; then
+    fatal "${CA_KEY} failed an openssl consistency check."
+  fi
+  if ! openssl x509 -in "${CA_CERT}" -text -noout >/dev/null; then
+    fatal "${CA_CERT} failed an openssl consistency check."
+  fi
+  if ! openssl x509 -in "${CA_CHAIN}" -text -noout >/dev/null; then
+    fatal "${CA_CHAIN} failed an openssl consistency check."
+  fi
+  if ! openssl x509 -in "${CA_ROOT}" -text -noout >/dev/null; then
+    fatal "${CA_ROOT} failed an openssl consistency check."
+  fi
+
+  info "Checking key matches certificate..."
+  local CERT_HASH; local KEY_HASH;
+  CERT_HASH="$(openssl x509 -noout -modulus -in "${CA_CERT}" | openssl md5)";
+  KEY_HASH="$(openssl rsa -noout -modulus -in "${CA_KEY}" | openssl md5)";
+  if [[ "${CERT_HASH}" != "${KEY_HASH}" ]]; then
+    fatal "Keyfile does not match the given certificate."
+    fatal "Cert: ${CA_CERT}"
+    fatal "Key: ${CA_KEY}"
+  fi
+  unset CERT_HASH; unset KEY_HASH;
+
+  info "Verifying certificate chain of trust..."
+  if ! openssl verify -trusted "${CA_ROOT}" -untrusted "${CA_CHAIN}" "${CA_CERT}"; then
+    fatal "Unable to verify chain of trust."
+  fi
 }
 
 set_kpt_package_url() {
@@ -523,7 +628,7 @@ validate_dependencies() {
   # kubeconfig so we're not breaking the promise that --only_validate gives
   configure_kubectl
   validate_expected_control_plane
-  
+
   if [[ "${MODE}" = "migrate" ]]; then
     validate_istio_version
   elif [[ "${MODE}" = "upgrade" ]]; then
@@ -557,6 +662,14 @@ kubectl
 sed
 tr
 EOF
+
+  if [[ "${CUSTOM_CA}" -eq 1 ]]; then
+    EXITCODE=0
+    hash openssl 2>/dev/null || EXITCODE=$?
+    if [[ "${EXITCODE}" -ne 0 ]]; then
+      NOTFOUND="openssl,${NOTFOUND}"
+    fi
+  fi
 
   if [[ -n "${NOTFOUND}" ]]; then
     NOTFOUND="${NOTFOUND::-1}"
@@ -1104,6 +1217,15 @@ sanitize_file() {
     -e '/^[[:space:]]*$/d' \
     -e 's/[[:space:]]*$//g' \
     "${1}"
+}
+
+install_secrets() {
+  info "Installing certificates into the cluster..."
+  run kubectl create secret generic cacerts -n istio-system \
+    --from-file="${CA_CERT}" \
+    --from-file="${CA_KEY}" \
+    --from-file="${CA_ROOT}" \
+    --from-file="${CA_CHAIN}"
 }
 
 install_asm() {
