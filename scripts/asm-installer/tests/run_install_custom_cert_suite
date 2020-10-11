@@ -140,12 +140,15 @@ main() {
   pushd "${TMP_DIR}"
   # openssl can give some weird return values sometimes
   set +e
+  set +o pipefail
   # use openssl from A to B to get the cert chain and split them into files
   # seems like 3 is the root cert, 2 is the ca cert, 4 is the chain
   kubectl exec -n "${NAMESPACE}" "${CHECK_FROM}" -c istio-proxy -- \
     openssl s_client -showcerts -connect "${CHECK_TO}" \
     | sed -n '/-----BEGIN CERTIFICATE-----/{:start /-----END CERTIFICATE-----/!{N;b start};/.*/p}' \
     | awk 'BEGIN {counter=0;} /BEGIN CERT/{counter++} { print > "cert-" counter ".pem"}'
+
+  echo "Checking certificates..."
 
   WANT_HASH="$(openssl x509 -in "${TEST_ROOT}" -modulus -noout)"
   GOT_HASH="$(openssl x509 -in cert-3.pem -modulus -noout)"
