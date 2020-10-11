@@ -178,7 +178,6 @@ main() {
   # Cluster teardown
   echo "Deleting cluster ${CLUSTER_NAME} and associated resources..."
   cleanup "${PROJECT_ID}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}" "${NAMESPACE}"
-  exit "$SUCCESS"
 }
 
 main "$@"
