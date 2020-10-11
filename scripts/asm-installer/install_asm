@@ -937,6 +937,7 @@ iamcredentials.googleapis.com
 gkeconnect.googleapis.com
 gkehub.googleapis.com
 cloudresourcemanager.googleapis.com
+stackdriver.googleapis.com
 EOF
 }
 # [END required_apis]
