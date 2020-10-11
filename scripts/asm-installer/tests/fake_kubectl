@@ -2,6 +2,35 @@
 
 FAKE_CONFIG="$(cat "${KUBECONFIG}")"
 
+if [[ "${*}" == *"version"* ]]; then
+  cat <<EOF
+{
+  "clientVersion": {
+    "major": "1",
+    "minor": "19",
+    "gitVersion": "v1.19.2",
+    "gitCommit": "f5743093fd1c663cb0cbc89748f730662345d44d",
+    "gitTreeState": "clean",
+    "buildDate": "2020-09-16T13:41:02Z",
+    "goVersion": "go1.15",
+    "compiler": "gc",
+    "platform": "linux/amd64"
+  },
+  "serverVersion": {
+    "major": "1",
+    "minor": "16+",
+    "gitVersion": "v1.16.12-gke.1337",
+    "gitCommit": "c56469002ffea532564027018cc503fdea159974",
+    "gitTreeState": "clean",
+    "buildDate": "2020-09-21T09:20:42Z",
+    "goVersion": "go1.12.17b4",
+    "compiler": "gc",
+    "platform": "linux/amd64"
+  }
+}
+EOF
+  exit 0
+fi
 if [[ "${FAKE_CONFIG}" == *"has_istio"*"right_namespace"*  ]]; then
   echo "istiod"
   exit 0
