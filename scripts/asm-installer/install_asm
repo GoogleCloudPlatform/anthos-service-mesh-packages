@@ -23,6 +23,7 @@ RELEASE_LINE="${MAJOR}.${MINOR}."
 REVISION_LABEL="asm-${MAJOR}${MINOR}${POINT}-${REV}"
 KPT_BRANCH="release-${MAJOR}.${MINOR}-asm"
 readonly RELEASE; readonly RELEASE_LINE; readonly REVISION_LABEL; readonly KPT_BRANCH;
+K8S_MINOR=0
 
 ### These are hooks for Cloud Build to be able to use debug/staging images
 ### when necessary. Don't set these environment variables unless you're testing
@@ -522,6 +523,7 @@ validate_dependencies() {
   # configure kubectl does have side effects but we've generated a temprorary
   # kubeconfig so we're not breaking the promise that --only_validate gives
   configure_kubectl
+  validate_k8s
   validate_expected_control_plane
   
   if [[ "${MODE}" = "migrate" ]]; then
@@ -657,6 +659,13 @@ Please verify the spelling and try again. To see a list of your clusters, in
 this project, run:
   gcloud container clusters list --format='value(name,zone)' --project="${PROJECT_ID}"
 EOF
+  fi
+}
+
+validate_k8s() {
+  K8S_MINOR="$(kubectl version -o json | jq .serverVersion.minor | sed 's/[^0-9]//g')"
+  if [[ "${K8S_MINOR}" -lt 15 ]]; then
+    fatal "ASM ${RELEASE} requires Kubernetes version 1.15+, found 1.${K8S_MINOR}"
   fi
 }
 
@@ -1117,6 +1126,9 @@ ${OPERATOR_OVERLAY}
 EOF
 
   PARAMS="${PARAMS} --set revision=${REVISION_LABEL}"
+  if [[ "${K8S_MINOR}" -eq 15 ]]; then
+    PARAMS="${PARAMS} --set values.base.crdVersion=v1beta1"
+  fi
   PARAMS="${PARAMS} -c ${KUBECONFIG}"
 
   info "Installing ASM control plane..."
