@@ -38,6 +38,7 @@ logging.googleapis.com
 cloudtrace.googleapis.com
 meshca.googleapis.com
 meshtelemetry.googleapis.com
+stackdriver.googleapis.com
 meshconfig.googleapis.com
 iamcredentials.googleapis.com
 gkeconnect.googleapis.com
