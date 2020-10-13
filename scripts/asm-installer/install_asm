@@ -458,11 +458,26 @@ CLUSTER_LOCATION
 CLUSTER_NAME
 PROJECT_ID
 MODE
-CA
 EOF
+
+  if [[ "${MODE}" != "upgrade" ]]; then
+    case "${CA}" in
+      citadel | mesh_ca);;
+      "")
+        MISSING_ARGS=1
+        warn "Missing value for CA"
+        ;;
+      *) fatal "CA must be one of 'citadel', 'mesh_ca'";;
+    esac
+  fi
 
   if [[ "${MISSING_ARGS}" -ne 0 ]]; then
     fatal_with_usage "Missing one or more required options."
+  fi
+
+  if [[ "${MODE}" == "upgrade" && -n "${CA}" ]]; then
+    warn "The CA flag is ignored during an update operation."
+    warn "Update will proceed with the currently installed CA."
   fi
 
   # shellcheck disable=SC2064
@@ -471,10 +486,6 @@ EOF
     *) fatal "MODE must be one of 'install', 'migrate', 'upgrade'";;
   esac
 
-  case "${CA}" in
-    citadel | mesh_ca);;
-    *) fatal "CA must be one of 'citadel', 'mesh_ca'";;
-  esac
 
   if [[ "${CUSTOM_CA}" -eq 1 ]]; then
     validate_certs
