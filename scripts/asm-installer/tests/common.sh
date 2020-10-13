@@ -167,6 +167,20 @@ EOF
   anneal_k8s "${NAMESPACE}"
 }
 
+install_strict_policy() {
+  local NAMESPACE; NAMESPACE="$1"
+
+  kubectl -n "${NAMESPACE}" apply -f - <<EOF
+apiVersion: "security.istio.io/v1beta1"
+kind: "PeerAuthentication"
+metadata:
+  name: "default"
+spec:
+  mtls:
+    mode: STRICT
+EOF
+}
+
 get_demo_yaml() {
  curl -L "https://raw.githubusercontent.com/GoogleCloudPlatform/\
 microservices-demo/v0.2.0/release/${1}-manifests.yaml"
