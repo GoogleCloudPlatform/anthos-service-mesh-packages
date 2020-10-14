@@ -38,6 +38,7 @@ PACKAGE_DIRECTORY="asm/istio"; readonly PACKAGE_DIRECTORY;
 OPTIONS_DIRECTORY="${PACKAGE_DIRECTORY}/options"; readonly OPTIONS_DIRECTORY;
 OPERATOR_MANIFEST="${PACKAGE_DIRECTORY}/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
 MULTICLUSTER_MANIFEST="${OPTIONS_DIRECTORY}/multicluster.yaml"; readonly MULTICLUSTER_MANIFEST;
+BETA_CRD_MANIFEST="${OPTIONS_DIRECTORY}/v1beta-crds.yaml"; readonly BETA_CRD_MANIFEST;
 
 SCRIPT_NAME="${0##*/}"
 
@@ -1261,7 +1262,7 @@ EOF
 
   PARAMS="${PARAMS} --set revision=${REVISION_LABEL}"
   if [[ "${K8S_MINOR}" -eq 15 ]]; then
-    PARAMS="${PARAMS} --set values.base.crdVersion=v1beta1"
+    PARAMS="${PARAMS} -f ${BETA_CRD_MANIFEST}"
   fi
   PARAMS="${PARAMS} -c ${KUBECONFIG}"
 
