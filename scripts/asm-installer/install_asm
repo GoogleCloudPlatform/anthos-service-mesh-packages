@@ -418,7 +418,7 @@ parse_args() {
         CUSTOM_CA=1
         shift 2
         ;;
-      -v)
+      -v | --verbose)
         VERBOSE=1
         shift 1
         ;;
