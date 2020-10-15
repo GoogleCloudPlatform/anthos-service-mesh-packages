@@ -144,7 +144,7 @@ retry() {
     { "${@}" && return 0; } || true
     warn "Failed, retrying...($((i+1)) of ${MAX_TRIES})"
     sleep 2
-    if [[ "$1" == "gcloud" || "$1" == "kubectl" ]]; then
+    if [[ "$1" == "kubectl" ]]; then
       configure_kubectl
     fi
   done
