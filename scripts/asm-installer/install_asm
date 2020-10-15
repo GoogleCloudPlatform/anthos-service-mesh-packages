@@ -131,7 +131,7 @@ run() {
 #######
 # retry takes an integer N as the first argument, and a list of arguments
 # representing a command afterwards. It will retry the given command up to N
-# times before returning 1. If the command is gcloud or kubectl, it will try to
+# times before returning 1. If the command is kubectl, it will try to
 # re-get credentials in case something caused the k8s IP to change.
 #######
 retry() {
