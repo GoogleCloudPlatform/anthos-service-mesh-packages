@@ -940,7 +940,7 @@ validate_asm_version() {
 
 version_valid_for_upgrade() {
   local VERSION; VERSION=$1
-  
+
   # if asm version found, pattern: 1.6.11-asm.1-586f900508ad482ed32b830dd15f6c54b32b93ed
   local VERSION_MAJOR VERSION_MINOR VERSION_POINT VERSION_REV
   IFS="." read -r VERSION_MAJOR VERSION_MINOR VERSION_POINT VERSION_REV <<EOF
@@ -984,7 +984,7 @@ validate_ca_consistency() {
   info "Checking existing CA..."
   local INSTALLED_CA; INSTALLED_CA="$(kubectl -n istio-system get pod -l istio=ingressgateway \
     -o jsonpath='{.items[].spec.containers[].env[?(@.name=="CA_ADDR")].value}')"
-  
+
   local CURRENT_CA; CURRENT_CA=citadel
   if is_meshca_installed; then
     CURRENT_CA=mesh_ca
