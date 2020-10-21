@@ -1298,6 +1298,10 @@ outro() {
   info "The ASM control plane installation is now complete."
   info "To enable automatic sidecar injection on a namespace, you can use the following command:"
   info "kubectl label namespace <NAMESPACE> istio-injection- istio.io/rev=${REVISION_LABEL} --overwrite"
+  info "If you use 'istioctl install' afterwards to modify this installation, you will need"
+  info "to specify the option '--set revision=${REVISION_LABEL}' to target this control plane"
+  info "instead of installing a new one."
+
 
   if [[ "${MODE}" = "migrate" ]]; then
     info "Please verify the new control plane and then: 1) migrate your workloads 2) remove old control plane."
