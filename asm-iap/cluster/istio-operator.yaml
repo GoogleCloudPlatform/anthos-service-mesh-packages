@@ -39,14 +39,6 @@ spec:
               port: 80
               targetPort: 8080
               name: http2
-            - name: status-port
-              nodePort: 31223
-              port: 15021
-              protocol: TCP
-              targetPort: 15021
-            - port: 80
-              targetPort: 8080
-              name: http2
             - port: 443
               targetPort: 8443
               name: https
