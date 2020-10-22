@@ -20,6 +20,7 @@ POINT="${POINT:=3}"
 REV="${REV:=3}"
 RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
 RELEASE_LINE="${MAJOR}.${MINOR}."
+PREVIOUS_RELEASE_LINE="${MAJOR}.$(( MINOR - 1 ))."
 REVISION_LABEL="asm-${MAJOR}${MINOR}${POINT}-${REV}"
 KPT_BRANCH="release-${MAJOR}.${MINOR}-asm"
 readonly RELEASE; readonly RELEASE_LINE; readonly REVISION_LABEL; readonly KPT_BRANCH;
@@ -899,7 +900,7 @@ validate_istio_version() {
   fi
   local FOUND_VALID_VERSION; FOUND_VALID_VERSION=0
   for version in $(echo "${VERSION_OUTPUT}" | jq -r '.meshVersion[].Info.version' -r); do
-    if [[ "$version" =~ ^$RELEASE_LINE ]]; then
+    if [[ "$version" =~ ^$RELEASE_LINE || "$version" =~ ^$PREVIOUS_RELEASE_LINE ]]; then
       info "  $version (suitable for migration)"
       FOUND_VALID_VERSION=1
     else
