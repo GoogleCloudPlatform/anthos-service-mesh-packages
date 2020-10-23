@@ -280,7 +280,8 @@ OPTIONS:
                                       apply. For options, see the
                                       anthos-service-mesh-package GitHub
                                       repo under GoogleCloudPlatform. Files
-                                      should be in "asm/istio/options" folder.
+                                      should be in "asm/istio/options" folder,
+                                      and shouldn't include the .yaml extension.
                                       To add multiple files, specify them with
                                       multiple options one at a time.
 
@@ -734,7 +735,7 @@ EOF
   fi
 
   while read -d ',' -r yaml_file; do
-    yaml_file="${OPTIONS_DIRECTORY}/${yaml_file}"
+    yaml_file="${OPTIONS_DIRECTORY}/${yaml_file}.yaml"
     if [[ ! -f "${yaml_file}" ]]; then
       fatal "Couldn't find remote yaml file ${yaml_file}."
     fi
