@@ -186,12 +186,52 @@ steps:
 
 - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
   dir: 'scripts/asm-installer'
+  id: 'run-migration-suite-meshca-previous-version'
+  entrypoint: '/bin/bash'
+  args:
+  - '-c'
+  - >
+    ./tests/run_migration_suite_meshca_prev
+    --PROJECT_ID "${PROJECT_ID}"
+    --BUILD_ID "${BUILD_ID}"
+    --CLUSTER_LOCATION "${_CLUSTER_LOCATION}"
+  waitFor:
+  - 'fetch-secrets'
+  env:
+  - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
+  - 'KEY_FILE=${_KEY_FILE}'
+  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
+  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
+  timeout: 2400s # 40 mins
+
+- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
+  dir: 'scripts/asm-installer'
   id: 'run-migration-suite-citadel'
   entrypoint: '/bin/bash'
   args:
   - '-c'
   - >
     ./tests/run_migration_suite_citadel
+    --PROJECT_ID "${PROJECT_ID}"
+    --BUILD_ID "${BUILD_ID}"
+    --CLUSTER_LOCATION "${_CLUSTER_LOCATION}"
+  waitFor:
+  - 'fetch-secrets'
+  env:
+  - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
+  - 'KEY_FILE=${_KEY_FILE}'
+  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
+  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
+  timeout: 2400s # 40 mins
+
+- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
+  dir: 'scripts/asm-installer'
+  id: 'run-migration-suite-citadel-previous-version'
+  entrypoint: '/bin/bash'
+  args:
+  - '-c'
+  - >
+    ./tests/run_migration_suite_citadel_prev
     --PROJECT_ID "${PROJECT_ID}"
     --BUILD_ID "${BUILD_ID}"
     --CLUSTER_LOCATION "${_CLUSTER_LOCATION}"

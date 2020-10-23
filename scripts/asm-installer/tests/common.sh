@@ -7,6 +7,7 @@ PROJECT_ID="${PROJECT_ID:=}"; export PROJECT_ID;
 CLUSTER_LOCATION="${CLUSTER_LOCATION:=us-central1-c}"; export CLUSTER_LOCATION;
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT:=}"; export SERVICE_ACCOUNT;
 KEY_FILE="${KEY_FILE:=}"; export KEY_FILE;
+OSS_VERSION="${OSS_VERSION:=1.7.1}"; export OSS_VERSION;
 
 KUBECONFIG=""
 
@@ -425,9 +426,9 @@ install_oss_istio() {
   TMPDIR="$(mktemp -d)"
   pushd "${TMPDIR}"
   curl -L "https://github.com/istio/istio/releases/download/\
-1.7.1/istio-1.7.1-linux-amd64.tar.gz" | tar xz
+${OSS_VERSION}/istio-${OSS_VERSION}-linux-amd64.tar.gz" | tar xz
 
-  ./istio-1.7.1/bin/istioctl operator init
+  ./istio-"${OSS_VERSION}"/bin/istioctl operator init
   popd
   rm -r "${TMPDIR}"
 

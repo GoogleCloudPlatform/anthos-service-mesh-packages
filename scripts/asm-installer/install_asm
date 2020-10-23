@@ -20,6 +20,7 @@ POINT="${POINT:=3}"
 REV="${REV:=3}"
 RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
 RELEASE_LINE="${MAJOR}.${MINOR}."
+PREVIOUS_RELEASE_LINE="${MAJOR}.$(( MINOR - 1 ))."
 REVISION_LABEL="asm-${MAJOR}${MINOR}${POINT}-${REV}"
 KPT_BRANCH="release-${MAJOR}.${MINOR}-asm"
 readonly RELEASE; readonly RELEASE_LINE; readonly REVISION_LABEL; readonly KPT_BRANCH;
@@ -55,6 +56,7 @@ MODE="${MODE:=}"
 CA="${CA:=}"
 
 OPERATOR_OVERLAY="${OPERATOR_OVERLAY:=}"
+COMMON_OVERLAY="${COMMON_OVERLAY:=}"
 ENABLE_APIS="${ENABLE_APIS:=0}"
 DISABLE_CANONICAL_SERVICE="${DISABLE_CANONICAL_SERVICE:=0}"
 PRINT_CONFIG="${PRINT_CONFIG:=0}"
@@ -212,6 +214,7 @@ OPTIONS:
   -s|--service_account   <ACCOUNT>
   -k|--key_file          <FILE PATH>
   -D|--output_dir        <DIR PATH>
+  --co|--common_overlay  <FILE NAME>
 
   --ca_cert              <FILE PATH>
   --ca_key               <FILE PATH>
@@ -273,6 +276,14 @@ OPTIONS:
                                       directory already contains the necessary
                                       files, they will be used instead of
                                       downloading them again.
+  --co|--common_overlay  <FILE NAME>  The name of a YAML file in the kpt pkg to
+                                      apply. For options, see the
+                                      anthos-service-mesh-package GitHub
+                                      repo under GoogleCloudPlatform. Files
+                                      should be in "asm/istio/options" folder,
+                                      and shouldn't include the .yaml extension.
+                                      To add multiple files, specify them with
+                                      multiple options one at a time.
 
   The following four options must be passed together and are only necessary
   for using a custom certificate for Citadel. Users that aren't sure whether
@@ -358,6 +369,11 @@ parse_args() {
       -o | --operator_overlay | --operator-overlay)
         arg_required "${@}"
         OPERATOR_OVERLAY="${2},${OPERATOR_OVERLAY}"
+        shift 2
+        ;;
+      --co | --common_overlay | --common-overlay)
+        arg_required "${@}"
+        COMMON_OVERLAY="${2},${COMMON_OVERLAY}"
         shift 2
         ;;
       -e | --enable_apis | --enable-apis)
@@ -528,9 +544,9 @@ EOF
 ${OPERATOR_OVERLAY}
 EOF
   if [[ "${CA}" = "citadel" ]]; then
-    ABS_OVERLAYS="${PACKAGE_DIRECTORY}/options/citadel-ca.yaml,${ABS_OVERLAYS}"
+    ABS_OVERLAYS="${OPTIONS_DIRECTORY}/citadel-ca.yaml,${ABS_OVERLAYS}"
   fi
-  OPERATOR_OVERLAY="${ABS_OVERLAYS}"; readonly OPERATOR_OVERLAY;
+  OPERATOR_OVERLAY="${ABS_OVERLAYS}"
 
   set_kpt_package_url
   WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"
@@ -717,6 +733,21 @@ EOF
     info "Downloading ASM kpt package..."
     retry 3 run kpt pkg get "${KPT_URL}" asm
   fi
+
+  local ABS_YAML
+  while read -d ',' -r yaml_file; do
+    ABS_YAML="${OPTIONS_DIRECTORY}/${yaml_file}.yaml"
+    if [[ ! -f "${ABS_YAML}" ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Couldn't find remote yaml file ${yaml_file}.
+See directory $(readlink -f "${OPTIONS_DIRECTORY}") for available options.
+EOF
+    fi
+    OPERATOR_OVERLAY="${ABS_YAML},${OPERATOR_OVERLAY}"
+  done <<EOF
+${COMMON_OVERLAY}
+EOF
+readonly OPERATOR_OVERLAY
 }
 
 download_asm() {
@@ -899,7 +930,7 @@ validate_istio_version() {
   fi
   local FOUND_VALID_VERSION; FOUND_VALID_VERSION=0
   for version in $(echo "${VERSION_OUTPUT}" | jq -r '.meshVersion[].Info.version' -r); do
-    if [[ "$version" =~ ^$RELEASE_LINE ]]; then
+    if [[ "$version" =~ ^$RELEASE_LINE || "$version" =~ ^$PREVIOUS_RELEASE_LINE ]]; then
       info "  $version (suitable for migration)"
       FOUND_VALID_VERSION=1
     else
@@ -940,7 +971,7 @@ validate_asm_version() {
 
 version_valid_for_upgrade() {
   local VERSION; VERSION=$1
-  
+
   # if asm version found, pattern: 1.6.11-asm.1-586f900508ad482ed32b830dd15f6c54b32b93ed
   local VERSION_MAJOR VERSION_MINOR VERSION_POINT VERSION_REV
   IFS="." read -r VERSION_MAJOR VERSION_MINOR VERSION_POINT VERSION_REV <<EOF
@@ -984,7 +1015,7 @@ validate_ca_consistency() {
   info "Checking existing CA..."
   local INSTALLED_CA; INSTALLED_CA="$(kubectl -n istio-system get pod -l istio=ingressgateway \
     -o jsonpath='{.items[].spec.containers[].env[?(@.name=="CA_ADDR")].value}')"
-  
+
   local CURRENT_CA; CURRENT_CA=citadel
   if is_meshca_installed; then
     CURRENT_CA=mesh_ca
@@ -1298,6 +1329,10 @@ outro() {
   info "The ASM control plane installation is now complete."
   info "To enable automatic sidecar injection on a namespace, you can use the following command:"
   info "kubectl label namespace <NAMESPACE> istio-injection- istio.io/rev=${REVISION_LABEL} --overwrite"
+  info "If you use 'istioctl install' afterwards to modify this installation, you will need"
+  info "to specify the option '--set revision=${REVISION_LABEL}' to target this control plane"
+  info "instead of installing a new one."
+
 
   if [[ "${MODE}" = "migrate" ]]; then
     info "Please verify the new control plane and then: 1) migrate your workloads 2) remove old control plane."
