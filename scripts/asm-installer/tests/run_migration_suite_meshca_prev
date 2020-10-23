@@ -1,0 +1,125 @@
+#!/bin/bash
+set -CeEu
+set -o pipefail
+
+SPATH="$(readlink -f "$0")"
+SDIR="$(dirname "${SPATH}")"; export SDIR;
+
+# shellcheck source=common.sh
+. "${SDIR}/common.sh"
+
+cd "${SDIR}"
+
+main() {
+  # CLI setup
+  parse_args "$@"
+
+  # Cluster setup
+  if [[ -n "${SERVICE_ACCOUNT}" ]]; then
+    echo "Authorizing service acount..."
+    auth_service_account
+  fi
+
+  local CLUSTER_NAME; CLUSTER_NAME="migration-meshca-old-${BUILD_ID::8}";
+  local NAMESPACE; NAMESPACE="namespace-${BUILD_ID}"
+  readonly CLUSTER_NAME
+  readonly NAMESPACE
+  echo "Creating cluster ${CLUSTER_NAME}..."
+  create_working_cluster "${PROJECT_ID}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}"
+  # this trap isn't tested for all circumstances so caveat emptor
+  trap 'cleanup "${PROJECT_ID}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}" "${NAMESPACE}"; exit 1;' ERR
+
+  # Demo app setup
+  echo "Installing and verifying demo app..."
+  install_demo_app "${NAMESPACE}"
+
+  local GATEWAY; GATEWAY="$(kube_ingress "${NAMESPACE}")";
+  verify_demo_app "$GATEWAY"
+
+  echo "Installing old OSS Istio and re-verifying demo app..."
+  OSS_VERSION="1.6.8"
+  install_oss_istio "${NAMESPACE}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}"
+
+  echo "Installing Istio manifests for demo app..."
+  install_demo_app_istio_manifests "${NAMESPACE}"
+
+  echo -n "Waiting for Istio ingress.."
+  for _ in $(seq 1 30); do
+    echo -n "."
+    GATEWAY="$(istio_ingress)"
+    [[ -n "${GATEWAY}" ]] && break || sleep 10
+  done
+  echo "."
+
+  if [[ -z "${GATEWAY}" ]]; then
+    fatal "Timed out waiting for OSS Istio ingress."
+  fi
+
+  verify_demo_app "${GATEWAY}"
+
+  # Test starts here
+  echo "Installing ASM with MeshCA..."
+  if [[ -n "${SERVICE_ACCOUNT}" ]]; then
+    echo "../install_asm \
+      -l ${CLUSTER_LOCATION} \
+      -n ${CLUSTER_NAME} \
+      -p ${PROJECT_ID} \
+      -m migrate \
+      -c mesh_ca \
+      -s ${SERVICE_ACCOUNT} \
+      -k ${KEY_FILE} -v"
+    ../install_asm \
+      -l "${CLUSTER_LOCATION}" \
+      -n "${CLUSTER_NAME}" \
+      -p "${PROJECT_ID}" \
+      -m migrate \
+      -c mesh_ca \
+      -s "${SERVICE_ACCOUNT}" \
+      -k "${KEY_FILE}" -v
+  else
+    echo "../install_asm \
+      -l ${CLUSTER_LOCATION} \
+      -n ${CLUSTER_NAME} \
+      -p ${PROJECT_ID} \
+      -m migrate \
+      -c mesh_ca -v"
+    ../install_asm \
+      -l "${CLUSTER_LOCATION}" \
+      -n "${CLUSTER_NAME}" \
+      -p "${PROJECT_ID}" \
+      -m migrate \
+      -c mesh_ca -v
+  fi
+
+  sleep 5
+
+  echo "Performing a rolling restart of the demo app..."
+  roll "${NAMESPACE}"
+
+  local SUCCESS; SUCCESS=0;
+  echo "Verifying demo app via Istio ingress..."
+  GATEWAY="$(istio_ingress)"
+  set +e
+  verify_demo_app "${GATEWAY}" || SUCCESS=1
+  set -e
+
+  if [[ "${SUCCESS}" -eq 1 ]]; then
+    echo "Failed to verify, restarting and trying again..."
+    roll "${NAMESPACE}"
+
+    echo "Getting istio ingress IP..."
+    GATEWAY="$(istio_ingress)"
+    echo "Got ${GATEWAY}"
+    echo "Verifying demo app via Istio ingress..."
+    set +e
+    verify_demo_app "${GATEWAY}" || SUCCESS=1
+    set -e
+  fi
+
+  # Cluster teardown
+  echo "Deleting cluster ${CLUSTER_NAME} and associated resources..."
+  cleanup "${PROJECT_ID}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}" "${NAMESPACE}"
+  exit "$SUCCESS"
+}
+
+main "$@"
