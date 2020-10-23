@@ -56,6 +56,7 @@ MODE="${MODE:=}"
 CA="${CA:=}"
 
 OPERATOR_OVERLAY="${OPERATOR_OVERLAY:=}"
+REMOTE_OVERLAY="${REMOTE_OVERLAY:=}"
 ENABLE_APIS="${ENABLE_APIS:=0}"
 DISABLE_CANONICAL_SERVICE="${DISABLE_CANONICAL_SERVICE:=0}"
 PRINT_CONFIG="${PRINT_CONFIG:=0}"
@@ -210,6 +211,7 @@ OPTIONS:
   -c|--ca                <CA>
 
   -o|--operator_overlay  <FILE PATH>
+  -r|--remote_overlay    <FILE PATH>
   -s|--service_account   <ACCOUNT>
   -k|--key_file          <FILE PATH>
   -D|--output_dir        <DIR PATH>
@@ -261,6 +263,13 @@ OPTIONS:
                                       omitted if not installing optional
                                       features. To add multiple files, specify
                                       them with multiple options one at a time.
+  -r|--remote_overlay    <FILE PATH>  The location of a YAML file in
+                                      the kpt pkg to apply. For options, see
+                                      the anthos-service-mesh-package GitHub
+                                      repo under GoogleCloudPlatform. Files
+                                      should be in "asm/istio/options" folder.
+                                      To add multiple files, specify them with
+                                      multiple options one at a time.
   -s|--service_account   <ACCOUNT>    The name of a service account used to
                                       install ASM. If not specified, the gcloud
                                       user currently configured will be used.
@@ -359,6 +368,11 @@ parse_args() {
       -o | --operator_overlay | --operator-overlay)
         arg_required "${@}"
         OPERATOR_OVERLAY="${2},${OPERATOR_OVERLAY}"
+        shift 2
+        ;;
+      -r | --remote_overlay | --remote-overlay)
+        arg_required "${@}"
+        REMOTE_OVERLAY="${2},${REMOTE_OVERLAY}"
         shift 2
         ;;
       -e | --enable_apis | --enable-apis)
@@ -529,9 +543,9 @@ EOF
 ${OPERATOR_OVERLAY}
 EOF
   if [[ "${CA}" = "citadel" ]]; then
-    ABS_OVERLAYS="${PACKAGE_DIRECTORY}/options/citadel-ca.yaml,${ABS_OVERLAYS}"
+    ABS_OVERLAYS="${OPTIONS_DIRECTORY}/citadel-ca.yaml,${ABS_OVERLAYS}"
   fi
-  OPERATOR_OVERLAY="${ABS_OVERLAYS}"; readonly OPERATOR_OVERLAY;
+  OPERATOR_OVERLAY="${ABS_OVERLAYS}"
 
   set_kpt_package_url
   WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"
@@ -718,6 +732,17 @@ EOF
     info "Downloading ASM kpt package..."
     retry 3 run kpt pkg get "${KPT_URL}" asm
   fi
+
+  while read -d ',' -r yaml_file; do
+    yaml_file="${OPTIONS_DIRECTORY}/${yaml_file}"
+    if [[ ! -f "${yaml_file}" ]]; then
+      fatal "Couldn't find remote yaml file ${yaml_file}."
+    fi
+    OPERATOR_OVERLAY="${yaml_file},${OPERATOR_OVERLAY}"
+  done <<EOF
+${REMOTE_OVERLAY}
+EOF
+readonly OPERATOR_OVERLAY
 }
 
 download_asm() {
