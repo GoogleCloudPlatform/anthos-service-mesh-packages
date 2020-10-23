@@ -56,7 +56,7 @@ MODE="${MODE:=}"
 CA="${CA:=}"
 
 OPERATOR_OVERLAY="${OPERATOR_OVERLAY:=}"
-REMOTE_OVERLAY="${REMOTE_OVERLAY:=}"
+COMMON_OVERLAY="${COMMON_OVERLAY:=}"
 ENABLE_APIS="${ENABLE_APIS:=0}"
 DISABLE_CANONICAL_SERVICE="${DISABLE_CANONICAL_SERVICE:=0}"
 PRINT_CONFIG="${PRINT_CONFIG:=0}"
@@ -211,10 +211,10 @@ OPTIONS:
   -c|--ca                <CA>
 
   -o|--operator_overlay  <FILE PATH>
-  -r|--remote_overlay    <FILE PATH>
   -s|--service_account   <ACCOUNT>
   -k|--key_file          <FILE PATH>
   -D|--output_dir        <DIR PATH>
+  --co|--common_overlay  <FILE NAME>
 
   --ca_cert              <FILE PATH>
   --ca_key               <FILE PATH>
@@ -263,13 +263,6 @@ OPTIONS:
                                       omitted if not installing optional
                                       features. To add multiple files, specify
                                       them with multiple options one at a time.
-  -r|--remote_overlay    <FILE PATH>  The location of a YAML file in
-                                      the kpt pkg to apply. For options, see
-                                      the anthos-service-mesh-package GitHub
-                                      repo under GoogleCloudPlatform. Files
-                                      should be in "asm/istio/options" folder.
-                                      To add multiple files, specify them with
-                                      multiple options one at a time.
   -s|--service_account   <ACCOUNT>    The name of a service account used to
                                       install ASM. If not specified, the gcloud
                                       user currently configured will be used.
@@ -283,6 +276,13 @@ OPTIONS:
                                       directory already contains the necessary
                                       files, they will be used instead of
                                       downloading them again.
+  --co|--common_overlay  <FILE NAME>  The name of a YAML file in the kpt pkg to
+                                      apply. For options, see the
+                                      anthos-service-mesh-package GitHub
+                                      repo under GoogleCloudPlatform. Files
+                                      should be in "asm/istio/options" folder.
+                                      To add multiple files, specify them with
+                                      multiple options one at a time.
 
   The following four options must be passed together and are only necessary
   for using a custom certificate for Citadel. Users that aren't sure whether
@@ -370,9 +370,9 @@ parse_args() {
         OPERATOR_OVERLAY="${2},${OPERATOR_OVERLAY}"
         shift 2
         ;;
-      -r | --remote_overlay | --remote-overlay)
+      --co | --common_overlay | --common-overlay)
         arg_required "${@}"
-        REMOTE_OVERLAY="${2},${REMOTE_OVERLAY}"
+        COMMON_OVERLAY="${2},${COMMON_OVERLAY}"
         shift 2
         ;;
       -e | --enable_apis | --enable-apis)
@@ -740,7 +740,7 @@ EOF
     fi
     OPERATOR_OVERLAY="${yaml_file},${OPERATOR_OVERLAY}"
   done <<EOF
-${REMOTE_OVERLAY}
+${COMMON_OVERLAY}
 EOF
 readonly OPERATOR_OVERLAY
 }
