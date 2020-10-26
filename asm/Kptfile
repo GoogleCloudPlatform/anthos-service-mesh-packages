@@ -99,6 +99,11 @@ openAPI:
         setter:
           name: anthos.servicemesh.tag
           value: 1.6.8-asm.9
+    io.k8s.cli.setters.anthos.servicemesh.rev:
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.rev
+          value: asm-168-9
     io.k8s.cli.setters.anthos.servicemesh.canonicalServiceHub:
       x-k8s-cli:
         setter:
