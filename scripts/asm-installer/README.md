@@ -22,7 +22,7 @@ To verify integrity of the script download, you also need:
 Google Cloud Shell pre-installs these tools except `kpt`, which
 you can install by using `sudo apt-get install google-cloud-sdk-kpt`.
 
-In addition, you need a GKE Kubernetes cluster with at least 4 nodes that use
+In addition, you need a GKE Kubernetes cluster with at least 8 vCPUs that use
 machine types with at least 4 vCPUs. If you are not the Project Owner for
 the GCP Project, you need the following Cloud IAM roles in order to run the
 script successfully:
@@ -51,19 +51,26 @@ Use the script's help flag to see detailed descriptions of its arguments:
 `./install_asm --help`. Pass these arguments by using the CLI flag or
 environment variables. Set the environment variables by providing the
 corresponding flag name in all capital letters. Set toggle flags to 0 to
-disable them or 1 to enable them.
+disable them or 1 to enable them. Descriptions of arguments from the usage
+prompt of the script are always more correct than any other source.
 
 There are five required options: CLUSTER\_NAME, CLUSTER\_LOCATION, PROJECT\_ID,
 CA, and MODE. Use the first three to specify the cluster where to install
 Anthos Service Mesh. Set MODE to `install` for a new installation, or `migrate`
-to migrate an Istio 1.7 control plane to Anthos Service Mesh.  Set `CA` to
-specify the Certificate Authority. [Mesh CA] is supported only on new
-installations. Citadel is supported during migrations to help migrate workloads
-safely. Google recommends migrating to Mesh CA when possible.
+to migrate an Istio 1.7 control plane to Anthos Service Mesh, or `upgrade` in
+order to upgrade an ASM installation to ASM 1.7. Upgrades are only supported
+from at most one minor version back.
 
-The script can enable the required Google Cloud APIs on your
-behalf, if you can pass the `--enable_apis` flag when you run it.
-Otherwise, the script will fail if they are not already enabled.
+Set `CA` to specify the Certificate Authority. [Mesh CA] is recommended for
+new installations. Citadel is supported during migrations to help migrate
+workloads safely. Google recommends migrating to Mesh CA when possible. Note
+that migrating CAs means changing the root of trust for your encrypted traffic.
+It's recommended to attempt this in a non-production environment before your
+production one.
+
+The script can enable the required Google Cloud APIs on your behalf, if you
+pass the `--enable_apis` flag when you run it. Otherwise, the script will fail
+if they are not already enabled.
 
 You can specify an optional YAML file to customize the IstioOperator to apply
 to the Kubernetes cluster by using the OPERATOR\_OVERLAY flag. This merges the
@@ -81,10 +88,23 @@ validation and stop before taking any actions with side effects.
 
 Use the `--dry-run` flag for the script to display commands with side effects
 instead of executing them, or use the `--verbose` flag to display _and_ execute
-the commands.
+the commands. Combine the --verbose flag with --help to see extended help.
 
 The script prefixes its output with 'install\_asm' to distinguish it from the
 output from other tools that it invokes.
+
+The script will by default create a temporary directory in order to download
+files and configuration necessary for installing ASM. Specify the --output-dir
+flag in order to designate an existing folder to use instead. Upon completion,
+the directory will contain the configuration used for installationm, as well as
+the ASM package which notably contains the istioctl binary for the installed
+version of ASM. For convenience, it also generates the combined configuration
+in a single file, in both raw (pre-manifest) and expanded (post-manifest) forms
+for later use. The raw form is easier for humans to understand, but in order
+to apply the configuration to a Kubernetes cluster you will need to use
+`istioctl manifest generate` to expand it, or use the expanded configuration.
+These configuration files can be useful if you ever need to roll back to this
+state, so saving them is recommended.
 
 [Mesh CA]: https://cloud.google.com/service-mesh/docs/overview#security_features
 
