@@ -35,6 +35,8 @@ _CI_ASM_PKG_LOCATION="${_CI_ASM_PKG_LOCATION:=}"
 ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
 ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
 OPERATOR_MANIFEST="asm/cluster/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
+PACKAGE_DIRECTORY="asm"; readonly PACKAGE_DIRECTORY;
+VALIDATION_FIX_SERVICE="${PACKAGE_DIRECTORY}/istiod-service.yaml"; readonly VALIDATION_FIX_SERVICE;
 
 SCRIPT_NAME="${0##*/}"
 
@@ -885,6 +887,15 @@ ensure_istio_namespace_exists(){
   fi
 }
 
+does_istiod_exist(){
+  local RETVAL; RETVAL=0;
+  kubectl get service \
+    --request-timeout='20s' \
+    -n istio-system \
+    istiod 1>/dev/null 2>/dev/null || RETVAL=$?
+  return "${RETVAL}"
+}
+
 ### Installation functions ###
 install_asm(){
 
@@ -899,6 +910,7 @@ install_asm(){
   run kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
   run kpt cfg set asm gcloud.project.environProjectNumber "${PROJECT_NUMBER}"
   run kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
+  run kpt cfg set asm anthos.servicemesh.rev "${REVISION_LABEL}"
   if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then
     run kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
     run kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
@@ -919,6 +931,11 @@ install_asm(){
   # Prevent the stderr buffer from ^ messing up the terminal output below
   sleep 1
   info "...done!"
+
+  if ! does_istiod_exist; then
+    info "Installing validation webhook fix..."
+    retry 3 run kubectl apply -f "${VALIDATION_FIX_SERVICE}"
+  fi
 
   if [[ "$DISABLE_CANONICAL_SERVICE" -ne 1 ]]; then
     info "Installing ASM CanonicalService controller in asm-system namespace..."
