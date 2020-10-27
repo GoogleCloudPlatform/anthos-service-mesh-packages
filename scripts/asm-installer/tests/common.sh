@@ -393,6 +393,15 @@ istio_ingress() {
   echo "${IP}"
 }
 
+does_istiod_exist(){
+  local RETVAL; RETVAL=0;
+  kubectl get service \
+    --request-timeout='20s' \
+    -n istio-system \
+    istiod 1>/dev/null 2>/dev/null || RETVAL=$?
+  return "${RETVAL}"
+}
+
 remove_ns() {
   local NS; NS="$1"
   kubectl get ns "$NS" || return
