@@ -1055,10 +1055,6 @@ set_up_project(){
   if [[ "$ENABLE_APIS" == 1 ]]; then
     enable_gcloud_apis
   fi
-
-  if [[ "${CA}" = "mesh_ca" ]]; then
-    init_meshca
-  fi
 }
 
 bind_user_to_iam_policy(){
@@ -1174,6 +1170,12 @@ set_up_cluster(){
   fi
   add_cluster_labels
   enable_workload_identity
+
+  # this is project scope but requires workload identity
+  if [[ "${CA}" = "mesh_ca" ]]; then
+    init_meshca
+  fi
+
   enable_stackdriver_kubernetes
   bind_user_to_cluster_admin
   ensure_istio_namespace_exists
