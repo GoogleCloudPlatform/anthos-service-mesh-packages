@@ -66,9 +66,16 @@ behalf, if you can pass the `--enable_apis` flag when you run it.
 Otherwise, the script will fail if they are not already enabled.
 
 You can specify an optional YAML file to customize the IstioOperator to apply
-to the Kubernetes cluster by using the OPERATOR\_OVERLAY flag. This merges the
+to the Kubernetes cluster by using the CUSTOM\_OVERLAY flag. This merges the
 specified file with the base Anthos Service Mesh manifest, and allows users to
 install optional components at install time.
+
+You can also specify a YAML file from the asm/istio/options folder in this
+repo by using the OPTION flag. This is a convenient way to apply configuration
+without needing to download the package beforehand. Specify the name without
+the .yaml file extension to specify the configuration. (e.g.
+`asm/istio/options/optional-configuration-example.yaml` would be passed by
+`--option optional-configuration-example`)
 
 If the script is running as a service account and not a user, set the
 SERVICE\_ACCOUNT option to the name of the service account, and
