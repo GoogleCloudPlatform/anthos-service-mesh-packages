@@ -266,6 +266,7 @@ OPTIONS:
                                       repo under GoogleCloudPlatform. Files
                                       should be in "asm/istio/options" folder,
                                       and shouldn't include the .yaml extension.
+                                      (See https://git.io/JTDdi for options.)
                                       To add multiple files, specify them with
                                       multiple options one at a time.
   -s|--service_account   <ACCOUNT>    The name of a service account used to
