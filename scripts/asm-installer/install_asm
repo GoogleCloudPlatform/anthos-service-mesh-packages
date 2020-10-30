@@ -51,7 +51,7 @@ CLUSTER_LOCATION="${CLUSTER_LOCATION:=}"
 MODE="${MODE:=}"
 CA="${CA:=}"
 
-OPERATOR_OVERLAY="${OPERATOR_OVERLAY:=}"
+CUSTOM_OVERLAY="${CUSTOM_OVERLAY:=}"
 ENABLE_APIS="${ENABLE_APIS:=0}"
 DISABLE_CANONICAL_SERVICE="${DISABLE_CANONICAL_SERVICE:=0}"
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT:=}"
@@ -191,10 +191,6 @@ OPTIONS:
                                       install. Specifying the CA is required
                                       for --mode migrate.  Allowed values for
                                       <CA> are {citadel|mesh_ca}.
-  -o|--operator_overlay  <FILE PATH>  The location of a YAML file to overlay on
-                                      the ASM IstioOperator. This option can be
-                                      omitted if not installing optional
-                                      features.
   -s|--service_account   <ACCOUNT>    The name of a service account used to
                                       install ASM. If not specified, the gcloud
                                       user currently configured will be used.
@@ -208,6 +204,10 @@ OPTIONS:
                                       directory already contains the necessary
                                       files, they will be used instead of
                                       downloading them again.
+  --co|--custom_overlay  <FILE PATH>  The location of a YAML file to overlay on
+                                      the ASM IstioOperator. This option can be
+                                      omitted if not installing optional
+                                      features.
 
 FLAGS:
   -e|--enable_apis                    Allow this script to enable necessary APIs
@@ -271,9 +271,9 @@ parse_args() {
         CA="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
         shift 2
         ;;
-      -o | --operator_overlay | --operator-overlay)
+      --co | --custom_overlay | --custom-overlay)
         arg_required "${@}"
-        OPERATOR_OVERLAY="${2}"
+        CUSTOM_OVERLAY="${2}"
         shift 2
         ;;
       -e | --enable_apis | --enable-apis)
@@ -383,11 +383,11 @@ EOF
     fatal "Couldn't find key file ${KEY_FILE}."
   fi
 
-  if [[ -f "${OPERATOR_OVERLAY}" ]]; then
-    OPERATOR_OVERLAY="$(readlink -f "${OPERATOR_OVERLAY}")"
-    readonly OPERATOR_OVERLAY
-  elif [[ -n "${OPERATOR_OVERLAY}" ]]; then
-    fatal "Couldn't find yaml file ${OPERATOR_OVERLAY}."
+  if [[ -f "${CUSTOM_OVERLAY}" ]]; then
+    CUSTOM_OVERLAY="$(readlink -f "${CUSTOM_OVERLAY}")"
+    readonly CUSTOM_OVERLAY
+  elif [[ -n "${CUSTOM_OVERLAY}" ]]; then
+    fatal "Couldn't find yaml file ${CUSTOM_OVERLAY}."
   fi
 
   set_kpt_package_url
@@ -920,8 +920,8 @@ install_asm(){
 
   local PARAMS
   PARAMS="-f ${OPERATOR_MANIFEST}"
-  if [[  -f "$OPERATOR_OVERLAY" ]]; then
-    PARAMS="${PARAMS} -f ${OPERATOR_OVERLAY}"
+  if [[  -f "$CUSTOM_OVERLAY" ]]; then
+    PARAMS="${PARAMS} -f ${CUSTOM_OVERLAY}"
   fi
   PARAMS="${PARAMS} --set revision=${REVISION_LABEL}"
   PARAMS="${PARAMS} -c ${KUBECONFIG}"
