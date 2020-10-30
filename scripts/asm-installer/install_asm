@@ -13,6 +13,7 @@ else
   set -u
 fi
 
+
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"
 MINOR="${MINOR:=7}"
