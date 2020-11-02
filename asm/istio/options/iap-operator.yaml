@@ -26,11 +26,12 @@ spec:
           type: NodePort
           ports:
             - name: status-port
-              nodePort: 31223
+              nodePort: 31223 # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.ingress.statusPort"}
               port: 15021
               protocol: TCP
               targetPort: 15021
-            - port: 80
+            - nodePort: 31224 # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.ingress.httpPort"}
+              port: 80
               targetPort: 8080
               name: http2
             - port: 443
