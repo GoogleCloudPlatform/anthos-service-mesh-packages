@@ -27,7 +27,8 @@ openAPI:
       x-k8s-cli:
         setter:
           name: gcloud.container.cluster.releaseChannel
-          value: REGULAR
+          value: STABLE
+          isSet: true
     io.k8s.cli.setters.gcloud.container.cluster:
       type: string
       x-k8s-cli:
