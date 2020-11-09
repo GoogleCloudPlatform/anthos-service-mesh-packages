@@ -8,5 +8,3 @@ with [Anthos Service Mesh] features enabled.
 Package Descriptions:
 
 * `asm`: Creates an ASM ready cluster and installs ASM
-* `asm-patch`: Exports an existing cluster to config, updates that cluster to
-  support ASM requirements, and installs ASM
