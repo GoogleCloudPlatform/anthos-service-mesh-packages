@@ -98,12 +98,16 @@ main() {
     validate_dependencies
   fi
 
+  if can_modify && ! necessary_files_exist; then
+    download_asm
+  fi
+
   if should_validate && ! can_modify_apis; then
     exit_if_apis_not_enabled
   fi
 
-  info "Successfully validated all requirements to install ASM in this environment."
   if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
+    info "Successfully validated all requirements to install ASM in this environment."
     return 0
   fi
 
@@ -694,6 +698,7 @@ set_up_local_workspace() {
 
 ### Environment validation functions ###
 validate_dependencies() {
+  validate_node_pool
   validate_k8s
   validate_expected_control_plane
 
@@ -750,22 +755,9 @@ EOF
   if [[ "$(uname -m)" != "x86_64" ]]; then
     fatal "Installation is only supported on x86_64."
   fi
-  case "$(uname)" in
-    Linux ) OS="linux-amd64";;
-    Darwin) OS="osx";;
-    *     ) fatal "$(uname) is not a supported OS.";;
-  esac
 
   if is_sa; then
     auth_service_account
-  fi
-
-  if ! necessary_files_exist; then
-    info "Downloading ASM.."
-    download_asm "${OS}"
-
-    info "Downloading ASM kpt package..."
-    retry 3 run kpt pkg get "${KPT_URL}" asm
   fi
 
   local ABS_YAML
@@ -785,7 +777,15 @@ unset OPTIONAL_OVERLAY; readonly CUSTOM_OVERLAY
 }
 
 download_asm() {
-  local OS; OS="${1}";
+  local OS
+
+  case "$(uname)" in
+    Linux ) OS="linux-amd64";;
+    Darwin) OS="osx";;
+    *     ) fatal "$(uname) is not a supported OS.";;
+  esac
+
+  info "Downloading ASM.."
   local TARBALL; TARBALL="istio-${RELEASE}-${OS}.tar.gz"
   if [[ -z "${_CI_ASM_PKG_LOCATION}" ]]; then
     curl -L "https://storage.googleapis.com/gke-release/asm/${TARBALL}" \
@@ -797,23 +797,23 @@ download_asm() {
 Authorization: Bearer ${TOKEN}
 EOF
   fi
+
+  info "Downloading ASM kpt package..."
+  retry 3 run kpt pkg get "${KPT_URL}" asm
 }
 
 necessary_files_exist() {
   if [[ ! -f "${OUTPUT_DIR}/${ISTIOCTL_REL_PATH}" ]]; then
     false
-  fi
-  if [[ ! -f "${OUTPUT_DIR}/${OPERATOR_MANIFEST}" ]]; then
+  elif [[ ! -f "${OUTPUT_DIR}/${OPERATOR_MANIFEST}" ]]; then
     false
   fi
-  return 0
 }
 
 validate_gcp_resources() {
   validate_project
   PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format="value(projectNumber)")"
   validate_cluster
-  validate_node_pool
 }
 
 validate_project() {
