@@ -78,34 +78,71 @@ PRINT_HELP=0
 
 main() {
   parse_args "${@}"
+
   # make sure to redirect stdout as soon as possible if we're dumping the config
   if [[ "${PRINT_CONFIG}" -eq 1 ]]; then
     exec 3>&1
     exec 1>&2
   fi
+
   validate_args
   set_up_local_workspace
+  validate_cli_dependencies
 
-  validate_dependencies
+  if should_validate || can_modify; then
+    validate_gcp_resources
+    configure_kubectl
+  fi
 
-  info "Successfully validated all requirements to install ASM from this computer."
-  if [[ "${ONLY_VALIDATE}" -ne 0 ]]; then
+  if (can_modify || should_validate) && ! necessary_files_exist; then
+    download_asm
+  fi
+
+  if should_validate; then
+    validate_dependencies
+  fi
+
+  if should_validate && ! can_modify_apis; then
+    exit_if_apis_not_enabled
+  fi
+
+  if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
+    info "Successfully validated all requirements to install ASM in this environment."
     return 0
   fi
 
-  set_up_project
-  set_up_cluster
+  if can_modify_apis; then
+    enable_gcloud_apis
+  fi
+
+  if can_modify; then
+    bind_user_to_iam_policy
+    add_cluster_labels
+    enable_workload_identity
+
+    if [[ "${CA}" = "mesh_ca" ]]; then
+      init_meshca
+    fi
+
+    enable_stackdriver_kubernetes
+    bind_user_to_cluster_admin
+    ensure_istio_namespace_exists
+  fi
+
   configure_package
+
   if [[ "${PRINT_CONFIG}" -eq 1 ]]; then
     print_config >&3
     return 0
-  else
-    if [[ "${CUSTOM_CA}" -eq 1 ]]; then
-      install_secrets
-    fi
-    install_asm
-    info "Successfully installed ASM."
   fi
+
+  if [[ "${CUSTOM_CA}" -eq 1 ]]; then
+    install_secrets
+  fi
+
+  install_asm
+
+  info "Successfully installed ASM."
   return 0
 }
 
@@ -117,7 +154,7 @@ main() {
 # not enabled it runs the command.
 #######
 run() {
-  if [[ "${DRY_RUN}" -ne 0 ]]; then
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
     warn "Would have executed: ${*}"
     return
   elif [[ "${VERBOSE}" -eq 0 ]]; then
@@ -126,7 +163,7 @@ run() {
   fi
   warn "Running: '${*}'"
   warn "-------------"
-  local RETVAL;
+  local RETVAL
   { "${@}"; RETVAL="$?"; } || true
   return $RETVAL
 }
@@ -142,7 +179,7 @@ retry() {
   shift 1
   for i in $(seq 0 "${MAX_TRIES}"); do
     if [[ "${i}" -eq "${MAX_TRIES}" ]]; then
-      return 1
+      false
     fi
     { "${@}" && return 0; } || true
     warn "Failed, retrying...($((i+1)) of ${MAX_TRIES})"
@@ -151,7 +188,7 @@ retry() {
       configure_kubectl
     fi
   done
-  return 1
+  false
 }
 
 configure_kubectl(){
@@ -192,8 +229,19 @@ fatal_with_usage() {
 }
 
 is_sa() {
-  [[ -n "${SERVICE_ACCOUNT}" ]] && return 0
-  return 1
+  if [[ -z "${SERVICE_ACCOUNT}" ]]; then false; fi
+}
+
+should_validate() {
+  if [[ "${PRINT_CONFIG}" -eq 1 ]]; then false; fi
+}
+
+can_modify() {
+  if [[ "${ONLY_VALIDATE}" -eq 1 || "${PRINT_CONFIG}" -eq 1 ]]; then false; fi
+}
+
+can_modify_apis() {
+  if [[ "${ENABLE_APIS}" -eq 0 ]] || ! can_modify; then false; fi
 }
 
 ### CLI/initial setup functions ###
@@ -650,15 +698,7 @@ set_up_local_workspace() {
 
 ### Environment validation functions ###
 validate_dependencies() {
-  validate_cli_dependencies
-  if [[ "${PRINT_CONFIG}" -eq 1 ]]; then
-    return 0
-  fi
-
-  validate_gcp_resources
-  # configure kubectl does have side effects but we've generated a temprorary
-  # kubeconfig so we're not breaking the promise that --only_validate gives
-  configure_kubectl
+  validate_node_pool
   validate_k8s
   validate_expected_control_plane
 
@@ -667,10 +707,6 @@ validate_dependencies() {
   elif [[ "${MODE}" = "upgrade" ]]; then
     validate_asm_version
     validate_ca_consistency
-  fi
-
-  if [[ "${ENABLE_APIS}" -eq 0 || "${ONLY_VALIDATE}" -eq 1 ]]; then
-    exit_if_apis_not_enabled
   fi
 }
 
@@ -719,22 +755,9 @@ EOF
   if [[ "$(uname -m)" != "x86_64" ]]; then
     fatal "Installation is only supported on x86_64."
   fi
-  case "$(uname)" in
-    Linux ) OS="linux-amd64";;
-    Darwin) OS="osx";;
-    *     ) fatal "$(uname) is not a supported OS.";;
-  esac
 
   if is_sa; then
     auth_service_account
-  fi
-
-  if ! necessary_files_exist; then
-    info "Downloading ASM.."
-    download_asm "${OS}"
-
-    info "Downloading ASM kpt package..."
-    retry 3 run kpt pkg get "${KPT_URL}" asm
   fi
 
   local ABS_YAML
@@ -754,7 +777,15 @@ unset OPTIONAL_OVERLAY; readonly CUSTOM_OVERLAY
 }
 
 download_asm() {
-  local OS; OS="${1}";
+  local OS
+
+  case "$(uname)" in
+    Linux ) OS="linux-amd64";;
+    Darwin) OS="osx";;
+    *     ) fatal "$(uname) is not a supported OS.";;
+  esac
+
+  info "Downloading ASM.."
   local TARBALL; TARBALL="istio-${RELEASE}-${OS}.tar.gz"
   if [[ -z "${_CI_ASM_PKG_LOCATION}" ]]; then
     curl -L "https://storage.googleapis.com/gke-release/asm/${TARBALL}" \
@@ -766,23 +797,23 @@ download_asm() {
 Authorization: Bearer ${TOKEN}
 EOF
   fi
+
+  info "Downloading ASM kpt package..."
+  retry 3 run kpt pkg get "${KPT_URL}" asm
 }
 
 necessary_files_exist() {
   if [[ ! -f "${OUTPUT_DIR}/${ISTIOCTL_REL_PATH}" ]]; then
-    return 1
+    false
+  elif [[ ! -f "${OUTPUT_DIR}/${OPERATOR_MANIFEST}" ]]; then
+    false
   fi
-  if [[ ! -f "${OUTPUT_DIR}/${OPERATOR_MANIFEST}" ]]; then
-    return 1
-  fi
-  return 0
 }
 
 validate_gcp_resources() {
   validate_project
   PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format="value(projectNumber)")"
   validate_cluster
-  validate_node_pool
 }
 
 validate_project() {
@@ -890,8 +921,10 @@ validate_expected_control_plane(){
 }
 
 check_no_istiod_outside_of_istio_system_namespace() {
-  local IN_ANY_NAMESPACE; IN_ANY_NAMESPACE="$(kubectl get deployment -A --ignore-not-found=true | grep -c istiod || true)";
-  local IN_NAMESPACE; IN_NAMESPACE="$(kubectl get deployment -n istio-system --ignore-not-found=true | grep -c istiod || true)";
+  local IN_ANY_NAMESPACE IN_NAMESPACE
+  IN_ANY_NAMESPACE="$(kubectl get deployment -A --ignore-not-found=true | grep -c istiod || true)";
+  IN_NAMESPACE="$(kubectl get deployment -n istio-system --ignore-not-found=true | grep -c istiod || true)";
+
   if [ "$IN_ANY_NAMESPACE" -gt "$IN_NAMESPACE" ]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 found istiod deployment outside of istio-system namespace. This installer
@@ -989,9 +1022,7 @@ ${VERSION_REV}
 EOF
 )"
   if is_major_minor_invalid || is_minor_point_rev_invalid; then
-    return 1
-  else
-    return 0
+    false
   fi
 }
 
@@ -1042,21 +1073,6 @@ is_meshca_installed() {
   [[ "${INSTALLED_CA}" =~ meshca\.googleapis\.com ]] && return 0
 }
 
-### Project functions ###
-set_up_project(){
-  if [[ "${PRINT_CONFIG}" -eq 1 ]]; then
-    return 0
-  fi
-
-  bind_user_to_iam_policy
-
-  # This if statement should always trigger, but just in case we should be
-  # careful about enabling things without explicit permission
-  if [[ "$ENABLE_APIS" == 1 ]]; then
-    enable_gcloud_apis
-  fi
-}
-
 bind_user_to_iam_policy(){
   local ACCOUNT_TYPE
   ACCOUNT_TYPE="user"
@@ -1064,7 +1080,7 @@ bind_user_to_iam_policy(){
     ACCOUNT_TYPE="serviceAccount"
   fi
   info "Getting account information..."
-  local GCLOUD_MEMBER;
+  local GCLOUD_MEMBER
   GCLOUD_MEMBER="$(retry 3 gcloud auth list \
     --project="${PROJECT_ID}" \
     --filter="status:ACTIVE" \
@@ -1163,27 +1179,9 @@ Authorization: Bearer ${TOKEN}
 EOF
 }
 
-### Cluster functions ###
-set_up_cluster(){
-  if [[ "${PRINT_CONFIG}" -eq 1 ]]; then
-    return 0
-  fi
-  add_cluster_labels
-  enable_workload_identity
-
-  # this is project scope but requires workload identity
-  if [[ "${CA}" = "mesh_ca" ]]; then
-    init_meshca
-  fi
-
-  enable_stackdriver_kubernetes
-  bind_user_to_cluster_admin
-  ensure_istio_namespace_exists
-}
-
 add_cluster_labels(){
   info "Reading labels for ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
-  local LABELS;
+  local LABELS
   LABELS="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
     --zone="${CLUSTER_LOCATION}" \
     --project="${PROJECT_ID}" \
@@ -1264,7 +1262,7 @@ print_config() {
   done <<EOF
 ${CUSTOM_OVERLAY}
 EOF
-  if [[ "$DISABLE_CANONICAL_SERVICE" -ne 1 ]]; then
+  if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
     echo "---"
     sanitize_file asm/canonical-service/controller.yaml
   fi
@@ -1332,7 +1330,7 @@ EOF
     retry 3 run kubectl apply -f "${VALIDATION_FIX_SERVICE}"
   fi
 
-  if [[ "$DISABLE_CANONICAL_SERVICE" -ne 1 ]]; then
+  if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
     info "Installing ASM CanonicalService controller in asm-system namespace..."
     retry 3 run kubectl apply -f asm/canonical-service/controller.yaml
     info "Waiting for deployment..."
