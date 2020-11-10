@@ -94,12 +94,12 @@ main() {
     configure_kubectl
   fi
 
-  if should_validate; then
-    validate_dependencies
+  if (can_modify || should_validate) && ! necessary_files_exist; then
+    download_asm
   fi
 
-  if can_modify && ! necessary_files_exist; then
-    download_asm
+  if should_validate; then
+    validate_dependencies
   fi
 
   if should_validate && ! can_modify_apis; then
