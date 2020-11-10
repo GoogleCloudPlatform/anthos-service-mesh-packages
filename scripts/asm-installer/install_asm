@@ -89,11 +89,14 @@ main() {
   set_up_local_workspace
   validate_cli_dependencies
 
+  if should_validate || can_modify; then
+    validate_gcp_resources
+    configure_kubectl
+  fi
+
   if should_validate; then
     validate_dependencies
   fi
-
-  configure_kubectl
 
   if should_validate && ! can_modify_apis; then
     exit_if_apis_not_enabled
@@ -691,7 +694,6 @@ set_up_local_workspace() {
 
 ### Environment validation functions ###
 validate_dependencies() {
-  validate_gcp_resources
   validate_k8s
   validate_expected_control_plane
 
