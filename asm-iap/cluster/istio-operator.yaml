@@ -27,6 +27,8 @@ spec:
     - enabled: true
       name: istio-ingressgateway
       k8s:
+        hpaSpec:
+          minReplicas: 2
         service:
           type: NodePort
           ports:
