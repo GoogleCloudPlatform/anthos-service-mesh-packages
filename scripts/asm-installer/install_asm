@@ -1185,7 +1185,7 @@ add_cluster_labels(){
   LABELS="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
     --zone="${CLUSTER_LOCATION}" \
     --project="${PROJECT_ID}" \
-    --format="value(resourceLabels)")";
+    --format='value(resourceLabels)[delimiter=","]')";
   local INSTALLER_LABEL; INSTALLER_LABEL="asmv=${RELEASE//\./-}"
   local MESH_LABEL; MESH_LABEL="mesh_id=proj-${PROJECT_NUMBER}"
   if [ "${LABELS}" ]; then
