@@ -94,7 +94,7 @@ main() {
     configure_kubectl
   fi
 
-  if (can_modify || should_validate) && ! necessary_files_exist; then
+  if needs_asm && ! necessary_files_exist; then
     download_asm
   fi
 
@@ -242,6 +242,10 @@ can_modify() {
 
 can_modify_apis() {
   if [[ "${ENABLE_APIS}" -eq 0 ]] || ! can_modify; then false; fi
+}
+
+needs_asm() {
+  if [[ "${PRINT_CONFIG}" -eq 0 ]] && ! can_modify && ! should_validate; then false; fi
 }
 
 ### CLI/initial setup functions ###
@@ -1185,7 +1189,7 @@ add_cluster_labels(){
   LABELS="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
     --zone="${CLUSTER_LOCATION}" \
     --project="${PROJECT_ID}" \
-    --format="value(resourceLabels)")";
+    --format='value(resourceLabels)[delimiter=","]')";
   local INSTALLER_LABEL; INSTALLER_LABEL="asmv=${RELEASE//\./-}"
   local MESH_LABEL; MESH_LABEL="mesh_id=proj-${PROJECT_NUMBER}"
   if [ "${LABELS}" ]; then
