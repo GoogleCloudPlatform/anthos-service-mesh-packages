@@ -196,6 +196,10 @@ is_sa() {
   return 1
 }
 
+needs_asm() {
+  if [[ "${PRINT_CONFIG}" -eq 0 ]] && ! can_modify && ! should_validate; then false; fi
+}
+
 ### CLI/initial setup functions ###
 usage_short() {
   cat << EOF
@@ -1187,7 +1191,7 @@ add_cluster_labels(){
   LABELS="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
     --zone="${CLUSTER_LOCATION}" \
     --project="${PROJECT_ID}" \
-    --format="value(resourceLabels)")";
+    --format='value(resourceLabels)[delimiter=","]')";
   local INSTALLER_LABEL; INSTALLER_LABEL="asmv=${RELEASE//\./-}"
   local MESH_LABEL; MESH_LABEL="mesh_id=proj-${PROJECT_NUMBER}"
   if [ "${LABELS}" ]; then
