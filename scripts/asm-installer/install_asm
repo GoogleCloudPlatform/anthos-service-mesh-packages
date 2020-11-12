@@ -47,6 +47,7 @@ SCRIPT_NAME="${0##*/}"
 PROJECT_NUMBER=""
 KPT_URL=""
 KUBECONFIG=""
+APATH=""
 ABS_OVERLAYS=""
 
 ### Option variables ###
@@ -77,6 +78,7 @@ VERBOSE="${VERBOSE:=0}"
 PRINT_HELP=0
 
 main() {
+  init
   parse_args "${@}"
 
   # make sure to redirect stdout as soon as possible if we're dumping the config
@@ -144,6 +146,19 @@ main() {
 
   info "Successfully installed ASM."
   return 0
+}
+
+init() {
+  # BSD-style readlink apparently doesn't have the same -f toggle on readlink
+  case "$(uname)" in
+    Linux ) APATH="readlink";;
+    Darwin) APATH="stat";;
+    *);;
+  esac
+}
+
+apath() {
+  "${APATH}" "${@}"
 }
 
 ### Convenience functions ###
@@ -583,7 +598,7 @@ EOF
   # since we cd to a tmp directory, we need the absolute path for the key file
   # and yaml file
   if [[ -f "${KEY_FILE}" ]]; then
-    KEY_FILE="$(readlink -f "${KEY_FILE}")"
+    KEY_FILE="$(apath -f "${KEY_FILE}")"
     readonly KEY_FILE
   elif [[ -n "${KEY_FILE}" ]]; then
     fatal "Couldn't find key file ${KEY_FILE}."
@@ -591,7 +606,7 @@ EOF
 
   while read -d ',' -r yaml_file; do
     if [[ -f "${yaml_file}" ]]; then
-      ABS_OVERLAYS="$(readlink -f "${yaml_file}"),${ABS_OVERLAYS}"
+      ABS_OVERLAYS="$(apath -f "${yaml_file}"),${ABS_OVERLAYS}"
     elif [[ -n "${yaml_file}" ]]; then
       fatal "Couldn't find yaml file ${yaml_file}."
     fi
@@ -625,10 +640,10 @@ CA_KEY
 CA_CHAIN
 EOF
 
-  CA_CERT="$(readlink -f "${CA_CERT}")"; readonly CA_CERT;
-  CA_KEY="$(readlink -f "${CA_KEY}")"; readonly CA_KEY;
-  CA_CHAIN="$(readlink -f "${CA_CHAIN}")"; readonly CA_CHAIN;
-  CA_ROOT="$(readlink -f "${CA_ROOT}")"; readonly CA_ROOT;
+  CA_CERT="$(apath -f "${CA_CERT}")"; readonly CA_CERT;
+  CA_KEY="$(apath -f "${CA_KEY}")"; readonly CA_KEY;
+  CA_CHAIN="$(apath -f "${CA_CHAIN}")"; readonly CA_CHAIN;
+  CA_ROOT="$(apath -f "${CA_ROOT}")"; readonly CA_ROOT;
 
   info "Checking certificate files for consistency..."
   if ! openssl rsa -in "${CA_KEY}" -check >/dev/null 2>/dev/null; then
@@ -688,7 +703,7 @@ set_up_local_workspace() {
       fatal "Encountered error when running mktemp -d!"
     fi
   else
-    OUTPUT_DIR="$(readlink -f "${OUTPUT_DIR}")"
+    OUTPUT_DIR="$(apath -f "${OUTPUT_DIR}")"
   fi
   pushd "$OUTPUT_DIR" > /dev/null
 
@@ -770,7 +785,7 @@ EOF
     if [[ ! -f "${ABS_YAML}" ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Couldn't find remote yaml file ${yaml_file}.
-See directory $(readlink -f "${OPTIONS_DIRECTORY}") for available options.
+See directory $(apath -f "${OPTIONS_DIRECTORY}") for available options.
 EOF
     fi
     CUSTOM_OVERLAY="${ABS_YAML},${CUSTOM_OVERLAY}"
