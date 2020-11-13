@@ -1,0 +1,40 @@
+#!/bin/bash
+set -CeEu
+set -o pipefail
+
+SPATH="$(readlink -f "$0")"
+SDIR="$(dirname "${SPATH}")"; export SDIR;
+
+# shellcheck source=common.sh
+. "${SDIR}/common.sh"
+
+cd "${SDIR}"
+
+main() {
+  echo '../install_asm \
+    -l us-region \
+    -n cluster-name \
+    -p project-name \
+    --print-config \
+    --option egressgateways \
+    -m install \
+    | grep egressGateways: -A 1 | tail -n 1 | grep 'enabled: true' -q'
+
+  RETVAL="$(../install_asm \
+    -l us-region \
+    -n cluster-name \
+    -p project-name \
+    --print-config \
+    --option egressgateways \
+    -m install \
+    | grep egressGateways: -A 1 | tail -n 1 | grep 'enabled: true' -q)"
+
+  if [[ "${RETVAL}" -ne 0 ]]; then
+    echo FAILED
+    exit "${RETVAL}"
+  fi
+
+  echo PASSED
+}
+
+main "$@"
