@@ -98,6 +98,7 @@ main() {
 
   if needs_asm && ! necessary_files_exist; then
     download_asm
+    validate_kpt_files
   fi
 
   if should_validate; then
@@ -729,6 +730,23 @@ validate_dependencies() {
   fi
 }
 
+validate_kpt_files () {
+  local ABS_YAML
+  while read -d ',' -r yaml_file; do
+    ABS_YAML="${OPTIONS_DIRECTORY}/${yaml_file}.yaml"
+    if [[ ! -f "${ABS_YAML}" ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Couldn't find remote yaml file ${yaml_file}.
+See directory $(apath -f "${OPTIONS_DIRECTORY}") for available options.
+EOF
+    fi
+    CUSTOM_OVERLAY="${ABS_YAML},${CUSTOM_OVERLAY}"
+  done <<EOF
+${OPTIONAL_OVERLAY}
+EOF
+unset OPTIONAL_OVERLAY; readonly CUSTOM_OVERLAY
+}
+
 validate_cli_dependencies() {
   local NOTFOUND; NOTFOUND="";
   local EXITCODE; EXITCODE=0;
@@ -778,21 +796,6 @@ EOF
   if is_sa; then
     auth_service_account
   fi
-
-  local ABS_YAML
-  while read -d ',' -r yaml_file; do
-    ABS_YAML="${OPTIONS_DIRECTORY}/${yaml_file}.yaml"
-    if [[ ! -f "${ABS_YAML}" ]]; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-Couldn't find remote yaml file ${yaml_file}.
-See directory $(apath -f "${OPTIONS_DIRECTORY}") for available options.
-EOF
-    fi
-    CUSTOM_OVERLAY="${ABS_YAML},${CUSTOM_OVERLAY}"
-  done <<EOF
-${OPTIONAL_OVERLAY}
-EOF
-unset OPTIONAL_OVERLAY; readonly CUSTOM_OVERLAY
 }
 
 download_asm() {
@@ -1274,26 +1277,14 @@ configure_package() {
 }
 
 print_config() {
-  echo "---"
-  sanitize_file "${OPERATOR_MANIFEST}"
+  PARAMS="-f ${OPERATOR_MANIFEST}"
   while read -d ',' -r yaml_file; do
-    echo "---"
-    sanitize_file "${yaml_file}"
+    PARAMS="${PARAMS} -f ${yaml_file} "
   done <<EOF
 ${CUSTOM_OVERLAY}
 EOF
-  if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
-    echo "---"
-    sanitize_file asm/canonical-service/controller.yaml
-  fi
-}
-
-# Strip comments, empty lines, trailing whitespace
-sanitize_file() {
-  sed -e 's/#.*$//g' \
-    -e '/^[[:space:]]*$/d' \
-    -e 's/[[:space:]]*$//g' \
-    "${1}"
+  # shellcheck disable=SC2086
+  run ./"${ISTIOCTL_REL_PATH}" profile dump ${PARAMS}
 }
 
 install_secrets() {
