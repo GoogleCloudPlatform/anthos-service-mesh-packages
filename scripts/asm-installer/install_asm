@@ -1235,7 +1235,7 @@ exit_if_out_of_iam_policy() {
 
   if [[ -n "${NOTFOUND}" ]]; then
     NOTFOUND=${NOTFOUND::-1}
-    for role in $(echo "${NOTFOUND}" | tr ' ' '\n'); do
+    for role in $(echo "${NOTFOUND}" | tr ',' '\n'); do
       warn "IAM role not enabled - ${role}"
     done
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
@@ -1316,7 +1316,7 @@ exit_if_apis_not_enabled() {
   local NOTFOUND; NOTFOUND="";
 
   info "Checking required APIs..."
-  NOTFOUND="$(find_missing_strings "$(REQUIRED)" "${ENABLED}")"
+  NOTFOUND="$(find_missing_strings "${REQUIRED}" "${ENABLED}")"
 
   if [[ -n "${NOTFOUND}" ]]; then
     for api in $(echo "${NOTFOUND}" | tr ' ' '\n'); do
@@ -1362,7 +1362,7 @@ exit_if_cluster_unlabeled() {
   local NOTFOUND; NOTFOUND="$(find_missing_strings "${REQUIRED}" "${LABELS}")"
 
   if [[ -n "${NOTFOUND}" ]]; then
-    for label in $(echo "${NOTFOUND}" | tr ' ' '\n'); do
+    for label in $(echo "${NOTFOUND}" | tr ',' '\n'); do
       warn "Cluster label not found - ${label}"
     done
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
