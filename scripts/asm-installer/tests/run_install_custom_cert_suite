@@ -71,7 +71,7 @@ main() {
       --root-cert ${TEST_ROOT} \
       --cert-chain ${TEST_CHAIN} \
       -s ${SERVICE_ACCOUNT} \
-      -k ${KEY_FILE} -v"
+      -k ${KEY_FILE} -v -e"
     ../install_asm \
       -l "${CLUSTER_LOCATION}" \
       -n "${CLUSTER_NAME}" \
@@ -83,7 +83,7 @@ main() {
       --root-cert ${TEST_ROOT} \
       --cert-chain ${TEST_CHAIN} \
       -s "${SERVICE_ACCOUNT}" \
-      -k "${KEY_FILE}" -v
+      -k "${KEY_FILE}" -v -e
   else
     echo "../install_asm \
       -l ${CLUSTER_LOCATION} \
@@ -94,7 +94,7 @@ main() {
       --ca-key ${TEST_KEY} \
       --root-cert ${TEST_ROOT} \
       --cert-chain ${TEST_CHAIN} \
-      -c citadel -v"
+      -c citadel -v -e"
     ../install_asm \
       -l "${CLUSTER_LOCATION}" \
       -n "${CLUSTER_NAME}" \
@@ -104,7 +104,7 @@ main() {
       --ca-key ${TEST_KEY} \
       --root-cert ${TEST_ROOT} \
       --cert-chain ${TEST_CHAIN} \
-      -c citadel -v
+      -c citadel -v -e
   fi
 
   sleep 5

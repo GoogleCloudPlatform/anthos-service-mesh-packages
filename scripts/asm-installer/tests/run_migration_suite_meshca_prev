@@ -67,7 +67,7 @@ main() {
       -m migrate \
       -c mesh_ca \
       -s ${SERVICE_ACCOUNT} \
-      -k ${KEY_FILE} -v"
+      -k ${KEY_FILE} -v -e"
     ../install_asm \
       -l "${CLUSTER_LOCATION}" \
       -n "${CLUSTER_NAME}" \
@@ -75,20 +75,20 @@ main() {
       -m migrate \
       -c mesh_ca \
       -s "${SERVICE_ACCOUNT}" \
-      -k "${KEY_FILE}" -v
+      -k "${KEY_FILE}" -v -e
   else
     echo "../install_asm \
       -l ${CLUSTER_LOCATION} \
       -n ${CLUSTER_NAME} \
       -p ${PROJECT_ID} \
       -m migrate \
-      -c mesh_ca -v"
+      -c mesh_ca -v -e"
     ../install_asm \
       -l "${CLUSTER_LOCATION}" \
       -n "${CLUSTER_NAME}" \
       -p "${PROJECT_ID}" \
       -m migrate \
-      -c mesh_ca -v
+      -c mesh_ca -v -e
   fi
 
   sleep 5

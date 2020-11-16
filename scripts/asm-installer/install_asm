@@ -102,7 +102,7 @@ main() {
     auth_service_account
   fi
 
-  if should_validate || can_modify; then
+  if should_validate || can_modify_at_all; then
     validate_gcp_resources
     configure_kubectl
   fi
