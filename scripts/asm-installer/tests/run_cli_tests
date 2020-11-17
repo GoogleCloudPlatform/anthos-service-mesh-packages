@@ -19,7 +19,7 @@ pwd
 # script.
 
 head ../install_asm -n -1 | sed -e 's/readonly.*$//g' >| ./fake_install_asm
-trap 'rm ./fake_install_asm' ERR EXIT
+trap 'rm ./fake_install_asm' EXIT
 
 . ./fake_install_asm
 
@@ -34,13 +34,19 @@ clear_variables() {
   CA=""; export CA;
 
   OPERATOR_OVERLAY=""; export OPERATOR_OVERLAY;
-  ENABLE_APIS=""; export ENABLE_APIS;
+  ENABLE_ALL=0; export ENABLE_ALL;
+  ENABLE_GCP_APIS=0; export ENABLE_GCP_APIS;
+  ENABLE_GCP_IAM_ROLES=0; export ENABLE_GCP_IAM_ROLES;
+  ENABLE_GCP_COMPONENTS=0; export ENABLE_GCP_COMPONENTS;
+  ENABLE_CLUSTER_LABELS=0; export ENABLE_CLUSTER_LABSL;
+  ENABLE_CLUSTER_ROLES=0; export ENABLE_CLUSTER_ROLES;
+  PRINT_CONFIG=0; export PRINT_CONFIG;
   SERVICE_ACCOUNT=""; export SERVICE_ACCOUNT;
   KEY_FILE=""; export KEY_FILE;
 
-  DRY_RUN=""; export DRY_RUN;
-  ONLY_VALIDATE=""; export ONLY_VALIDATE;
-  VERBOSE=""; export VERBOSE;
+  DRY_RUN=0; export DRY_RUN;
+  ONLY_VALIDATE=0; export ONLY_VALIDATE;
+  VERBOSE=0; export VERBOSE;
 }
 
 kubectl() {
@@ -262,6 +268,119 @@ test_main() {
     ((++FAILURES))
   fi
 
+  #################
+  # Below we're testing that what permissions we use match the flags
+  #################
+
+  CMD="-l this_should_pass"
+  CMD="${CMD} -n this_should_pass"
+  CMD="${CMD} -p this_should_pass"
+  CMD="${CMD} -m install"
+  CMD="${CMD} -c mesh_ca"
+
+  clear_variables
+  parse_args ${CMD}
+
+  if can_modify_cluster_roles \
+    || can_modify_cluster_labels \
+    || can_modify_gcp_apis \
+    || can_modify_gcp_components \
+    || can_modify_gcp_iam_roles; then
+    echo "Permissions with no flags: FAIL"
+    ((++FAILURES))
+  else
+    echo "Permissions with no flags: PASS"
+  fi
+
+  clear_variables
+  parse_args ${CMD} -e
+
+  if ! can_modify_at_all \
+    || ! can_modify_cluster_roles \
+    || ! can_modify_cluster_labels \
+    || ! can_modify_gcp_apis \
+    || ! can_modify_gcp_components \
+    || ! can_modify_gcp_iam_roles; then
+    echo "Permissions with --enable-all flag: FAIL"
+    ((++FAILURES))
+  else
+    echo "Permissions with --enable-all flag: PASS"
+  fi
+
+  clear_variables
+  parse_args ${CMD} --enable-cluster-labels
+
+  if ! can_modify_at_all \
+    || can_modify_cluster_roles \
+    || ! can_modify_cluster_labels \
+    || can_modify_gcp_apis \
+    || can_modify_gcp_components \
+    || can_modify_gcp_iam_roles; then
+    echo "Permissions with --enable-cluster-labels flag: FAIL"
+    ((++FAILURES))
+  else
+    echo "Permissions with --enable-cluster-labels flag: PASS"
+  fi
+
+  clear_variables
+  parse_args ${CMD} --enable-cluster-roles
+
+  if ! can_modify_at_all \
+    || ! can_modify_cluster_roles \
+    || can_modify_cluster_labels \
+    || can_modify_gcp_apis \
+    || can_modify_gcp_components \
+    || can_modify_gcp_iam_roles; then
+    echo "Permissions with --enable-cluster-roles flag: FAIL"
+    ((++FAILURES))
+  else
+    echo "Permissions with --enable-cluster-roles flag: PASS"
+  fi
+
+  clear_variables
+  parse_args ${CMD} --enable-gcp-apis
+
+  if ! can_modify_at_all \
+    || can_modify_cluster_roles \
+    || can_modify_cluster_labels \
+    || ! can_modify_gcp_apis \
+    || can_modify_gcp_components \
+    || can_modify_gcp_iam_roles; then
+    echo "Permissions with --enable-gcp-apis flag: FAIL"
+    ((++FAILURES))
+  else
+    echo "Permissions with --enable-gcp-apis flag: PASS"
+  fi
+
+  clear_variables
+  parse_args ${CMD} --enable-gcp-components
+
+  if ! can_modify_at_all \
+    || can_modify_cluster_roles \
+    || can_modify_cluster_labels \
+    || can_modify_gcp_apis \
+    || ! can_modify_gcp_components \
+    || can_modify_gcp_iam_roles; then
+    echo "Permissions with --enable-gcp-components flag: FAIL"
+    ((++FAILURES))
+  else
+    echo "Permissions with --enable-gcp-components flag: PASS"
+  fi
+
+  clear_variables
+  parse_args ${CMD} --enable-gcp-iam-roles
+
+  if ! can_modify_at_all \
+    || can_modify_cluster_roles \
+    || can_modify_cluster_labels \
+    || can_modify_gcp_apis \
+    || can_modify_gcp_components \
+    || ! can_modify_gcp_iam_roles; then
+    echo "Permissions with --enable-gcp-iam-roles flag: FAIL"
+    ((++FAILURES))
+  else
+    echo "Permissions with --enable-gcp-iam-roles flag: PASS"
+  fi
   #################
   echo "There were ${FAILURES} failures."
   exit "${FAILURES}"
