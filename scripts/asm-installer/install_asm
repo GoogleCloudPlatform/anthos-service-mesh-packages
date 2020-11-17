@@ -59,7 +59,14 @@ CA="${CA:=}"
 
 CUSTOM_OVERLAY=""
 OPTIONAL_OVERLAY=""
-ENABLE_APIS="${ENABLE_APIS:=0}"
+
+ENABLE_ALL="${ENABLE_ALL:=0}"
+ENABLE_CLUSTER_ROLES="${ENABLE_CLUSTER_ROLES:=0}"
+ENABLE_CLUSTER_LABELS="${ENABLE_CLUSTER_LABELS:=0}"
+ENABLE_GCP_APIS="${ENABLE_GCP_APIS:=0}"
+ENABLE_GCP_IAM_ROLES="${ENABLE_GCP_IAM_ROLES:=0}"
+ENABLE_GCP_COMPONENTS="${ENABLE_GCP_COMPONENTS:=0}"
+
 DISABLE_CANONICAL_SERVICE="${DISABLE_CANONICAL_SERVICE:=0}"
 PRINT_CONFIG="${PRINT_CONFIG:=0}"
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT:=}"
@@ -91,7 +98,11 @@ main() {
   set_up_local_workspace
   validate_cli_dependencies
 
-  if should_validate || can_modify; then
+  if is_sa; then
+    auth_service_account
+  fi
+
+  if should_validate || can_modify_at_all; then
     validate_gcp_resources
     configure_kubectl
   fi
@@ -105,31 +116,49 @@ main() {
     validate_dependencies
   fi
 
-  if should_validate && ! can_modify_apis; then
+  if can_modify_gcp_apis; then
+    enable_gcloud_apis
+  elif should_validate; then
     exit_if_apis_not_enabled
+  fi
+
+  if can_modify_gcp_iam_roles; then
+    bind_user_to_iam_policy
+  elif should_validate; then
+    exit_if_out_of_iam_policy
+  fi
+
+  if can_modify_cluster_labels; then
+    add_cluster_labels
+  elif should_validate; then
+    exit_if_cluster_unlabeled
+  fi
+
+  if can_modify_gcp_components; then
+    enable_workload_identity
+    enable_stackdriver_kubernetes
+  elif should_validate; then
+    exit_if_no_workload_identity
+    exit_if_stackdriver_not_enabled
+  fi
+
+  if [[ "${CA}" = "mesh_ca" ]] && can_modify_at_all; then
+    init_meshca
+  fi
+
+  if can_modify_cluster_roles; then
+    bind_user_to_cluster_admin
+  elif should_validate; then
+    exit_if_not_cluster_admin
+  fi
+
+  if should_validate; then
+    ensure_istio_namespace_exists
   fi
 
   if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
     info "Successfully validated all requirements to install ASM in this environment."
     return 0
-  fi
-
-  if can_modify_apis; then
-    enable_gcloud_apis
-  fi
-
-  if can_modify; then
-    bind_user_to_iam_policy
-    add_cluster_labels
-    enable_workload_identity
-
-    if [[ "${CA}" = "mesh_ca" ]]; then
-      init_meshca
-    fi
-
-    enable_stackdriver_kubernetes
-    bind_user_to_cluster_admin
-    ensure_istio_namespace_exists
   fi
 
   configure_package
@@ -177,8 +206,8 @@ run() {
     "${@}" 2>/dev/null
     return "$?"
   fi
-  warn "Running: '${*}'"
-  warn "-------------"
+  info "Running: '${*}'"
+  info "-------------"
   local RETVAL
   { "${@}"; RETVAL="$?"; } || true
   return $RETVAL
@@ -207,6 +236,27 @@ retry() {
   false
 }
 
+find_missing_strings() {
+  local NEEDLES; NEEDLES="${1}";
+  local HAYSTACK; HAYSTACK="${2}";
+  local NOTFOUND; NOTFOUND="";
+
+  while read -r needle; do
+    EXITCODE=0
+    grep -q "${needle}" <<EOF || EXITCODE=$?
+${HAYSTACK}
+EOF
+    if [[ "${EXITCODE}" -ne 0 ]]; then
+      NOTFOUND="${needle},${NOTFOUND}"
+    fi
+  done <<EOF
+${NEEDLES}
+EOF
+
+  if [[ -n "${NOTFOUND}" ]]; then NOTFOUND="${NOTFOUND::-1}"; fi
+  echo "${NOTFOUND}"
+}
+
 configure_kubectl(){
   info "Fetching/writing GCP credentials to kubeconfig file..."
   retry 2 run gcloud container clusters get-credentials "${CLUSTER_NAME}" \
@@ -226,15 +276,15 @@ EOF
 }
 
 warn() {
-  info "${1}" >&2
+  info "[WARNING]:${1}" >&2
 }
 
 info() {
-  echo "${SCRIPT_NAME}: ${1}"
+  echo "${SCRIPT_NAME}: ${1}" >&2
 }
 
 fatal() {
-  warn "ERROR: ${1}"
+  warn "[ERROR]: ${1}"
   exit 2
 }
 
@@ -252,16 +302,37 @@ should_validate() {
   if [[ "${PRINT_CONFIG}" -eq 1 ]]; then false; fi
 }
 
-can_modify() {
+can_modify_at_all() {
   if [[ "${ONLY_VALIDATE}" -eq 1 || "${PRINT_CONFIG}" -eq 1 ]]; then false; fi
 }
 
-can_modify_apis() {
-  if [[ "${ENABLE_APIS}" -eq 0 ]] || ! can_modify; then false; fi
+can_modify_cluster_roles() {
+  if [[ "${ENABLE_ALL}" -eq 0 && "${ENABLE_CLUSTER_ROLES}" -eq 0 ]] \
+    || ! can_modify_at_all; then false; fi
+}
+
+can_modify_cluster_labels() {
+  if [[ "${ENABLE_ALL}" -eq 0 && "${ENABLE_CLUSTER_LABELS}" -eq 0 ]] \
+    || ! can_modify_at_all; then false; fi
+}
+
+can_modify_gcp_apis() {
+  if [[ "${ENABLE_ALL}" -eq 0 && "${ENABLE_GCP_APIS}" -eq 0 ]] \
+    || ! can_modify_at_all; then false; fi
+}
+
+can_modify_gcp_iam_roles() {
+  if [[ "${ENABLE_ALL}" -eq 0 && "${ENABLE_GCP_IAM_ROLES}" -eq 0 ]] \
+    || ! can_modify_at_all; then false; fi
+}
+
+can_modify_gcp_components() {
+  if [[ "${ENABLE_ALL}" -eq 0 && "${ENABLE_GCP_COMPONENTS}" -eq 0 ]] \
+    || ! can_modify_at_all; then false; fi
 }
 
 needs_asm() {
-  if [[ "${PRINT_CONFIG}" -eq 0 ]] && ! can_modify && ! should_validate; then false; fi
+  if [[ "${PRINT_CONFIG}" -eq 0 ]] && ! can_modify_at_all && ! should_validate; then false; fi
 }
 
 ### CLI/initial setup functions ###
@@ -291,7 +362,13 @@ OPTIONS:
   --cert_chain           <FILE PATH>
 
 FLAGS:
-  -e|--enable_apis
+  -e|--enable_all
+     --enable_cluster_roles
+     --enable_cluster_labels
+     --enable_gcp_apis
+     --enable_gcp_iam_roles
+     --enable_gcp_components
+
      --print_config
      --disable_canonical_service
   -v|--verbose
@@ -366,9 +443,25 @@ OPTIONS:
   --cert_chain           <FILE PATH>  The certificate chain
 
 FLAGS:
-  -e|--enable_apis                    Allow this script to enable necessary APIs
-                                      on your behalf. Without this flag, it will
-                                      abort if APIs are not already enabled.
+
+  The following several flags all relate to allowing the script to create, set,
+  or enable required APIs, roles, or services. These can all be performed
+  manually before running the script if desired. To allow the script to perform
+  every necessary action, pass the -e|--enable_all flag.
+
+  -e|--enable_all                     Allow the script to perform all of the
+                                      individual enable actions below.
+     --enable_cluster_roles           Allow the script to attempt to set
+                                      the necessary cluster roles.
+     --enable_cluster_labels          Allow the script to attempt to set
+                                      necessary cluster labels.
+     --enable_gcp_apis                Allow the script to enable GCP APIs on
+                                      the user's behalf
+     --enable_gcp_iam_roles           Allow the script to set the required GCP
+                                      IAM permissions
+     --enable_gcp_components  Allow the script to enable required GCP
+                                      managed services and components
+
      --print_config                   Instead of installing ASM, print all of
                                       the compiled YAML to stdout. All other
                                       output will be written to stderr, even if
@@ -447,8 +540,28 @@ parse_args() {
         CUSTOM_OVERLAY="${2},${CUSTOM_OVERLAY}"
         shift 2
         ;;
-      -e | --enable_apis | --enable-apis)
-        ENABLE_APIS=1
+      -e | --enable_all | --enable-all)
+        ENABLE_ALL=1
+        shift 1
+        ;;
+      --enable_cluster_roles | --enable-cluster-roles)
+        ENABLE_CLUSTER_ROLES=1
+        shift 1
+        ;;
+      --enable_cluster_labels | --enable-cluster-labels)
+        ENABLE_CLUSTER_LABELS=1
+        shift 1
+        ;;
+      --enable_gcp_apis | --enable-gcp-apis)
+        ENABLE_GCP_APIS=1
+        shift 1
+        ;;
+      --enable_gcp_iam_roles | --enable-gcp-iam-roles)
+        ENABLE_GCP_IAM_ROLES=1
+        shift 1
+        ;;
+      --enable_gcp_components | --enable-gcp-components)
+        ENABLE_GCP_COMPONENTS=1
         shift 1
         ;;
       --disable_canonical_service | --disable-canonical-service)
@@ -586,7 +699,12 @@ EOF
     readonly "${FLAG}"
   done <<EOF
 DRY_RUN
-ENABLE_APIS
+ENABLE_ALL
+ENABLE_CLUSTER_ROLES
+ENABLE_CLUSTER_LABELS
+ENABLE_GCP_APIS
+ENABLE_GCP_IAM_ROLES
+ENABLE_GCP_COMPONENTS
 DISABLE_CANONICAL_SERVICE
 ONLY_VALIDATE
 VERBOSE
@@ -791,10 +909,6 @@ EOF
   shopt -s nocasematch
   if [[ "$(uname -m)" != "x86_64" ]]; then
     fatal "Installation is only supported on x86_64."
-  fi
-
-  if is_sa; then
-    auth_service_account
   fi
 }
 
@@ -1096,32 +1210,68 @@ is_meshca_installed() {
 }
 
 bind_user_to_iam_policy(){
+  local GCLOUD_MEMBER; GCLOUD_MEMBER="$(iam_user)";
+  info "Binding ${GCLOUD_MEMBER} to required IAM roles..."
+  while read -r role; do
+  retry 3 run gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+    --member "${GCLOUD_MEMBER}" \
+    --role="${role}" >/dev/null
+  done <<EOF
+$(required_iam_roles)
+EOF
+}
+
+exit_if_out_of_iam_policy() {
+  local GCLOUD_MEMBER; GCLOUD_MEMBER="$(iam_user)";
+  local MEMBER_ROLES
+  MEMBER_ROLES="$(run gcloud projects \
+    get-iam-policy "${PROJECT_ID}" \
+    --flatten='bindings[].members' \
+    --filter="bindings.members:$(iam_user)" \
+    --format='value(bindings.role)')"
+  local REQUIRED; REQUIRED="$(required_iam_roles)";
+
+  local NOTFOUND; NOTFOUND="$(find_missing_strings "${REQUIRED}" "${MEMBER_ROLES}")"
+
+  if [[ -n "${NOTFOUND}" ]]; then
+    NOTFOUND=${NOTFOUND::-1}
+    for role in $(echo "${NOTFOUND}" | tr ',' '\n'); do
+      warn "IAM role not enabled - ${role}"
+    done
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+One or more IAM roles required to install ASM is missing. Please add
+${GCLOUD_MEMBER} to the roles above, or re-run
+the script with "--enable_gcp_iam_roles" to allow the script to add
+them on your behalf.
+EOF
+  fi
+}
+
+iam_user() {
   local ACCOUNT_TYPE
   ACCOUNT_TYPE="user"
   if is_sa; then
     ACCOUNT_TYPE="serviceAccount"
   fi
   info "Getting account information..."
-  local GCLOUD_MEMBER
-  GCLOUD_MEMBER="$(retry 3 gcloud auth list \
+  local ACCOUNT_NAME
+  ACCOUNT_NAME="$(retry 3 gcloud auth list \
     --project="${PROJECT_ID}" \
     --filter="status:ACTIVE" \
     --format="value(account)")"
 
-  info "Binding ${GCLOUD_MEMBER} to required IAM roles..."
-  while read -r role; do
-  retry 3 run gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
-    --member "${ACCOUNT_TYPE}":"${GCLOUD_MEMBER}" \
-    --condition=None \
-    --role=roles/"${role}" >/dev/null
-  done <<EOF
-editor
-compute.admin
-container.admin
-resourcemanager.projectIamAdmin
-iam.serviceAccountAdmin
-iam.serviceAccountKeyAdmin
-gkehub.admin
+  echo "${ACCOUNT_TYPE}:${ACCOUNT_NAME}"
+}
+
+required_iam_roles() {
+  cat <<EOF
+roles/editor
+roles/compute.admin
+roles/container.admin
+roles/resourcemanager.projectIamAdmin
+roles/iam.serviceAccountAdmin
+roles/iam.serviceAccountKeyAdmin
+roles/gkehub.admin
 EOF
 }
 
@@ -1162,31 +1312,20 @@ get_enabled_apis() {
 
 exit_if_apis_not_enabled() {
   local ENABLED; ENABLED="$(get_enabled_apis)";
+  local REQUIRED; REQUIRED="$(required_apis)";
   local NOTFOUND; NOTFOUND="";
-  local EXITCODE; EXITCODE=0;
 
   info "Checking required APIs..."
-  while read -r api; do
-    EXITCODE=0
-    grep -q "${api}" <<EOF || EXITCODE=$?
-$ENABLED
-EOF
-    if [[ "${EXITCODE}" -ne 0 ]]; then
-      NOTFOUND="${api},${NOTFOUND}"
-    fi
-  done <<EOF
-$(required_apis)
-EOF
+  NOTFOUND="$(find_missing_strings "${REQUIRED}" "${ENABLED}")"
 
   if [[ -n "${NOTFOUND}" ]]; then
-    NOTFOUND=${NOTFOUND::-1}
     for api in $(echo "${NOTFOUND}" | tr ' ' '\n'); do
       warn "API not enabled - ${api}"
     done
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-One or more APIs are not enabled. Please enable them and retry, or
-re-run the script with the '--enable_apis' flag to allow the script to enable
-them on your behalf.
+One or more APIs are not enabled. Please enable them and retry, or re-run the
+script with the '--enable_gcp_apis' flag to allow the script to enable them on
+your behalf.
 EOF
   fi
 }
@@ -1203,26 +1342,69 @@ EOF
 }
 
 add_cluster_labels(){
-  info "Reading labels for ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
-  local LABELS
-  LABELS="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
-    --zone="${CLUSTER_LOCATION}" \
-    --project="${PROJECT_ID}" \
-    --format='value(resourceLabels)[delimiter=","]')";
-  local INSTALLER_LABEL; INSTALLER_LABEL="asmv=${RELEASE//\./-}"
-  local MESH_LABEL; MESH_LABEL="mesh_id=proj-${PROJECT_NUMBER}"
-  if [ "${LABELS}" ]; then
-    LABELS="${LABELS},"
+  local LABELS; LABELS="$(get_cluster_labels)";
+  if [[ -n "${LABELS}" ]]; then
+    local REQUIRED; REQUIRED="$(required_cluster_labels)";
+    local NOTFOUND; NOTFOUND="$(find_missing_strings "${REQUIRED}" "${LABELS}")"
+    if [[ -z "${NOTFOUND}" ]]; then return 0; fi
+    LABELS="${LABELS},${NOTFOUND}"
   fi
   info "Adding labels to ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
-  LABELS="${LABELS}${INSTALLER_LABEL},${MESH_LABEL}"
   retry 2 run gcloud container clusters update "${CLUSTER_NAME}" \
     --project="${PROJECT_ID}" \
     --zone="${CLUSTER_LOCATION}" \
     --update-labels="${LABELS}"
 }
 
+exit_if_cluster_unlabeled() {
+  local LABELS; LABELS="$(get_cluster_labels)";
+  local REQUIRED; REQUIRED="$(required_cluster_labels)";
+  local NOTFOUND; NOTFOUND="$(find_missing_strings "${REQUIRED}" "${LABELS}")"
+
+  if [[ -n "${NOTFOUND}" ]]; then
+    for label in $(echo "${NOTFOUND}" | tr ',' '\n'); do
+      warn "Cluster label not found - ${label}"
+    done
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+One or more required cluster labels were not found. Please label them and retry,
+or re-run the script with the '--enable_cluster_labels' flag to allow the script
+to enable them on your behalf.
+EOF
+  fi
+}
+
+required_cluster_labels() {
+  cat <<EOF
+asmv=${RELEASE//\./-}
+mesh_id=proj-${PROJECT_NUMBER}
+EOF
+}
+
+get_cluster_labels() {
+  info "Reading labels for ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
+  local LABELS
+  LABELS="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
+    --zone="${CLUSTER_LOCATION}" \
+    --project="${PROJECT_ID}" \
+    --format='value(resourceLabels)[delimiter=","]')";
+  echo "${LABELS}"
+}
+
+is_workload_identity_enabled() {
+  local ENABLED
+  ENABLED="$(gcloud container clusters describe \
+    --project="${PROJECT_ID}" \
+    --region "${CLUSTER_LOCATION}" \
+    "${CLUSTER_NAME}" \
+    --format=json | \
+    jq .workloadIdentityConfig)"
+
+  if [[ "${ENABLED}" = 'null' ]]; then false; fi
+}
+
 enable_workload_identity(){
+  if is_workload_identity_enabled; then return; fi
+
   info "Enabling Workload Identity on ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
   info "(This could take awhile, up to 10 minutes)"
   retry 2 run gcloud container clusters update "${CLUSTER_NAME}" \
@@ -1231,12 +1413,61 @@ enable_workload_identity(){
     --workload-pool="${WORKLOAD_POOL}"
 }
 
+exit_if_no_workload_identity() {
+  if ! is_workload_identity_enabled; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Workload identity is not enabled on ${CLUSTER_NAME}. Please enable it and
+retry, or re-run the script with the '--enable_gcp_components' flag to allow
+the script to enable it on your behalf.
+EOF
+  fi
+}
+
+is_stackdriver_enabled() {
+  local ENABLED
+  ENABLED="$(gcloud container clusters describe \
+    --project="${PROJECT_ID}" \
+    --region "${CLUSTER_LOCATION}" \
+    "${CLUSTER_NAME}" \
+    --format=json | \
+    jq '.
+    | [
+    select(
+      .loggingService == "logging.googleapis.com/kubernetes"
+      and .monitoringService == "monitoring.googleapis.com/kubernetes")
+      ] | length')"
+
+  if [[ "${ENABLED}" -lt 1 ]]; then false; fi
+}
+
 enable_stackdriver_kubernetes(){
   info "Enabling Stackdriver on ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
   retry 2 run gcloud container clusters update "${CLUSTER_NAME}" \
     --project="${PROJECT_ID}" \
     --zone="${CLUSTER_LOCATION}" \
     --enable-stackdriver-kubernetes
+}
+
+exit_if_stackdriver_not_enabled() {
+  if ! is_stackdriver_enabled; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Cloud Operations (Stackdriver)  is not enabled on ${CLUSTER_NAME}.
+Please enable it and retry, or re-run the script with the
+'--enable_gcp_components' flag to allow the script to enable it on your behalf.
+EOF
+  fi
+}
+
+is_user_cluster_admin() {
+  local GCLOUD_USER; GCLOUD_USER="$(gcloud config get-value core/account)"
+  local ROLES
+  ROLES="$(\
+    kubectl get clusterrolebinding \
+    --all-namespaces \
+    -o jsonpath='{range .items[?(@.subjects[0].name=="'"${GCLOUD_USER}"'")]}[{.roleRef.name}]{end}'\
+    2>/dev/null)"
+
+  if ! echo "${ROLES}" | grep -q cluster-admin; then false; fi
 }
 
 bind_user_to_cluster_admin(){
@@ -1251,6 +1482,16 @@ bind_user_to_cluster_admin(){
   retry 3 run kubectl apply -f - <<EOF
 ${YAML}
 EOF
+}
+
+exit_if_not_cluster_admin() {
+  if ! is_user_cluster_admin; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Current user must have the cluster-admin role on ${CLUSTER_NAME}.
+Please add the cluster role binding and retry, or re-run the script with the
+'--enable_gcp_components' flag to allow the script to enable it on your behalf.
+EOF
+  fi
 }
 
 ensure_istio_namespace_exists(){

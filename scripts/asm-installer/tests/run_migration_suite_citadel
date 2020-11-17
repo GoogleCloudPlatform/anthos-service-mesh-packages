@@ -75,7 +75,7 @@ main() {
       -m migrate \
       -c citadel \
       -s ${SERVICE_ACCOUNT} \
-      -k ${KEY_FILE} -v"
+      -k ${KEY_FILE} -v -e"
     ../install_asm \
       -l "${CLUSTER_LOCATION}" \
       -n "${CLUSTER_NAME}" \
@@ -83,20 +83,20 @@ main() {
       -m migrate \
       -c citadel \
       -s "${SERVICE_ACCOUNT}" \
-      -k "${KEY_FILE}" -v
+      -k "${KEY_FILE}" -v -e
   else
     echo "../install_asm \
       -l ${CLUSTER_LOCATION} \
       -n ${CLUSTER_NAME} \
       -p ${PROJECT_ID} \
       -m migrate \
-      -c citadel -v"
+      -c citadel -v -e"
     ../install_asm \
       -l "${CLUSTER_LOCATION}" \
       -n "${CLUSTER_NAME}" \
       -p "${PROJECT_ID}" \
       -m migrate \
-      -c citadel -v
+      -c citadel -v -e
   fi
 
   if ps -p "${SEND_TRAFFIC_CMD_PID}" > /dev/null; then

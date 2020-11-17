@@ -31,6 +31,10 @@ if [[ "${*}" == *"version"* ]]; then
 EOF
   exit 0
 fi
+if [[ "${*}" == *"clusterrolebinding"*"this_should_pass"* ]]; then
+  echo '[cluster-admin]'
+  exit 0
+fi
 if [[ "${FAKE_CONFIG}" == *"has_istio"*"right_namespace"*  ]]; then
   echo "istiod"
   exit 0

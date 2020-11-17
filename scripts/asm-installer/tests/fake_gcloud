@@ -29,6 +29,36 @@ fi
 if [[ "${*}" == *"this_should_fail"* ]]; then
   exit 1
 fi
+
+if [[ "${*}" == *"get-iam-policy"*"this_should_pass"* ]]; then
+  cat <<EOF
+roles/editor
+roles/compute.admin
+roles/container.admin
+roles/resourcemanager.projectIamAdmin
+roles/iam.serviceAccountAdmin
+roles/iam.serviceAccountKeyAdmin
+roles/gkehub.admin
+EOF
+exit 0
+fi
+
+if [[ "${*}" == *"this_should_pass"*"resourceLabel"* ]]; then
+  echo 'mesh_id=proj-this_should_pass,asmv=1-7-3-asm-6'
+  exit 0
+fi
+
+if [[ "${*}" == *"describe"*"this_should_pass"*"json"* ]]; then
+cat <<EOF
+{
+  "loggingService": "logging.googleapis.com/kubernetes",
+  "monitoringService": "monitoring.googleapis.com/kubernetes",
+  "workloadIdentityConfig": "definitely_enabled"
+}
+EOF
+  exit 0
+fi
+
 if [[ "${*}" == *"services list --enabled"*"this_should_pass" ]]; then
   cat <<EOF
 container.googleapis.com
