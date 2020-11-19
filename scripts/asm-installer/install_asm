@@ -15,9 +15,9 @@ fi
 
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"
-MINOR="${MINOR:=7}"
-POINT="${POINT:=3}"
-REV="${REV:=6}"
+MINOR="${MINOR:=8}"
+POINT="${POINT:=0}"
+REV="${REV:=5}"
 RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
 RELEASE_LINE="${MAJOR}.${MINOR}."
 PREVIOUS_RELEASE_LINE="${MAJOR}.$(( MINOR - 1 ))."
@@ -1573,7 +1573,7 @@ EOF
 
   info "Installing ASM control plane..."
   # shellcheck disable=SC2086
-  retry 5 run ./"${ISTIOCTL_REL_PATH}" install $PARAMS
+  retry 5 run ./"${ISTIOCTL_REL_PATH}" install --skip-confirmation $PARAMS
 
   # Prevent the stderr buffer from ^ messing up the terminal output below
   sleep 1
