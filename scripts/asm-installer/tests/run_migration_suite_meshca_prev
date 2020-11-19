@@ -37,7 +37,7 @@ main() {
   verify_demo_app "$GATEWAY"
 
   echo "Installing old OSS Istio and re-verifying demo app..."
-  OSS_VERSION="1.6.8"
+  OSS_VERSION="${OLD_OSS_VERSION}"
   install_oss_istio "${NAMESPACE}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}"
 
   echo "Installing Istio manifests for demo app..."
