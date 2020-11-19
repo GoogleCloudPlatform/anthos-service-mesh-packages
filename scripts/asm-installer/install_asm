@@ -136,14 +136,19 @@ main() {
 
   if can_modify_gcp_components; then
     enable_workload_identity
+    # As of now there's no way to check this without trying to initialize it,
+    # by this point if we're verifying then we'll already know the user has
+    # the proper IAM roles for the curl call.
+    init_meshconfig
     enable_stackdriver_kubernetes
   elif should_validate; then
+    # There's no way to check here whether meshconfig has been initialized, so
+    # it's possible in some pathological cases that the user might get an
+    # installation that isn't working properly, probably metrics can't make it
+    # to Stackdriver or certificates from MeshCA aren't working. Hopefully
+    # those users will find this comment.
     exit_if_no_workload_identity
     exit_if_stackdriver_not_enabled
-  fi
-
-  if [[ "${CA}" = "mesh_ca" ]] && can_modify_at_all; then
-    init_meshca
   fi
 
   if can_modify_cluster_roles; then
@@ -1264,8 +1269,12 @@ iam_user() {
 }
 
 required_iam_roles() {
+  # meshconfig.admin - required for init, stackdriver, UI elements, etc.
+  # servicemanagement.admin/serviceusage.serviceUsageAdmin - enables APIs
   cat <<EOF
-roles/editor
+roles/servicemanagement.admin
+roles/serviceusage.serviceUsageAdmin
+roles/meshconfig.admin
 roles/compute.admin
 roles/container.admin
 roles/resourcemanager.projectIamAdmin
@@ -1330,8 +1339,8 @@ EOF
   fi
 }
 
-init_meshca() {
-  info "Initializing Mesh CA..."
+init_meshconfig() {
+  info "Initializing meshconfig API..."
   local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
   run curl --request POST --fail \
     --data '' -o /dev/null \

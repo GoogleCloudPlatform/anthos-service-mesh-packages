@@ -32,7 +32,9 @@ fi
 
 if [[ "${*}" == *"get-iam-policy"*"this_should_pass"* ]]; then
   cat <<EOF
-roles/editor
+roles/servicemanagement.admin
+roles/serviceusage.serviceUsageAdmin
+roles/meshconfig.admin
 roles/compute.admin
 roles/container.admin
 roles/resourcemanager.projectIamAdmin
