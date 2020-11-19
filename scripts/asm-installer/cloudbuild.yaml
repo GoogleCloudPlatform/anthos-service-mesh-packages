@@ -167,7 +167,7 @@ steps:
   - 'KEY_FILE=${_KEY_FILE}'
   - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
   - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
-  - '_CI_ASM_KPT_BRANCH=${_KPT_BRANCH}'
+  - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
   timeout: 2400s # 40 mins
 
 - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
@@ -189,7 +189,7 @@ steps:
   - 'KEY_FILE=${_KEY_FILE}'
   - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
   - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
-  - '_CI_ASM_KPT_BRANCH=${_KPT_BRANCH}'
+  - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
   timeout: 2400s # 40 mins
 
 - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
@@ -211,7 +211,7 @@ steps:
   - 'KEY_FILE=${_KEY_FILE}'
   - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
   - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
-  - '_CI_ASM_KPT_BRANCH=${_KPT_BRANCH}'
+  - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
   timeout: 2400s # 40 mins
 
 - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
@@ -233,7 +233,7 @@ steps:
   - 'KEY_FILE=${_KEY_FILE}'
   - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
   - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
-  - '_CI_ASM_KPT_BRANCH=${_KPT_BRANCH}'
+  - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
   timeout: 2400s # 40 mins
 
 - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
@@ -255,7 +255,7 @@ steps:
   - 'KEY_FILE=${_KEY_FILE}'
   - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
   - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
-  - '_CI_ASM_KPT_BRANCH=${_KPT_BRANCH}'
+  - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
   timeout: 2400s # 40 mins
 
 - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
@@ -277,7 +277,7 @@ steps:
   - 'KEY_FILE=${_KEY_FILE}'
   - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
   - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
-  - '_CI_ASM_KPT_BRANCH=${_KPT_BRANCH}'
+  - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
   timeout: 2400s # 40 mins
 
 - name: 'gcr.io/cloud-builders/gcloud'
@@ -310,7 +310,7 @@ substitutions:
   _CLUSTER_LOCATION: us-central1-c
   _IMAGE_NAME: gcloud-with-kpt
   _SCRIPT_NAME: install_asm
-  _KPT_BRANCH: ""
+  _ASM_PKG_BRANCH: ""
   _SERVICE_ACCOUNT: asm-installer
   _SECRET_NAME: asm-installer-creds
   _KEY_FILE: key.json
