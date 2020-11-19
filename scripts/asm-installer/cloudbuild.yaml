@@ -141,6 +141,9 @@ steps:
   waitFor:
   - 'fetch-secrets'
   env:
+  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
+  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
+  - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
   - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
   - 'KEY_FILE=${_KEY_FILE}'
   timeout: 120s
