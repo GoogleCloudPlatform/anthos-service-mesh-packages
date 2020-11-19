@@ -1096,7 +1096,9 @@ bind_user_to_iam_policy(){
     --condition=None \
     --role=roles/"${role}" >/dev/null
   done <<EOF
-editor
+servicemanagement.admin
+serviceusage.serviceUsageAdmin
+meshconfig.admin
 compute.admin
 container.admin
 resourcemanager.projectIamAdmin
@@ -1172,8 +1174,8 @@ EOF
   fi
 }
 
-init_meshca() {
-  info "Initializing Mesh CA..."
+init_meshconfig() {
+  info "Initializing meshconfig API..."
   local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
   run curl --request POST --fail \
     --data '' -o /dev/null \
@@ -1191,10 +1193,7 @@ set_up_cluster(){
   add_cluster_labels
   enable_workload_identity
 
-  # this is project scope but requires workload identity
-  if [[ "${CA}" = "mesh_ca" ]]; then
-    init_meshca
-  fi
+  init_meshconfig
 
   enable_stackdriver_kubernetes
   bind_user_to_cluster_admin
