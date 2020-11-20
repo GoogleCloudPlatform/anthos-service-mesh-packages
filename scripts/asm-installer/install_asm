@@ -30,7 +30,10 @@ K8S_MINOR=0
 ### when necessary. Don't set these environment variables unless you're testing
 ### in CI/CD.
 _CI_ASM_IMAGE_LOCATION="${_CI_ASM_IMAGE_LOCATION:=}"
+_CI_ASM_IMAGE_TAG="${_CI_ASM_IMAGE_TAG:=}"
 _CI_ASM_PKG_LOCATION="${_CI_ASM_PKG_LOCATION:=}"
+_CI_NO_VALIDATE="${_CI_NO_VALIDATE:=0}"
+_CI_NO_REVISION="${_CI_NO_REVISION:=0}"
 
 ### File related constants ###
 ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
@@ -304,7 +307,7 @@ is_sa() {
 }
 
 should_validate() {
-  if [[ "${PRINT_CONFIG}" -eq 1 ]]; then false; fi
+  if [[ "${PRINT_CONFIG}" -eq 1 || "${_CI_NO_VALIDATE}" -eq 1 ]]; then false; fi
 }
 
 can_modify_at_all() {
@@ -1524,6 +1527,9 @@ configure_package() {
     run kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
     run kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
   fi
+  if [[ -n "${_CI_ASM_IMAGE_TAG}" ]]; then
+    run kpt cfg set asm anthos.servicemesh.tag "${_CI_ASM_IMAGE_TAG}"
+  fi
 }
 
 print_config() {
@@ -1565,7 +1571,10 @@ install_asm() {
 ${CUSTOM_OVERLAY}
 EOF
 
-  PARAMS="${PARAMS} --set revision=${REVISION_LABEL}"
+  if [[ "${_CI_NO_REVISION}" -ne 1 ]]; then
+    PARAMS="${PARAMS} --set revision=${REVISION_LABEL}"
+  fi
+
   if [[ "${K8S_MINOR}" -eq 15 ]]; then
     PARAMS="${PARAMS} -f ${BETA_CRD_MANIFEST}"
   fi
