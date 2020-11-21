@@ -192,13 +192,13 @@ openAPI:
       x-k8s-cli:
         substitution:
           name: cluster-name
-          pattern: "cn-PROJECTID-us-central1-c-asm-cluster"
+          pattern: "PROJECT_ID/CLUSTER_LOCATION/CLUSTER_NAME"
           values:
-          - marker: PROJECTID
+          - marker: PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
-          - marker: us-central1-c
+          - marker: CLUSTER_LOCATION
             ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.location'
-          - marker: asm-cluster
+          - marker: CLUSTER_NAME
             ref: '#/definitions/io.k8s.cli.setters.gcloud.container.cluster'
     io.k8s.cli.substitutions.spiffe-bundle-endpoints:
       x-k8s-cli:
