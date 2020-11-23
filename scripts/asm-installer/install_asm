@@ -92,10 +92,10 @@ VERBOSE="${VERBOSE:=0}"
 PRINT_HELP=0
 
 # Environment variables used by Hub IDNS
-ENABLE_HUB_IDNS="${ENABLE_HUB_IDNS:=0}"
-ENVIRON_PROJECT_ID="${ENVIRON_PROJECT_ID:=}"
-HUB_MEMBERSHIP_ID="${HUB_MEMBERSHIP_ID:=}"
-
+ENABLE_HUB_IDNS=0
+ENVIRON_PROJECT_ID=""
+HUB_MEMBERSHIP_ID=""
+MESHAPI_POST_DATA=""
 
 main() {
   init
@@ -148,16 +148,11 @@ main() {
   fi
 
   if can_modify_gcp_components; then
-    if [[ "${CA}" = "mesh_ca" && "${ENABLE_HUB_IDNS}" -eq 1 ]]; then
-      get_hub_workload_identity
-      init_meshca_with_hub_idns
-    else
-      enable_workload_identity
-      # As of now there's no way to check this without trying to initialize it,
-      # by this point if we're verifying then we'll already know the user has
-      # the proper IAM roles for the curl call.
-      init_meshconfig
-    fi
+    enable_workload_identity
+    # As of now there's no way to check this without trying to initialize it,
+    # by this point if we're verifying then we'll already know the user has
+    # the proper IAM roles for the curl call.
+    init_meshconfig
     enable_stackdriver_kubernetes
   elif should_validate; then
     # There's no way to check here whether meshconfig has been initialized, so
@@ -556,7 +551,7 @@ parse_args() {
       -o | --option)
         arg_required "${@}"
         OPTIONAL_OVERLAY="${2},${OPTIONAL_OVERLAY}"
-        if [[ ${2} == "hub-meshca" ]]; then
+        if [[ "${2}" == "hub-meshca" ]]; then
           ENABLE_HUB_IDNS=1
         fi
         shift 2
@@ -724,9 +719,8 @@ EOF
   esac
 
   if [[ "${MODE}" != "install" && "${ENABLE_HUB_IDNS}" -eq 1 ]]; then
-    fatal "Hub is only supported in new installation"
+    fatal "Hub IDNS is only supported in new installation"
   fi
-
 
   if [[ "${CUSTOM_CA}" -eq 1 ]]; then
     validate_certs
@@ -1386,19 +1380,9 @@ init_meshconfig() {
   info "Initializing meshconfig API..."
   local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
   run curl --request POST --fail \
-    --data '' -o /dev/null \
+    --data "${MESHAPI_POST_DATA}" -o /dev/null \
     "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
-    --header @- <<EOF
-Authorization: Bearer ${TOKEN}
-EOF
-}
-
-init_meshca_with_hub_idns() {
-  info "Initializing Mesh CA with Hub..."
-  local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
-  run curl --request POST \
-    --data '{"workloadIdentityPools":["'${ENVIRON_PROJECT_ID}'.hub.id.goog"]}' -o /dev/null \
-    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
+    --header "Content-Type: application/json" \
     --header @- <<EOF
 Authorization: Bearer ${TOKEN}
 EOF
@@ -1466,25 +1450,24 @@ is_workload_identity_enabled() {
 }
 
 get_hub_workload_identity() {
-  local ID_NUMBER
-  ID_NUMBER=`kubectl get membership -o=json | jq '.items | length'`
-  if [[ ${ID_NUMBER} -gt 1 ]]; then
-    fatal "Found more than one Hub Membership. Please make sure one cluster is associated with one Hub Membership.";
-  fi
   local IDENTITY_PROVIDER
-  IDENTITY_PROVIDER=`kubectl get membership -o=json | jq .items[0].spec.identity_provider`
-  if [[ ${IDENTITY_PROVIDER} =~ ^\"https:\/\/gkehub.googleapis.com\/projects\/(.+)\/locations\/global\/memberships\/(.+)\"$ ]]; then
-    ENVIRON_PROJECT_ID=${BASH_REMATCH[1]}
-    HUB_MEMBERSHIP_ID=${BASH_REMATCH[2]}
-    info "Cluster is in the Hub of project ${ENVIRON_PROJECT_ID} with Membership ID ${HUB_MEMBERSHIP_ID}"
-  else
-    fatal "Unsupported Hub Identity Provider format."
-  fi
+  local IDENTITY
+  IDENTITY_PROVIDER="$(kubectl get memberships membership -o=json | jq .spec.identity_provider)"
+  IDENTITY="$(echo "${IDENTITY_PROVIDER}" | sed 's/^\"https:\/\/gkehub.googleapis.com\/projects\/\(.*\)\/locations\/global\/memberships\/\(.*\)\"$/\1 \2/g')"
+  read -r ENVIRON_PROJECT_ID HUB_MEMBERSHIP_ID <<EOF
+${IDENTITY}
+EOF
+  MESHAPI_POST_DATA='{"workloadIdentityPools":["'${ENVIRON_PROJECT_ID}'.hub.id.goog"]}'
+  info "Cluster is in the Hub of project ${ENVIRON_PROJECT_ID} with Membership ID ${HUB_MEMBERSHIP_ID}"
 }
 
 enable_workload_identity(){
+  # Enable workload identity is not needed for Hub IDNS as the cluster needs to be registered with Hub IDNS before the installation script
+  if [[ "${CA}" == "mesh_ca" && "${ENABLE_HUB_IDNS}" -eq 1 ]]; then
+    get_hub_workload_identity
+    return
+  fi
   if is_workload_identity_enabled; then return; fi
-
   info "Enabling Workload Identity on ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
   info "(This could take awhile, up to 10 minutes)"
   retry 2 run gcloud container clusters update "${CLUSTER_NAME}" \
@@ -1616,8 +1599,8 @@ EOF
     run kpt cfg set asm gcloud.project.environProjectNumber "${ENVIRON_PROJECT_NUMBER}"
   fi
   if [[ "${ENABLE_HUB_IDNS}" -eq 1 ]]; then
-    run kpt cfg set asm gcloud.project.environProjectID ${ENVIRON_PROJECT_ID}
-    run kpt cfg set asm anthos.servicemesh.hubMembershipID ${HUB_MEMBERSHIP_ID}
+    run kpt cfg set asm gcloud.project.environProjectID "${ENVIRON_PROJECT_ID}"
+    run kpt cfg set asm anthos.servicemesh.hubMembershipID "${HUB_MEMBERSHIP_ID}"
   fi
 }
 
