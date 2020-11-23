@@ -27,5 +27,8 @@ spec:
     machineType: e2-standard-4
     workloadMetadataConfig:
       nodeMetadata: GKE_METADATA_SERVER
+  management:
+    autoRepair: true
+    autoUpgrade: true
   clusterRef:
     name: "asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster"}
