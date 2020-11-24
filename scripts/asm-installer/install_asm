@@ -85,10 +85,9 @@ VERBOSE="${VERBOSE:=0}"
 PRINT_HELP=0
 
 # Environment variables used by Hub IDNS
-ENABLE_HUB_IDNS=0
+USE_HUB_IDNS=0
 ENVIRON_PROJECT_ID=""
 HUB_MEMBERSHIP_ID=""
-MESHAPI_POST_DATA=""
 
 main() {
   init
@@ -170,6 +169,14 @@ main() {
   if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
     info "Successfully validated all requirements to install ASM in this environment."
     return 0
+  fi
+
+  if [[ "${PRINT_CONFIG}" -eq 1 && "${USE_HUB_IDNS}" -eq 1 ]]; then
+    configure_kubectl
+    local IDENTITY; IDENTITY="$(get_hub_workload_identity)"
+    read -r ENVIRON_PROJECT_ID HUB_MEMBERSHIP_ID <<EOF
+${IDENTITY}
+EOF
   fi
 
   configure_package
@@ -545,7 +552,7 @@ parse_args() {
         arg_required "${@}"
         OPTIONAL_OVERLAY="${2},${OPTIONAL_OVERLAY}"
         if [[ "${2}" == "hub-meshca" ]]; then
-          ENABLE_HUB_IDNS=1
+          USE_HUB_IDNS=1
         fi
         shift 2
         ;;
@@ -701,8 +708,11 @@ EOF
     *) fatal "MODE must be one of 'install', 'migrate', 'upgrade'";;
   esac
 
-  if [[ "${MODE}" != "install" && "${ENABLE_HUB_IDNS}" -eq 1 ]]; then
+  if [[ "${MODE}" != "install" && "${USE_HUB_IDNS}" -eq 1 ]]; then
     fatal "Hub IDNS is only supported in new installation"
+  fi
+  if [[ "${CA}" == "citadel" && "${USE_HUB_IDNS}" -eq 1 ]]; then
+    fatal "Hub IDNS is only supported for Mesh CA"
   fi
 
   if [[ "${CUSTOM_CA}" -eq 1 ]]; then
@@ -1354,13 +1364,28 @@ EOF
 init_meshconfig() {
   info "Initializing meshconfig API..."
   local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
-  run curl --request POST --fail \
-    --data "${MESHAPI_POST_DATA}" -o /dev/null \
+  if [[ "${USE_HUB_IDNS}" -eq 1 ]]; then
+    local IDENTITY; IDENTITY="$(get_hub_workload_identity)"
+    read -r ENVIRON_PROJECT_ID HUB_MEMBERSHIP_ID <<EOF
+${IDENTITY}
+EOF
+    info "Cluster is in the Hub of project ${ENVIRON_PROJECT_ID} with Membership ID ${HUB_MEMBERSHIP_ID}"
+    local POST_DATA; POST_DATA='{"workloadIdentityPools":["'${ENVIRON_PROJECT_ID}'.hub.id.goog"]}'
+    run curl --request POST --fail \
+    --data "${POST_DATA}" -o /dev/null \
     "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
     --header "Content-Type: application/json" \
     --header @- <<EOF
 Authorization: Bearer ${TOKEN}
 EOF
+  else
+    run curl --request POST --fail \
+    --data '' -o /dev/null \
+    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
+    --header @- <<EOF
+Authorization: Bearer ${TOKEN}
+EOF
+  fi
 }
 
 add_cluster_labels(){
@@ -1429,19 +1454,13 @@ get_hub_workload_identity() {
   local IDENTITY
   IDENTITY_PROVIDER="$(kubectl get memberships membership -o=json | jq .spec.identity_provider)"
   IDENTITY="$(echo "${IDENTITY_PROVIDER}" | sed 's/^\"https:\/\/gkehub.googleapis.com\/projects\/\(.*\)\/locations\/global\/memberships\/\(.*\)\"$/\1 \2/g')"
-  read -r ENVIRON_PROJECT_ID HUB_MEMBERSHIP_ID <<EOF
-${IDENTITY}
-EOF
-  MESHAPI_POST_DATA='{"workloadIdentityPools":["'${ENVIRON_PROJECT_ID}'.hub.id.goog"]}'
-  info "Cluster is in the Hub of project ${ENVIRON_PROJECT_ID} with Membership ID ${HUB_MEMBERSHIP_ID}"
+  echo "${IDENTITY}"
 }
 
 enable_workload_identity(){
   # Enable workload identity is not needed for Hub IDNS as the cluster needs to be registered with Hub IDNS before the installation script
-  if [[ "${CA}" == "mesh_ca" && "${ENABLE_HUB_IDNS}" -eq 1 ]]; then
-    get_hub_workload_identity
-    return
-  fi
+  if [[ "${USE_HUB_IDNS}" -eq 1 ]]; then return; fi
+
   if is_workload_identity_enabled; then return; fi
   info "Enabling Workload Identity on ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
   info "(This could take awhile, up to 10 minutes)"
@@ -1553,7 +1572,7 @@ configure_package() {
     run kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
     run kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
   fi
-  if [[ "${ENABLE_HUB_IDNS}" -eq 1 ]]; then
+  if [[ "${USE_HUB_IDNS}" -eq 1 ]]; then
     run kpt cfg set asm gcloud.project.environProjectID "${ENVIRON_PROJECT_ID}"
     run kpt cfg set asm anthos.servicemesh.hubMembershipID "${HUB_MEMBERSHIP_ID}"
   fi
