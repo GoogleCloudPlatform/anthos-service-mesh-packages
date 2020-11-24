@@ -1105,7 +1105,7 @@ check_istio_not_deployed(){
 
 validate_istio_version() {
   info "Checking existing Istio version(s)..."
-  local VERSION_OUTPUT; VERSION_OUTPUT="$(retry 3 $(istioctl_path) version -o json)"
+  local VERSION_OUTPUT; VERSION_OUTPUT="$(retry 3 "$(istioctl_path)" version -o json)"
   if [[ -z "${VERSION_OUTPUT}" ]]; then
     fatal "Couldn't validate existing Istio versions."
   fi
@@ -1128,7 +1128,7 @@ validate_istio_version() {
 
 validate_asm_version() {
   info "Checking existing ASM version(s)..."
-  local VERSION_OUTPUT; VERSION_OUTPUT="$(retry 3 $(istioctl_path) version -o json)"
+  local VERSION_OUTPUT; VERSION_OUTPUT="$(retry 3 "$(istioctl_path)" version -o json)"
   if [[ -z "${VERSION_OUTPUT}" ]]; then
     fatal "Couldn't validate existing Istio versions."
   fi
@@ -1549,7 +1549,7 @@ print_config() {
 ${CUSTOM_OVERLAY}
 EOF
   # shellcheck disable=SC2086
-  run $(istioctl_path) profile dump ${PARAMS}
+  run "$(istioctl_path)" profile dump ${PARAMS}
 }
 
 install_secrets() {
@@ -1591,7 +1591,7 @@ EOF
 
   info "Installing ASM control plane..."
   # shellcheck disable=SC2086
-  retry 5 run $(istioctl_path) install $PARAMS
+  retry 5 run "$(istioctl_path)" install $PARAMS
 
   # Prevent the stderr buffer from ^ messing up the terminal output below
   sleep 1
@@ -1600,7 +1600,7 @@ EOF
   local RAW_YAML; RAW_YAML="${REVISION_LABEL}-manifest-raw.yaml"
   local EXPANDED_YAML; EXPANDED_YAML="${REVISION_LABEL}-manifest-expanded.yaml"
   print_config > "${RAW_YAML}"
-  run $(istioctl_path) manifest generate \
+  run "$(istioctl_path)" manifest generate \
     <"${RAW_YAML}" \
     >"${EXPANDED_YAML}"
 
