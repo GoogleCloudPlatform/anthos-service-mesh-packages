@@ -30,7 +30,11 @@ K8S_MINOR=0
 ### when necessary. Don't set these environment variables unless you're testing
 ### in CI/CD.
 _CI_ASM_IMAGE_LOCATION="${_CI_ASM_IMAGE_LOCATION:=}"
+_CI_ASM_IMAGE_TAG="${_CI_ASM_IMAGE_TAG:=}"
 _CI_ASM_PKG_LOCATION="${_CI_ASM_PKG_LOCATION:=}"
+_CI_NO_VALIDATE="${_CI_NO_VALIDATE:=0}"
+_CI_NO_REVISION="${_CI_NO_REVISION:=0}"
+_CI_ISTIOCTL_REL_PATH="${_CI_ISTIOCTL_REL_PATH:=}"
 
 ### File related constants ###
 ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
@@ -318,7 +322,7 @@ is_sa() {
 }
 
 should_validate() {
-  if [[ "${PRINT_CONFIG}" -eq 1 ]]; then false; fi
+  if [[ "${PRINT_CONFIG}" -eq 1 || "${_CI_NO_VALIDATE}" -eq 1 ]]; then false; fi
 }
 
 can_modify_at_all() {
@@ -1124,7 +1128,7 @@ check_istio_not_deployed(){
 
 validate_istio_version() {
   info "Checking existing Istio version(s)..."
-  local VERSION_OUTPUT; VERSION_OUTPUT="$(retry 3 ./${ISTIOCTL_REL_PATH} version -o json)"
+  local VERSION_OUTPUT; VERSION_OUTPUT="$(retry 3 "$(istioctl_path)" version -o json)"
   if [[ -z "${VERSION_OUTPUT}" ]]; then
     fatal "Couldn't validate existing Istio versions."
   fi
@@ -1147,7 +1151,7 @@ validate_istio_version() {
 
 validate_asm_version() {
   info "Checking existing ASM version(s)..."
-  local VERSION_OUTPUT; VERSION_OUTPUT="$(retry 3 ./${ISTIOCTL_REL_PATH} version -o json)"
+  local VERSION_OUTPUT; VERSION_OUTPUT="$(retry 3 "$(istioctl_path)" version -o json)"
   if [[ -z "${VERSION_OUTPUT}" ]]; then
     fatal "Couldn't validate existing Istio versions."
   fi
@@ -1289,6 +1293,14 @@ iam_user() {
     --format="value(account)")"
 
   echo "${ACCOUNT_TYPE}:${ACCOUNT_NAME}"
+}
+
+istioctl_path() {
+  if [[ -n "${_CI_ISTIOCTL_REL_PATH}" && -f "${_CI_ISTIOCTL_REL_PATH}" ]]; then
+    echo "${_CI_ISTIOCTL_REL_PATH}"
+  else
+    echo "./${ISTIOCTL_REL_PATH}"
+  fi
 }
 
 required_iam_roles() {
@@ -1581,6 +1593,10 @@ configure_package() {
     run kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
     run kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
   fi
+  if [[ -n "${_CI_ASM_IMAGE_TAG}" ]]; then
+    run kpt cfg set asm anthos.servicemesh.tag "${_CI_ASM_IMAGE_TAG}"
+  fi
+
   if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
     run kpt cfg set asm gcloud.project.environProjectID "${ENVIRON_PROJECT_ID}"
     run kpt cfg set asm anthos.servicemesh.hubMembershipID "${HUB_MEMBERSHIP_ID}"
@@ -1595,7 +1611,7 @@ print_config() {
 ${CUSTOM_OVERLAY}
 EOF
   # shellcheck disable=SC2086
-  run ./"${ISTIOCTL_REL_PATH}" profile dump ${PARAMS}
+  run "$(istioctl_path)" profile dump ${PARAMS}
 }
 
 install_secrets() {
@@ -1626,7 +1642,10 @@ install_asm() {
 ${CUSTOM_OVERLAY}
 EOF
 
-  PARAMS="${PARAMS} --set revision=${REVISION_LABEL}"
+  if [[ "${_CI_NO_REVISION}" -ne 1 ]]; then
+    PARAMS="${PARAMS} --set revision=${REVISION_LABEL}"
+  fi
+
   if [[ "${K8S_MINOR}" -eq 15 ]]; then
     PARAMS="${PARAMS} -f ${BETA_CRD_MANIFEST}"
   fi
@@ -1635,7 +1654,7 @@ EOF
 
   info "Installing ASM control plane..."
   # shellcheck disable=SC2086
-  retry 5 run ./"${ISTIOCTL_REL_PATH}" install $PARAMS
+  retry 5 run "$(istioctl_path)" install $PARAMS
 
   # Prevent the stderr buffer from ^ messing up the terminal output below
   sleep 1
@@ -1644,7 +1663,7 @@ EOF
   local RAW_YAML; RAW_YAML="${REVISION_LABEL}-manifest-raw.yaml"
   local EXPANDED_YAML; EXPANDED_YAML="${REVISION_LABEL}-manifest-expanded.yaml"
   print_config > "${RAW_YAML}"
-  run ./"${ISTIOCTL_REL_PATH}" manifest generate \
+  run "$(istioctl_path)" manifest generate \
     <"${RAW_YAML}" \
     >"${EXPANDED_YAML}"
 
