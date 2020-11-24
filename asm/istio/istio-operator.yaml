@@ -35,7 +35,6 @@ spec:
         TRUST_DOMAIN: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
   values:
     global:
-      trustDomain: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
       # Enable SDS
       sds:
         token:
