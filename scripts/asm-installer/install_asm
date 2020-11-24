@@ -185,6 +185,7 @@ If this is a private cluster, verify that the correct firewall rules are applied
 https://cloud.google.com/service-mesh/docs/gke-install-overview#requirements
 EOF
   fi
+  info "kubeconfig set to ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
 }
 
 warn() {
@@ -753,7 +754,7 @@ EOF
     download_asm "${OS}"
 
     info "Downloading ASM kpt package..."
-    retry 3 run kpt pkg get "${KPT_URL}" asm
+    retry 3 run kpt pkg get --auto-set=false "${KPT_URL}" asm
   fi
 
   local ABS_YAML
@@ -825,7 +826,7 @@ EOF
 validate_cluster() {
   local RESULT; RESULT=""
 
-  info "Confirming cluster information..."
+  info "Confirming cluster information for ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
   RESULT="$(gcloud container clusters list \
     --project="${PROJECT_ID}" \
     --filter="name = ${CLUSTER_NAME} and location = ${CLUSTER_LOCATION}" \
@@ -874,7 +875,7 @@ validate_node_pool() {
   local MACHINE_CPU_REQ; MACHINE_CPU_REQ=4; readonly MACHINE_CPU_REQ;
   local TOTAL_CPU_REQ; TOTAL_CPU_REQ=8; readonly TOTAL_CPU_REQ;
 
-  info "Confirming node pool requirements..."
+  info "Confirming node pool requirements for ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
   local ACTUAL_CPU
   ACTUAL_CPU="$(list_valid_pools "${MACHINE_CPU_REQ}" | \
       jq '.[] |
