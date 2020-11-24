@@ -91,8 +91,8 @@ ONLY_VALIDATE="${ONLY_VALIDATE:=0}"
 VERBOSE="${VERBOSE:=0}"
 PRINT_HELP=0
 
-# Environment variables used by Hub IDNS
-USE_HUB_IDNS=0
+# Environment variables used by Hub Workload Identity Pool
+USE_HUB_WIP=0
 ENVIRON_PROJECT_ID=""
 HUB_MEMBERSHIP_ID=""
 
@@ -178,7 +178,7 @@ main() {
     return 0
   fi
 
-  if [[ "${PRINT_CONFIG}" -eq 1 && "${USE_HUB_IDNS}" -eq 1 ]]; then
+  if [[ "${PRINT_CONFIG}" -eq 1 && "${USE_HUB_WIP}" -eq 1 ]]; then
     configure_kubectl
     local IDENTITY; IDENTITY="$(get_hub_workload_identity)"
     read -r ENVIRON_PROJECT_ID HUB_MEMBERSHIP_ID <<EOF
@@ -559,7 +559,7 @@ parse_args() {
         arg_required "${@}"
         OPTIONAL_OVERLAY="${2},${OPTIONAL_OVERLAY}"
         if [[ "${2}" == "hub-meshca" ]]; then
-          USE_HUB_IDNS=1
+          USE_HUB_WIP=1
         fi
         shift 2
         ;;
@@ -725,11 +725,11 @@ EOF
     *) fatal "MODE must be one of 'install', 'migrate', 'upgrade'";;
   esac
 
-  if [[ "${MODE}" != "install" && "${USE_HUB_IDNS}" -eq 1 ]]; then
-    fatal "Hub IDNS is only supported in new installation"
+  if [[ "${MODE}" != "install" && "${USE_HUB_WIP}" -eq 1 ]]; then
+    fatal "Hub Workload Identity Pool is only supported in new installation"
   fi
-  if [[ "${CA}" == "citadel" && "${USE_HUB_IDNS}" -eq 1 ]]; then
-    fatal "Hub IDNS is only supported for Mesh CA"
+  if [[ "${CA}" == "citadel" && "${USE_HUB_WIP}" -eq 1 ]]; then
+    fatal "Hub Workload Identity Pool is only supported for Mesh CA"
   fi
 
   if [[ "${CUSTOM_CA}" -eq 1 ]]; then
@@ -1389,7 +1389,7 @@ EOF
 init_meshconfig() {
   info "Initializing meshconfig API..."
   local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
-  if [[ "${USE_HUB_IDNS}" -eq 1 ]]; then
+  if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
     local IDENTITY; IDENTITY="$(get_hub_workload_identity)"
     read -r ENVIRON_PROJECT_ID HUB_MEMBERSHIP_ID <<EOF
 ${IDENTITY}
@@ -1483,8 +1483,8 @@ get_hub_workload_identity() {
 }
 
 enable_workload_identity(){
-  # Enable workload identity is not needed for Hub IDNS as the cluster needs to be registered with Hub IDNS before the installation script
-  if [[ "${USE_HUB_IDNS}" -eq 1 ]]; then return; fi
+  # Enable workload identity is not needed for using Hub Workload Identity Pool as the cluster needs to be registered with Hub Workload Identity Pool before the installation script
+  if [[ "${USE_HUB_WIP}" -eq 1 ]]; then return; fi
 
   if is_workload_identity_enabled; then return; fi
   info "Enabling Workload Identity on ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
@@ -1617,7 +1617,7 @@ EOF
   if [[ -n "${ENVIRON_PROJECT_NUMBER}" ]]; then
     run kpt cfg set asm gcloud.project.environProjectNumber "${ENVIRON_PROJECT_NUMBER}"
   fi
-  if [[ "${USE_HUB_IDNS}" -eq 1 ]]; then
+  if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
     run kpt cfg set asm gcloud.project.environProjectID "${ENVIRON_PROJECT_ID}"
     run kpt cfg set asm anthos.servicemesh.hubMembershipID "${HUB_MEMBERSHIP_ID}"
   fi
