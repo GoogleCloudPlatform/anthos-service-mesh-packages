@@ -254,3 +254,9 @@ openAPI:
           values:
           - marker: ENVIRON_PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectID'
+    io.k8s.cli.setters.anthos.servicemesh.external_ca.ca_name:
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.external_ca.ca_name
+          value: ""
+          isSet: true
