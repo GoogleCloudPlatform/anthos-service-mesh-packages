@@ -1002,10 +1002,10 @@ validate_cluster() {
   local RESULT; RESULT=""
 
   info "Confirming cluster information for ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
-  RESULT="$(gcloud container clusters list \
+  RESULT='$(gcloud container clusters list \
     --project="${PROJECT_ID}" \
     --filter="name = ${CLUSTER_NAME} and location = ${CLUSTER_LOCATION}" \
-    --format="value(name)" || true)"
+    --format="value(name)" || true)'
   if [[ -z "${RESULT}" ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Unable to find cluster ${CLUSTER_LOCATION}/${CLUSTER_NAME}.
