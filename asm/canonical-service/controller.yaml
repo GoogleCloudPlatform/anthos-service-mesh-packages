@@ -1,0 +1,330 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    control-plane: controller-manager
+  annotations:
+    gke.io/cluster: "gke://PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+  name: asm-system
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.2.5
+    gke.io/cluster: "gke://PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+  creationTimestamp: null
+  name: canonicalservices.anthos.cloud.google.com
+spec:
+  group: anthos.cloud.google.com
+  names:
+    kind: CanonicalService
+    listKind: CanonicalServiceList
+    plural: canonicalservices
+    singular: canonicalservice
+  scope: Namespaced
+  validation:
+    openAPIV3Schema:
+      description: CanonicalService is the Schema for the canonicalservices API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: CanonicalServiceSpec defines the desired state of CanonicalService
+          properties:
+            description:
+              description: Description of the service
+              maxLength: 500
+              minLength: 0
+              type: string
+            displayName:
+              description: Human-friendly name of the service
+              maxLength: 100
+              minLength: 0
+              type: string
+          type: object
+        status:
+          description: CanonicalServiceStatus defines the observed state of CanonicalService
+          properties:
+            inactiveSince:
+              description: The time that the service was set to Inactive (if the service
+                is Active, will be empty)
+              format: date-time
+              type: string
+            resourceTypes:
+              description: Array of the resource types the service is currently found
+                on
+              items:
+                description: Struct representing the types of resource a Canonical
+                  Service has been run on. It includes information about whether the
+                  resource is currently in use by the service, so that we can track
+                  resources that might still have valuable metrics but are not active.
+                properties:
+                  inactiveSince:
+                    format: date-time
+                    type: string
+                  name:
+                    enum:
+                    - Pod
+                    - WorkloadEntry
+                    type: string
+                  state:
+                    description: CanonicalServiceState tells us whether the service
+                      is currently Active (aka there is at least one Pod or WorkloadEntry
+                      running this service) or Inactive.
+                    enum:
+                    - Active
+                    - Inactive
+                    - Error
+                    type: string
+                required:
+                - name
+                - state
+                type: object
+              type: array
+            resourceVersionWhenBecameInactive:
+              description: The resource version of the Canonical Service resource
+                when it was marked Inactive
+              type: string
+            state:
+              description: Current state of the service
+              enum:
+              - Active
+              - Inactive
+              - Error
+              type: string
+          required:
+          - state
+          type: object
+      type: object
+  version: v1beta1
+  versions:
+  - name: v1beta1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: canonical-service-leader-election-role
+  namespace: asm-system
+  annotations:
+    gke.io/cluster: "gke://PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - configmaps/status
+  verbs:
+  - get
+  - update
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: canonical-service-manager-role
+  annotations:
+    gke.io/cluster: "gke://PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - anthos.cloud.google.com
+  resources:
+  - canonicalservices
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - anthos.cloud.google.com
+  resources:
+  - canonicalservices/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - networking.istio.io
+  resources:
+  - workloadentries
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: canonical-service-metrics-reader
+  annotations:
+    gke.io/cluster: "gke://PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+rules:
+- nonResourceURLs:
+  - /metrics
+  verbs:
+  - get
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: canonical-service-account
+  namespace: asm-system
+  annotations:
+    gke.io/cluster: "gke://PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: canonical-service-leader-election-rolebinding
+  namespace: asm-system
+  annotations:
+    gke.io/cluster: "gke://PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: canonical-service-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: canonical-service-account
+  namespace: asm-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: canonical-service-manager-rolebinding
+  annotations:
+    gke.io/cluster: "gke://PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: canonical-service-manager-role
+subjects:
+- kind: ServiceAccount
+  name: canonical-service-account
+  namespace: asm-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: canonical-service-proxy-rolebinding
+  annotations:
+    gke.io/cluster: "gke://PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: canonical-service-proxy-role
+subjects:
+- kind: ServiceAccount
+  name: canonical-service-account
+  namespace: asm-system
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: canonical-service-controller-manager-metrics-service
+  namespace: asm-system
+  annotations:
+    gke.io/cluster: "gke://PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+spec:
+  ports:
+  - name: https
+    port: 8443
+    targetPort: https
+  selector:
+    control-plane: controller-manager
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    control-plane: controller-manager
+  name: canonical-service-controller-manager
+  namespace: asm-system
+  annotations:
+    gke.io/cluster: "gke://PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+    spec:
+      serviceAccountName: canonical-service-account
+      containers:
+      - args:
+        - --secure-listen-address=0.0.0.0:8443
+        - --upstream=http://127.0.0.1:8080/
+        - --logtostderr=true
+        - --v=10
+        image: gcr.io/kubebuilder/kube-rbac-proxy:v0.5.0
+        name: kube-rbac-proxy
+        ports:
+        - containerPort: 8443
+          name: https
+      - args:
+        - --metrics-addr=127.0.0.1:8080
+        - --enable-leader-election
+        command:
+        - /manager
+        image: gcr.io/gke-release/asm/canonical-service-controller:1.7.3-asm.6 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.canonicalServiceHub"}
+        name: manager
+        resources:
+          limits:
+            cpu: 100m
+            memory: 100Mi
+          requests:
+            cpu: 100m
+            memory: 20Mi
+      terminationGracePeriodSeconds: 10

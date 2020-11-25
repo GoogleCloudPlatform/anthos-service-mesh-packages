@@ -1,15 +1,14 @@
 apiVersion: kpt.dev/v1alpha1
 kind: Kptfile
 metadata:
-  name: asm
+  name: .
 openAPI:
   definitions:
-    io.k8s.cli.setters.gcloud.compute.location:
-      type: string
+    io.k8s.cli.setters.base-dir:
       x-k8s-cli:
         setter:
-          name: gcloud.compute.location
-          value: us-central1-c
+          name: base-dir
+          value: base
     io.k8s.cli.setters.gcloud.compute.network:
       type: string
       x-k8s-cli:
@@ -42,7 +41,7 @@ openAPI:
           value: REGULAR
     io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases:
       items:
-        pattern: '[a-z0-9\-].svc.id.goog'
+        pattern: '[a-z0-9\-].(svc|hub).id.goog'
         type: string
       minItems: 1
       type: array
@@ -50,6 +49,20 @@ openAPI:
         setter:
           name: anthos.servicemesh.trustDomainAliases
           listValues:
+    io.k8s.cli.setters.gcloud.container.cluster.ingress.statusPort:
+      type: integer
+      x-k8s-cli:
+        setter:
+          name: gcloud.container.cluster.ingress.statusPort
+          value: "31223"
+          isSet: true
+    io.k8s.cli.setters.gcloud.container.cluster.ingress.httpPort:
+      type: integer
+      x-k8s-cli:
+        setter:
+          name: gcloud.container.cluster.ingress.httpPort
+          value: "31224"
+          isSet: true
     io.k8s.cli.setters.gcloud.container.cluster:
       type: string
       x-k8s-cli:
@@ -79,6 +92,17 @@ openAPI:
         setter:
           name: gcloud.project.environProjectNumber
           value: PROJECT_NUMBER
+    io.k8s.cli.setters.gcloud.project.environProjectID:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: gcloud.project.environProjectID
+          value: ENVIRON_PROJECT_ID
+    io.k8s.cli.setters.gcloud.compute.location:
+      x-k8s-cli:
+        setter:
+          name: gcloud.compute.location
+          value: us-central1-c
     io.k8s.cli.setters.anthos.servicemesh.hub:
       x-k8s-cli:
         setter:
@@ -88,12 +112,26 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.tag
-          value: 1.6.11-asm.1
+          value: 1.7.3-asm.6
+          isSet: true
+    io.k8s.cli.setters.anthos.servicemesh.rev:
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.rev
+          value: asm-173-6
+          isSet: true
     io.k8s.cli.setters.anthos.servicemesh.canonicalServiceHub:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.canonicalServiceHub
-          value: gcr.io/gke-release/asm/canonical-service-controller:1.6.11-asm.1
+          value: gcr.io/gke-release/asm/canonical-service-controller:1.7.3-asm.6
+          isSet: true
+    io.k8s.cli.setters.anthos.servicemesh.hubMembershipID:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.hubMembershipID
+          value: MEMBERSHIP_ID
     io.k8s.cli.substitutions.mesh-id:
       type: string
       x-k8s-cli:
@@ -102,7 +140,7 @@ openAPI:
           pattern: "proj-PROJECT_NUMBER"
           values:
           - marker: PROJECT_NUMBER
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.projectNumber'
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectNumber'
     io.k8s.cli.substitutions.gke-metadata:
       type: string
       x-k8s-cli:
@@ -127,6 +165,15 @@ openAPI:
           values:
           - marker: PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+    io.k8s.cli.substitutions.token-audiences:
+      type: string
+      x-k8s-cli:
+        substitution:
+          name: token-audiences
+          pattern: "istio-ca,PROJECT_ID.svc.id.goog"
+          values:
+          - marker: PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
     io.k8s.cli.substitutions.gke-cluster-url:
       type: string
       x-k8s-cli:
@@ -145,19 +192,14 @@ openAPI:
       x-k8s-cli:
         substitution:
           name: cluster-name
-          pattern: "PROJECT_ID/us-central1-c/asm-cluster"
+          pattern: "cn-PROJECTID-us-central1-c-asm-cluster"
           values:
-          - marker: PROJECT_ID
+          - marker: PROJECTID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
           - marker: us-central1-c
             ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.location'
           - marker: asm-cluster
             ref: '#/definitions/io.k8s.cli.setters.gcloud.container.cluster'
-    io.k8s.cli.setters.anthos.servicemesh.profile:
-      x-k8s-cli:
-        setter:
-          name: anthos.servicemesh.profile
-          value: asm-gcp
     io.k8s.cli.substitutions.spiffe-bundle-endpoints:
       x-k8s-cli:
         substitution:
@@ -166,12 +208,6 @@ openAPI:
           values:
           - marker: PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
-    io.k8s.cli.setters.anthos.servicemesh.controlplane.monitoring.enabled:
-      type: string
-      x-k8s-cli:
-        setter:
-          name: anthos.servicemesh.controlplane.monitoring.enabled
-          value: "true"
     io.k8s.cli.substitutions.gkeio-cluster:
       x-k8s-cli:
         substitution:
@@ -184,3 +220,37 @@ openAPI:
             ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.location'
           - marker: PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+    io.k8s.cli.setters.anthos.servicemesh.controlplane.monitoring.enabled:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.controlplane.monitoring.enabled
+          value: "true"
+    io.k8s.cli.substitutions.spiffe-bundle-endpoints-hub:
+      x-k8s-cli:
+        substitution:
+          name: spiffe-bundle-endpoints-hub
+          pattern: ENVIRON_PROJECT_ID.hub.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json
+          values:
+          - marker: ENVIRON_PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectID'
+    io.k8s.cli.substitutions.hub-idp-url:
+      type: string
+      x-k8s-cli:
+        substitution:
+          name: hub-idp-url
+          pattern: "https://gkehub.googleapis.com/projects/ENVIRON_PROJECT_ID/locations/global/memberships/MEMBERSHIP_ID"
+          values:
+          - marker: ENVIRON_PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectID'
+          - marker: MEMBERSHIP_ID
+            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.hubMembershipID'
+    io.k8s.cli.substitutions.trust-domain-hub:
+      type: string
+      x-k8s-cli:
+        substitution:
+          name: trust-domain-hub
+          pattern: "ENVIRON_PROJECT_ID.hub.id.goog"
+          values:
+          - marker: ENVIRON_PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectID'
