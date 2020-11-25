@@ -53,4 +53,4 @@ spec:
           aud: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
       meshID: "proj-PROJECT_NUMBER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh-id"}
       multiCluster:
-        clusterName: "PROJECT_ID/CLUSTER_LOCATION/CLUSTER_NAME" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
+        clusterName: "cn-PROJECT_ID-CLUSTER_LOCATION-CLUSTER_NAME" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
