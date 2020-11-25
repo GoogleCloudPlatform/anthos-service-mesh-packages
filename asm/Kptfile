@@ -156,6 +156,21 @@ openAPI:
             ref: '#/definitions/io.k8s.cli.setters.gcloud.container.cluster'
           - marker: us-central1-c
             ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.location'
+    io.k8s.cli.substitutions.gke-hub-metadata:
+      type: string
+      x-k8s-cli:
+        substitution:
+          name: gke-hub-metadata
+          pattern: "PROJECT_ID|PROJECT_NUMBER|asm-cluster|us-central1-c"
+          values:
+          - marker: PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+          - marker: PROJECT_NUMBER
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectNumber'
+          - marker: asm-cluster
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.container.cluster'
+          - marker: us-central1-c
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.location'
     io.k8s.cli.substitutions.trust-domain:
       type: string
       x-k8s-cli:
