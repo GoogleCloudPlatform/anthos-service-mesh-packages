@@ -1547,7 +1547,7 @@ exit_if_not_cluster_admin() {
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Current user must have the cluster-admin role on ${CLUSTER_NAME}.
 Please add the cluster role binding and retry, or re-run the script with the
-'--enable_gcp_components' flag to allow the script to enable it on your behalf.
+'--enable_cluster_roles' flag to allow the script to enable it on your behalf.
 EOF
   fi
 }
