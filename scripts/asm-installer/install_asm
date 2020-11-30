@@ -1376,17 +1376,20 @@ EOF
     --data "${POST_DATA}" -o /dev/null \
     "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
     --header "Content-Type: application/json" \
-    --header @- <<EOF
-Authorization: Bearer ${TOKEN}
-EOF
+    -K <(auth_header "${TOKEN}")
   else
     run curl --request POST --fail \
     --data '' -o /dev/null \
     "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
-    --header @- <<EOF
-Authorization: Bearer ${TOKEN}
-EOF
+    -K <(auth_header "${TOKEN}")
   fi
+}
+
+# LTS releases don't have curl 7.55 so we can't use the @- construction,
+# using -K keeps the token from printing if this script is run with -v
+auth_header() {
+  local TOKEN; TOKEN="${1}"
+  echo "--header \"Authorization: Bearer ${TOKEN}\""
 }
 
 add_cluster_labels(){
