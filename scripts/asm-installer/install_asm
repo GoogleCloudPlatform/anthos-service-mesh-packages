@@ -61,6 +61,9 @@ CLUSTER_LOCATION="${CLUSTER_LOCATION:=}"
 MODE="${MODE:=}"
 CA="${CA:=}"
 
+TRUSTED_GCP_PROJECTS="${TRUSTED_GCP_PROJECTS:=}"
+ENVIRON_PROJECT_NUMBER="${ENVIRON_PROJECT_NUMBER:=}"
+
 CUSTOM_OVERLAY=""
 OPTIONAL_OVERLAY=""
 
@@ -564,6 +567,16 @@ parse_args() {
       --co | --custom_overlay | --custom-overlay)
         arg_required "${@}"
         CUSTOM_OVERLAY="${2},${CUSTOM_OVERLAY}"
+        shift 2
+        ;;
+      --trusted_gcp_project | --trusted-gcp-project)
+        arg_required "${@}"
+        TRUSTED_GCP_PROJECTS="${2},${TRUSTED_GCP_PROJECTS}"
+        shift 2
+        ;;
+      --environ_project_number | --environ-project-number)
+        arg_required "${@}"
+        ENVIRON_PROJECT_NUMBER="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
         shift 2
         ;;
       -e | --enable_all | --enable-all)
@@ -1600,6 +1613,23 @@ configure_package() {
   if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
     run kpt cfg set asm gcloud.project.environProjectID "${ENVIRON_PROJECT_ID}"
     run kpt cfg set asm anthos.servicemesh.hubMembershipID "${HUB_MEMBERSHIP_ID}"
+  fi
+
+  if [[ "${CA}" == "mesh_ca" && -n "${TRUSTED_GCP_PROJECTS}" ]]; then
+    # Gather the trust domain aliases from projects.
+    TRUST_DOMAIN_ALIASES="${PROJECT_ID}.svc.id.goog"
+    while read -d ',' -r trusted_gcp_project; do
+      TRUST_DOMAIN_ALIASES="${TRUST_DOMAIN_ALIASES} ${trusted_gcp_project}.svc.id.goog"
+    done <<EOF
+${TRUSTED_GCP_PROJECTS}
+EOF
+    # kpt treats words in quotes as a single param, while kpt need ${TRUST_DOMAIN_ALIASES} to be splitting params for a list. If we remove quotes, the lint will complain.
+    # eval will translate the quoted TRUST_DOMAIN_ALIASES into params to workaround both.
+    run eval kpt cfg set asm anthos.servicemesh.trustDomainAliases "${TRUST_DOMAIN_ALIASES}"
+  fi
+
+  if [[ -n "${ENVIRON_PROJECT_NUMBER}" ]]; then
+    run kpt cfg set asm gcloud.project.environProjectNumber "${ENVIRON_PROJECT_NUMBER}"
   fi
 }
 
