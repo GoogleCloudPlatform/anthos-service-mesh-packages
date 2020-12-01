@@ -1561,6 +1561,8 @@ configure_package() {
     done <<EOF
 ${TRUSTED_GCP_PROJECTS}
 EOF
+    # kpt treats words in quotes as a single param, while kpt need ${TRUST_DOMAIN_ALIASES} to be splitting params for a list. If we remove quotes, the lint will complain.
+    # eval will translate the quoted TRUST_DOMAIN_ALIASES into params to workaround both.
     run eval kpt cfg set asm anthos.servicemesh.trustDomainAliases "${TRUST_DOMAIN_ALIASES}"
   fi
 
