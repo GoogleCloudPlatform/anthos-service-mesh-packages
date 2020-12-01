@@ -1561,7 +1561,7 @@ configure_package() {
     done <<EOF
 ${TRUSTED_GCP_PROJECTS}
 EOF
-    run kpt cfg set asm anthos.servicemesh.trustDomainAliases ${TRUST_DOMAIN_ALIASES}
+    run eval kpt cfg set asm anthos.servicemesh.trustDomainAliases "${TRUST_DOMAIN_ALIASES}"
   fi
 
   if [[ -n "${ENVIRON_PROJECT_NUMBER}" ]]; then
