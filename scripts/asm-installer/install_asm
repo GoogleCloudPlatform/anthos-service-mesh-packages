@@ -1391,12 +1391,16 @@ EOF
 
 add_cluster_labels(){
   local LABELS; LABELS="$(get_cluster_labels)";
+  local REQUIRED; REQUIRED="$(required_cluster_labels)";
+  local NOTFOUND; NOTFOUND="$(find_missing_strings "${REQUIRED}" "${LABELS}")"
+  if [[ -z "${NOTFOUND}" ]]; then return 0; fi
+
   if [[ -n "${LABELS}" ]]; then
-    local REQUIRED; REQUIRED="$(required_cluster_labels)";
-    local NOTFOUND; NOTFOUND="$(find_missing_strings "${REQUIRED}" "${LABELS}")"
-    if [[ -z "${NOTFOUND}" ]]; then return 0; fi
     LABELS="${LABELS},${NOTFOUND}"
+  else
+    LABELS="${NOTFOUND}"
   fi
+
   info "Adding labels to ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
   retry 2 run gcloud container clusters update "${CLUSTER_NAME}" \
     --project="${PROJECT_ID}" \
