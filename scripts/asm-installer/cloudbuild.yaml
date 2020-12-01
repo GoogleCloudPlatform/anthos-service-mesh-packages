@@ -21,13 +21,16 @@ steps:
   - '${_SCRIPT_NAME}'
   waitFor:
   - 'publish-tester-image'
-- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
-  dir: 'scripts/asm-installer'
-  id: 'check-posh-compatibility'
-  entrypoint: 'posh'
-  args: ['-n', '${_SCRIPT_NAME}']
-  waitFor:
-  - 'publish-tester-image'
+
+    # Disabled for now, see #296. We have more users with LTS Linux releases
+    # than non-Bourne shells. Please open an issue if you're affected.
+    #- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
+    #  dir: 'scripts/asm-installer'
+    #  id: 'check-posh-compatibility'
+    #  entrypoint: 'posh'
+    #  args: ['-n', '${_SCRIPT_NAME}']
+    #  waitFor:
+    #  - 'publish-tester-image'
 
 - name: 'gcr.io/cloud-builders/gcloud'
   dir: 'scripts/asm-installer'
@@ -44,7 +47,6 @@ steps:
     | base64 -d > "${_KEY_FILE}"
   waitFor:
   - 'lint-with-shellcheck'
-  - 'check-posh-compatibility'
 
 - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
   dir: 'scripts/asm-installer'
