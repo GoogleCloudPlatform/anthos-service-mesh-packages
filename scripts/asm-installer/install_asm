@@ -1567,10 +1567,6 @@ EOF
   if [[ -n "${ENVIRON_PROJECT_NUMBER}" ]]; then
     run kpt cfg set asm gcloud.project.environProjectNumber "${ENVIRON_PROJECT_NUMBER}"
   fi
-
-  run cat asm/istio/istio-operator.yaml
-  run cat asm/istio/options/multicluster.yaml
-  run cat asm/istio/options/multiproject.yaml
 }
 
 print_config() {
