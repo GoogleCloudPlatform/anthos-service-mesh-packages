@@ -1630,6 +1630,7 @@ EOF
     PARAMS="${PARAMS} -f ${BETA_CRD_MANIFEST}"
   fi
   PARAMS="${PARAMS} -c ${KUBECONFIG}"
+  PARAMS="${PARAMS} --skip-confirmation"
 
   info "Installing ASM control plane..."
   # shellcheck disable=SC2086
