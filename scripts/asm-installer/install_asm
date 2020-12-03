@@ -1371,7 +1371,7 @@ init_meshconfig() {
 ${IDENTITY}
 EOF
     info "Cluster is in the Hub of project ${ENVIRON_PROJECT_ID} with Membership ID ${HUB_MEMBERSHIP_ID}"
-    # Support both Hub Workload Identity Pool and GKE Workload Identity Pool.
+    # initialize replaces the existing Workload Identity Pools in the IAM binding, so we need to support both Hub and GKE Workload Identity Pools
     local POST_DATA; POST_DATA='{"workloadIdentityPools":["'${ENVIRON_PROJECT_ID}'.hub.id.goog","'${ENVIRON_PROJECT_ID}'.svc.id.goog"]}'
     run curl --request POST --fail \
     --data "${POST_DATA}" -o /dev/null \
