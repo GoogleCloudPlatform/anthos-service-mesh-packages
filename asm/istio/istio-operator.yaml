@@ -17,7 +17,7 @@ kind: IstioOperator
 spec:
   profile: asm-gcp
   hub: gcr.io/gke-release/asm # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}
-  tag: 1.8.0-asm.7 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
+  tag: 1.8.1-asm.0 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
   components:
     pilot:
       k8s:
