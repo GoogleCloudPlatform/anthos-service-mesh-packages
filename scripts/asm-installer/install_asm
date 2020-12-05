@@ -78,7 +78,7 @@ CA_CERT="${CA_CERT:=}"
 CA_KEY="${CA_KEY:=}"
 CA_ROOT="${CA_ROOT:=}"
 CA_CHAIN="${CA_CHAIN:=}"
-CA_NAME="${CA_NAME:=}"
+CA_ID="${CA_ID:=}"
 
 
 DRY_RUN="${DRY_RUN:=0}"
@@ -383,7 +383,7 @@ OPTIONS:
   --ca_key               <FILE PATH>
   --root_cert            <FILE PATH>
   --cert_chain           <FILE PATH>
-  --ca_name              <CA NAME>
+  --ca_id                <CA-ID>
 
 FLAGS:
   -e|--enable_all
@@ -456,11 +456,11 @@ OPTIONS:
                                       omitted if not installing optional
                                       features. To add multiple files, specify
                                       them with multiple options one at a time.
-  --ca_name|--ca-name    <CA NAME>    Required only if --ca option is private_ca.
+  --ca_id|--ca-id         <CA_ID>     Required only if --ca option is private_ca.
                                       Name of the ca in the GCP CAS service used to
                                       sign certificates in the format
-                                      'projects/project_name/locations/ \
-                                       ca_region/certificateAuthorities/ca_name'
+                                      'projects/$(project_name)/locations/ \
+                                      $(ca_region)/certificateAuthorities/$(ca_name)'
   The following four options must be passed together and are only necessary
   for using a custom certificate for Citadel. Users that aren't sure whether
   they need this probably don't.
@@ -558,9 +558,9 @@ parse_args() {
         CA="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
         shift 2
         ;;
-      --ca_name | --ca-name)
+      --ca_id | --ca-id)
         arg_required "${@}"
-        CA_NAME="${2}"
+        CA_ID="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
         shift 2
         ;;
       -o | --option)
@@ -780,8 +780,6 @@ ${CUSTOM_OVERLAY}
 EOF
   if [[ "${CA}" = "citadel" ]]; then
     ABS_OVERLAYS="${OPTIONS_DIRECTORY}/citadel-ca.yaml,${ABS_OVERLAYS}"
-  elif [[ "${CA}" = "private_ca" ]]; then
-    ABS_OVERLAYS="${OPTIONS_DIRECTORY}/private-ca.yaml,${ABS_OVERLAYS}"
   fi
   CUSTOM_OVERLAY="${ABS_OVERLAYS}"
 
@@ -790,16 +788,11 @@ EOF
 }
 
 validate_private_ca() {
-  local CA_NAME_TEMPLATE
-  CA_NAME_TEMPLATE="projects/project_name/locations/ca_region/certificateAuthorities/ca_name"
-
-  if [[ -z ${CA_NAME} ]]; then
-    fatal "A ca-name must be provided for integration with private ca."
-  elif [[ $(grep -o "/" <<< "${CA_NAME}" | wc -l) != $(grep -o "/" <<< "${CA_NAME_TEMPLATE}" | wc -l) ]]; then
-    fatal "Malformed ca-name. ca-name must be of the form ${CA_NAME_TEMPLATE}."
-  elif [[ "$(echo "${CA_NAME}" | cut -f1 -d/)" != "$(echo "${CA_NAME_TEMPLATE}" | cut -f1 -d/)" ]]; then
-    fatal "Malformed ca-name. ca-name must be of the form ${CA_NAME_TEMPLATE}."
+  if [[ -n ${CA_ID}]]; then
+    fatal "A CA_ID must be provided for integration with private ca."
   fi
+  #TODO: Validate that the CA_ID must be of the form 
+  # 'projects/$(project_name)/locations/$(ca_region)/certificateAuthorities/$(ca_name)'
 }
 
 validate_certs() {
@@ -1251,20 +1244,20 @@ validate_ca_consistency() {
   fi
 
   info "CA already in use: ${CURRENT_CA}"
-
-  if [[ "${CA}" != "${CURRENT_CA}" ]]; then
+ 
+  if [[ ${CA} != ${CURRENT_CA} ]]; then
     fatal "CA cannot be switched while performing upgrade. Please use ${CURRENT_CA} as the CA."
   fi
 }
 
 is_meshca_installed() {
-  local INSTALLED_CA; INSTALLED_CA="$(kubectl -n istio-system get pod -l istio=ingressgateway \
+  INSTALLED_CA="$(kubectl -n istio-system get pod -l istio=ingressgateway \
     -o jsonpath='{.items[].spec.containers[].env[?(@.name=="CA_ADDR")].value}')"
   [[ "${INSTALLED_CA}" =~ meshca\.googleapis\.com ]] && return 0
 }
 
 is_privateca_installed() {
-  local INSTALLED_CA; INSTALLED_CA="$(kubectl -n istio-system get pod -l istio=istiod \
+  INSTALLED_CA="$(kubectl -n istio-system get pod -l istio=istiod \
     -o jsonpath='{.items[].spec.containers[].env[?(@.name=="EXTERNAL_CA")].value}')"
   [[ "${INSTALLED_CA}" = "ISTIOD_RA_CAS_API" ]] && return 0
 }
@@ -1609,8 +1602,8 @@ configure_package() {
     run kpt cfg set asm gcloud.project.environProjectID "${ENVIRON_PROJECT_ID}"
     run kpt cfg set asm anthos.servicemesh.hubMembershipID "${HUB_MEMBERSHIP_ID}"
   fi
-  if [[ -n "${CA_NAME}" ]]; then
-    run kpt cfg set asm anthos.servicemesh.external_ca.ca_name "${CA_NAME}"
+  if [[ -n "${CA_ID}" ]]; then
+    run kpt cfg set asm anthos.servicemesh.external_ca.ca_name "${CA_ID}"
   fi
 }
 
@@ -1636,16 +1629,9 @@ install_secrets() {
 
 init_private_ca() {
   WORKLOAD_IDENTITY="$PROJECT_ID.svc.id.goog[istio-system/istiod-service-account]"
-
-  local NAME; NAME=$(echo "${CA_NAME}" | cut -f6 -d/)
-  local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
-  local CA_PROJECT; CA_PROJECT=$(echo "${CA_NAME}" | cut -f2 -d/)
-
-  retry 3 run gcloud beta privateca subordinates add-iam-policy-binding "${NAME}" \
-  --location "${CA_LOCATION}" \
-  --project "${CA_PROJECT}" \
-  --member "serviceAccount:$WORKLOAD_IDENTITY" \
-  --role "roles/privateca.certificateManager"
+  retry 3 run gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member "serviceAccount:$WORKLOAD_IDENTITY" \
+    --role "roles/privateca.certificateManager"
 }
 
 does_istiod_exist(){
