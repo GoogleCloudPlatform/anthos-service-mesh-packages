@@ -381,6 +381,21 @@ test_main() {
   else
     echo "Permissions with --enable-gcp-iam-roles flag: PASS"
   fi
+
+  clear_variables
+  parse_args ${CMD} --managed
+
+  if ! can_modify_at_all \
+    || ! can_modify_cluster_roles \
+    || can_modify_cluster_labels \
+    || can_modify_gcp_apis \
+    || ! can_modify_gcp_components \
+    || ! can_modify_gcp_iam_roles; then
+    echo "Permissions with --managed flag: FAIL"
+    ((++FAILURES))
+  else
+    echo "Permissions with --managed flag: PASS"
+  fi
   #################
   echo "There were ${FAILURES} failures."
   exit "${FAILURES}"

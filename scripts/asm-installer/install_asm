@@ -15,15 +15,15 @@ fi
 
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"
-MINOR="${MINOR:=7}"
-POINT="${POINT:=3}"
-REV="${REV:=6}"
+MINOR="${MINOR:=8}"
+POINT="${POINT:=1}"
+REV="${REV:=2}"
 RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
 RELEASE_LINE="${MAJOR}.${MINOR}."
 PREVIOUS_RELEASE_LINE="${MAJOR}.$(( MINOR - 1 ))."
 REVISION_LABEL="asm-${MAJOR}${MINOR}${POINT}-${REV}"
 KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=release-${MAJOR}.${MINOR}-asm}"
-readonly RELEASE; readonly RELEASE_LINE; readonly REVISION_LABEL; readonly KPT_BRANCH;
+readonly RELEASE; readonly RELEASE_LINE; readonly KPT_BRANCH;
 K8S_MINOR=0
 
 ### These are hooks for Cloud Build to be able to use debug/staging images
@@ -31,6 +31,8 @@ K8S_MINOR=0
 ### in CI/CD.
 _CI_ASM_IMAGE_LOCATION="${_CI_ASM_IMAGE_LOCATION:=}"
 _CI_ASM_PKG_LOCATION="${_CI_ASM_PKG_LOCATION:=}"
+_CI_CLOUDRUN_IMAGE_HUB="${_CI_CLOUDRUN_IMAGE_HUB:=}"
+_CI_CLOUDRUN_IMAGE_TAG="${_CI_CLOUDRUN_IMAGE_TAG:=}"
 
 ### File related constants ###
 ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
@@ -41,6 +43,7 @@ OPTIONS_DIRECTORY="${PACKAGE_DIRECTORY}/options"; readonly OPTIONS_DIRECTORY;
 OPERATOR_MANIFEST="${PACKAGE_DIRECTORY}/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
 MULTICLUSTER_MANIFEST="${OPTIONS_DIRECTORY}/multicluster.yaml"; readonly MULTICLUSTER_MANIFEST;
 BETA_CRD_MANIFEST="${OPTIONS_DIRECTORY}/v1beta1-crds.yaml"; readonly BETA_CRD_MANIFEST;
+MANAGED_MANIFEST="${OPTIONS_DIRECTORY}/managed-control-plane.yaml"; readonly MANAGED_MANIFEST;
 
 SCRIPT_NAME="${0##*/}"
 
@@ -83,6 +86,8 @@ DRY_RUN="${DRY_RUN:=0}"
 ONLY_VALIDATE="${ONLY_VALIDATE:=0}"
 VERBOSE="${VERBOSE:=0}"
 PRINT_HELP=0
+MANAGED="${MANAGED:=0}"
+MANAGED_SERVICE_ACCOUNT=""
 
 # Environment variables used by Hub Workload Identity Pool
 USE_HUB_WIP=0
@@ -117,7 +122,7 @@ main() {
     validate_kpt_files
   fi
 
-  if should_validate; then
+  if should_validate && ! is_managed; then
     validate_dependencies
   fi
 
@@ -127,8 +132,27 @@ main() {
     exit_if_apis_not_enabled
   fi
 
+  # Managed must be able to set IAM permissions on a generated user, so the flow
+  # is a bit different
+  if is_managed; then
+    if can_modify_gcp_components; then
+      enable_workload_identity
+      enable_stackdriver_kubernetes
+    else
+      exit_if_no_workload_identity
+      exit_if_stackdriver_not_enabled
+    fi
+    if can_modify_gcp_iam_roles; then
+      bind_user_to_iam_policy "roles/meshconfig.admin" "$(local_iam_user)"
+    fi
+    MANAGED_SERVICE_ACCOUNT="$(init_meshconfig_managed | jq -r .serviceAccount)"
+    if [[ -z "${MANAGED_SERVICE_ACCOUNT}" ]]; then
+      fatal "Couldn't initialize meshconfig, do you have the required permission resourcemanager.projects.setIamPolicy?"
+    fi
+  fi
+
   if can_modify_gcp_iam_roles; then
-    bind_user_to_iam_policy
+    bind_user_to_iam_policy "$(required_iam_roles)" "$(iam_user)"
   elif should_validate; then
     exit_if_out_of_iam_policy
   fi
@@ -139,21 +163,15 @@ main() {
     exit_if_cluster_unlabeled
   fi
 
-  if can_modify_gcp_components; then
-    enable_workload_identity
-    # As of now there's no way to check this without trying to initialize it,
-    # by this point if we're verifying then we'll already know the user has
-    # the proper IAM roles for the curl call.
-    init_meshconfig
-    enable_stackdriver_kubernetes
-  elif should_validate; then
-    # There's no way to check here whether meshconfig has been initialized, so
-    # it's possible in some pathological cases that the user might get an
-    # installation that isn't working properly, probably metrics can't make it
-    # to Stackdriver or certificates from MeshCA aren't working. Hopefully
-    # those users will find this comment.
-    exit_if_no_workload_identity
-    exit_if_stackdriver_not_enabled
+  if ! is_managed; then
+    if can_modify_gcp_components; then
+      enable_workload_identity
+      init_meshconfig
+      enable_stackdriver_kubernetes
+    elif should_validate; then
+      exit_if_no_workload_identity
+      exit_if_stackdriver_not_enabled
+    fi
   fi
 
   if can_modify_cluster_roles; then
@@ -162,7 +180,7 @@ main() {
     exit_if_not_cluster_admin
   fi
 
-  if should_validate; then
+  if should_validate && ! is_managed; then
     ensure_istio_namespace_exists
   fi
 
@@ -177,6 +195,14 @@ main() {
     read -r ENVIRON_PROJECT_ID HUB_MEMBERSHIP_ID <<EOF
 ${IDENTITY}
 EOF
+  fi
+
+  if [[ "${MANAGED}" -eq 1 ]]; then
+    start_managed_control_plane
+    configure_package
+    install_managed_components
+    outro
+    return 0
   fi
 
   configure_package
@@ -313,6 +339,10 @@ fatal_with_usage() {
   exit 2
 }
 
+is_managed() {
+  if [[ "${MANAGED}" -ne 1 ]]; then false; fi
+}
+
 is_sa() {
   if [[ -z "${SERVICE_ACCOUNT}" ]]; then false; fi
 }
@@ -326,8 +356,9 @@ can_modify_at_all() {
 }
 
 can_modify_cluster_roles() {
-  if [[ "${ENABLE_ALL}" -eq 0 && "${ENABLE_CLUSTER_ROLES}" -eq 0 ]] \
-    || ! can_modify_at_all; then false; fi
+  if [[ "${ENABLE_ALL}" -eq 0 && "${ENABLE_CLUSTER_ROLES}" -eq 0 ]] && \
+    ! is_managed || \
+    ! can_modify_at_all; then false; fi
 }
 
 can_modify_cluster_labels() {
@@ -341,13 +372,15 @@ can_modify_gcp_apis() {
 }
 
 can_modify_gcp_iam_roles() {
-  if [[ "${ENABLE_ALL}" -eq 0 && "${ENABLE_GCP_IAM_ROLES}" -eq 0 ]] \
-    || ! can_modify_at_all; then false; fi
+  if [[ "${ENABLE_ALL}" -eq 0 && "${ENABLE_GCP_IAM_ROLES}" -eq 0 ]] && \
+    ! is_managed ||
+    ! can_modify_at_all; then false; fi
 }
 
 can_modify_gcp_components() {
-  if [[ "${ENABLE_ALL}" -eq 0 && "${ENABLE_GCP_COMPONENTS}" -eq 0 ]] \
-    || ! can_modify_at_all; then false; fi
+  if [[ "${ENABLE_ALL}" -eq 0 && "${ENABLE_GCP_COMPONENTS}" -eq 0 ]] &&
+    ! is_managed || \
+    ! can_modify_at_all; then false; fi
 }
 
 needs_asm() {
@@ -387,6 +420,8 @@ FLAGS:
      --enable_gcp_apis
      --enable_gcp_iam_roles
      --enable_gcp_components
+
+     --managed
 
      --print_config
      --disable_canonical_service
@@ -478,8 +513,11 @@ FLAGS:
                                       the user's behalf
      --enable_gcp_iam_roles           Allow the script to set the required GCP
                                       IAM permissions
-     --enable_gcp_components  Allow the script to enable required GCP
+     --enable_gcp_components          Allow the script to enable required GCP
                                       managed services and components
+
+     --managed                        Provision a remote, managed control plane
+                                      instead of installing one in-cluster.
 
      --print_config                   Instead of installing ASM, print all of
                                       the compiled YAML to stdout. All other
@@ -586,6 +624,11 @@ parse_args() {
         ENABLE_GCP_COMPONENTS=1
         shift 1
         ;;
+      --managed)
+        MANAGED=1
+        REVISION_LABEL="asm-managed"
+        shift 1
+        ;;
       --disable_canonical_service | --disable-canonical-service)
         DISABLE_CANONICAL_SERVICE=1
         shift 1
@@ -662,11 +705,26 @@ parse_args() {
     fi
     exit
   fi
+  readonly REVISION_LABEL
 }
 
 validate_args() {
   if [[ "${MODE}" == "install" && -z "${CA}" ]]; then
     CA="mesh_ca"
+  fi
+
+  if is_managed; then
+    if [[ "${MODE}" != "install" ]]; then
+      fatal "Migrate and upgrade are incompatible with managed control plane."
+    fi
+
+    if [[ "${CA}" == "citadel" ]]; then
+      fatal "Citadel is not supported with managed control plane."
+    fi
+
+    if [[ "${CUSTOM_CA}" -eq 1 ]]; then
+      fatal "Specifying a custom CA with managed control plane is not supported."
+    fi
   fi
 
   local MISSING_ARGS=0
@@ -733,6 +791,7 @@ ENABLE_CLUSTER_LABELS
 ENABLE_GCP_APIS
 ENABLE_GCP_IAM_ROLES
 ENABLE_GCP_COMPONENTS
+MANAGED
 DISABLE_CANONICAL_SERVICE
 ONLY_VALIDATE
 VERBOSE
@@ -1238,14 +1297,15 @@ is_meshca_installed() {
 }
 
 bind_user_to_iam_policy(){
-  local GCLOUD_MEMBER; GCLOUD_MEMBER="$(iam_user)";
+  local ROLES; ROLES="${1}"
+  local GCLOUD_MEMBER; GCLOUD_MEMBER="${2}"
   info "Binding ${GCLOUD_MEMBER} to required IAM roles..."
   while read -r role; do
   retry 3 run gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
     --member "${GCLOUD_MEMBER}" \
     --role="${role}" >/dev/null
   done <<EOF
-$(required_iam_roles)
+${ROLES}
 EOF
 }
 
@@ -1262,7 +1322,6 @@ exit_if_out_of_iam_policy() {
   local NOTFOUND; NOTFOUND="$(find_missing_strings "${REQUIRED}" "${MEMBER_ROLES}")"
 
   if [[ -n "${NOTFOUND}" ]]; then
-    NOTFOUND=${NOTFOUND::-1}
     for role in $(echo "${NOTFOUND}" | tr ',' '\n'); do
       warn "IAM role not enabled - ${role}"
     done
@@ -1276,7 +1335,15 @@ EOF
 }
 
 iam_user() {
-  local ACCOUNT_TYPE
+  if ! is_managed; then
+    local_iam_user
+    return
+  fi
+
+  echo "serviceAccount:${MANAGED_SERVICE_ACCOUNT}"
+}
+
+local_iam_user() {
   ACCOUNT_TYPE="user"
   if is_sa; then
     ACCOUNT_TYPE="serviceAccount"
@@ -1287,7 +1354,6 @@ iam_user() {
     --project="${PROJECT_ID}" \
     --filter="status:ACTIVE" \
     --format="value(account)")"
-
   echo "${ACCOUNT_TYPE}:${ACCOUNT_NAME}"
 }
 
@@ -1364,7 +1430,6 @@ EOF
 
 init_meshconfig() {
   info "Initializing meshconfig API..."
-  local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
   if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
     local IDENTITY; IDENTITY="$(get_hub_workload_identity)"
     read -r ENVIRON_PROJECT_ID HUB_MEMBERSHIP_ID <<EOF
@@ -1377,13 +1442,28 @@ EOF
     --data "${POST_DATA}" -o /dev/null \
     "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
     --header "Content-Type: application/json" \
-    -K <(auth_header "${TOKEN}")
+    -K <(auth_header "$(get_auth_token)")
   else
     run curl --request POST --fail \
     --data '' -o /dev/null \
     "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
-    -K <(auth_header "${TOKEN}")
+    -K <(auth_header "$(get_auth_token)")
   fi
+}
+
+init_meshconfig_managed() {
+  info "Initializing meshconfig managed API..."
+  run curl --request POST --fail \
+    --data '{"prepare_istiod": true}' \
+    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
+    --header "X-Server-Timeout: 600" \
+    --header "Content-Type: application/json" \
+    -K <(auth_header "$(get_auth_token)")
+}
+
+get_auth_token() {
+  local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
+  echo "${TOKEN}"
 }
 
 # LTS releases don't have curl 7.55 so we can't use the @- construction,
@@ -1430,8 +1510,13 @@ EOF
 }
 
 required_cluster_labels() {
+  local VERSION_TAG
+  VERSION_TAG="${RELEASE//\./-}"
+  if is_managed; then
+    VERSION_TAG="asm-managed"
+  fi
   cat <<EOF
-asmv=${RELEASE//\./-}
+asmv=${VERSION_TAG}
 mesh_id=proj-${PROJECT_NUMBER}
 EOF
 }
@@ -1663,6 +1748,33 @@ EOF
   fi
 
   outro
+}
+
+start_managed_control_plane() {
+  local CR_IMAGE_JSON; CR_IMAGE_JSON="";
+  if [[ -n "${_CI_CLOUDRUN_IMAGE_HUB}" ]]; then
+    CR_IMAGE_JSON=$(cat <<EOF
+{"image": "${_CI_CLOUDRUN_IMAGE_HUB}:${_CI_CLOUDRUN_IMAGE_TAG}"}
+EOF
+)
+  fi
+  retry 2 run curl --request POST \
+    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}:runIstiod" \
+    --data "${CR_IMAGE_JSON}" \
+    --header "X-Server-Timeout: 600" \
+    --header "Content-Type: application/json" \
+    -K <(auth_header "$(get_auth_token)")
+}
+
+install_managed_components() {
+  PARAMS="--set revision=${REVISION_LABEL}"
+  PARAMS="-f ${MANAGED_MANIFEST}"
+  PARAMS="${PARAMS} -c ${KUBECONFIG}"
+  PARAMS="${PARAMS} --skip-confirmation"
+
+  info "Installing ASM managed control plane components..."
+  # shellcheck disable=SC2086
+  retry 5 run ./"${ISTIOCTL_REL_PATH}" install $PARAMS
 }
 
 outro() {

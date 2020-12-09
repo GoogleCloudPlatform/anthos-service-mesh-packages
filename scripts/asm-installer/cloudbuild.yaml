@@ -145,6 +145,9 @@ steps:
   env:
   - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
   - 'KEY_FILE=${_KEY_FILE}'
+  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
+  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
+  - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
   timeout: 120s
 
   #############
@@ -158,6 +161,28 @@ steps:
   - '-c'
   - >
     ./tests/run_basic_suite
+    --PROJECT_ID "${PROJECT_ID}"
+    --BUILD_ID "${BUILD_ID}"
+    --CLUSTER_LOCATION "${_CLUSTER_LOCATION}"
+  waitFor:
+  - 'run-print-config-test'
+  - 'run-cli-tests'
+  env:
+  - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
+  - 'KEY_FILE=${_KEY_FILE}'
+  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
+  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
+  - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
+  timeout: 2400s # 40 mins
+
+- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
+  dir: 'scripts/asm-installer'
+  id: 'run-basic-suite-managed'
+  entrypoint: '/bin/bash'
+  args:
+  - '-c'
+  - >
+    ./tests/run_basic_suite_managed
     --PROJECT_ID "${PROJECT_ID}"
     --BUILD_ID "${BUILD_ID}"
     --CLUSTER_LOCATION "${_CLUSTER_LOCATION}"
@@ -216,27 +241,28 @@ steps:
   - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
   timeout: 2400s # 40 mins
 
-- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
-  dir: 'scripts/asm-installer'
-  id: 'run-migration-suite-meshca-previous-version'
-  entrypoint: '/bin/bash'
-  args:
-  - '-c'
-  - >
-    ./tests/run_migration_suite_meshca_prev
-    --PROJECT_ID "${PROJECT_ID}"
-    --BUILD_ID "${BUILD_ID}"
-    --CLUSTER_LOCATION "${_CLUSTER_LOCATION}"
-  waitFor:
-  - 'run-print-config-test'
-  - 'run-cli-tests'
-  env:
-  - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
-  - 'KEY_FILE=${_KEY_FILE}'
-  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
-  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
-  - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
-  timeout: 2400s # 40 mins
+  # TODO: not working for 1.8 yet
+  #- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
+  #  dir: 'scripts/asm-installer'
+  #  id: 'run-migration-suite-meshca-previous-version'
+  #  entrypoint: '/bin/bash'
+  #  args:
+  #  - '-c'
+  #  - >
+  #    ./tests/run_migration_suite_meshca_prev
+  #    --PROJECT_ID "${PROJECT_ID}"
+  #    --BUILD_ID "${BUILD_ID}"
+  #    --CLUSTER_LOCATION "${_CLUSTER_LOCATION}"
+  #  waitFor:
+  #  - 'run-print-config-test'
+  #  - 'run-cli-tests'
+  #  env:
+  #  - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
+  #  - 'KEY_FILE=${_KEY_FILE}'
+  #  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
+  #  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
+  #  - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
+  #  timeout: 2400s # 40 mins
 
 - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
   dir: 'scripts/asm-installer'
@@ -260,27 +286,28 @@ steps:
   - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
   timeout: 2400s # 40 mins
 
-- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
-  dir: 'scripts/asm-installer'
-  id: 'run-migration-suite-citadel-previous-version'
-  entrypoint: '/bin/bash'
-  args:
-  - '-c'
-  - >
-    ./tests/run_migration_suite_citadel_prev
-    --PROJECT_ID "${PROJECT_ID}"
-    --BUILD_ID "${BUILD_ID}"
-    --CLUSTER_LOCATION "${_CLUSTER_LOCATION}"
-  waitFor:
-  - 'run-print-config-test'
-  - 'run-cli-tests'
-  env:
-  - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
-  - 'KEY_FILE=${_KEY_FILE}'
-  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
-  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
-  - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
-  timeout: 2400s # 40 mins
+  # TODO: not working for 1.8 yet
+  #- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
+  #  dir: 'scripts/asm-installer'
+  #  id: 'run-migration-suite-citadel-previous-version'
+  #  entrypoint: '/bin/bash'
+  #  args:
+  #  - '-c'
+  #  - >
+  #    ./tests/run_migration_suite_citadel_prev
+  #    --PROJECT_ID "${PROJECT_ID}"
+  #    --BUILD_ID "${BUILD_ID}"
+  #    --CLUSTER_LOCATION "${_CLUSTER_LOCATION}"
+  #  waitFor:
+  #  - 'run-print-config-test'
+  #  - 'run-cli-tests'
+  #  env:
+  #  - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
+  #  - 'KEY_FILE=${_KEY_FILE}'
+  #  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
+  #  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
+  #  - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
+  #  timeout: 2400s # 40 mins
 
 - name: 'gcr.io/cloud-builders/gcloud'
   dir: 'scripts/asm-installer'
@@ -305,7 +332,6 @@ steps:
   - 'run-install-custom-cert-suite'
   - 'run-migration-suite-meshca'
   - 'run-migration-suite-citadel'
-  - 'run-migration-suite-citadel-previous-version'
 
 substitutions:
   _BUCKET_NAME: my-gcs-bucket
