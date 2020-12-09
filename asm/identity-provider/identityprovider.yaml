@@ -1,0 +1,81 @@
+---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.2.2
+  creationTimestamp: null
+  name: identityproviders.security.anthos.io
+spec:
+  group: security.anthos.io
+  names:
+    kind: IdentityProvider
+    listKind: IdentityProviderList
+    plural: identityproviders
+    singular: identityprovider
+  scope: Cluster
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: IdentityProvider is the Schema for the identityproviders API.
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: IdentityProviderSpec defines the desired state of IdentityProvider.
+          properties:
+            authentication:
+              description: Authentication specifies how to authenticate credential.
+              properties:
+                oidc:
+                  description: OIDCAuthSpec defines method to authenticate OIDC credential.
+                  properties:
+                    issuerUri:
+                      description: IssuerURI defines URI of issuer for the OIDC credential.
+                      type: string
+                  type: object
+                type:
+                  description: AuthenticationType describes authentication type.
+                  enum:
+                  - OIDC
+                  type: string
+              type: object
+            serviceAccount:
+              description: ServiceAccount specifies how to extract identity from authenticated
+                attributes. Currently only request.auth.claims is supported.
+              type: string
+          required:
+          - authentication
+          type: object
+        status:
+          description: IdentityProviderStatus defines the observed state of IdentityProvider.
+          properties:
+            lastObservedTime:
+              description: LastObservedTime is the last time this status is observed.
+              format: date-time
+              nullable: true
+              type: string
+          type: object
+      type: object
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
