@@ -505,7 +505,8 @@ FLAGS:
   The following several flags all relate to allowing the script to create, set,
   or enable required APIs, roles, or services. These can all be performed
   manually before running the script if desired. To allow the script to perform
-  every necessary action, pass the -e|--enable_all flag.
+  every necessary action, pass the -e|--enable_all flag. All of these flags
+  are incompatible with --only_validate.
 
   -e|--enable_all                     Allow the script to perform all of the
                                       individual enable actions below.
@@ -1338,7 +1339,7 @@ exit_if_out_of_iam_policy() {
     done
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 One or more IAM roles required to install ASM is missing. Please add
-${GCLOUD_MEMBER} to the roles above, or re-run
+${GCLOUD_MEMBER} to the roles above, or run
 the script with "--enable_gcp_iam_roles" to allow the script to add
 them on your behalf.
 EOF
@@ -1432,7 +1433,7 @@ exit_if_apis_not_enabled() {
       warn "API not enabled - ${api}"
     done
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-One or more APIs are not enabled. Please enable them and retry, or re-run the
+One or more APIs are not enabled. Please enable them and retry, or run the
 script with the '--enable_gcp_apis' flag to allow the script to enable them on
 your behalf.
 EOF
@@ -1514,7 +1515,7 @@ exit_if_cluster_unlabeled() {
     done
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 One or more required cluster labels were not found. Please label them and retry,
-or re-run the script with the '--enable_cluster_labels' flag to allow the script
+or run the script with the '--enable_cluster_labels' flag to allow the script
 to enable them on your behalf.
 EOF
   fi
@@ -1579,7 +1580,7 @@ exit_if_no_workload_identity() {
   if ! is_workload_identity_enabled; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Workload identity is not enabled on ${CLUSTER_NAME}. Please enable it and
-retry, or re-run the script with the '--enable_gcp_components' flag to allow
+retry, or run the script with the '--enable_gcp_components' flag to allow
 the script to enable it on your behalf.
 EOF
   fi
@@ -1614,7 +1615,7 @@ exit_if_stackdriver_not_enabled() {
   if ! is_stackdriver_enabled; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Cloud Operations (Stackdriver)  is not enabled on ${CLUSTER_NAME}.
-Please enable it and retry, or re-run the script with the
+Please enable it and retry, or run the script with the
 '--enable_gcp_components' flag to allow the script to enable it on your behalf.
 EOF
   fi
@@ -1650,7 +1651,7 @@ exit_if_not_cluster_admin() {
   if ! is_user_cluster_admin; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Current user must have the cluster-admin role on ${CLUSTER_NAME}.
-Please add the cluster role binding and retry, or re-run the script with the
+Please add the cluster role binding and retry, or run the script with the
 '--enable_cluster_roles' flag to allow the script to enable it on your behalf.
 EOF
   fi
