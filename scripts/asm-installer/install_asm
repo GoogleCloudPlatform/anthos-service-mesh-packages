@@ -801,6 +801,13 @@ ONLY_VALIDATE
 VERBOSE
 EOF
 
+  if [[ "${ENABLE_ALL}" -eq 1 || "${ENABLE_CLUSTER_ROLES}" -eq 1 || \
+    "${ENABLE_CLUSTER_LABELS}" -eq 1 || "${ENABLE_GCP_APIS}" -eq 1 || \
+    "${ENABLE_GCP_IAM_ROLES}" -eq 1 || "${ENABLE_GCP_COMPONENTS}" -eq 1 ]] && \
+    [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
+      fatal "The only_validate flag cannot be used with any --enable* flag"
+  fi
+
   if [[ -n "$SERVICE_ACCOUNT" && -z "$KEY_FILE" || -z "$SERVICE_ACCOUNT" && -n "$KEY_FILE" ]]; then
     fatal "Service account and key file must be used together."
   fi
