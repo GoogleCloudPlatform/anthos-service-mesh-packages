@@ -321,7 +321,11 @@ EOF
 }
 
 warn() {
-  info "[WARNING]:${1}" >&2
+  info "[WARNING]: ${1}" >&2
+}
+
+error() {
+  info "[ERROR]: ${1}" >&2
 }
 
 info() {
@@ -329,12 +333,12 @@ info() {
 }
 
 fatal() {
-  warn "[ERROR]: ${1}"
+  error "${1}"
   exit 2
 }
 
 fatal_with_usage() {
-  warn "${1}"
+  error "${1}"
   usage_short >&2
   exit 2
 }
