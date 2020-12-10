@@ -69,6 +69,10 @@ tar() {
   return 0
 }
 
+kpt() {
+  return 0
+}
+
 test_main() {
   local FAILURES; FAILURES=0;
 
