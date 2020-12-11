@@ -69,6 +69,10 @@ tar() {
   return 0
 }
 
+kpt() {
+  return 0
+}
+
 test_main() {
   local FAILURES; FAILURES=0;
 
@@ -82,7 +86,7 @@ test_main() {
   CMD="${CMD} -p this_should_pass"
   CMD="${CMD} -m install"
   CMD="${CMD} -c mesh_ca"
-  CMD="${CMD} -e --only_validate"
+  CMD="${CMD} --only_validate"
 
   RETVAL=0
   clear_variables
@@ -104,7 +108,7 @@ test_main() {
   CMD="${CMD} -p this_should_fail"
   CMD="${CMD} -m install"
   CMD="${CMD} -c mesh_ca"
-  CMD="${CMD} -e --only-validate"
+  CMD="${CMD} --only-validate"
 
   RETVAL=0
   clear_variables
@@ -127,7 +131,7 @@ test_main() {
   CMD="${CMD} -p this_should_pass"
   CMD="${CMD} -m install"
   CMD="${CMD} -c mesh_ca"
-  CMD="${CMD} -e --only-validate"
+  CMD="${CMD} --only-validate"
 
   RETVAL=0
   clear_variables
@@ -149,7 +153,7 @@ test_main() {
   CMD="${CMD} -p this_should_pass"
   CMD="${CMD} -m this_should_fail"
   CMD="${CMD} -c mesh_ca"
-  CMD="${CMD} -e --only_validate"
+  CMD="${CMD} --only_validate"
 
   RETVAL=0
   clear_variables
@@ -168,7 +172,7 @@ test_main() {
   CMD="${CMD} -p this_should_pass"
   CMD="${CMD} -m migrate"
   CMD="${CMD} -c this_should_fail"
-  CMD="${CMD} -e --only_validate"
+  CMD="${CMD} --only_validate"
 
   RETVAL=0
   clear_variables
@@ -191,7 +195,7 @@ test_main() {
   CMD="${CMD} -m install"
   CMD="${CMD} -c mesh_ca"
   CMD="${CMD} -s service-account"
-  CMD="${CMD} -e --only_validate"
+  CMD="${CMD} --only_validate"
 
   RETVAL=0
   clear_variables
@@ -211,7 +215,7 @@ test_main() {
   CMD="${CMD} -m install"
   CMD="${CMD} -c mesh_ca"
   CMD="${CMD} -k keyfile"
-  CMD="${CMD} -e --only_validate"
+  CMD="${CMD} --only_validate"
 
   RETVAL=0
   clear_variables
@@ -233,7 +237,7 @@ test_main() {
   CMD="${CMD} -p this_should_pass"
   CMD="${CMD} -m install"
   CMD="${CMD} -c mesh_ca"
-  CMD="${CMD} -e --only_validate"
+  CMD="${CMD} --only_validate"
 
   RETVAL=0
   clear_variables
@@ -255,7 +259,7 @@ test_main() {
   CMD="${CMD} -p this_should_pass"
   CMD="${CMD} -m migrate"
   CMD="${CMD} -c mesh_ca"
-  CMD="${CMD} -e --only_validate"
+  CMD="${CMD} --only_validate"
 
   RETVAL=0
   clear_variables
@@ -265,6 +269,28 @@ test_main() {
     echo "Fails on migrating with Istio outside of istio-system: PASS"
   else
     echo "Fails on migrating with Istio outside of istio-system: FAIL"
+    ((++FAILURES))
+  fi
+
+  #################
+  # Should fail if enable* passed with only-validate
+  #################
+
+  CMD="-l this_should_pass"
+  CMD="${CMD} -n this_should_pass"
+  CMD="${CMD} -p this_should_pass"
+  CMD="${CMD} -m migrate"
+  CMD="${CMD} -c mesh_ca"
+  CMD="${CMD} -e --only_validate"
+
+  RETVAL=0
+  clear_variables
+  _="$(main ${CMD})" || RETVAL="${?}"
+
+  if [[ "${RETVAL}" -ne 0 ]]; then
+    echo "Fails on using enable* with --only-validate: PASS"
+  else
+    echo "Fails on using enable* with --only-validate: FAIL"
     ((++FAILURES))
   fi
 
