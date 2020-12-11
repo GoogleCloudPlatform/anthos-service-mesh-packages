@@ -922,6 +922,7 @@ set_up_local_workspace() {
     fi
   else
     OUTPUT_DIR="$(apath -f "${OUTPUT_DIR}")"
+    info "Created ${OUTPUT_DIR}"
   fi
   pushd "$OUTPUT_DIR" > /dev/null
 
