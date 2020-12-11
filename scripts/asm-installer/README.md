@@ -143,12 +143,17 @@ the tarball with the required ASM binaries.
 
 `_CI_ASM_IMAGE_LOCATION` is the location of the Docker images.
 
+You can also specify a branch of this repo to use for the configuration with
+
+`_CI_ASM_KPT_BRANCH` the name of the branch
+
 So for example, to use gs://super-secret-bucket/asm/istio-2.0.0-asm-9.tar.gz and
-gcr.io/super-secret-repo/asm as your container hub, you can invoke the script
-like this:
+gcr.io/super-secret-repo/asm as your container hub, with the master branch
+config, you can invoke the script like this:
 
 ```
 _CI_ASM_PKG_LOCATION=super-secret-bucket \
 _CI_ASM_IMAGE_LOCATION=gcr.io/super-secret-repo/asm \
+_CI_ASM_KPT_BRANCH=master \
 install_asm --flag --flag...
 ```

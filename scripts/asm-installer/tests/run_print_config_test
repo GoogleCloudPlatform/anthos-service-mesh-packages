@@ -18,7 +18,7 @@ main() {
     --print-config \
     --option egressgateways \
     -m install \
-    | grep egressGateways: -A 1 | tail -n 1 | grep 'enabled: true' -q'
+    | grep egressGateways: -A 1 | tail -n 1 | grep enabled: true -q'
 
   RETVAL="$(../install_asm \
     -l us-region \
