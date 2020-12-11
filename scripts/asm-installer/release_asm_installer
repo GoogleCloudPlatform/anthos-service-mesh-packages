@@ -1,0 +1,70 @@
+#!/bin/bash
+set -eEuC
+set -o pipefail
+
+BUCKET_URL="https://storage.googleapis.com"
+BUCKET_PATH="csm-artifacts/asm"; readonly BUCKET_PATH
+
+CURRENT_RELEASE="release-1.7-asm"; readonly CURRENT_RELEASE
+all_releases() {
+  cat << EOF
+release 1.7
+release 1.6
+staging 1.8
+EOF
+}
+
+main() {
+  setup
+
+  while read -r branch version; do
+    publish_script "${branch}" "${version}"
+  done <<EOF
+$(all_releases)
+EOF
+}
+
+publish_script() {
+  local TYPE; TYPE="${1}"
+  local VERSION; VERSION="${2}"
+  local BRANCH_NAME; BRANCH_NAME="${TYPE}-${VERSION}-asm"
+  local FILE_NAME; FILE_NAME="install_asm_${VERSION}"
+  local FILE_PATH; FILE_PATH="${BUCKET_PATH}/${FILE_NAME}"
+  local FILE_URI; FILE_URI="${BUCKET_URL}/${FILE_PATH}"
+
+  git checkout "${BRANCH_NAME}"
+  sha256sum install_asm >| install_asm.sha256
+  mv install_asm "${FILE_NAME}"
+  sha256sum "${FILE_NAME}" >> install_asm.sha256
+  gsutil cp "${FILE_NAME}" gs://"${FILE_PATH}"
+  gsutil cp install_asm.sha256 gs://"${FILE_PATH}.sha256"
+  gsutil acl ch -u AllUsers:R gs://"${FILE_PATH}" gs://"${FILE_PATH}.sha256"
+
+  curl -O "${FILE_URI}"
+  curl -O "${FILE_URI}.sha256"
+
+  sha256sum -c --ignore-missing "${FILE_NAME}.sha256" || echo "Failed to verify ${FILE_NAME}!" >&2
+
+  if [[ "${BRANCH_NAME}" == "${CURRENT_RELEASE}" ]]; then
+    gsutil cp "${FILE_NAME}" gs://"${BUCKET_PATH}/install_asm"
+    gsutil cp install_asm.sha256 gs://"${BUCKET_PATH}/install_asm.sha256"
+    gsutil acl ch -u AllUsers:R gs://"${BUCKET_PATH}/install_asm" gs://"${BUCKET_PATH}/install_asm.sha256"
+
+    curl -O "${BUCKET_URL}/${BUCKET_PATH}/install_asm"
+    curl -O "${BUCKET_URL}/${BUCKET_PATH}/install_asm.sha256"
+
+    sha256sum -c --ignore-missing "install_asm.sha256" || echo "Failed to verify install_asm!" >&2
+  fi
+
+  git restore install_asm
+  echo "Published ${FILE_NAME} successfully."
+}
+
+setup() {
+  tmpdir="$(mktemp -d)"
+  pushd "${tmpdir}"
+  git clone git@github.com:GoogleCloudPlatform/anthos-service-mesh-packages.git
+  cd anthos-service-mesh-packages/scripts/asm-installer
+}
+
+main
