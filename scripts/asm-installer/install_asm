@@ -917,12 +917,12 @@ set_up_local_workspace() {
   if [[ -z "${OUTPUT_DIR}" ]]; then
     info "Creating temp directory..."
     OUTPUT_DIR="$(mktemp -d)"
+    info "Created ${OUTPUT_DIR}"
     if [[ -z "${OUTPUT_DIR}" ]]; then
       fatal "Encountered error when running mktemp -d!"
     fi
   else
     OUTPUT_DIR="$(apath -f "${OUTPUT_DIR}")"
-    info "Created ${OUTPUT_DIR}"
   fi
   pushd "$OUTPUT_DIR" > /dev/null
 
