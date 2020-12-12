@@ -297,8 +297,12 @@ EOF
 ${NEEDLES}
 EOF
 
-  if [[ -n "${NOTFOUND}" ]]; then NOTFOUND="${NOTFOUND::-1}"; fi
+  if [[ -n "${NOTFOUND}" ]]; then NOTFOUND="$(strip_last_char "${NOTFOUND}")"; fi
   echo "${NOTFOUND}"
+}
+
+strip_last_char() {
+  echo "${1:0:$((${#1} - 1))}"
 }
 
 configure_kubectl(){
@@ -995,7 +999,7 @@ EOF
   fi
 
   if [[ -n "${NOTFOUND}" ]]; then
-    NOTFOUND="${NOTFOUND::-1}"
+    NOTFOUND="$(strip_last_char "${NOTFOUND}")"
     for dep in $(echo "${NOTFOUND}" | tr ' ' '\n'); do
       warn "Dependency not found: ${dep}"
     done

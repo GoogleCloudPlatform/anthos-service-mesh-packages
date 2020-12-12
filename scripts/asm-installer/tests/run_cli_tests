@@ -422,6 +422,29 @@ test_main() {
   else
     echo "Permissions with --managed flag: PASS"
   fi
+
+  #################
+  # find_missing_strings shouldn't return anything with a trailing comma
+  #################
+
+  read -r HAYSTACK <<EOF
+one
+two
+three
+four
+EOF
+
+  ANS="$(find_missing_strings "one,four" "${HAYSTACK}")"
+  echo "Got ${ANS} when testing find_missing_strings"
+  if [[ "${ANS}" != "one,four" ]]; then
+    echo "find_missing_strings is formatted properly: FAIL"
+    ((++FAILURES))
+  else
+    echo "find_missing_strings is formatted properly: FAIL"
+  fi
+
+
+
   #################
   echo "There were ${FAILURES} failures."
   exit "${FAILURES}"
