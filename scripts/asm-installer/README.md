@@ -157,3 +157,10 @@ _CI_ASM_IMAGE_LOCATION=gcr.io/super-secret-repo/asm \
 _CI_ASM_KPT_BRANCH=master \
 install_asm --flag --flag...
 ```
+
+### Release
+
+The release_asm_installer script is used to upload various versions of the
+script into the associated GCS buckets.
+
+This is intended for Google internal use, but is included here for transparency.
