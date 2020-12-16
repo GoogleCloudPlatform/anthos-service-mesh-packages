@@ -5,12 +5,12 @@ set -o pipefail
 BUCKET_URL="https://storage.googleapis.com"
 BUCKET_PATH="csm-artifacts/asm"; readonly BUCKET_PATH
 
-CURRENT_RELEASE="release-1.7-asm"; readonly CURRENT_RELEASE
+CURRENT_RELEASE="release-1.8-asm"; readonly CURRENT_RELEASE
 all_releases() {
   cat << EOF
 release 1.7
 release 1.6
-staging 1.8
+release 1.8
 EOF
 }
 
