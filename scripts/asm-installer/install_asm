@@ -1683,9 +1683,9 @@ configure_package() {
   run kpt cfg set asm gcloud.project.environProjectNumber "${PROJECT_NUMBER}"
   run kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
   run kpt cfg set asm anthos.servicemesh.rev "${REVISION_LABEL}"
+  run kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
   if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then
     run kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
-    run kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
   fi
   if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
     run kpt cfg set asm gcloud.project.environProjectID "${ENVIRON_PROJECT_ID}"
