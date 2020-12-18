@@ -1362,7 +1362,11 @@ is_rev_invalid() {
 }
 
 validate_ca_consistency() {
-  local CURRENT_CA; CURRENT_CA="citadel"
+  info "Checking existing CA..."
+  local INSTALLED_CA; INSTALLED_CA="$(kubectl -n istio-system get pod -l app=istio-ingressgateway \
+    -o jsonpath='{.items[].spec.containers[].env[?(@.name=="CA_ADDR")].value}')"
+
+  local CURRENT_CA; CURRENT_CA="citadel";
   if is_meshca_installed; then
     CURRENT_CA="mesh_ca"
   elif is_gcp_cas_installed; then
@@ -1923,7 +1927,7 @@ outro() {
     info "The version of istioctl that matches the installation can be found at:"
     info "${OUTPUT_DIR}/${ISTIOCTL_REL_PATH}"
   fi
-  if ! is_managed && ! is_sa; then
+  if ! is_managed || ! is_sa; then
     info "The combined configuration generated for installation can be found at:"
     info "${OUTPUT_DIR}/${RAW_YAML}"
     info "The full, expanded set of kubernetes resources can be found at:"
