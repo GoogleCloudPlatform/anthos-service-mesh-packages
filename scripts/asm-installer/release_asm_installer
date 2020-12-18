@@ -8,9 +8,9 @@ BUCKET_PATH="csm-artifacts/asm"; readonly BUCKET_PATH
 CURRENT_RELEASE="release-1.8-asm"; readonly CURRENT_RELEASE
 all_releases() {
   cat << EOF
+release 1.8
 release 1.7
 release 1.6
-release 1.8
 EOF
 }
 
@@ -33,6 +33,13 @@ publish_script() {
   local FILE_URI; FILE_URI="${BUCKET_URL}/${FILE_PATH}"
 
   git checkout "${BRANCH_NAME}"
+
+  curl -O "${FILE_URI}.sha256"
+  if sha256sum -c --ignore-missing "${FILE_NAME}.sha256" >/dev/null 2>/dev/null; then
+    echo "No changes in ${FILE_NAME}, skipping"
+  fi
+  rm "${FILE_NAME}.sha256"
+
   sha256sum install_asm >| install_asm.sha256
   mv install_asm "${FILE_NAME}"
   sha256sum "${FILE_NAME}" >> install_asm.sha256
