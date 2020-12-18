@@ -145,10 +145,12 @@ main() {
     if can_modify_gcp_iam_roles; then
       bind_user_to_iam_policy "roles/meshconfig.admin" "$(local_iam_user)"
     fi
-    MANAGED_SERVICE_ACCOUNT="$(init_meshconfig_managed | jq -r .serviceAccount)"
-    if [[ -z "${MANAGED_SERVICE_ACCOUNT}" ]]; then
+    MANAGED_SERVICE_JSON="$(init_meshconfig_managed)"
+    MANAGED_SERVICE_ACCOUNT="$(echo "${MANAGED_SERVICE_JSON}" | jq -r .serviceAccount)"
+    if [[ -z "${MANAGED_SERVICE_JSON}" || "${MANAGED_SERVICE_ACCOUNT}" == "null" ]]; then
       fatal "Couldn't initialize meshconfig, do you have the required permission resourcemanager.projects.setIamPolicy?"
     fi
+    unset MANAGED_SERVICE_JSON
   fi
 
   if can_modify_gcp_iam_roles; then
@@ -1287,7 +1289,7 @@ is_rev_invalid() {
 
 validate_ca_consistency() {
   info "Checking existing CA..."
-  local INSTALLED_CA; INSTALLED_CA="$(kubectl -n istio-system get pod -l istio=ingressgateway \
+  local INSTALLED_CA; INSTALLED_CA="$(kubectl -n istio-system get pod -l app=istio-ingressgateway \
     -o jsonpath='{.items[].spec.containers[].env[?(@.name=="CA_ADDR")].value}')"
 
   local CURRENT_CA; CURRENT_CA=citadel
@@ -1452,7 +1454,11 @@ init_meshconfig() {
     read -r ENVIRON_PROJECT_ID HUB_MEMBERSHIP_ID <<EOF
 ${IDENTITY}
 EOF
-    info "Cluster is in the Hub of project ${ENVIRON_PROJECT_ID} with Membership ID ${HUB_MEMBERSHIP_ID}"
+    info "Cluster has Membership ID ${HUB_MEMBERSHIP_ID} in the Hub of project ${ENVIRON_PROJECT_ID}"
+    if [[ "${ENVIRON_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
+      info "Skip initializing meshconfig API as the Hub is not hosted in the project ${PROJECT_ID}"
+      return 0
+    fi
     # initialize replaces the existing Workload Identity Pools in the IAM binding, so we need to support both Hub and GKE Workload Identity Pools
     local POST_DATA; POST_DATA='{"workloadIdentityPools":["'${ENVIRON_PROJECT_ID}'.hub.id.goog","'${ENVIRON_PROJECT_ID}'.svc.id.goog"]}'
     run curl --request POST --fail \
@@ -1819,6 +1825,8 @@ outro() {
     info "${OUTPUT_DIR}/asm"
     info "The version of istioctl that matches the installation can be found at:"
     info "${OUTPUT_DIR}/${ISTIOCTL_REL_PATH}"
+  fi
+  if ! is_managed || ! is_sa; then
     info "The combined configuration generated for installation can be found at:"
     info "${OUTPUT_DIR}/${RAW_YAML}"
     info "The full, expanded set of kubernetes resources can be found at:"
