@@ -1287,7 +1287,7 @@ is_rev_invalid() {
 
 validate_ca_consistency() {
   info "Checking existing CA..."
-  local INSTALLED_CA; INSTALLED_CA="$(kubectl -n istio-system get pod -l istio=ingressgateway \
+  local INSTALLED_CA; INSTALLED_CA="$(kubectl -n istio-system get pod -l app=istio-ingressgateway \
     -o jsonpath='{.items[].spec.containers[].env[?(@.name=="CA_ADDR")].value}')"
 
   local CURRENT_CA; CURRENT_CA=citadel
