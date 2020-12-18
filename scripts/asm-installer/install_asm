@@ -145,10 +145,12 @@ main() {
     if can_modify_gcp_iam_roles; then
       bind_user_to_iam_policy "roles/meshconfig.admin" "$(local_iam_user)"
     fi
-    MANAGED_SERVICE_ACCOUNT="$(init_meshconfig_managed | jq -r .serviceAccount)"
-    if [[ -z "${MANAGED_SERVICE_ACCOUNT}" ]]; then
+    MANAGED_SERVICE_JSON="$(init_meshconfig_managed)"
+    MANAGED_SERVICE_ACCOUNT="$(echo "${MANAGED_SERVICE_JSON}" | jq -r .serviceAccount)"
+    if [[ -z "${MANAGED_SERVICE_JSON}" || "${MANAGED_SERVICE_ACCOUNT}" == "null" ]]; then
       fatal "Couldn't initialize meshconfig, do you have the required permission resourcemanager.projects.setIamPolicy?"
     fi
+    unset MANAGED_SERVICE_JSON
   fi
 
   if can_modify_gcp_iam_roles; then
