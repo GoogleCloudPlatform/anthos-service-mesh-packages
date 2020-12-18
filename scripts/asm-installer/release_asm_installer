@@ -37,6 +37,8 @@ publish_script() {
   curl -O "${FILE_URI}.sha256"
   if sha256sum -c --ignore-missing "${FILE_NAME}.sha256" >/dev/null 2>/dev/null; then
     echo "No changes in ${FILE_NAME}, skipping"
+    rm "${FILE_NAME}.sha256"
+    return
   fi
   rm "${FILE_NAME}.sha256"
 
