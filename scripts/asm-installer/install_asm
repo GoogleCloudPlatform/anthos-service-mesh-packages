@@ -1427,6 +1427,7 @@ roles/resourcemanager.projectIamAdmin
 roles/iam.serviceAccountAdmin
 roles/iam.serviceAccountKeyAdmin
 roles/gkehub.admin
+roles/privateca.admin
 EOF
 }
 
@@ -1446,6 +1447,7 @@ gkeconnect.googleapis.com
 gkehub.googleapis.com
 cloudresourcemanager.googleapis.com
 stackdriver.googleapis.com
+privateca.googleapis.com
 EOF
 }
 # [END required_apis]
