@@ -172,6 +172,9 @@ main() {
       enable_workload_identity
       init_meshconfig
       if [[ "${CA}" = "gcp_cas" ]]; then
+        # This sets up IAM privileges for the project to be able to access GCP CAS.
+        # If modify_gcp_component permissions are not granted, it is assumed that the
+        # user has taken care of this, else Istio setup will fail
         init_gcp_cas
       fi
       enable_stackdriver_kubernetes
