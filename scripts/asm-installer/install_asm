@@ -840,7 +840,7 @@ EOF
   if [[ "${CA}" = "citadel" ]]; then
     ABS_OVERLAYS="${OPTIONS_DIRECTORY}/citadel-ca.yaml,${ABS_OVERLAYS}"
   fi
-  CUSTOM_OVERLAY="${ABS_OVERLAYS}"
+  CUSTOM_OVERLAY="${MULTICLUSTER_MANIFEST},${ABS_OVERLAYS}"
 
   set_kpt_package_url
   WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"
@@ -1727,7 +1727,7 @@ does_istiod_exist(){
 install_asm() {
 
   local PARAMS
-  PARAMS="-f ${OPERATOR_MANIFEST} -f ${MULTICLUSTER_MANIFEST}"
+  PARAMS="-f ${OPERATOR_MANIFEST}"
   while read -d ',' -r yaml_file; do
     PARAMS="${PARAMS} -f ${yaml_file}"
   done <<EOF
