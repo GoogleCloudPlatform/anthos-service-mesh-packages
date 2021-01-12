@@ -41,6 +41,7 @@ roles/resourcemanager.projectIamAdmin
 roles/iam.serviceAccountAdmin
 roles/iam.serviceAccountKeyAdmin
 roles/gkehub.admin
+roles/privateca.admin
 EOF
 exit 0
 fi
@@ -76,6 +77,7 @@ iamcredentials.googleapis.com
 gkeconnect.googleapis.com
 gkehub.googleapis.com
 cloudresourcemanager.googleapis.com
+privateca.googleapis.com
 EOF
 exit 0
 fi

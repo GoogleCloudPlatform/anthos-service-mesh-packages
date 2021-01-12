@@ -81,6 +81,8 @@ CA_CERT="${CA_CERT:=}"
 CA_KEY="${CA_KEY:=}"
 CA_ROOT="${CA_ROOT:=}"
 CA_CHAIN="${CA_CHAIN:=}"
+CA_NAME="${CA_NAME:=}"
+
 
 DRY_RUN="${DRY_RUN:=0}"
 ONLY_VALIDATE="${ONLY_VALIDATE:=0}"
@@ -169,6 +171,12 @@ main() {
     if can_modify_gcp_components; then
       enable_workload_identity
       init_meshconfig
+      if [[ "${CA}" = "gcp_cas" ]]; then
+        # This sets up IAM privileges for the project to be able to access GCP CAS.
+        # If modify_gcp_component permissions are not granted, it is assumed that the
+        # user has taken care of this, else Istio setup will fail
+        init_gcp_cas
+      fi
       enable_stackdriver_kubernetes
     elif should_validate; then
       exit_if_no_workload_identity
@@ -422,6 +430,7 @@ OPTIONS:
   --ca_key               <FILE PATH>
   --root_cert            <FILE PATH>
   --cert_chain           <FILE PATH>
+  --ca_name              <CA NAME>
 
 FLAGS:
   -e|--enable_all
@@ -468,7 +477,7 @@ OPTIONS:
                                       used. Defaults to "mesh_ca" for --mode
                                       install. Specifying the CA is required
                                       for --mode migrate.  Allowed values for
-                                      <CA> are {citadel|mesh_ca}.
+                                      <CA> are {citadel|mesh_ca|gcp_cas}.
   -o|--option            <FILE NAME>  The name of a YAML file in the kpt pkg to
                                       apply. For options, see the
                                       anthos-service-mesh-package GitHub
@@ -496,7 +505,11 @@ OPTIONS:
                                       omitted if not installing optional
                                       features. To add multiple files, specify
                                       them with multiple options one at a time.
-
+  --ca_name              <CA NAME>    Required only if --ca option is gcp_cas.
+                                      Name of the ca in the GCP CAS service used to
+                                      sign certificates in the format
+                                      'projects/project_name/locations/ \
+                                       ca_region/certificateAuthorities/ca_name'
   The following four options must be passed together and are only necessary
   for using a custom certificate for Citadel. Users that aren't sure whether
   they need this probably don't.
@@ -596,6 +609,11 @@ parse_args() {
       -c | --ca)
         arg_required "${@}"
         CA="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+        shift 2
+        ;;
+      --ca_name | --ca-name)
+        arg_required "${@}"
+        CA_NAME="${2}"
         shift 2
         ;;
       -o | --option)
@@ -733,6 +751,10 @@ validate_args() {
       fatal "Citadel is not supported with managed control plane."
     fi
 
+    if [[ "${CA}" == "gcp_cas" ]]; then
+      fatal "Google Certificate Authority Service integration is not supported with managed control plane."
+    fi
+
     if [[ "${CUSTOM_CA}" -eq 1 ]]; then
       fatal "Specifying a custom CA with managed control plane is not supported."
     fi
@@ -754,12 +776,12 @@ EOF
 
   if [[ "${MODE}" != "upgrade" ]]; then
     case "${CA}" in
-      citadel | mesh_ca);;
+      citadel | mesh_ca | gcp_cas);;
       "")
         MISSING_ARGS=1
         warn "Missing value for CA"
         ;;
-      *) fatal "CA must be one of 'citadel', 'mesh_ca'";;
+      *) fatal "CA must be one of 'citadel', 'mesh_ca', 'gcp_cas'";;
     esac
   fi
 
@@ -770,6 +792,10 @@ EOF
   if [[ "${MODE}" == "upgrade" && -n "${CA}" ]]; then
     warn "The CA flag is ignored during an update operation."
     warn "Update will proceed with the currently installed CA."
+  fi
+
+  if [[ "${CA}" = "gcp_cas" ]]; then
+    validate_gcp_cas_args
   fi
 
   # shellcheck disable=SC2064
@@ -839,11 +865,27 @@ ${CUSTOM_OVERLAY}
 EOF
   if [[ "${CA}" = "citadel" ]]; then
     ABS_OVERLAYS="${OPTIONS_DIRECTORY}/citadel-ca.yaml,${ABS_OVERLAYS}"
+  elif [[ "${CA}" = "gcp_cas" ]]; then
+    ABS_OVERLAYS="${OPTIONS_DIRECTORY}/private-ca.yaml,${ABS_OVERLAYS}"
   fi
   CUSTOM_OVERLAY="${MULTICLUSTER_MANIFEST},${ABS_OVERLAYS}"
 
   set_kpt_package_url
   WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"
+}
+
+validate_gcp_cas_args() {
+  local CA_NAME_TEMPLATE
+  CA_NAME_TEMPLATE="projects/project_name/locations/ca_region/certificateAuthorities/ca_name"
+  readonly CA_NAME_TEMPLATE
+
+  if [[ -z ${CA_NAME} ]]; then
+    fatal "A ca-name must be provided for integration with Google Certificate Authority Service."
+  elif [[ $(grep -o "/" <<< "${CA_NAME}" | wc -l) != $(grep -o "/" <<< "${CA_NAME_TEMPLATE}" | wc -l) ]]; then
+    fatal "Malformed ca-name. ca-name must be of the form ${CA_NAME_TEMPLATE}."
+  elif [[ "$(echo "${CA_NAME}" | cut -f1 -d/)" != "$(echo "${CA_NAME_TEMPLATE}" | cut -f1 -d/)" ]]; then
+    fatal "Malformed ca-name. ca-name must be of the form ${CA_NAME_TEMPLATE}."
+  fi
 }
 
 validate_certs() {
@@ -1288,31 +1330,30 @@ is_rev_invalid() {
 }
 
 validate_ca_consistency() {
-  info "Checking existing CA..."
-  local INSTALLED_CA; INSTALLED_CA="$(kubectl -n istio-system get pod -l app=istio-ingressgateway \
-    -o jsonpath='{.items[].spec.containers[].env[?(@.name=="CA_ADDR")].value}')"
-
-  local CURRENT_CA; CURRENT_CA=citadel
+  local CURRENT_CA; CURRENT_CA="citadel"
   if is_meshca_installed; then
-    CURRENT_CA=mesh_ca
+    CURRENT_CA="mesh_ca"
+  elif is_gcp_cas_installed; then
+    CURRENT_CA="gcp_cas"
   fi
+
   info "CA already in use: ${CURRENT_CA}"
 
-  if is_ca_citadel_to_meshca || is_ca_meshca_to_citadel; then
+  if [[ "${CA}" != "${CURRENT_CA}" ]]; then
     fatal "CA cannot be switched while performing upgrade. Please use ${CURRENT_CA} as the CA."
   fi
 }
 
-is_ca_citadel_to_meshca() {
-  ! is_meshca_installed && [[ "${CA}" = "mesh_ca" ]] && return 0
-}
-
-is_ca_meshca_to_citadel() {
-  is_meshca_installed && [[ "${CA}" = "citadel" ]] && return 0
-}
-
 is_meshca_installed() {
+  local INSTALLED_CA; INSTALLED_CA="$(kubectl -n istio-system get pod -l istio=ingressgateway \
+    -o jsonpath='{.items[].spec.containers[].env[?(@.name=="CA_ADDR")].value}')"
   [[ "${INSTALLED_CA}" =~ meshca\.googleapis\.com ]] && return 0
+}
+
+is_gcp_cas_installed() {
+  local INSTALLED_CA; INSTALLED_CA="$(kubectl -n istio-system get pod -l istio=istiod \
+    -o jsonpath='{.items[].spec.containers[].env[?(@.name=="EXTERNAL_CA")].value}')"
+  [[ "${INSTALLED_CA}" = "ISTIOD_RA_CAS_API" ]] && return 0
 }
 
 bind_user_to_iam_policy(){
@@ -1389,6 +1430,7 @@ roles/resourcemanager.projectIamAdmin
 roles/iam.serviceAccountAdmin
 roles/iam.serviceAccountKeyAdmin
 roles/gkehub.admin
+roles/privateca.admin
 EOF
 }
 
@@ -1408,6 +1450,7 @@ gkeconnect.googleapis.com
 gkehub.googleapis.com
 cloudresourcemanager.googleapis.com
 stackdriver.googleapis.com
+privateca.googleapis.com
 EOF
 }
 # [END required_apis]
@@ -1693,6 +1736,9 @@ configure_package() {
     run kpt cfg set asm gcloud.project.environProjectID "${ENVIRON_PROJECT_ID}"
     run kpt cfg set asm anthos.servicemesh.hubMembershipID "${HUB_MEMBERSHIP_ID}"
   fi
+  if [[ -n "${CA_NAME}" && "${CA}" = "gcp_cas" ]]; then
+    run kpt cfg set asm anthos.servicemesh.external_ca.ca_name "${CA_NAME}"
+  fi
 }
 
 print_config() {
@@ -1713,6 +1759,20 @@ install_secrets() {
     --from-file="${CA_KEY}" \
     --from-file="${CA_ROOT}" \
     --from-file="${CA_CHAIN}"
+}
+
+init_gcp_cas() {
+  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="$PROJECT_ID.svc.id.goog[istio-system/istiod-service-account]"
+
+  local NAME; NAME=$(echo "${CA_NAME}" | cut -f6 -d/)
+  local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
+  local CA_PROJECT; CA_PROJECT=$(echo "${CA_NAME}" | cut -f2 -d/)
+
+  retry 3 run gcloud beta privateca subordinates add-iam-policy-binding "${NAME}" \
+    --location "${CA_LOCATION}" \
+    --project "${CA_PROJECT}" \
+    --member "serviceAccount:${WORKLOAD_IDENTITY}" \
+    --role "roles/privateca.certificateManager"
 }
 
 does_istiod_exist(){
