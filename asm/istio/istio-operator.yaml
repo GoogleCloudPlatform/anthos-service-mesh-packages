@@ -34,6 +34,9 @@ spec:
       proxyMetadata:
         GCE_METADATA_HOST: "metadata.google.internal"
   values:
+    pilot:
+      env:
+        PILOT_ENABLE_WORKLOAD_ENTRY_AUTOREGISTRATION: true
     global:
       # Enable SDS
       sds:
