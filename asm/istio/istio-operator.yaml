@@ -36,7 +36,7 @@ spec:
   values:
     pilot:
       env:
-        PILOT_ENABLE_WORKLOAD_ENTRY_AUTOREGISTRATION: "true"
+        PILOT_ENABLE_WORKLOAD_ENTRY_AUTOREGISTRATION: true
     global:
       # Enable SDS
       sds:
