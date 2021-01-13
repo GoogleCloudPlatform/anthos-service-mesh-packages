@@ -429,6 +429,18 @@ does_istiod_exist(){
   return "${RETVAL}"
 }
 
+is_cluster_registered() {
+  local PROJECT_ID; PROJECT_ID="$1"
+  local CLUSTER_NAME; CLUSTER_NAME="$2"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$3"
+
+  local MEMBERSHIP_NAME
+  MEMBERSHIP_NAME="gke-${PROJECT_ID}-${CLUSTER_LOCATION}-${CLUSTER_NAME}"
+  local RETVAL; RETVAL=0;
+  (gcloud container hub memberships list | grep -q "${MEMBERSHIP_NAME}") || RETVAL=$?
+  return "${RETVAL}"
+}
+
 remove_ns() {
   local NS; NS="$1"
   kubectl get ns "$NS" || return

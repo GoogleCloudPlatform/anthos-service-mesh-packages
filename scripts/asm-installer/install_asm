@@ -70,6 +70,7 @@ ENABLE_CLUSTER_LABELS="${ENABLE_CLUSTER_LABELS:=0}"
 ENABLE_GCP_APIS="${ENABLE_GCP_APIS:=0}"
 ENABLE_GCP_IAM_ROLES="${ENABLE_GCP_IAM_ROLES:=0}"
 ENABLE_GCP_COMPONENTS="${ENABLE_GCP_COMPONENTS:=0}"
+ENABLE_REGISTRATION="${ENABLE_REGISTRATION:=0}"
 
 DISABLE_CANONICAL_SERVICE="${DISABLE_CANONICAL_SERVICE:=0}"
 PRINT_CONFIG="${PRINT_CONFIG:=0}"
@@ -97,6 +98,9 @@ MANAGED_SERVICE_ACCOUNT=""
 USE_HUB_WIP=0
 ENVIRON_PROJECT_ID=""
 HUB_MEMBERSHIP_ID=""
+
+# Environment variable used by VM
+VM_EXPANSION=0
 
 main() {
   init
@@ -173,6 +177,12 @@ main() {
     exit_if_cluster_unlabeled
   fi
 
+  if can_register_cluster; then
+    register_cluster
+  elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 ]]; then
+    exit_if_cluster_unregistered
+  fi
+
   if ! is_managed; then
     if can_modify_gcp_components; then
       enable_workload_identity
@@ -224,6 +234,10 @@ EOF
     install_managed_components
     outro
     return 0
+  fi
+
+  if [[ "${VM_EXPANSION}" -eq 1 ]]; then
+    register_gce_identity_provider
   fi
 
   configure_package
@@ -411,7 +425,13 @@ can_modify_gcp_iam_roles() {
 }
 
 can_modify_gcp_components() {
-  if [[ "${ENABLE_ALL}" -eq 0 && "${ENABLE_GCP_COMPONENTS}" -eq 0 ]] &&
+  if [[ "${ENABLE_ALL}" -eq 0 && "${ENABLE_GCP_COMPONENTS}" -eq 0 ]] && \
+    ! is_managed || \
+    ! can_modify_at_all; then false; fi
+}
+
+can_register_cluster() {
+  if [[ "${ENABLE_ALL}" -eq 0 && "${ENABLE_REGISTRATION}" -eq 0 ]] && \
     ! is_managed || \
     ! can_modify_at_all; then false; fi
 }
@@ -560,6 +580,8 @@ FLAGS:
                                       IAM permissions
      --enable_gcp_components          Allow the script to enable required GCP
                                       managed services and components
+     --enable_registration            Allow the script to register the cluster
+                                      as an environ memeber
 
      --managed                        Provision a remote, managed control plane
                                       instead of installing one in-cluster.
@@ -646,6 +668,9 @@ parse_args() {
         if [[ "${2}" == "hub-meshca" ]]; then
           USE_HUB_WIP=1
         fi
+        if [[ "${2}" == "vm" ]]; then
+          VM_EXPANSION=1
+        fi
         shift 2
         ;;
       --co | --custom_overlay | --custom-overlay)
@@ -675,6 +700,10 @@ parse_args() {
         ;;
       --enable_gcp_components | --enable-gcp-components)
         ENABLE_GCP_COMPONENTS=1
+        shift 1
+        ;;
+      --enable_registration | --enable-registration)
+        ENABLE_REGISTRATION=1
         shift 1
         ;;
       --managed)
@@ -786,6 +815,10 @@ validate_args() {
     if [[ "${CUSTOM_CA}" -eq 1 ]]; then
       fatal "Specifying a custom CA with managed control plane is not supported."
     fi
+
+    if [[ "${VM_EXPANSION}" -eq 1 ]]; then
+      fatal "Adding VM workloads with managed control plane is not supported."
+    fi
   fi
 
   local MISSING_ARGS=0
@@ -839,6 +872,10 @@ EOF
     fatal "Hub Workload Identity Pool is only supported for Mesh CA"
   fi
 
+  if [[ "${VM_EXPANSION}" -eq 1 && "${USE_HUB_WIP}" -eq 0 ]]; then
+    fatal "Hub Workload Identity Pool is required to add VM workloads. Add -o "
+  fi
+
   if [[ "${CUSTOM_CA}" -eq 1 ]]; then
     validate_certs
   fi
@@ -856,6 +893,7 @@ ENABLE_CLUSTER_LABELS
 ENABLE_GCP_APIS
 ENABLE_GCP_IAM_ROLES
 ENABLE_GCP_COMPONENTS
+ENABLE_REGISTRATION
 MANAGED
 DISABLE_CANONICAL_SERVICE
 ONLY_VALIDATE
@@ -865,7 +903,8 @@ EOF
 
   if [[ "${ENABLE_ALL}" -eq 1 || "${ENABLE_CLUSTER_ROLES}" -eq 1 || \
     "${ENABLE_CLUSTER_LABELS}" -eq 1 || "${ENABLE_GCP_APIS}" -eq 1 || \
-    "${ENABLE_GCP_IAM_ROLES}" -eq 1 || "${ENABLE_GCP_COMPONENTS}" -eq 1 ]]; then
+    "${ENABLE_GCP_IAM_ROLES}" -eq 1 || "${ENABLE_GCP_COMPONENTS}" -eq 1 \
+    "${ENABLE_REGISTRATION}" -eq 1 ]]; then
     if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
       fatal "The only_validate flag cannot be used with any --enable* flag"
     fi
@@ -1632,6 +1671,38 @@ get_cluster_labels() {
   echo "${LABELS}"
 }
 
+is_cluster_registered() {
+  local RETVAL; RETVAL=0;
+  kubectl get memberships \
+    --request-timeout='20s' \
+    membership 1>/dev/null 2>/dev/null || RETVAL=$?
+  return "${RETVAL}"
+}
+
+register_cluster() {
+  if is_cluster_registered; then return; fi
+
+  local MEMBERSHIP_NAME
+  local GKE_CLUSTER
+  MEMBERSHIP_NAME="gke-${PROJECT_ID}-${CLUSTER_LOCATION}-${CLUSTER_NAME}"
+  GKE_CLUSTER="${CLUSTER_LOCATION}/${CLUSTER_NAME}"
+  info "Registering the cluster as ${MEMBERSHIP_NAME}..."
+  retry 2 run gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
+    --project="${PROJECT_ID}" \
+    --gke-cluster="${GKE_CLUSTER}" \
+    --enable-workload-identity
+}
+
+exit_if_cluster_unregistered() {
+  if ! is_cluster_registered; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Cluster is not registered to an environ. Please register the cluster and
+retry, or run the script with the '--enable_registration' flag to allow
+the script to register to the current project's environ on your behalf.
+EOF
+  fi
+}
+
 is_workload_identity_enabled() {
   local ENABLED
   ENABLED="$(gcloud container clusters describe \
@@ -1757,6 +1828,12 @@ ensure_istio_namespace_exists(){
   fi
 }
 
+register_gce_identity_provider() {
+  info "Registering GCE Identity Provider in the cluster..."
+  retry 3 run kubectl apply -f asm/identity-provider/identityprovider-crd.yaml
+  retry 3 run kubectl apply -f asm/identity-provider/googleidp.yaml
+}
+
 ### Installation functions ###
 configure_package() {
   info "Configuring kpt package..."
@@ -1865,6 +1942,11 @@ EOF
     retry 3 run kubectl wait --for=condition=available --timeout=600s \
         deployment/canonical-service-controller-manager -n asm-system
     info "...done!"
+  fi
+
+  if [[ "${VM_EXPANSION}" -eq 1 ]]; then
+    info "Exposing the control plane for VM workloads..."
+    retry 3 run kubectl apply -f asm/istio/expansion/expose-istiod.yaml
   fi
 
   outro
