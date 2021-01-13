@@ -28,15 +28,14 @@ spec:
           value: "true" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.controlplane.monitoring.enabled"}
         - name: TOKEN_AUDIENCES
           value: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.token-audiences"}
+        - name: PILOT_ENABLE_WORKLOAD_ENTRY_AUTOREGISTRATION
+          value: "true"
   meshConfig:
     trustDomain: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
     defaultConfig:
       proxyMetadata:
         GCE_METADATA_HOST: "metadata.google.internal"
   values:
-    pilot:
-      env:
-        PILOT_ENABLE_WORKLOAD_ENTRY_AUTOREGISTRATION: true
     global:
       # Enable SDS
       sds:
