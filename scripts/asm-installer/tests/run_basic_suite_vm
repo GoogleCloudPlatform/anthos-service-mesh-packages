@@ -83,7 +83,7 @@ main() {
         deployment/istio-eastwestgateway -n istio-system
 
   echo "Verifying cluster is registered..."
-  if ! is_cluster_registered; then
+  if ! is_cluster_registered "${PROJECT_ID}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}"; then
     fatal "Cluster is not registered."
   fi
 
