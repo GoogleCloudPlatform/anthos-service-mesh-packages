@@ -437,7 +437,8 @@ is_cluster_registered() {
   local MEMBERSHIP_NAME
   MEMBERSHIP_NAME="gke-${PROJECT_ID}-${CLUSTER_LOCATION}-${CLUSTER_NAME}"
   local RETVAL; RETVAL=0;
-  (gcloud container hub memberships list | grep -q "${MEMBERSHIP_NAME}") || RETVAL=$?
+  (gcloud container hub memberships list --project="${PROJECT_ID}" \
+    | grep -q "${MEMBERSHIP_NAME}") || RETVAL=$?
   return "${RETVAL}"
 }
 
