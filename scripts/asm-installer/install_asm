@@ -873,7 +873,7 @@ EOF
   fi
 
   if [[ "${VM_EXPANSION}" -eq 1 && "${USE_HUB_WIP}" -eq 0 ]]; then
-    fatal "Hub Workload Identity Pool is required to add VM workloads. Add -o "
+    fatal "Hub Workload Identity Pool is required to add VM workloads. Run the script with the -o hub-meshca option."
   fi
 
   if [[ "${CUSTOM_CA}" -eq 1 ]]; then
