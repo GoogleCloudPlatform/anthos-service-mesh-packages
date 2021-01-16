@@ -1886,7 +1886,7 @@ outro() {
     info "The version of istioctl that matches the installation can be found at:"
     info "${OUTPUT_DIR}/${ISTIOCTL_REL_PATH}"
   fi
-  if ! is_managed || ! is_sa; then
+  if ! is_managed && ! is_sa; then
     info "The combined configuration generated for installation can be found at:"
     info "${OUTPUT_DIR}/${RAW_YAML}"
     info "The full, expanded set of kubernetes resources can be found at:"
