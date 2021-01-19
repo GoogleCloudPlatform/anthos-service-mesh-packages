@@ -5,9 +5,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.2.2
   creationTimestamp: null
-  name: identityproviders.security.anthos.io
+  name: identityproviders.security.cloud.google.com
 spec:
-  group: security.anthos.io
+  group: security.cloud.google.com
   names:
     kind: IdentityProvider
     listKind: IdentityProviderList
@@ -79,3 +79,4 @@ status:
     plural: ""
   conditions: []
   storedVersions: []
+  
