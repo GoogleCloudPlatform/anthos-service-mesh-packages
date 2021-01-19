@@ -45,10 +45,12 @@ OPERATOR_MANIFEST="${PACKAGE_DIRECTORY}/istio-operator.yaml"; readonly OPERATOR_
 MULTICLUSTER_MANIFEST="${OPTIONS_DIRECTORY}/multicluster.yaml"; readonly MULTICLUSTER_MANIFEST;
 BETA_CRD_MANIFEST="${OPTIONS_DIRECTORY}/v1beta1-crds.yaml"; readonly BETA_CRD_MANIFEST;
 MANAGED_MANIFEST="${OPTIONS_DIRECTORY}/managed-control-plane.yaml"; readonly MANAGED_MANIFEST;
+EXPOSE_ISTIOD_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_SERVICE;
 
 SCRIPT_NAME="${0##*/}"
 
 PROJECT_NUMBER=""
+GKE_CLUSTER_URI=""
 KPT_URL=""
 KUBECONFIG=""
 APATH=""
@@ -100,7 +102,7 @@ ENVIRON_PROJECT_ID=""
 HUB_MEMBERSHIP_ID=""
 
 # Environment variable used by VM
-VM_EXPANSION=0
+USE_VM=0
 
 main() {
   init
@@ -236,7 +238,7 @@ EOF
     return 0
   fi
 
-  if [[ "${VM_EXPANSION}" -eq 1 ]]; then
+  if [[ "${USE_VM}" -eq 1 ]]; then
     register_gce_identity_provider
   fi
 
@@ -581,7 +583,7 @@ FLAGS:
      --enable_gcp_components          Allow the script to enable required GCP
                                       managed services and components
      --enable_registration            Allow the script to register the cluster
-                                      as an environ memeber
+                                      to an environ
 
      --managed                        Provision a remote, managed control plane
                                       instead of installing one in-cluster.
@@ -669,7 +671,7 @@ parse_args() {
           USE_HUB_WIP=1
         fi
         if [[ "${2}" == "vm" ]]; then
-          VM_EXPANSION=1
+          USE_VM=1
         fi
         shift 2
         ;;
@@ -816,7 +818,7 @@ validate_args() {
       fatal "Specifying a custom CA with managed control plane is not supported."
     fi
 
-    if [[ "${VM_EXPANSION}" -eq 1 ]]; then
+    if [[ "${USE_VM}" -eq 1 ]]; then
       fatal "Adding VM workloads with managed control plane is not supported."
     fi
   fi
@@ -872,7 +874,7 @@ EOF
     fatal "Hub Workload Identity Pool is only supported for Mesh CA"
   fi
 
-  if [[ "${VM_EXPANSION}" -eq 1 && "${USE_HUB_WIP}" -eq 0 ]]; then
+  if [[ "${USE_VM}" -eq 1 && "${USE_HUB_WIP}" -eq 0 ]]; then
     fatal "Hub Workload Identity Pool is required to add VM workloads. Run the script with the -o hub-meshca option."
   fi
 
@@ -1169,6 +1171,10 @@ validate_gcp_resources() {
   validate_project
   PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format="value(projectNumber)")"
   validate_cluster
+  GKE_CLUSTER_URI="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
+    --zone="${CLUSTER_LOCATION}" \
+    --project="${PROJECT_ID}" \
+    --format='value(selfLink)')"; readonly GKE_CLUSTER_URI;
 }
 
 validate_project() {
@@ -1672,24 +1678,24 @@ get_cluster_labels() {
 }
 
 is_cluster_registered() {
-  local RETVAL; RETVAL=0;
-  kubectl get memberships \
-    --request-timeout='20s' \
-    membership 1>/dev/null 2>/dev/null || RETVAL=$?
-  return "${RETVAL}"
+  local IDENTITY_PROVIDER
+  IDENTITY_PROVIDER="$(retry 2 kubectl get memberships.hub.gke.io \
+    membership -ojson 2>/dev/null | jq .spec.identity_provider)"
+
+  if [[ -z "${IDENTITY_PROVIDER}" ]] || [[ "${IDENTITY_PROVIDER}" = 'null' ]]; then
+    false
+  fi
 }
 
 register_cluster() {
   if is_cluster_registered; then return; fi
 
   local MEMBERSHIP_NAME
-  local GKE_CLUSTER
   MEMBERSHIP_NAME="gke-${PROJECT_ID}-${CLUSTER_LOCATION}-${CLUSTER_NAME}"
-  GKE_CLUSTER="${CLUSTER_LOCATION}/${CLUSTER_NAME}"
   info "Registering the cluster as ${MEMBERSHIP_NAME}..."
   retry 2 run gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
     --project="${PROJECT_ID}" \
-    --gke-cluster="${GKE_CLUSTER}" \
+    --gke-uri="${GKE_CLUSTER_URI}" \
     --enable-workload-identity
 }
 
@@ -1718,7 +1724,7 @@ is_workload_identity_enabled() {
 get_hub_workload_identity() {
   local IDENTITY_PROVIDER
   local IDENTITY
-  IDENTITY_PROVIDER="$(kubectl get memberships membership -o=json | jq .spec.identity_provider)"
+  IDENTITY_PROVIDER="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.identity_provider)"
   IDENTITY="$(echo "${IDENTITY_PROVIDER}" | sed 's/^\"https:\/\/gkehub.googleapis.com\/projects\/\(.*\)\/locations\/global\/memberships\/\(.*\)\"$/\1 \2/g')"
   echo "${IDENTITY}"
 }
@@ -1944,9 +1950,9 @@ EOF
     info "...done!"
   fi
 
-  if [[ "${VM_EXPANSION}" -eq 1 ]]; then
+  if [[ "${USE_VM}" -eq 1 ]]; then
     info "Exposing the control plane for VM workloads..."
-    retry 3 run kubectl apply -f asm/istio/expansion/expose-istiod.yaml
+    retry 3 run kubectl apply -f "${EXPOSE_ISTIOD_SERVICE}"
   fi
 
   outro
