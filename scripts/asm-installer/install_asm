@@ -1785,6 +1785,10 @@ does_istiod_exist(){
 }
 
 install_asm() {
+  if ! does_istiod_exist; then
+    info "Installing validation webhook fix..."
+    retry 3 run kubectl apply -f "${VALIDATION_FIX_SERVICE}"
+  fi
 
   local PARAMS
   PARAMS="-f ${OPERATOR_MANIFEST}"
@@ -1815,11 +1819,6 @@ EOF
   run ./"${ISTIOCTL_REL_PATH}" manifest generate \
     <"${RAW_YAML}" \
     >"${EXPANDED_YAML}"
-
-  if ! does_istiod_exist; then
-    info "Installing validation webhook fix..."
-    retry 3 run kubectl apply -f "${VALIDATION_FIX_SERVICE}"
-  fi
 
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
     info "Installing ASM CanonicalService controller in asm-system namespace..."
