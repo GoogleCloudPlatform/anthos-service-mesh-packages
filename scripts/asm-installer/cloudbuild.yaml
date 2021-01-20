@@ -38,12 +38,13 @@ steps:
   entrypoint: '/bin/bash'
   args:
   - '-c'
-  - >
-    gcloud secrets versions access latest
-    --secret="${_SECRET_NAME}"
-    --format='get(payload.data)'
-    --project="${PROJECT_ID}"
-    | tr '_-' '/+'
+  - |
+    date
+    gcloud secrets versions access latest \
+    --secret="${_SECRET_NAME}" \
+    --format='get(payload.data)' \
+    --project="${PROJECT_ID}" \
+    | tr '_-' '/+' \
     | base64 -d > "${_KEY_FILE}"
   waitFor:
   - 'lint-with-shellcheck'
@@ -58,6 +59,7 @@ steps:
     set -e
     # This will delete all clusters older than 3 hours old
 
+    date
     gcloud auth activate-service-account \
       "${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com" \
       --key-file="${_KEY_FILE}"
