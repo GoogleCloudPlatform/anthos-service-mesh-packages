@@ -481,6 +481,7 @@ FLAGS:
      --enable_gcp_apis
      --enable_gcp_iam_roles
      --enable_gcp_components
+     --enable_registration
 
      --managed
 
