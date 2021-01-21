@@ -237,7 +237,7 @@ create_working_cluster() {
 
   gcloud beta container \
     --project "${PROJECT_ID}" \
-    clusters create "${CLUSTER_NAME}" \
+    clusters create "ephem-${CLUSTER_NAME}" \
     --zone "${CLUSTER_LOCATION}" \
     --no-enable-basic-auth \
     --release-channel "regular" \
