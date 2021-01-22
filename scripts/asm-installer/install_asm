@@ -405,6 +405,10 @@ needs_asm() {
   if [[ "${PRINT_CONFIG}" -eq 0 ]] && ! can_modify_at_all && ! should_validate; then false; fi
 }
 
+enable_common_message() {
+  echo "Alternatively, use --enable_all|-e to allow this tool to handle all dependencies."
+}
+
 ### CLI/initial setup functions ###
 usage_short() {
   cat << EOF
@@ -1390,6 +1394,7 @@ One or more IAM roles required to install ASM is missing. Please add
 ${GCLOUD_MEMBER} to the roles above, or run
 the script with "--enable_gcp_iam_roles" to allow the script to add
 them on your behalf.
+$(enable_common_message)
 EOF
   fi
 }
@@ -1486,6 +1491,7 @@ exit_if_apis_not_enabled() {
 One or more APIs are not enabled. Please enable them and retry, or run the
 script with the '--enable_gcp_apis' flag to allow the script to enable them on
 your behalf.
+$(enable_common_message)
 EOF
   fi
 }
@@ -1571,6 +1577,7 @@ exit_if_cluster_unlabeled() {
 One or more required cluster labels were not found. Please label them and retry,
 or run the script with the '--enable_cluster_labels' flag to allow the script
 to enable them on your behalf.
+$(enable_common_message)
 EOF
   fi
 }
@@ -1636,6 +1643,7 @@ exit_if_no_workload_identity() {
 Workload identity is not enabled on ${CLUSTER_NAME}. Please enable it and
 retry, or run the script with the '--enable_gcp_components' flag to allow
 the script to enable it on your behalf.
+$(enable_common_message)
 EOF
   fi
 }
@@ -1671,6 +1679,7 @@ exit_if_stackdriver_not_enabled() {
 Cloud Operations (Stackdriver)  is not enabled on ${CLUSTER_NAME}.
 Please enable it and retry, or run the script with the
 '--enable_gcp_components' flag to allow the script to enable it on your behalf.
+$(enable_common_message)
 EOF
   fi
 }
@@ -1707,6 +1716,7 @@ exit_if_not_cluster_admin() {
 Current user must have the cluster-admin role on ${CLUSTER_NAME}.
 Please add the cluster role binding and retry, or run the script with the
 '--enable_cluster_roles' flag to allow the script to enable it on your behalf.
+$(enable_common_message)
 EOF
   fi
 }
