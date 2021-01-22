@@ -1107,6 +1107,7 @@ kpt
 kubectl
 sed
 tr
+head
 EOF
 
   if [[ "${CUSTOM_CA}" -eq 1 ]]; then
@@ -1688,11 +1689,27 @@ is_cluster_registered() {
   fi
 }
 
+generate_membership_name() {
+  local MEMBERSHIP_NAME
+  MEMBERSHIP_NAME="gke-${PROJECT_ID}-${CLUSTER_LOCATION}-${CLUSTER_NAME}"
+  MEMBERSHIP_NAME="${MEMBERSHIP_NAME:0:63}"
+  if [[ "$(retry 2 gcloud container hub memberships list --format='value(name)' \
+   | grep -c "^${MEMBERSHIP_NAME}$" || true)" -ne 0 ]]; then
+    if [[ ${#MEMBERSHIP_NAME} -gt 58 ]]; then
+      MEMBERSHIP_NAME="${MEMBERSHIP_NAME:0:58}"
+    fi
+    local RAND
+    RAND="$(tr -dc "a-z0-9" </dev/urandom | head -c4 || true)"
+    MEMBERSHIP_NAME="${MEMBERSHIP_NAME}-${RAND}"
+  fi
+  echo "${MEMBERSHIP_NAME}"
+}
+
 register_cluster() {
   if is_cluster_registered; then return; fi
 
   local MEMBERSHIP_NAME
-  MEMBERSHIP_NAME="gke-${PROJECT_ID}-${CLUSTER_LOCATION}-${CLUSTER_NAME}"
+  MEMBERSHIP_NAME="$(generate_membership_name)"
   info "Registering the cluster as ${MEMBERSHIP_NAME}..."
   retry 2 run gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
     --project="${PROJECT_ID}" \
