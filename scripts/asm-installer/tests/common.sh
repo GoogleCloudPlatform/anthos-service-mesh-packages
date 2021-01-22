@@ -321,6 +321,10 @@ cleanup() {
 
   # all of the resources are now deleted except for the cluster
   delete_cluster "${PROJECT_ID}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}"
+
+  # we should delete only the membership for the cluster. It should be okay for
+  # now, as we register new memebership during tests.
+  cleanup_all_memberships
 }
 
 delete_cluster() {
@@ -353,6 +357,20 @@ delete_cluster_async() {
 
   return "$?"
 }
+
+cleanup_all_memberships() {
+  echo "Deleting all memberships in ${PROJECT_ID}..."
+  local MEMBERSHIPS
+  MEMBERSHIPS="$(gcloud container hub memberships list --project "${PROJECT_ID}" \
+   --format='value(name)')"
+  while read -r MEMBERSHIP; do
+    gcloud container hub memberships delete "${MEMBERSHIP}" --quiet \
+   --project "${PROJECT_ID}"
+  done <<EOF
+${MEMBERSHIPS}
+EOF
+}
+
 #
 ### kubectl convenience functions
 auth_service_account() {

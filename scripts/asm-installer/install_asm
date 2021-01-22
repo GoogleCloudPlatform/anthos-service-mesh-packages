@@ -1694,7 +1694,7 @@ generate_membership_name() {
   MEMBERSHIP_NAME="gke-${PROJECT_ID}-${CLUSTER_LOCATION}-${CLUSTER_NAME}"
   MEMBERSHIP_NAME="${MEMBERSHIP_NAME:0:63}"
   if [[ "$(retry 2 gcloud container hub memberships list --format='value(name)' \
-   | grep -c "^${MEMBERSHIP_NAME}$" || true)" -ne 0 ]]; then
+   --project "${PROJECT_ID}" | grep -c "^${MEMBERSHIP_NAME}$" || true)" -ne 0 ]]; then
     if [[ ${#MEMBERSHIP_NAME} -gt 58 ]]; then
       MEMBERSHIP_NAME="${MEMBERSHIP_NAME:0:58}"
     fi
