@@ -20,7 +20,7 @@ main() {
     auth_service_account
   fi
 
-  local CLUSTER_NAME; CLUSTER_NAME="migration-citadel-${BUILD_ID::8}";
+  local CLUSTER_NAME; CLUSTER_NAME="ephem-migration-citadel-${BUILD_ID::8}";
   local NAMESPACE; NAMESPACE="namespace-${BUILD_ID}"
   readonly CLUSTER_NAME
   readonly NAMESPACE
