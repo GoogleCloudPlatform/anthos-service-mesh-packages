@@ -20,7 +20,7 @@ main() {
     auth_service_account
   fi
 
-  local CLUSTER_NAME; CLUSTER_NAME="basic-suite-managed-${BUILD_ID::8}";
+  local CLUSTER_NAME; CLUSTER_NAME="ephem-basic-suite-managed-${BUILD_ID::8}";
   local NAMESPACE; NAMESPACE="namespace-${BUILD_ID}"
   echo "Creating cluster ${CLUSTER_NAME}..."
   create_working_cluster "${PROJECT_ID}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}"
