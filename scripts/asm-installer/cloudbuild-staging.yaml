@@ -51,6 +51,17 @@ steps:
 
 - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
   dir: 'scripts/asm-installer'
+  id: 'setup-long-term-cluster'
+  entrypoint: '/bin/bash'
+  args:
+  - '-c'
+  - >
+    ./tests/setup_longterm_cluster
+  waitFor:
+  - 'fetch-secrets'
+
+- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
+  dir: 'scripts/asm-installer'
   id: 'clean-up-old-clusters'
   entrypoint: '/bin/bash'
   args:
@@ -128,7 +139,7 @@ steps:
   - >
     ./tests/run_cli_tests
   waitFor:
-  - 'fetch-secrets'
+  - 'setup-long-term-cluster'
   env:
   - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
   - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
@@ -146,7 +157,7 @@ steps:
   - >
     ./tests/run_print_config_test
   waitFor:
-  - 'fetch-secrets'
+  - 'setup-long-term-cluster'
   env:
   - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
   - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
