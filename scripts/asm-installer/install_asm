@@ -13,6 +13,15 @@ else
   set -u
 fi
 
+### These are hooks for Cloud Build to be able to use debug/staging images
+### when necessary. Don't set these environment variables unless you're testing
+### in CI/CD.
+_CI_ASM_IMAGE_LOCATION="${_CI_ASM_IMAGE_LOCATION:=}"
+_CI_ASM_PKG_LOCATION="${_CI_ASM_PKG_LOCATION:=}"
+_CI_CLOUDRUN_IMAGE_HUB="${_CI_CLOUDRUN_IMAGE_HUB:=}"
+_CI_CLOUDRUN_IMAGE_TAG="${_CI_CLOUDRUN_IMAGE_TAG:=}"
+_CI_REVISION_PREFIX="${_CI_REVISION_PREFIX:=}"
+
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"
 MINOR="${MINOR:=8}"
@@ -21,18 +30,10 @@ REV="${REV:=5}"
 RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
 RELEASE_LINE="${MAJOR}.${MINOR}."
 PREVIOUS_RELEASE_LINE="${MAJOR}.$(( MINOR - 1 ))."
-REVISION_LABEL="asm-${MAJOR}${MINOR}${POINT}-${REV}"
+REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}-${REV}"
 KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=release-${MAJOR}.${MINOR}-asm}"
 readonly RELEASE; readonly RELEASE_LINE; readonly KPT_BRANCH;
 K8S_MINOR=0
-
-### These are hooks for Cloud Build to be able to use debug/staging images
-### when necessary. Don't set these environment variables unless you're testing
-### in CI/CD.
-_CI_ASM_IMAGE_LOCATION="${_CI_ASM_IMAGE_LOCATION:=}"
-_CI_ASM_PKG_LOCATION="${_CI_ASM_PKG_LOCATION:=}"
-_CI_CLOUDRUN_IMAGE_HUB="${_CI_CLOUDRUN_IMAGE_HUB:=}"
-_CI_CLOUDRUN_IMAGE_TAG="${_CI_CLOUDRUN_IMAGE_TAG:=}"
 
 ### File related constants ###
 ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
@@ -86,6 +87,7 @@ CA_NAME="${CA_NAME:=}"
 
 DRY_RUN="${DRY_RUN:=0}"
 ONLY_VALIDATE="${ONLY_VALIDATE:=0}"
+ONLY_ENABLE="${ONLY_ENABLE:=0}"
 VERBOSE="${VERBOSE:=0}"
 PRINT_HELP=0
 MANAGED="${MANAGED:=0}"
@@ -107,7 +109,11 @@ main() {
   fi
 
   validate_args
-  set_up_local_workspace
+
+  if ! only_enable; then
+    set_up_local_workspace
+  fi
+
   validate_cli_dependencies
 
   if is_sa; then
@@ -196,6 +202,11 @@ main() {
 
   if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
     info "Successfully validated all requirements to install ASM in this environment."
+    return 0
+  fi
+
+  if only_enable; then
+    info "Successfully performed specified --enable actions."
     return 0
   fi
 
@@ -366,7 +377,11 @@ is_sa() {
 }
 
 should_validate() {
-  if [[ "${PRINT_CONFIG}" -eq 1 ]]; then false; fi
+  if [[ "${PRINT_CONFIG}" -eq 1 ]] || only_enable; then false; fi
+}
+
+only_enable() {
+  if [[ "${ONLY_ENABLE}" -eq 0 ]]; then false; fi
 }
 
 can_modify_at_all() {
@@ -403,6 +418,7 @@ can_modify_gcp_components() {
 
 needs_asm() {
   if [[ "${PRINT_CONFIG}" -eq 0 ]] && ! can_modify_at_all && ! should_validate; then false; fi
+  if only_enable; then false; fi
 }
 
 enable_common_message() {
@@ -451,6 +467,7 @@ FLAGS:
   -v|--verbose
      --dry_run
      --only_validate
+     --only_enable
   -h|--help
 EOF
 }
@@ -558,6 +575,9 @@ FLAGS:
   -v|--verbose                        Print commands before and after execution.
      --dry_run                        Print commands, but don't execute them.
      --only_validate                  Run validation, but don't install.
+     --only_enable                    Perform the specified steps to set up the
+                                      current user/cluster but don't install
+                                      anything.
   -h|--help                           Show this message and exit.
 
 EXAMPLE:
@@ -691,6 +711,10 @@ parse_args() {
         ;;
       --only_validate | --only-validate)
         ONLY_VALIDATE=1
+        shift 1
+        ;;
+      --only_enable | --only-enable)
+        ONLY_ENABLE=1
         shift 1
         ;;
       --ca_cert | --ca-cert)
@@ -835,14 +859,18 @@ ENABLE_GCP_COMPONENTS
 MANAGED
 DISABLE_CANONICAL_SERVICE
 ONLY_VALIDATE
+ONLY_ENABLE
 VERBOSE
 EOF
 
   if [[ "${ENABLE_ALL}" -eq 1 || "${ENABLE_CLUSTER_ROLES}" -eq 1 || \
     "${ENABLE_CLUSTER_LABELS}" -eq 1 || "${ENABLE_GCP_APIS}" -eq 1 || \
-    "${ENABLE_GCP_IAM_ROLES}" -eq 1 || "${ENABLE_GCP_COMPONENTS}" -eq 1 ]] && \
-    [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
+    "${ENABLE_GCP_IAM_ROLES}" -eq 1 || "${ENABLE_GCP_COMPONENTS}" -eq 1 ]]; then
+    if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
       fatal "The only_validate flag cannot be used with any --enable* flag"
+    fi
+  elif only_enable; then
+    fatal "You must specify at least one --enable* flag with --only_enable"
   fi
 
   if [[ -n "$SERVICE_ACCOUNT" && -z "$KEY_FILE" || -z "$SERVICE_ACCOUNT" && -n "$KEY_FILE" ]]; then
