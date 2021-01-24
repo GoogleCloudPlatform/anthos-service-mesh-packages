@@ -450,16 +450,13 @@ does_istiod_exist(){
 }
 
 is_cluster_registered() {
-  local PROJECT_ID; PROJECT_ID="$1"
-  local CLUSTER_NAME; CLUSTER_NAME="$2"
-  local CLUSTER_LOCATION; CLUSTER_LOCATION="$3"
+  local IDENTITY_PROVIDER
+  IDENTITY_PROVIDER="$(retry 2 kubectl get memberships.hub.gke.io \
+    membership -ojson 2>/dev/null | jq .spec.identity_provider)"
 
-  local MEMBERSHIP_NAME
-  MEMBERSHIP_NAME="gke-${PROJECT_ID}-${CLUSTER_LOCATION}-${CLUSTER_NAME}"
-  local RETVAL; RETVAL=0;
-  (gcloud container hub memberships list --project="${PROJECT_ID}" \
-    | grep -q "${MEMBERSHIP_NAME}") || RETVAL=$?
-  return "${RETVAL}"
+  if [[ -z "${IDENTITY_PROVIDER}" ]] || [[ "${IDENTITY_PROVIDER}" = 'null' ]]; then
+    false
+  fi
 }
 
 remove_ns() {
