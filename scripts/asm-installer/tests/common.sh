@@ -451,7 +451,7 @@ does_istiod_exist(){
 
 is_cluster_registered() {
   local IDENTITY_PROVIDER
-  IDENTITY_PROVIDER="$(retry 2 kubectl get memberships.hub.gke.io \
+  IDENTITY_PROVIDER="$(kubectl get memberships.hub.gke.io \
     membership -ojson 2>/dev/null | jq .spec.identity_provider)"
 
   if [[ -z "${IDENTITY_PROVIDER}" ]] || [[ "${IDENTITY_PROVIDER}" = 'null' ]]; then
