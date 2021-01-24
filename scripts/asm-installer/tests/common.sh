@@ -364,8 +364,10 @@ cleanup_all_memberships() {
   MEMBERSHIPS="$(gcloud container hub memberships list --project "${PROJECT_ID}" \
    --format='value(name)')"
   while read -r MEMBERSHIP; do
-    gcloud container hub memberships delete "${MEMBERSHIP}" --quiet \
-   --project "${PROJECT_ID}"
+    if [[ -n "${MEMBERSHIP}" ]]; then
+      gcloud container hub memberships delete "${MEMBERSHIP}" --quiet \
+     --project "${PROJECT_ID}"
+    fi
   done <<EOF
 ${MEMBERSHIPS}
 EOF

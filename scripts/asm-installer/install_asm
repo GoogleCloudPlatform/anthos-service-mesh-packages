@@ -1691,16 +1691,17 @@ is_cluster_registered() {
 
 generate_membership_name() {
   local MEMBERSHIP_NAME
-  MEMBERSHIP_NAME="gke-${PROJECT_ID}-${CLUSTER_LOCATION}-${CLUSTER_NAME}"
-  MEMBERSHIP_NAME="${MEMBERSHIP_NAME:0:63}"
+  MEMBERSHIP_NAME="${CLUSTER_NAME}"
   if [[ "$(retry 2 gcloud container hub memberships list --format='value(name)' \
    --project "${PROJECT_ID}" | grep -c "^${MEMBERSHIP_NAME}$" || true)" -ne 0 ]]; then
-    if [[ ${#MEMBERSHIP_NAME} -gt 58 ]]; then
-      MEMBERSHIP_NAME="${MEMBERSHIP_NAME:0:58}"
-    fi
+    MEMBERSHIP_NAME="${CLUSTER_NAME}-${PROJECT_ID}-${CLUSTER_LOCATION}"
+  fi
+  if [[ "${#MEMBERSHIP_NAME}" -gt 63 ]] || [[ "$(retry 2 gcloud container hub \
+   memberships list --format='value(name)' --project "${PROJECT_ID}" | grep -c \
+   "^${MEMBERSHIP_NAME}$" || true)" -ne 0 ]]; then
     local RAND
-    RAND="$(tr -dc "a-z0-9" </dev/urandom | head -c4 || true)"
-    MEMBERSHIP_NAME="${MEMBERSHIP_NAME}-${RAND}"
+    RAND="$(tr -dc "a-z0-9" </dev/urandom | head -c8 || true)"
+    MEMBERSHIP_NAME="${CLUSTER_NAME:0:54}-${RAND}"
   fi
   echo "${MEMBERSHIP_NAME}"
 }
