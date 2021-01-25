@@ -13,6 +13,15 @@ else
   set -u
 fi
 
+### These are hooks for Cloud Build to be able to use debug/staging images
+### when necessary. Don't set these environment variables unless you're testing
+### in CI/CD.
+_CI_ASM_IMAGE_LOCATION="${_CI_ASM_IMAGE_LOCATION:=}"
+_CI_ASM_PKG_LOCATION="${_CI_ASM_PKG_LOCATION:=}"
+_CI_CLOUDRUN_IMAGE_HUB="${_CI_CLOUDRUN_IMAGE_HUB:=}"
+_CI_CLOUDRUN_IMAGE_TAG="${_CI_CLOUDRUN_IMAGE_TAG:=}"
+_CI_REVISION_PREFIX="${_CI_REVISION_PREFIX:=}"
+
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"
 MINOR="${MINOR:=8}"
@@ -21,18 +30,10 @@ REV="${REV:=5}"
 RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
 RELEASE_LINE="${MAJOR}.${MINOR}."
 PREVIOUS_RELEASE_LINE="${MAJOR}.$(( MINOR - 1 ))."
-REVISION_LABEL="asm-${MAJOR}${MINOR}${POINT}-${REV}"
+REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}-${REV}"
 KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=release-${MAJOR}.${MINOR}-asm}"
 readonly RELEASE; readonly RELEASE_LINE; readonly KPT_BRANCH;
 K8S_MINOR=0
-
-### These are hooks for Cloud Build to be able to use debug/staging images
-### when necessary. Don't set these environment variables unless you're testing
-### in CI/CD.
-_CI_ASM_IMAGE_LOCATION="${_CI_ASM_IMAGE_LOCATION:=}"
-_CI_ASM_PKG_LOCATION="${_CI_ASM_PKG_LOCATION:=}"
-_CI_CLOUDRUN_IMAGE_HUB="${_CI_CLOUDRUN_IMAGE_HUB:=}"
-_CI_CLOUDRUN_IMAGE_TAG="${_CI_CLOUDRUN_IMAGE_TAG:=}"
 
 ### File related constants ###
 ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
@@ -81,9 +82,12 @@ CA_CERT="${CA_CERT:=}"
 CA_KEY="${CA_KEY:=}"
 CA_ROOT="${CA_ROOT:=}"
 CA_CHAIN="${CA_CHAIN:=}"
+CA_NAME="${CA_NAME:=}"
+
 
 DRY_RUN="${DRY_RUN:=0}"
 ONLY_VALIDATE="${ONLY_VALIDATE:=0}"
+ONLY_ENABLE="${ONLY_ENABLE:=0}"
 VERBOSE="${VERBOSE:=0}"
 PRINT_HELP=0
 MANAGED="${MANAGED:=0}"
@@ -105,7 +109,11 @@ main() {
   fi
 
   validate_args
-  set_up_local_workspace
+
+  if ! only_enable; then
+    set_up_local_workspace
+  fi
+
   validate_cli_dependencies
 
   if is_sa; then
@@ -169,6 +177,12 @@ main() {
     if can_modify_gcp_components; then
       enable_workload_identity
       init_meshconfig
+      if [[ "${CA}" = "gcp_cas" ]]; then
+        # This sets up IAM privileges for the project to be able to access GCP CAS.
+        # If modify_gcp_component permissions are not granted, it is assumed that the
+        # user has taken care of this, else Istio setup will fail
+        init_gcp_cas
+      fi
       enable_stackdriver_kubernetes
     elif should_validate; then
       exit_if_no_workload_identity
@@ -188,6 +202,11 @@ main() {
 
   if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
     info "Successfully validated all requirements to install ASM in this environment."
+    return 0
+  fi
+
+  if only_enable; then
+    info "Successfully performed specified --enable actions."
     return 0
   fi
 
@@ -358,7 +377,11 @@ is_sa() {
 }
 
 should_validate() {
-  if [[ "${PRINT_CONFIG}" -eq 1 ]]; then false; fi
+  if [[ "${PRINT_CONFIG}" -eq 1 ]] || only_enable; then false; fi
+}
+
+only_enable() {
+  if [[ "${ONLY_ENABLE}" -eq 0 ]]; then false; fi
 }
 
 can_modify_at_all() {
@@ -395,6 +418,11 @@ can_modify_gcp_components() {
 
 needs_asm() {
   if [[ "${PRINT_CONFIG}" -eq 0 ]] && ! can_modify_at_all && ! should_validate; then false; fi
+  if only_enable; then false; fi
+}
+
+enable_common_message() {
+  echo "Alternatively, use --enable_all|-e to allow this tool to handle all dependencies."
 }
 
 ### CLI/initial setup functions ###
@@ -422,6 +450,7 @@ OPTIONS:
   --ca_key               <FILE PATH>
   --root_cert            <FILE PATH>
   --cert_chain           <FILE PATH>
+  --ca_name              <CA NAME>
 
 FLAGS:
   -e|--enable_all
@@ -438,6 +467,7 @@ FLAGS:
   -v|--verbose
      --dry_run
      --only_validate
+     --only_enable
   -h|--help
 EOF
 }
@@ -468,7 +498,7 @@ OPTIONS:
                                       used. Defaults to "mesh_ca" for --mode
                                       install. Specifying the CA is required
                                       for --mode migrate.  Allowed values for
-                                      <CA> are {citadel|mesh_ca}.
+                                      <CA> are {citadel|mesh_ca|gcp_cas}.
   -o|--option            <FILE NAME>  The name of a YAML file in the kpt pkg to
                                       apply. For options, see the
                                       anthos-service-mesh-package GitHub
@@ -496,7 +526,11 @@ OPTIONS:
                                       omitted if not installing optional
                                       features. To add multiple files, specify
                                       them with multiple options one at a time.
-
+  --ca_name              <CA NAME>    Required only if --ca option is gcp_cas.
+                                      Name of the ca in the GCP CAS service used to
+                                      sign certificates in the format
+                                      'projects/project_name/locations/ \
+                                       ca_region/certificateAuthorities/ca_name'
   The following four options must be passed together and are only necessary
   for using a custom certificate for Citadel. Users that aren't sure whether
   they need this probably don't.
@@ -541,6 +575,9 @@ FLAGS:
   -v|--verbose                        Print commands before and after execution.
      --dry_run                        Print commands, but don't execute them.
      --only_validate                  Run validation, but don't install.
+     --only_enable                    Perform the specified steps to set up the
+                                      current user/cluster but don't install
+                                      anything.
   -h|--help                           Show this message and exit.
 
 EXAMPLE:
@@ -596,6 +633,11 @@ parse_args() {
       -c | --ca)
         arg_required "${@}"
         CA="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+        shift 2
+        ;;
+      --ca_name | --ca-name)
+        arg_required "${@}"
+        CA_NAME="${2}"
         shift 2
         ;;
       -o | --option)
@@ -671,6 +713,10 @@ parse_args() {
         ONLY_VALIDATE=1
         shift 1
         ;;
+      --only_enable | --only-enable)
+        ONLY_ENABLE=1
+        shift 1
+        ;;
       --ca_cert | --ca-cert)
         arg_required "${@}"
         CA_CERT="${2}"
@@ -733,6 +779,10 @@ validate_args() {
       fatal "Citadel is not supported with managed control plane."
     fi
 
+    if [[ "${CA}" == "gcp_cas" ]]; then
+      fatal "Google Certificate Authority Service integration is not supported with managed control plane."
+    fi
+
     if [[ "${CUSTOM_CA}" -eq 1 ]]; then
       fatal "Specifying a custom CA with managed control plane is not supported."
     fi
@@ -754,12 +804,12 @@ EOF
 
   if [[ "${MODE}" != "upgrade" ]]; then
     case "${CA}" in
-      citadel | mesh_ca);;
+      citadel | mesh_ca | gcp_cas);;
       "")
         MISSING_ARGS=1
         warn "Missing value for CA"
         ;;
-      *) fatal "CA must be one of 'citadel', 'mesh_ca'";;
+      *) fatal "CA must be one of 'citadel', 'mesh_ca', 'gcp_cas'";;
     esac
   fi
 
@@ -770,6 +820,10 @@ EOF
   if [[ "${MODE}" == "upgrade" && -n "${CA}" ]]; then
     warn "The CA flag is ignored during an update operation."
     warn "Update will proceed with the currently installed CA."
+  fi
+
+  if [[ "${CA}" = "gcp_cas" ]]; then
+    validate_gcp_cas_args
   fi
 
   # shellcheck disable=SC2064
@@ -805,14 +859,18 @@ ENABLE_GCP_COMPONENTS
 MANAGED
 DISABLE_CANONICAL_SERVICE
 ONLY_VALIDATE
+ONLY_ENABLE
 VERBOSE
 EOF
 
   if [[ "${ENABLE_ALL}" -eq 1 || "${ENABLE_CLUSTER_ROLES}" -eq 1 || \
     "${ENABLE_CLUSTER_LABELS}" -eq 1 || "${ENABLE_GCP_APIS}" -eq 1 || \
-    "${ENABLE_GCP_IAM_ROLES}" -eq 1 || "${ENABLE_GCP_COMPONENTS}" -eq 1 ]] && \
-    [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
+    "${ENABLE_GCP_IAM_ROLES}" -eq 1 || "${ENABLE_GCP_COMPONENTS}" -eq 1 ]]; then
+    if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
       fatal "The only_validate flag cannot be used with any --enable* flag"
+    fi
+  elif only_enable; then
+    fatal "You must specify at least one --enable* flag with --only_enable"
   fi
 
   if [[ -n "$SERVICE_ACCOUNT" && -z "$KEY_FILE" || -z "$SERVICE_ACCOUNT" && -n "$KEY_FILE" ]]; then
@@ -839,11 +897,27 @@ ${CUSTOM_OVERLAY}
 EOF
   if [[ "${CA}" = "citadel" ]]; then
     ABS_OVERLAYS="${OPTIONS_DIRECTORY}/citadel-ca.yaml,${ABS_OVERLAYS}"
+  elif [[ "${CA}" = "gcp_cas" ]]; then
+    ABS_OVERLAYS="${OPTIONS_DIRECTORY}/private-ca.yaml,${ABS_OVERLAYS}"
   fi
-  CUSTOM_OVERLAY="${ABS_OVERLAYS}"
+  CUSTOM_OVERLAY="${MULTICLUSTER_MANIFEST},${ABS_OVERLAYS}"
 
   set_kpt_package_url
   WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"
+}
+
+validate_gcp_cas_args() {
+  local CA_NAME_TEMPLATE
+  CA_NAME_TEMPLATE="projects/project_name/locations/ca_region/certificateAuthorities/ca_name"
+  readonly CA_NAME_TEMPLATE
+
+  if [[ -z ${CA_NAME} ]]; then
+    fatal "A ca-name must be provided for integration with Google Certificate Authority Service."
+  elif [[ $(grep -o "/" <<< "${CA_NAME}" | wc -l) != $(grep -o "/" <<< "${CA_NAME_TEMPLATE}" | wc -l) ]]; then
+    fatal "Malformed ca-name. ca-name must be of the form ${CA_NAME_TEMPLATE}."
+  elif [[ "$(echo "${CA_NAME}" | cut -f1 -d/)" != "$(echo "${CA_NAME_TEMPLATE}" | cut -f1 -d/)" ]]; then
+    fatal "Malformed ca-name. ca-name must be of the form ${CA_NAME_TEMPLATE}."
+  fi
 }
 
 validate_certs() {
@@ -1288,31 +1362,30 @@ is_rev_invalid() {
 }
 
 validate_ca_consistency() {
-  info "Checking existing CA..."
-  local INSTALLED_CA; INSTALLED_CA="$(kubectl -n istio-system get pod -l app=istio-ingressgateway \
-    -o jsonpath='{.items[].spec.containers[].env[?(@.name=="CA_ADDR")].value}')"
-
-  local CURRENT_CA; CURRENT_CA=citadel
+  local CURRENT_CA; CURRENT_CA="citadel"
   if is_meshca_installed; then
-    CURRENT_CA=mesh_ca
+    CURRENT_CA="mesh_ca"
+  elif is_gcp_cas_installed; then
+    CURRENT_CA="gcp_cas"
   fi
+
   info "CA already in use: ${CURRENT_CA}"
 
-  if is_ca_citadel_to_meshca || is_ca_meshca_to_citadel; then
+  if [[ "${CA}" != "${CURRENT_CA}" ]]; then
     fatal "CA cannot be switched while performing upgrade. Please use ${CURRENT_CA} as the CA."
   fi
 }
 
-is_ca_citadel_to_meshca() {
-  ! is_meshca_installed && [[ "${CA}" = "mesh_ca" ]] && return 0
-}
-
-is_ca_meshca_to_citadel() {
-  is_meshca_installed && [[ "${CA}" = "citadel" ]] && return 0
-}
-
 is_meshca_installed() {
+  local INSTALLED_CA; INSTALLED_CA="$(kubectl -n istio-system get pod -l istio=ingressgateway \
+    -o jsonpath='{.items[].spec.containers[].env[?(@.name=="CA_ADDR")].value}')"
   [[ "${INSTALLED_CA}" =~ meshca\.googleapis\.com ]] && return 0
+}
+
+is_gcp_cas_installed() {
+  local INSTALLED_CA; INSTALLED_CA="$(kubectl -n istio-system get pod -l istio=istiod \
+    -o jsonpath='{.items[].spec.containers[].env[?(@.name=="EXTERNAL_CA")].value}')"
+  [[ "${INSTALLED_CA}" = "ISTIOD_RA_CAS_API" ]] && return 0
 }
 
 bind_user_to_iam_policy(){
@@ -1349,6 +1422,7 @@ One or more IAM roles required to install ASM is missing. Please add
 ${GCLOUD_MEMBER} to the roles above, or run
 the script with "--enable_gcp_iam_roles" to allow the script to add
 them on your behalf.
+$(enable_common_message)
 EOF
   fi
 }
@@ -1389,6 +1463,7 @@ roles/resourcemanager.projectIamAdmin
 roles/iam.serviceAccountAdmin
 roles/iam.serviceAccountKeyAdmin
 roles/gkehub.admin
+roles/privateca.admin
 EOF
 }
 
@@ -1408,6 +1483,7 @@ gkeconnect.googleapis.com
 gkehub.googleapis.com
 cloudresourcemanager.googleapis.com
 stackdriver.googleapis.com
+privateca.googleapis.com
 EOF
 }
 # [END required_apis]
@@ -1443,6 +1519,7 @@ exit_if_apis_not_enabled() {
 One or more APIs are not enabled. Please enable them and retry, or run the
 script with the '--enable_gcp_apis' flag to allow the script to enable them on
 your behalf.
+$(enable_common_message)
 EOF
   fi
 }
@@ -1528,6 +1605,7 @@ exit_if_cluster_unlabeled() {
 One or more required cluster labels were not found. Please label them and retry,
 or run the script with the '--enable_cluster_labels' flag to allow the script
 to enable them on your behalf.
+$(enable_common_message)
 EOF
   fi
 }
@@ -1593,6 +1671,7 @@ exit_if_no_workload_identity() {
 Workload identity is not enabled on ${CLUSTER_NAME}. Please enable it and
 retry, or run the script with the '--enable_gcp_components' flag to allow
 the script to enable it on your behalf.
+$(enable_common_message)
 EOF
   fi
 }
@@ -1628,6 +1707,7 @@ exit_if_stackdriver_not_enabled() {
 Cloud Operations (Stackdriver)  is not enabled on ${CLUSTER_NAME}.
 Please enable it and retry, or run the script with the
 '--enable_gcp_components' flag to allow the script to enable it on your behalf.
+$(enable_common_message)
 EOF
   fi
 }
@@ -1664,6 +1744,7 @@ exit_if_not_cluster_admin() {
 Current user must have the cluster-admin role on ${CLUSTER_NAME}.
 Please add the cluster role binding and retry, or run the script with the
 '--enable_cluster_roles' flag to allow the script to enable it on your behalf.
+$(enable_common_message)
 EOF
   fi
 }
@@ -1693,6 +1774,9 @@ configure_package() {
     run kpt cfg set asm gcloud.project.environProjectID "${ENVIRON_PROJECT_ID}"
     run kpt cfg set asm anthos.servicemesh.hubMembershipID "${HUB_MEMBERSHIP_ID}"
   fi
+  if [[ -n "${CA_NAME}" && "${CA}" = "gcp_cas" ]]; then
+    run kpt cfg set asm anthos.servicemesh.external_ca.ca_name "${CA_NAME}"
+  fi
 }
 
 print_config() {
@@ -1715,6 +1799,20 @@ install_secrets() {
     --from-file="${CA_CHAIN}"
 }
 
+init_gcp_cas() {
+  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="$PROJECT_ID.svc.id.goog[istio-system/istiod-service-account]"
+
+  local NAME; NAME=$(echo "${CA_NAME}" | cut -f6 -d/)
+  local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
+  local CA_PROJECT; CA_PROJECT=$(echo "${CA_NAME}" | cut -f2 -d/)
+
+  retry 3 run gcloud beta privateca subordinates add-iam-policy-binding "${NAME}" \
+    --location "${CA_LOCATION}" \
+    --project "${CA_PROJECT}" \
+    --member "serviceAccount:${WORKLOAD_IDENTITY}" \
+    --role "roles/privateca.certificateManager"
+}
+
 does_istiod_exist(){
   local RETVAL; RETVAL=0;
   kubectl get service \
@@ -1725,9 +1823,13 @@ does_istiod_exist(){
 }
 
 install_asm() {
+  if ! does_istiod_exist; then
+    info "Installing validation webhook fix..."
+    retry 3 run kubectl apply -f "${VALIDATION_FIX_SERVICE}"
+  fi
 
   local PARAMS
-  PARAMS="-f ${OPERATOR_MANIFEST} -f ${MULTICLUSTER_MANIFEST}"
+  PARAMS="-f ${OPERATOR_MANIFEST}"
   while read -d ',' -r yaml_file; do
     PARAMS="${PARAMS} -f ${yaml_file}"
   done <<EOF
@@ -1755,11 +1857,6 @@ EOF
   run ./"${ISTIOCTL_REL_PATH}" manifest generate \
     <"${RAW_YAML}" \
     >"${EXPANDED_YAML}"
-
-  if ! does_istiod_exist; then
-    info "Installing validation webhook fix..."
-    retry 3 run kubectl apply -f "${VALIDATION_FIX_SERVICE}"
-  fi
 
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
     info "Installing ASM CanonicalService controller in asm-system namespace..."
@@ -1826,7 +1923,7 @@ outro() {
     info "The version of istioctl that matches the installation can be found at:"
     info "${OUTPUT_DIR}/${ISTIOCTL_REL_PATH}"
   fi
-  if ! is_managed || ! is_sa; then
+  if ! is_managed && ! is_sa; then
     info "The combined configuration generated for installation can be found at:"
     info "${OUTPUT_DIR}/${RAW_YAML}"
     info "The full, expanded set of kubernetes resources can be found at:"

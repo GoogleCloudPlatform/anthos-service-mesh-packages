@@ -169,6 +169,17 @@ EOF
   anneal_k8s "${NAMESPACE}"
 }
 
+label_with_revision() {
+  local NAMESPACE; NAMESPACE="$1"
+  local LABEL; LABEL="$2"
+
+  kubectl label \
+    namespace "${NAMESPACE}" \
+    istio-injection- \
+    "${LABEL}" \
+    --overwrite
+}
+
 install_strict_policy() {
   local NAMESPACE; NAMESPACE="$1"
 

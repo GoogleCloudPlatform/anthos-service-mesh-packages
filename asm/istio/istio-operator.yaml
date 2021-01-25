@@ -17,7 +17,7 @@ kind: IstioOperator
 spec:
   profile: asm-gcp
   hub: gcr.io/gke-release/asm # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}
-  tag: 1.8.1-asm.5 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
+  tag: ASM_IMAGE_TAG # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
   components:
     pilot:
       k8s:
@@ -31,13 +31,12 @@ spec:
         - name: PILOT_ENABLE_WORKLOAD_ENTRY_AUTOREGISTRATION
           value: "true"
   meshConfig:
+    trustDomain: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
     defaultConfig:
       proxyMetadata:
         GCE_METADATA_HOST: "metadata.google.internal"
-        TRUST_DOMAIN: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
   values:
     global:
-      trustDomain: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
       # Enable SDS
       sds:
         token:

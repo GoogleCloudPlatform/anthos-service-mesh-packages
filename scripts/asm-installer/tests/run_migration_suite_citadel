@@ -20,7 +20,7 @@ main() {
     auth_service_account
   fi
 
-  local CLUSTER_NAME; CLUSTER_NAME="migration-citadel-${BUILD_ID::8}";
+  local CLUSTER_NAME; CLUSTER_NAME="ephem-migration-citadel-${BUILD_ID::8}";
   local NAMESPACE; NAMESPACE="namespace-${BUILD_ID}"
   readonly CLUSTER_NAME
   readonly NAMESPACE
@@ -66,6 +66,8 @@ main() {
     fatal "Failed to fork child process to send traffic."
   fi
 
+  mkfifo "${CLUSTER_NAME}"
+
   echo "Installing ASM with Citadel..."
   if [[ -n "${SERVICE_ACCOUNT}" ]]; then
     echo "../install_asm \
@@ -83,7 +85,8 @@ main() {
       -m migrate \
       -c citadel \
       -s "${SERVICE_ACCOUNT}" \
-      -k "${KEY_FILE}" -v -e
+      -k "${KEY_FILE}" -v -e \
+      2>&1 | tee "${CLUSTER_NAME}" &
   else
     echo "../install_asm \
       -l ${CLUSTER_LOCATION} \
@@ -96,7 +99,8 @@ main() {
       -n "${CLUSTER_NAME}" \
       -p "${PROJECT_ID}" \
       -m migrate \
-      -c citadel -v -e
+      -c citadel -v -e \
+      2>&1 | tee "${CLUSTER_NAME}" &
   fi
 
   if ps -p "${SEND_TRAFFIC_CMD_PID}" > /dev/null; then
@@ -109,6 +113,10 @@ main() {
 
   sleep 5
 
+  LABEL="$(grep -o -m 1 'istio.io/rev=\S*' "${CLUSTER_NAME}")"
+  rm "${CLUSTER_NAME}"
+  echo "Relabelling namsepace with ${LABEL}..."
+  label_with_revision "${NAMESPACE}" "${LABEL}"
   echo "Performing a rolling restart of the demo app..."
   roll "${NAMESPACE}"
 

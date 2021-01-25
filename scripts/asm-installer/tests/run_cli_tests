@@ -34,6 +34,7 @@ clear_variables() {
   CA=""; export CA;
 
   OPERATOR_OVERLAY=""; export OPERATOR_OVERLAY;
+  CUSTOM_OVERLAY=""; export CUSTOM_OVERLAY;
   ENABLE_ALL=0; export ENABLE_ALL;
   ENABLE_GCP_APIS=0; export ENABLE_GCP_APIS;
   ENABLE_GCP_IAM_ROLES=0; export ENABLE_GCP_IAM_ROLES;
@@ -424,6 +425,19 @@ test_main() {
   fi
 
   #################
+  # The multicluster profile should get added all the time, not just install
+  #################
+
+  validate_args
+
+  if [[ "${CUSTOM_OVERLAY}" != *multicluster.yaml* ]]; then
+    echo "Multicluster yaml added by default in all paths: FAIL"
+    ((++FAILURES))
+  else
+    echo "Multicluster yaml added by default in all paths: PASS"
+  fi
+
+  #################
   # find_missing_strings shouldn't return anything with a trailing comma
   #################
 
@@ -440,7 +454,7 @@ EOF
     echo "find_missing_strings is formatted properly: FAIL"
     ((++FAILURES))
   else
-    echo "find_missing_strings is formatted properly: FAIL"
+    echo "find_missing_strings is formatted properly: PASS"
   fi
 
 

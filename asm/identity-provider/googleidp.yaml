@@ -1,10 +1,10 @@
 ---
-apiVersion: security.anthos.io/v1alpha1
+apiVersion: security.cloud.google.com/v1alpha1
 kind: IdentityProvider
 metadata:
   name: google
 spec:
   authentication:
     oidc:
-      issuerUri: "https://accounts.google.com"
+      issuerUri: https://accounts.google.com
   serviceAccount: request.auth.claims[email]
