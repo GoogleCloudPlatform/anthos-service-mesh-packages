@@ -26,13 +26,12 @@ spec:
         - name: ENABLE_STACKDRIVER_MONITORING
           value: "true" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.controlplane.monitoring.enabled"}
   meshConfig:
+    trustDomain: "cluster.local"
     defaultConfig:
       proxyMetadata:
-        TRUST_DOMAIN: "cluster.local"
         CA_PROVIDER: "Citadel"
         PLUGINS: ""
   values:
     global:
-      trustDomain: "cluster.local"
       caAddress: ""
       pilotCertProvider: "istiod"
