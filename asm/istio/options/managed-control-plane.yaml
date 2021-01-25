@@ -35,12 +35,12 @@ spec:
         app: istio-ingressgateway
         istio: ingressgateway
   meshConfig:
+    trustDomain: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
     defaultConfig:
       proxyMetadata:
         CA_ROOT_CA: "/etc/ssl/certs/ca-certificates.crt"
         XDS_ROOT_CA: "/etc/ssl/certs/ca-certificates.crt"
         OUTPUT_CERTS: "/etc/istio/proxy"
-        TRUST_DOMAIN: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
         XDS_TOKEN_TYPE: "Istio"
         XDS_HEADER_Cloud-Run-Enable-H2: "y"
   values:
