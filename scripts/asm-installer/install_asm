@@ -906,7 +906,7 @@ EOF
 
   if [[ "${ENABLE_ALL}" -eq 1 || "${ENABLE_CLUSTER_ROLES}" -eq 1 || \
     "${ENABLE_CLUSTER_LABELS}" -eq 1 || "${ENABLE_GCP_APIS}" -eq 1 || \
-    "${ENABLE_GCP_IAM_ROLES}" -eq 1 || "${ENABLE_GCP_COMPONENTS}" -eq 1 \
+    "${ENABLE_GCP_IAM_ROLES}" -eq 1 || "${ENABLE_GCP_COMPONENTS}" -eq 1 || \
     "${ENABLE_REGISTRATION}" -eq 1 ]]; then
     if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
       fatal "The only_validate flag cannot be used with any --enable* flag"
