@@ -30,16 +30,15 @@ spec:
           - name: TOKEN_AUDIENCES
             value: "istio-ca,ENVIRON_PROJECT_ID.hub.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.token-audiences-hub"}
   meshConfig:
+    trustDomain: "ENVIRON_PROJECT_ID.hub.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain-hub"}
     defaultConfig:
       proxyMetadata:
         GCP_METADATA: "PROJECT_ID|PROJECT_NUMBER|asm-cluster|us-central1-c" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-hub-metadata"}
-        TRUST_DOMAIN: "ENVIRON_PROJECT_ID.hub.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain-hub"}
         GKE_CLUSTER_URL: "https://gkehub.googleapis.com/projects/ENVIRON_PROJECT_ID/locations/global/memberships/MEMBERSHIP_ID" # {"$ref":"#/definitions/io.k8s.cli.substitutions.hub-idp-url"}
     trustDomainAliases: # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases"}
       - "ENVIRON_PROJECT_ID.hub.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain-hub"}
   values:
     global:
-      trustDomain: "ENVIRON_PROJECT_ID.hub.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain-hub"}
       # Enable SDS
       sds:
         token:
