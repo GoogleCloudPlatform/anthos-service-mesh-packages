@@ -39,6 +39,7 @@ publish_script() {
     echo "No changes in ${FILE_NAME}, skipping"
     rm "${FILE_NAME}.sha256"
     return
+
   fi
   rm "${FILE_NAME}.sha256"
 
