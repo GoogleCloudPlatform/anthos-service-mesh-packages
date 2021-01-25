@@ -1,6 +1,6 @@
-#!/bin/bash
-set -CeEu
-set -o pipefail
+LT_CLUSTER_NAME="long-term-test-cluster"
+LT_CLUSTER_LOCATION="us-central1-c"
+LT_PROJECT_ID="asm-scriptaro-oss"
 
 BUILD_ID="${BUILD_ID:=}"; export BUILD_ID;
 PROJECT_ID="${PROJECT_ID:=}"; export PROJECT_ID;
@@ -33,6 +33,13 @@ fatal_with_usage() {
   warn "$1"
   usage
   exit 2
+}
+
+uniq_name() {
+  TEST_NAME="${1}"
+  BUILD_ID="${2}"
+  HASH="$(echo "${TEST_NAME}/${BUILD_ID}" | sha256sum)"
+  echo "${HASH::16}"
 }
 
 arg_required() {
@@ -255,11 +262,28 @@ create_working_cluster() {
 
   KUBECONFIG="$(mktemp)"
   export KUBECONFIG
+  configure_kubectl  "${CLUSTER_NAME}" "${PROJECT_ID}" "${CLUSTER_LOCATION}"
+
+}
+
+configure_kubectl() {
+  local CLUSTER_NAME; CLUSTER_NAME="${1}";
+  local PROJECT_ID; PROJECT_ID="${2}";
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="${3}";
 
   gcloud container clusters get-credentials \
     "${CLUSTER_NAME}" \
     --project "${PROJECT_ID}" \
     --zone="${CLUSTER_LOCATION}"
+}
+
+cleanup_lt_cluster() {
+  local NAMESPACE; NAMESPACE="$1"
+  local DIR; DIR="$2"
+  local REV; REV="$3"
+
+  remove_ns "${NAMESPACE}" || true
+  "${DIR}"/istio*/bin/istioctl x uninstall --revision "${REV}" -y
 }
 
 cleanup() {
