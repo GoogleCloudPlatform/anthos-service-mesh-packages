@@ -104,6 +104,9 @@ HUB_MEMBERSHIP_ID=""
 # Environment variable used by VM
 USE_VM=0
 
+# Managed Control Plane variables
+LOGS_BUCKET="${LOGS_BUCKET:=asm-control-plane-logs}"
+
 main() {
   init
   parse_args "${@}"
@@ -231,9 +234,11 @@ EOF
   fi
 
   if [[ "${MANAGED}" -eq 1 ]]; then
+    establish_managed_logging_bucket
     start_managed_control_plane
     configure_package
     install_managed_components
+    grant_managed_logging_permissions
     outro
     return 0
   fi
@@ -1975,6 +1980,16 @@ EOF
   fi
 
   outro
+}
+
+establish_managed_logging_bucket() {
+  gcloud beta logging buckets create ${LOGS_BUCKET} --project=${PROJECT_ID} --location=${CLUSTER_LOCATION}
+}
+
+grant_managed_logging_permissions() {
+  gcloud projects add-iam-policy-binding ${PROJECT_ID} \
+    --member=serviceAccount:${MANAGED_SERVICE_ACCOUNT} \
+    --role=roles/logging.bucketWriter
 }
 
 start_managed_control_plane() {
