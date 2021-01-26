@@ -182,7 +182,6 @@ steps:
     ./tests/run_basic_suite
     --PROJECT_ID "${PROJECT_ID}"
     --BUILD_ID "${BUILD_ID}"
-    --CLUSTER_LOCATION "${_CLUSTER_LOCATION}"
   waitFor:
   - 'run-print-config-test'
   - 'run-cli-tests'
@@ -192,7 +191,7 @@ steps:
   - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
   - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
   - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
-  timeout: 2400s # 40 mins
+  timeout: 600s # 40 mins
 
 - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
   dir: 'scripts/asm-installer'

@@ -4,6 +4,7 @@ set -o pipefail
 
 SPATH="$(readlink -f "$0")"
 SDIR="$(dirname "${SPATH}")"; export SDIR;
+SCRIPT_NAME="${0##*/}"
 
 # shellcheck source=common.sh
 . "${SDIR}/common.sh"
@@ -12,21 +13,18 @@ cd "${SDIR}"
 
 main() {
   # CLI setup
+  date +"%T"
   parse_args "$@"
 
-  # Cluster setup
   if [[ -n "${SERVICE_ACCOUNT}" ]]; then
     echo "Authorizing service acount..."
     auth_service_account
   fi
 
-  local CLUSTER_NAME; CLUSTER_NAME="ephem-basic-suite-${BUILD_ID::8}";
-  local NAMESPACE; NAMESPACE="namespace-${BUILD_ID}"
-  echo "Creating cluster ${CLUSTER_NAME}..."
-  create_working_cluster "${PROJECT_ID}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}"
-  # this trap isn't tested for all circumstances so caveat emptor
-  trap 'cleanup "${PROJECT_ID}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}" "${NAMESPACE}"; exit 1;' ERR
+  local NAMESPACE; NAMESPACE="$(uniq_name "${SCRIPT_NAME}" "${BUILD_ID}")"
+  local OUTPUT_DIR; OUTPUT_DIR="$(mktemp -d)"
 
+  configure_kubectl "${LT_CLUSTER_NAME}" "${PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
   # Demo app setup
   echo "Installing and verifying demo app..."
   install_demo_app "${NAMESPACE}"
@@ -34,45 +32,45 @@ main() {
   local GATEWAY; GATEWAY="$(kube_ingress "${NAMESPACE}")";
   verify_demo_app "$GATEWAY"
 
+  if [[ -n "${KEY_FILE}" && -n "${SERVICE_ACCOUNT}" ]]; then
+    KEY_FILE="-k ${KEY_FILE}"
+    SERVICE_ACCOUNT="-s ${SERVICE_ACCOUNT}"
+  fi
+
+  mkfifo "${NAMESPACE}"
+
   # Test starts here
   echo "Installing ASM with MeshCA..."
-  if [[ -n "${SERVICE_ACCOUNT}" ]]; then
-    echo "../install_asm \
-      -l ${CLUSTER_LOCATION} \
-      -n ${CLUSTER_NAME} \
-      -p ${PROJECT_ID} \
-      -m install \
-      -c mesh_ca \
-      -s ${SERVICE_ACCOUNT} \
-      -k ${KEY_FILE} -v -e"
-    ../install_asm \
-      -l "${CLUSTER_LOCATION}" \
-      -n "${CLUSTER_NAME}" \
-      -p "${PROJECT_ID}" \
-      -m install \
-      -c mesh_ca \
-      -s "${SERVICE_ACCOUNT}" \
-      -k "${KEY_FILE}" -v -e
-  else
-    echo "../install_asm \
-      -l ${CLUSTER_LOCATION} \
-      -n ${CLUSTER_NAME} \
-      -p ${PROJECT_ID} \
-      -m install \
-      -c mesh_ca -v -e"
-    ../install_asm \
-      -l "${CLUSTER_LOCATION}" \
-      -n "${CLUSTER_NAME}" \
-      -p "${PROJECT_ID}" \
-      -m install \
-      -c mesh_ca -v -e
-  fi
+  echo "_CI_REVISION_PREFIX=${NAMESPACE} \
+  ../install_asm ${KEY_FILE} ${SERVICE_ACCOUNT} \
+    -l ${LT_CLUSTER_LOCATION} \
+    -n ${LT_CLUSTER_NAME} \
+    -p ${PROJECT_ID} \
+    -m install \
+    -c mesh_ca -v \
+    --output-dir ${OUTPUT_DIR}"
+  # shellcheck disable=SC2086
+  _CI_REVISION_PREFIX="${NAMESPACE}" \
+    ../install_asm ${KEY_FILE} ${SERVICE_ACCOUNT} \
+    -l "${LT_CLUSTER_LOCATION}" \
+    -n "${LT_CLUSTER_NAME}" \
+    -p "${PROJECT_ID}" \
+    -m install \
+    -c mesh_ca -v -e \
+    --output-dir "${OUTPUT_DIR}" \
+    2>&1 | tee "${NAMESPACE}" &
+
+  LABEL="$(grep -o -m 1 'istio.io/rev=\S*' "${NAMESPACE}")"
+  REV="$(echo "${LABEL}" | cut -f 2 -d =)"
+  echo "Got label ${LABEL}"
+  rm "${NAMESPACE}"
 
   sleep 5
   echo "Installing Istio manifests for demo app..."
   install_demo_app_istio_manifests "${NAMESPACE}"
 
   echo "Performing a rolling restart of the demo app..."
+  label_with_revision "${NAMESPACE}" "${LABEL}"
   roll "${NAMESPACE}"
 
   local SUCCESS; SUCCESS=0;
@@ -104,8 +102,8 @@ main() {
   fi
 
   # Cluster teardown
-  echo "Deleting cluster ${CLUSTER_NAME} and associated resources..."
-  cleanup "${PROJECT_ID}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}" "${NAMESPACE}"
+  cleanup_lt_cluster "${NAMESPACE}" "${OUTPUT_DIR}" "${REV}"
+  date +"%T"
   exit "$SUCCESS"
 }
 
