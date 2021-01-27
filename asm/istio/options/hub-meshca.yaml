@@ -29,6 +29,8 @@ spec:
             value: "PROJECT_ID|PROJECT_NUMBER|asm-cluster|us-central1-c" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-hub-metadata"}
           - name: TOKEN_AUDIENCES
             value: "istio-ca,ENVIRON_PROJECT_ID.hub.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.token-audiences-hub"}
+          - name: PILOT_ENABLE_WORKLOAD_ENTRY_AUTOREGISTRATION
+            value: "true" 
   meshConfig:
     trustDomain: "ENVIRON_PROJECT_ID.hub.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain-hub"}
     defaultConfig:
