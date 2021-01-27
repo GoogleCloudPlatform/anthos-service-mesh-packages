@@ -7,4 +7,4 @@ spec:
   authentication:
     oidc:
       issuerUri: https://accounts.google.com
-  serviceAccount: request.auth.claims[email]
+  serviceAccount: request.auth.claims["email"]
