@@ -1983,12 +1983,22 @@ EOF
 }
 
 establish_managed_logging_bucket() {
-  gcloud beta logging buckets create ${LOGS_BUCKET} --project=${PROJECT_ID} --location=${CLUSTER_LOCATION}
+  # The only supported regions are: global, us-central1, us-east1, us-west1, asia-east1, europe-west1.
+  BUCKET_LOCATION="global"
+  case "$CLUSTER_LOCATION" in
+    us-central*    ) BUCKET_LOCATION="us-central1";;
+    us-east*       ) BUCKET_LOCATION="us-east1";;
+    us-west*       ) BUCKET_LOCATION="us-west1";;
+    asia*          ) BUCKET_LOCATION="asia-east1";;
+    europe*        ) BUCKET_LOCATION="europe-west1";;
+    *              ) BUCKET_LOCATION="global";;
+  esac
+  gcloud beta logging buckets create "${LOGS_BUCKET}" --project="${PROJECT_ID}" --location="${BUCKET_LOCATION}"
 }
 
 grant_managed_logging_permissions() {
-  gcloud projects add-iam-policy-binding ${PROJECT_ID} \
-    --member=serviceAccount:${MANAGED_SERVICE_ACCOUNT} \
+  gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+    --member=serviceAccount:"${MANAGED_SERVICE_ACCOUNT}" \
     --role=roles/logging.bucketWriter
 }
 
