@@ -1982,18 +1982,50 @@ EOF
   outro
 }
 
+pref_len() {
+  local LEN; LEN="${#1}";
+  if ((${#2} > $LEN)); then
+    LEN="${#2}"
+  fi
+
+  for ((i=0; i<$LEN; ++i)); do
+    if [[ "${1:i:1}" != "${2:i:1}" ]]; then
+      echo "${i}"
+      return
+    fi
+  done
+
+  echo "${LEN}"
+}
+
+find_best_region() {
+  REGION="global"
+  BEST=0
+  for location in $(gcloud beta logging locations list --format='value(location_id)'); do
+    SCORE="$(pref_len "${CLUSTER_LOCATION}" "${location}")"
+    if (( $SCORE > $BEST )); then
+      BEST="${SCORE}"
+      REGION="${location}"
+    fi
+  done
+
+  echo ${REGION}
+}
+
+managed_logging_bucket_exists() {
+  BUCKET_LOCATION="$(find_best_region)"
+  BUCKET_COUNT=$(gcloud beta logging buckets list --project="$PROJECT_ID" --location="$BUCKET_LOCATION" --filter="$LOGS_BUCKET" --format=json | jq length)
+
+  if [[ -z "${BUCKET_COUNT}" ]] || [[ "${BUCKET_COUNT}" = '0' ]]; then
+    false
+  fi
+}
+
 establish_managed_logging_bucket() {
-  # The only supported regions are: global, us-central1, us-east1, us-west1, asia-east1, europe-west1.
-  BUCKET_LOCATION="global"
-  case "$CLUSTER_LOCATION" in
-    us-central*    ) BUCKET_LOCATION="us-central1";;
-    us-east*       ) BUCKET_LOCATION="us-east1";;
-    us-west*       ) BUCKET_LOCATION="us-west1";;
-    asia*          ) BUCKET_LOCATION="asia-east1";;
-    europe*        ) BUCKET_LOCATION="europe-west1";;
-    *              ) BUCKET_LOCATION="global";;
-  esac
-  gcloud beta logging buckets create "${LOGS_BUCKET}" --project="${PROJECT_ID}" --location="${BUCKET_LOCATION}"
+  if managed_logging_bucket_exists; then return; fi
+
+  info "creating new logs bucket for managed control plane"
+  gcloud beta logging buckets create "${LOGS_BUCKET}" --project="${PROJECT_ID}" --location="$(find_best_region)"
 }
 
 grant_managed_logging_permissions() {
