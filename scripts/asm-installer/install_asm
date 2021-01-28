@@ -1219,7 +1219,7 @@ validate_cluster() {
   info "Confirming cluster information for ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
   RESULT="$(gcloud container clusters list \
     --project="${PROJECT_ID}" \
-    --filter="name = ${CLUSTER_NAME} and location = ${CLUSTER_LOCATION}" \
+    --filter="name = ${CLUSTER_NAME} AND location = ${CLUSTER_LOCATION}" \
     --format="value(name)" || true)"
   if [[ -z "${RESULT}" ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
