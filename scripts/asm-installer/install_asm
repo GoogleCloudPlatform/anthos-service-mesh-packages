@@ -405,7 +405,7 @@ is_sa() {
 }
 
 should_validate() {
-  if [[ "${PRINT_CONFIG}" -eq 1 || only_enable || "${_CI_NO_VALIDATE}" -eq 1 ]]; then false; fi
+  if [[ "${PRINT_CONFIG}" -eq 1 || "${_CI_NO_VALIDATE}" -eq 1 ]] || only_enable; then false; fi
 }
 
 only_enable() {
