@@ -1,6 +1,4 @@
-#!/bin/bash
-
-# shellcheck disable=SC1004,SC1012,SC2016,SC2034
+#!/usr/bin/env bash
 set -CeE
 set -o pipefail
 if [[ "${BASH_VERSINFO:-0}" -lt 4 ]]; then
@@ -10,16 +8,17 @@ This script was written with the latest POSIX standard in mind, and was only
 tested with modern shell standards. This script may not perform correctly in
 this environment.
 EOF
-sleep 1
+  sleep 1
 else
   set -u
 fi
 
 ### Internal variables ###
-MAJOR="1"; MINOR="7"; PATCH="0";
+MAJOR="${MAJOR:=1}"
+MINOR="${MINOR:=8}"
+POINT="${POINT:=1}"
 ASM_RELEASE="${MAJOR}.${MINOR}"
-ASM_META_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-unset MAJOR; unset MINOR; unset PATCH;
+ASM_META_VERSION="${MAJOR}.${MINOR}.${POINT}"
 readonly ASM_RELEASE
 readonly ASM_META_VERSION
 
@@ -40,8 +39,6 @@ IP_REGEX="^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$"
 
 ### Command internal toggle ###
 CREATE_GCE_INSTANCE_TEMPLATE=0
-REGISTER_GCE_INSTANCE=0
-REGISTER_GCE_INSTANCE_GROUP=0
 
 ### Option variables ###
 PROJECT_ID="${PROJECT_ID:=}"
@@ -53,12 +50,6 @@ WORKLOAD_LABELS="${WORKLOAD_LABELS:=}"
 WORKLOAD_SERVICE_ACCOUNT="${WORKLOAD_SERVICE_ACCOUNT:=}"
 
 NEW_INSTANCE_TEMPLATE=""
-INSTANCE_NAME=""
-INSTANCE_GROUP_NAME=""
-
-INSTANCE_ZONE="${INSTANCE_ZONE:=}"
-INSTANCE_GROUP_ZONE="${INSTANCE_GROUP_ZONE:=}"
-INSTANCE_GROUP_REGION="${INSTANCE_GROUP_REGION:=}"
 
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT:=}"
 KEY_FILE="${KEY_FILE:=}"
@@ -66,36 +57,33 @@ KEY_FILE="${KEY_FILE:=}"
 DRY_RUN="${DRY_RUN:=0}"
 ONLY_VALIDATE="${ONLY_VALIDATE:=0}"
 VERBOSE="${VERBOSE:=0}"
-QUIET="${QUIET:=0}"
 
 ### Convenience functions ###
 
 #######
-# run takes a list of arguments that represents a command If DRY_RUN or VERBOSE
-# is enabled, it will print the command, and if DRY_RUN is not enabled it runs
-# the command.
+# run takes a list of arguments that represents a command
+# If DRY_RUN or VERBOSE is enabled, it will print the command, and if DRY_RUN is
+# not enabled it runs the command.
 #######
 run() {
-  if [[ "${DRY_RUN}" -ne 0 ]]; then
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
     warn "Would have executed: ${*}"
     return
   elif [[ "${VERBOSE}" -eq 0 ]]; then
-    "${@}"
+    "${@}" 2>/dev/null
     return "$?"
   fi
-  warn "Running: '${*}'"
-  warn "-------------"
+  info "Running: '${*}'"
+  info "-------------"
   local RETVAL
   { "${@}"; RETVAL="$?"; } || true
-  warn "-------------"
-  warn "Ran: '${*}'"
   return $RETVAL
 }
 
 #######
 # retry takes an integer N as the first argument, and a list of arguments
 # representing a command afterwards. It will retry the given command up to N
-# times before returning 1. If the command is gcloud or kubectl, it will try to
+# times before returning 1. If the command is kubectl, it will try to
 # re-get credentials in case something caused the k8s IP to change.
 #######
 retry() {
@@ -103,16 +91,16 @@ retry() {
   shift 1
   for i in $(seq 0 "${MAX_TRIES}"); do
     if [[ "${i}" -eq "${MAX_TRIES}" ]]; then
-      return 1
+      false
     fi
     { "${@}" && return 0; } || true
     warn "Failed, retrying...($((i+1)) of ${MAX_TRIES})"
     sleep 2
-    if [[ "$1" == "gcloud" || "$1" == "kubectl" ]]; then
+    if [[ "$1" == "kubectl" ]]; then
       configure_kubectl
     fi
   done
-  return 1
+  false
 }
 
 #######
@@ -144,27 +132,43 @@ watch_for_result() {
   return 1
 }
 
+strip_last_char() {
+  echo "${1:0:$((${#1} - 1))}"
+}
+
 configure_kubectl(){
   info "Fetching/writing GCP credentials to kubeconfig file..."
   retry 2 run gcloud container clusters get-credentials "${CLUSTER_NAME}" \
     --project="${PROJECT_ID}" \
     --zone="${CLUSTER_LOCATION}"
+
+  info "Verifying connectivity (20s)..."
+  local RETVAL; RETVAL=0;
+  kubectl cluster-info --request-timeout='20s' 1>/dev/null 2>/dev/null || RETVAL=$?
+  if [[ "${RETVAL}" -ne 0 ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Couldn't connect to ${CLUSTER_NAME}.
+If this is a private cluster, verify that the correct firewall rules are applied.
+https://cloud.google.com/service-mesh/docs/gke-install-overview#requirements
+EOF
+  fi
+  info "kubeconfig set to ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
 }
 
 warn() {
-  info "${1}" >&2
+  info "[WARNING]: ${1}" >&2
+}
+
+error() {
+  info "[ERROR]: ${1}" >&2
 }
 
 info() {
-  if [[ "${QUIET}" -ne 0 ]]; then
-    return
-  else
-    echo "${SCRIPT_NAME}: ${1}"
-  fi
+  echo "${SCRIPT_NAME}: ${1}" >&2
 }
 
 fatal() {
-  warn "ERROR: ${1}"
+  error "${1}"
   exit 2
 }
 
@@ -172,10 +176,6 @@ fatal_with_usage() {
   warn "${1}"
   if [[ "${CREATE_GCE_INSTANCE_TEMPLATE}" -eq 1 ]]; then
     usage_create_gce_instance_template >&2
-  elif [[ "${REGISTER_GCE_INSTANCE}" -eq 1 ]]; then
-    usage_register_gce_instance >&2
-  elif [[ "${REGISTER_GCE_INSTANCE_GROUP}" -eq 1 ]]; then
-    usage_register_gce_instance_group >&2
   else
     usage_asm_vm >&2
   fi
@@ -190,8 +190,6 @@ ASM VM command line utility to add GCE instances to Anthos Service Mesh.
 
 COMMANDS:
   create_gce_instance_template   Create a new GCE instance template for ASM VMs.
-  register_gce_instance          Register a single GCE instance in ASM.
-  register_gce_instance_group    Register an instance group in ASM.
 
 OPTIONS:
   -h|--help                      Show this message and exit.
@@ -209,185 +207,47 @@ All options can also be passed via environment variables by using the ALL_CAPS
 name. Options specified via flags take precedence over environment variables.
 
 POSITIONAL ARGUMENTS:
-  NAME                                                      Name of the instance
-                                                            template to create.
+  NAME                                              Name of the instance
+                                                    template to create.
 
 OPTIONS:
-  -l|--cluster_location         <CLUSTER_LOCATION>          The GCP location of
-                                                            the target cluster.
-  -n|--cluster_name             <CLUSTER_NAME>              The name of the
-                                                            target cluster.
-  -i|--source_instance_template <SOURCE_INSTANCE_TEMPLATE>  (optional) The name
-                                                            of the source GCE
-                                                            instance template.
-  -p|--project_id               <PROJECT_ID>                The GCP project ID.
-  -w|--workload_name            <WORKLOAD_NAME>             The name of the
-                                                            workload running on
-                                                            the GCE instance(s).
-  -e|--workload_labels          <WORKLOAD_LABELS>           (optional) The
-                                                            labels of the
-                                                            workload, comma
-                                                            separated.
-  -s|--service_account          <SERVICE_ACCOUNT>           (optional) The name
-                                                            of a service account
-                                                            used to run the
-                                                            script.
-  -k|--key_file                 <FILE PATH>                 (optional) The key
-                                                            file for a service
-                                                            account. Required if
-                                                            --service_account is
-                                                            passed.
-  -v|--verbose                                              Print commands
-                                                            before and after
-                                                            execution.
-     --dry_run                                              Print commands,
-                                                            don't execute them.
-     --only_validate                                        Run validation but
-                                                            don't install.
-  -h|--help                                                 Show this message
-                                                            and exit.
+  -l|--cluster_location         <LOCATION>          The GCP location of the
+                                                    target cluster.
+  -n|--cluster_name             <NAME>              The name of the target
+                                                    cluster.
+  -p|--project_id               <ID>                The GCP project ID.
+  -w|--workload_name            <WORKLOAD_NAME>     The name of the workload
+                                                    running on the GCE
+                                                    instance(s).
+  -e|--workload_labels          <WORKLOAD_LABELS>   (optional) The
+                                                    labels of the workload,
+                                                    comma separated.
+  -i|--source_instance_template <TEMPLATE>          (optional) The name of the
+                                                    source GCE instance
+                                                    template.
+  -s|--service_account          <SERVICE_ACCOUNT>   (optional) The name of a
+                                                    service account used to run
+                                                    the script.
+  -k|--key_file                 <FILE PATH>         (optional) The key file for
+                                                    a service account. Required
+                                                    if --service_account is
+                                                    passed.
+
+FLAGS:
+
+  -v|--verbose                                      Print commands before and
+                                                    after execution.
+     --dry_run                                      Print commands, but don't
+                                                    execute them.
+     --only_validate                                Run validation but don't
+                                                    install.
+  -h|--help                                         Show this message and exit.
 
 EXAMPLE:
 The following invocation will prepare a GCE VM template named "my_vm_template"
 in project "my_project" based on the configurations in ASM cluster "my_cluster"
 in zone "us-central1-c":
   $> ${SCRIPT_NAME} create_gce_instance_template my_vm_template \\
-      -n my_cluster \\
-      -p my_project \\
-      -l us-central1-c \\
-      -i base_vm_template \\
-      -w checkout \\
-      -e app=checkout
-EOF
-}
-
-usage_register_gce_instance() {
-  cat << EOF
-usage: ${SCRIPT_NAME} register_gce_instance NAME [OPTION]...
-
-Register a single GCE instance in an existing ASM cluster.
-All options can also be passed via environment variables by using the ALL_CAPS
-name. Options specified via flags take precedence over environment variables.
-
-POSITIONAL ARGUMENTS:
-  NAME                                              Name of the GCE instance
-                                                    to register.
-
-OPTIONS:
-  -z|--zone                     <INSTANCE_ZONE>       The GCP zone of the target
-                                                      instance.
-  -l|--cluster_location         <CLUSTER_LOCATION>    The GCP location of the
-                                                      target cluster.
-  -n|--cluster_name             <CLUSTER_NAME>        The name of the target
-                                                      cluster.
-  -p|--project_id               <PROJECT_ID>          The GCP project ID.
-  -w|--workload_name            <WORKLOAD_NAME>       The name of the workload
-                                                      running on the GCE
-                                                      instance(s).
-  -e|--workload_labels          <WORKLOAD_LABELS>     (optional) The labels of
-                                                      the workload, comma
-                                                      separated.
-  -a|--workload_service_account <WORKLOAD_SERVICE_ACCOUNT>
-                                                      (optional) The service
-                                                      account associated with
-                                                      the workload instance.
-                                                      If not specified, it will
-                                                      use the default GCE
-                                                      service account of your
-                                                      project.
-  -s|--service_account          <SERVICE_ACCOUNT>     (optional) The name of a
-                                                      service account used to
-                                                      run the script.
-  -k|--key_file                 <FILE PATH>           (optional) The key file
-                                                      for a service
-                                                      account. Required if
-                                                      --service_account is
-                                                      passed.
-  -v|--verbose                                        Print commands before and
-                                                      after execution.
-     --dry_run                                        Print the yaml files,
-                                                      don't apply them.
-     --only_validate                                  Run validation but don't
-                                                      install.
-  -q|--quiet                                          Turn off logging.
-  -h|--help                                           Show this message and
-                                                      exit.
-
-EXAMPLE:
-The following invocation will register a GCE instance "my_instance" in zone
-"us-central1-c" of project "my_project" in ASM cluster "my_cluster" in zone
-"us-central1-c":
-  $> ${SCRIPT_NAME} register_gce_instance my_instance \\
-      -z us-central1-c \\
-      -n my_cluster \\
-      -p my_project \\
-      -l us-central1-c \\
-      -i base_vm_template \\
-      -w checkout \\
-      -e app=checkout
-EOF
-}
-
-usage_register_gce_instance_group() {
-  cat << EOF
-usage: ${SCRIPT_NAME} register_gce_instance_group NAME [OPTION]...
-
-Register instances in a GCE instance group in an existing ASM cluster.
-All options can also be passed via environment variables by using the ALL_CAPS
-name. Options specified via flags take precedence over environment variables.
-
-POSITIONAL ARGUMENTS:
-  NAME                                                Name of the GCE instance
-                                                      group to register.
-
-OPTIONS:
-  -z|--zone                 <INSTANCE_GROUP_ZONE>     The GCP zone of the target
-                                                      instance group.
-  -r|--region               <INSTANCE_GROUP_REGION>   The GCP region of the
-                                                      target instance group.
-  -l|--cluster_location     <CLUSTER_LOCATION>        The GCP location of the
-                                                      target cluster.
-  -n|--cluster_name         <CLUSTER_NAME>            The name of the target
-                                                      cluster.
-  -p|--project_id           <PROJECT_ID>              The GCP project ID.
-  -w|--workload_name        <WORKLOAD_NAME>           The name of the workload
-                                                      running on the GCE
-                                                      instance(s).
-  -e|--workload_labels      <WORKLOAD_LABELS>         (optional) The labels of
-                                                      the workload, comma
-                                                      separated.
-  -a|--workload_service_account <WORKLOAD_SERVICE_ACCOUNT>
-                                                      (optional) The service
-                                                      account associated with
-                                                      the workload instances.
-                                                      If not specified, it will
-                                                      use the default GCE
-                                                      service account of your
-                                                      project.
-  -s|--service_account      <SERVICE_ACCOUNT>         (optional) The name of a
-                                                      service account used to
-                                                      run the script.
-  -k|--key_file             <FILE PATH>               (optional) The key file
-                                                      for a service account.
-                                                      Required if
-                                                      --service_account is
-                                                      passed.
-  -v|--verbose                                        Print commands before and
-                                                      after execution.
-     --dry_run                                        Print the yaml files,
-                                                      don't apply them.
-     --only_validate                                  Run validation but don't
-                                                      install.
-  -q|--quiet                                          Turn off logging.
-  -h|--help                                           Show this message and
-                                                      exit.
-
-EXAMPLE:
-The following invocation will register instances in a GCE instance group
-"my_instance_group" in zone "us-central1-c" of project "my_project" in ASM
-cluster "my_cluster" in zone "us-central1-c":
-  $> ${SCRIPT_NAME} register_gce_instance_group my_instance_group \\
-      -z us-central1-c \\
       -n my_cluster \\
       -p my_project \\
       -l us-central1-c \\
@@ -416,16 +276,6 @@ parse_args() {
     create_gce_instance_template)
       CREATE_GCE_INSTANCE_TEMPLATE=1; readonly CREATE_GCE_INSTANCE_TEMPLATE;
       parse_args_create_gce_instance_template "${@}"
-      shift 1
-      ;;
-    register_gce_instance)
-      REGISTER_GCE_INSTANCE=1; readonly REGISTER_GCE_INSTANCE;
-      parse_args_register_gce_instance "${@}"
-      shift 1
-      ;;
-    register_gce_instance_group)
-      REGISTER_GCE_INSTANCE_GROUP=1; readonly REGISTER_GCE_INSTANCE_GROUP;
-      parse_args_register_gce_instance_group "${@}"
       shift 1
       ;;
     -h | --help)
@@ -514,181 +364,6 @@ parse_args_create_gce_instance_template() {
   done
 }
 
-parse_args_register_gce_instance() {
-  # shellcheck disable=SC2064
-  trap "$(shopt -p nocasematch)" RETURN
-  shopt -s nocasematch
-
-  if [[ ! "${2:-}" || "${2:0:1}" = '-' ]]; then
-    fatal_with_usage "Command register_gce_instance requires an argument."
-  fi
-  INSTANCE_NAME="${2}"
-  shift 2
-
-  while [[ ${#} != 0 ]]; do
-    case "${1}" in
-      -z | --zone)
-        arg_required "${@}"
-        INSTANCE_ZONE="${2}"
-        shift 2
-        ;;
-      -l | --cluster_location | --cluster-location)
-        arg_required "${@}"
-        CLUSTER_LOCATION="${2}"
-        shift 2
-        ;;
-      -n | --cluster_name | --cluster-name)
-        arg_required "${@}"
-        CLUSTER_NAME="${2}"
-        shift 2
-        ;;
-      -p | --project_id | --project-id)
-        arg_required "${@}"
-        PROJECT_ID="${2}"
-        shift 2
-        ;;
-      -w | --workload_name | --workload-name)
-        arg_required "${@}"
-        WORKLOAD_NAME="${2}"
-        shift 2
-        ;;
-      -e | --workload_labels | --workload-labels)
-        arg_required "${@}"
-        WORKLOAD_LABELS="${2}"
-        shift 2
-        ;;
-      -a | --workload_service_account | --workload-service-account)
-        arg_required "${@}"
-        WORKLOAD_SERVICE_ACCOUNT="${2}"
-        shift 2
-        ;;
-      -s | --service_account | --service-account)
-        arg_required "${@}"
-        SERVICE_ACCOUNT="${2}"
-        shift 2
-        ;;
-      -k | --key_file | --key-file)
-        arg_required "${@}"
-        KEY_FILE="${2}"
-        shift 2
-        ;;
-      --dry_run | --dry-run)
-        DRY_RUN=1
-        shift 1
-        ;;
-      --only_validate | --only-validate)
-        ONLY_VALIDATE=1
-        shift 1
-        ;;
-      -v | --verbose)
-        VERBOSE=1
-        shift 1
-        ;;
-      -q | --quiet)
-        QUIET=1
-        shift 1
-        ;;
-      -h | --help)
-        usage
-        exit
-        ;;
-      *)
-        fatal_with_usage "Unknown option ${1}"
-        ;;
-    esac
-  done
-}
-
-parse_args_register_gce_instance_group() {
-  # shellcheck disable=SC2064
-  trap "$(shopt -p nocasematch)" RETURN
-  shopt -s nocasematch
-
-  if [[ ! "${2:-}" || "${2:0:1}" = '-' ]]; then
-    fatal_with_usage "Command register_gce_instance_group requires an argument."
-  fi
-  INSTANCE_GROUP_NAME="${2}"
-  shift 2
-
-  while [[ ${#} != 0 ]]; do
-    case "${1}" in
-      -z | --zone)
-        arg_required "${@}"
-        INSTANCE_GROUP_ZONE="${2}"
-        shift 2
-        ;;
-      -r | --region)
-        arg_required "${@}"
-        INSTANCE_GROUP_REGION="${2}"
-        shift 2
-        ;;
-      -l | --cluster_location | --cluster-location)
-        arg_required "${@}"
-        CLUSTER_LOCATION="${2}"
-        shift 2
-        ;;
-      -n | --cluster_name | --cluster-name)
-        arg_required "${@}"
-        CLUSTER_NAME="${2}"
-        shift 2
-        ;;
-      -p | --project_id | --project-id)
-        arg_required "${@}"
-        PROJECT_ID="${2}"
-        shift 2
-        ;;
-      -w | --workload_name | --workload-name)
-        arg_required "${@}"
-        WORKLOAD_NAME="${2}"
-        shift 2
-        ;;
-      -e | --workload_labels | --workload-labels)
-        arg_required "${@}"
-        WORKLOAD_LABELS="${2}"
-        shift 2
-        ;;
-      -a | --workload_service_account | --workload-service-account)
-        arg_required "${@}"
-        WORKLOAD_SERVICE_ACCOUNT="${2}"
-        shift 2
-        ;;
-      -s | --service_account | --service-account)
-        arg_required "${@}"
-        SERVICE_ACCOUNT="${2}"
-        shift 2
-        ;;
-      -k | --key_file | --key-file)
-        arg_required "${@}"
-        KEY_FILE="${2}"
-        shift 2
-        ;;
-      --dry_run | --dry-run)
-        DRY_RUN=1
-        shift 1
-        ;;
-      --only_validate | --only-validate)
-        ONLY_VALIDATE=1
-        shift 1
-        ;;
-      -v | --verbose)
-        VERBOSE=1
-        shift 1
-        ;;
-      -q | --quiet)
-        QUIET=1
-        shift 1
-        ;;
-      -h | --help)
-        usage
-        exit
-        ;;
-      *)
-        fatal_with_usage "Unknown option ${1}"
-        ;;
-    esac
-  done
-}
-
 validate_args() {
   local MISSING_ARGS; MISSING_ARGS=0
   while read -r REQUIRED_ARG; do
@@ -725,27 +400,14 @@ EOF
     fatal "Workload labels ${WORKLOAD_LABELS} are not specified in the correct format. Example: app=label,env=prod"
   fi
 
-  if [[ "${REGISTER_GCE_INSTANCE}" -eq 1 ]]; then
-    if [[ -z "${INSTANCE_ZONE}" ]]; then
-      fatal_with_usage "Missing value for GCE instance zone."
-    fi
-  fi
-
-  if [[ "${REGISTER_GCE_INSTANCE_GROUP}" -eq 1 ]]; then
-    if [[ -z "${INSTANCE_GROUP_ZONE}" && -z "${INSTANCE_GROUP_REGION}" ]]; then
-      fatal_with_usage "Specify one of instance group zone and region."
-    fi
-    if [[ -n "${INSTANCE_GROUP_ZONE}" && -n "${INSTANCE_GROUP_REGION}" ]]; then
-      fatal "Either the instance group zone or region can be specified."
-    fi
-  fi
-
   if [[ -n "$SERVICE_ACCOUNT" && -z "$KEY_FILE" || -z "$SERVICE_ACCOUNT" && -n "$KEY_FILE" ]]; then
     fatal "Service account and key file must be used together."
   fi
 
+  # since we cd to a tmp directory, we need the absolute path for the key file
+  # and yaml file
   if [[ -f "${KEY_FILE}" ]]; then
-    KEY_FILE="$(readlink -f "$KEY_FILE")"
+    KEY_FILE="$(apath -f "${KEY_FILE}")"
     readonly KEY_FILE
   elif [[ -n "${KEY_FILE}" ]]; then
     fatal "Couldn't find key file ${KEY_FILE}."
@@ -760,27 +422,17 @@ auth_service_account() {
     --key-file="${KEY_FILE}"
 }
 
+### Environment validation functions ###
 validate_dependencies() {
   validate_cli_dependencies
   validate_project
+  PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" \
+    --format="value(projectNumber)")"
   validate_asm_cluster
 
   if [[ "${CREATE_GCE_INSTANCE_TEMPLATE}" -eq 1 ]]; then
     validate_gce_instance_template
   fi
-}
-
-cli_dependencies() {
-  cat <<EOF
-gcloud
-curl
-jq
-tr
-awk
-xargs
-printf
-kubectl
-EOF
 }
 
 validate_cli_dependencies() {
@@ -790,20 +442,35 @@ validate_cli_dependencies() {
   info "Checking installation tool dependencies..."
   while read -r dependency; do
     EXITCODE=0
-    command -v "${dependency}" &>/dev/null || EXITCODE=$?
+    hash "${dependency}" 2>/dev/null || EXITCODE=$?
     if [[ "${EXITCODE}" -ne 0 ]]; then
       NOTFOUND="${dependency},${NOTFOUND}"
     fi
-  done << EOF
-$(cli_dependencies)
+  done <<EOF
+gcloud
+curl
+jq
+tr
+awk
+xargs
+printf
+kubectl
 EOF
 
   if [[ -n "${NOTFOUND}" ]]; then
-    NOTFOUND="${NOTFOUND::-1}"
+    NOTFOUND="$(strip_last_char "${NOTFOUND}")"
     for dep in $(echo "${NOTFOUND}" | tr ' ' '\n'); do
       warn "Dependency not found: ${dep}"
     done
     fatal "One or more dependencies were not found. Please install them and retry."
+  fi
+
+  local OS
+  # shellcheck disable=SC2064
+  trap "$(shopt -p nocasematch)" RETURN
+  shopt -s nocasematch
+  if [[ "$(uname -m)" != "x86_64" ]]; then
+    fatal "Installation is only supported on x86_64."
   fi
 }
 
@@ -823,9 +490,6 @@ again. To see a list of your projects, run:
   gcloud projects list --format='value(project_id)'
 EOF
   fi
-
-  PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" \
-    --format="value(projectNumber)")"
 }
 
 validate_asm_cluster() {
@@ -839,7 +503,7 @@ validate_asm_cluster() {
 validate_cluster() {
   local RESULT; RESULT=""
 
-  info "Confirming cluster information..."
+  info "Confirming cluster information for ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
   RESULT="$(gcloud container clusters list \
     --project="${PROJECT_ID}" \
     --filter="name = ${CLUSTER_NAME} and location = ${CLUSTER_LOCATION}" \
@@ -849,9 +513,7 @@ validate_cluster() {
 Unable to find cluster ${CLUSTER_LOCATION}/${CLUSTER_NAME}.
 Please verify the spelling and try again. To see a list of your clusters, in
 this project, run:
-  gcloud container clusters list \
-  --format='value(name,zone)' \
-  --project="${PROJECT_ID}"
+  gcloud container clusters list --format='value(name,zone)' --project="${PROJECT_ID}"
 EOF
   fi
 }
@@ -1339,79 +1001,6 @@ To create a managed instance group from the instance template, run:
 "
 }
 
-retrieve_instance_ip() {
-  info "Retrieving IP address of GCE instance ${INSTANCE_NAME} in zone ${INSTANCE_ZONE}..."
-
-  INSTANCE_IPS=$(retry 2 gcloud compute instances describe \
-    "${INSTANCE_NAME}" --zone "${INSTANCE_ZONE}" \
-    --project="${PROJECT_ID}" \
-    --format="value(networkInterfaces[0].networkIP)")
-}
-
-retrieve_instance_group_ips() {
-  info "Retrieving IP addresses of GCE instances in the instance group ${INSTANCE_GROUP_NAME}..."
-  local FILTER; FILTER=""
-  if [[ -n "${INSTANCE_GROUP_ZONE}" ]]; then
-    FILTER="--zone=${INSTANCE_GROUP_ZONE}"
-  elif [[ -n "${INSTANCE_GROUP_REGION}" ]]; then
-    FILTER="--region=${INSTANCE_GROUP_REGION}"
-  fi
-
-  INSTANCE_IPS=$(retry 2 gcloud compute instance-groups list-instances \
-    --project="${PROJECT_ID}" \
-    "${INSTANCE_GROUP_NAME}" "${FILTER}" --uri \
-    | xargs -I '{}' gcloud compute instances describe '{}' --format \
-    'value(networkInterfaces[0].networkIP)')
-}
-
-register_instances() {
-  info "Registering GCE instances with your mesh..."
-  local LABELS; LABELS="${WORKLOAD_LABELS}"
-  if [[ -n "${LABELS}" ]]; then
-    # Generate the labels to be included in the WorkloadEntry.
-    # No dedupe happens here as kubernetes does that during apply.
-    LABELS=$(sed -e 's/=/: /g' -e $'s/,/\\\n    /g' <<< ",${LABELS}")
-  fi
-
-  if [[ -z "${WORKLOAD_SERVICE_ACCOUNT}" ]]; then
-    WORKLOAD_SERVICE_ACCOUNT="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
-  fi
-
-  local YAML;
-  for ins in $(echo "${INSTANCE_IPS}" | tr ' ' '\n'); do
-    YAML="$(cat << EOF
----
-apiVersion: networking.istio.io/v1beta1
-kind: WorkloadEntry
-metadata:
-  name: ${WORKLOAD_NAME}-${ins}
-  namespace: ${PROJECT_ID}
-spec:
-  address: ${ins}
-  labels:${LABELS}
-    service.istio.io/canonical-name: ${CANONICAL_SERVICE}
-    service.istio.io/canonical-revision: ${CANONICAL_REVISION}
-  serviceAccount: ${WORKLOAD_SERVICE_ACCOUNT}
-
-EOF
-)"
-
-    if [[ "${DRY_RUN}" -ne 0 ]]; then
-      echo "${YAML}"
-    else
-      echo "${YAML}" | kubectl apply -f -
-    fi
-  done
-}
-
-success_message_register_gce_instance() {
-  info "
-*****************************
-The GCE Instances are now registered.
-*****************************
-"
-}
-
 main() {
   parse_args "${@}"
   validate_args
@@ -1433,14 +1022,6 @@ main() {
     retrieve_ingressgateway
     create_gce_instance_template
     success_message_create_gce_instance_template
-  else
-    if [[ "${REGISTER_GCE_INSTANCE}" -eq 1 ]]; then
-      retrieve_instance_ip
-    elif [[ "${REGISTER_GCE_INSTANCE_GROUP}" -eq 1 ]]; then
-      retrieve_instance_group_ips
-    fi
-    register_instances
-    success_message_register_gce_instance
   fi
 
   return 0
