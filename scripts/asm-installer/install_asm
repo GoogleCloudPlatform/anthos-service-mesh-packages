@@ -224,10 +224,7 @@ main() {
 
   if [[ "${PRINT_CONFIG}" -eq 1 && "${USE_HUB_WIP}" -eq 1 ]]; then
     configure_kubectl
-    local IDENTITY; IDENTITY="$(get_hub_workload_identity)"
-    read -r ENVIRON_PROJECT_ID HUB_MEMBERSHIP_ID <<EOF
-${IDENTITY}
-EOF
+    populate_environ_info
   fi
 
   if [[ "${MANAGED}" -eq 1 ]]; then
@@ -438,9 +435,8 @@ can_modify_gcp_components() {
 }
 
 can_register_cluster() {
-  if [[ "${ENABLE_ALL}" -eq 0 && "${ENABLE_REGISTRATION}" -eq 0 ]] && \
-    ! is_managed || \
-    ! can_modify_at_all; then false; fi
+  if [[ "${ENABLE_ALL}" -eq 0 && "${ENABLE_REGISTRATION}" -eq 0 ]] \
+    || ! can_modify_at_all; then false; fi
 }
 
 needs_asm() {
@@ -1597,10 +1593,7 @@ EOF
 init_meshconfig() {
   info "Initializing meshconfig API..."
   if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
-    local IDENTITY; IDENTITY="$(get_hub_workload_identity)"
-    read -r ENVIRON_PROJECT_ID HUB_MEMBERSHIP_ID <<EOF
-${IDENTITY}
-EOF
+    populate_environ_info
     info "Cluster has Membership ID ${HUB_MEMBERSHIP_ID} in the Hub of project ${ENVIRON_PROJECT_ID}"
     if [[ "${ENVIRON_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
       info "Skip initializing meshconfig API as the Hub is not hosted in the project ${PROJECT_ID}"
@@ -1764,12 +1757,18 @@ is_workload_identity_enabled() {
   if [[ "${ENABLED}" = 'null' ]]; then false; fi
 }
 
-get_hub_workload_identity() {
-  local IDENTITY_PROVIDER
-  local IDENTITY
-  IDENTITY_PROVIDER="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.identity_provider)"
-  IDENTITY="$(echo "${IDENTITY_PROVIDER}" | sed 's/^\"https:\/\/gkehub.googleapis.com\/projects\/\(.*\)\/locations\/global\/memberships\/\(.*\)\"$/\1 \2/g')"
-  echo "${IDENTITY}"
+populate_environ_info() {
+  if [[ -n "${ENVIRON_PROJECT_ID}" && -n "${HUB_MEMBERSHIP_ID}" ]]; then return; fi
+    configure_kubectl
+    local IDENTITY_PROVIDER
+    local IDENTITY
+    IDENTITY_PROVIDER="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.identity_provider)"
+    IDENTITY="$(echo "${IDENTITY_PROVIDER}" | sed 's/^\"https:\/\/gkehub.googleapis.com\/projects\/\(.*\)\/locations\/global\/memberships\/\(.*\)\"$/\1 \2/g')"
+    if [[ -n "${IDENTITY}" ]]; then
+      read -r ENVIRON_PROJECT_ID HUB_MEMBERSHIP_ID <<EOF
+${IDENTITY}
+EOF
+  fi
 }
 
 enable_workload_identity(){
@@ -1888,6 +1887,7 @@ configure_package() {
   info "Configuring kpt package..."
 
   populate_cluster_values
+  populate_environ_info
   run kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
   run kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
   run kpt cfg set asm gcloud.project.environProjectNumber "${PROJECT_NUMBER}"
