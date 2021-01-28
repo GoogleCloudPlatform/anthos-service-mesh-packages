@@ -1698,9 +1698,6 @@ EOF
 required_cluster_labels() {
   local VERSION_TAG
   VERSION_TAG="${RELEASE//\./-}"
-  if is_managed; then
-    VERSION_TAG="asm-managed"
-  fi
   cat <<EOF
 asmv=${VERSION_TAG}
 mesh_id=proj-${PROJECT_NUMBER}
