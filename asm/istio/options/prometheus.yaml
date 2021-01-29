@@ -15,4 +15,12 @@
 apiVersion: install.istio.io/v1alpha1
 kind: IstioOperator
 spec:
-  profile: asm-multicloud
+  values:
+    telemetry:
+      enabled: true
+      v2:
+        enabled: true
+        prometheus:
+          enabled: true
+        stackdriver:
+          enabled: false

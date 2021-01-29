@@ -12,18 +12,18 @@ cd "${SDIR}"
 
 main() {
   echo '../install_asm \
-    -l us-region \
-    -n cluster-name \
-    -p project-name \
+    -l us-central1-c \
+    -n long-term-test-cluster \
+    -p asm-scriptaro-oss \
     --print-config \
     --option egressgateways \
     -m install \
     | grep egressGateways: -A 1 | tail -n 1 | grep enabled: true -q'
 
   RETVAL="$(../install_asm \
-    -l us-region \
-    -n cluster-name \
-    -p project-name \
+    -l us-central1-c \
+    -n long-term-test-cluster \
+    -p asm-scriptaro-oss \
     --print-config \
     --option egressgateways \
     -m install \

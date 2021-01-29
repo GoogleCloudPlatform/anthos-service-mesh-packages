@@ -425,19 +425,6 @@ test_main() {
   fi
 
   #################
-  # The multicluster profile should get added all the time, not just install
-  #################
-
-  validate_args
-
-  if [[ "${CUSTOM_OVERLAY}" != *multicluster.yaml* ]]; then
-    echo "Multicluster yaml added by default in all paths: FAIL"
-    ((++FAILURES))
-  else
-    echo "Multicluster yaml added by default in all paths: PASS"
-  fi
-
-  #################
   # find_missing_strings shouldn't return anything with a trailing comma
   #################
 
