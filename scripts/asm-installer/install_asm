@@ -42,7 +42,6 @@ PACKAGE_DIRECTORY="asm/istio"; readonly PACKAGE_DIRECTORY;
 VALIDATION_FIX_SERVICE="${PACKAGE_DIRECTORY}/istiod-service.yaml"; readonly VALIDATION_FIX_SERVICE;
 OPTIONS_DIRECTORY="${PACKAGE_DIRECTORY}/options"; readonly OPTIONS_DIRECTORY;
 OPERATOR_MANIFEST="${PACKAGE_DIRECTORY}/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
-MULTICLUSTER_MANIFEST="${OPTIONS_DIRECTORY}/multicluster.yaml"; readonly MULTICLUSTER_MANIFEST;
 BETA_CRD_MANIFEST="${OPTIONS_DIRECTORY}/v1beta1-crds.yaml"; readonly BETA_CRD_MANIFEST;
 MANAGED_MANIFEST="${OPTIONS_DIRECTORY}/managed-control-plane.yaml"; readonly MANAGED_MANIFEST;
 EXPOSE_ISTIOD_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_SERVICE;
@@ -51,6 +50,7 @@ SCRIPT_NAME="${0##*/}"
 
 PROJECT_NUMBER=""
 GKE_CLUSTER_URI=""
+GCE_NETWORK_NAME=""
 KPT_URL=""
 KUBECONFIG=""
 APATH=""
@@ -942,7 +942,7 @@ EOF
   elif [[ "${CA}" = "gcp_cas" ]]; then
     ABS_OVERLAYS="${OPTIONS_DIRECTORY}/private-ca.yaml,${ABS_OVERLAYS}"
   fi
-  CUSTOM_OVERLAY="${MULTICLUSTER_MANIFEST},${ABS_OVERLAYS}"
+  CUSTOM_OVERLAY="${ABS_OVERLAYS}"
 
   set_kpt_package_url
   WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"
@@ -1173,10 +1173,21 @@ validate_gcp_resources() {
   validate_project
   PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format="value(projectNumber)")"
   validate_cluster
-  GKE_CLUSTER_URI="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
-    --zone="${CLUSTER_LOCATION}" \
-    --project="${PROJECT_ID}" \
-    --format='value(selfLink)')"; readonly GKE_CLUSTER_URI;
+}
+
+populate_cluster_values() {
+  if [[ -z "${GKE_CLUSTER_URI}" && -z "${GCE_NETWORK_NAME}" ]]; then
+    CLUSTER_DATA="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
+      --zone="${CLUSTER_LOCATION}" \
+      --project="${PROJECT_ID}" \
+      --format='value(selfLink, network)')"
+    read -r GKE_CLUSTER_URI GCE_NETWORK_NAME <<EOF
+${CLUSTER_DATA}
+EOF
+
+    GCE_NETWORK_NAME="${PROJECT_ID}-${GCE_NETWORK_NAME}"
+    readonly GKE_CLUSTER_URI; readonly GCE_NETWORK_NAME;
+  fi
 }
 
 validate_project() {
@@ -1709,6 +1720,7 @@ generate_membership_name() {
 register_cluster() {
   if is_cluster_registered; then return; fi
 
+  populate_cluster_values
   local MEMBERSHIP_NAME
   MEMBERSHIP_NAME="$(generate_membership_name)"
   info "Registering the cluster as ${MEMBERSHIP_NAME}..."
@@ -1863,10 +1875,12 @@ register_gce_identity_provider() {
 configure_package() {
   info "Configuring kpt package..."
 
+  populate_cluster_values
   run kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
   run kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
   run kpt cfg set asm gcloud.project.environProjectNumber "${PROJECT_NUMBER}"
   run kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
+  run kpt cfg set asm gcloud.compute.network "${GCE_NETWORK_NAME}"
   run kpt cfg set asm anthos.servicemesh.rev "${REVISION_LABEL}"
   run kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
   if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then

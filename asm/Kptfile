@@ -132,6 +132,15 @@ openAPI:
         setter:
           name: anthos.servicemesh.hubMembershipID
           value: MEMBERSHIP_ID
+    io.k8s.cli.substitutions.network:
+      type: string
+      x-k8s-cli:
+        substitution:
+          name: network
+          pattern: "NETWORK_ID"
+          values:
+          - marker: NETWORK_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.network'
     io.k8s.cli.substitutions.mesh-id:
       type: string
       x-k8s-cli:
@@ -141,6 +150,15 @@ openAPI:
           values:
           - marker: PROJECT_NUMBER
             ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectNumber'
+    io.k8s.cli.substitutions.network-id:
+      type: string
+      x-k8s-cli:
+        substitution:
+          name: network-id
+          pattern: "NETWORK_ID"
+          values:
+          - marker: NETWORK_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.network'
     io.k8s.cli.substitutions.gke-metadata:
       type: string
       x-k8s-cli:
