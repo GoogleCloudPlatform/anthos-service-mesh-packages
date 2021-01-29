@@ -1906,6 +1906,9 @@ configure_package() {
   run kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
   run kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
   run kpt cfg set asm gcloud.project.environProjectNumber "${PROJECT_NUMBER}"
+  if [[ -n "${_CI_ENVIRON_PROJECT_NUMBER}" ]]; then
+    run kpt cfg set asm gcloud.project.environProjectNumber "${_CI_ENVIRON_PROJECT_NUMBER}"
+  fi
   run kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
   run kpt cfg set asm gcloud.compute.network "${GCE_NETWORK_NAME}"
   run kpt cfg set asm anthos.servicemesh.rev "${REVISION_LABEL}"
@@ -1936,10 +1939,6 @@ EOF
     # kpt treats words in quotes as a single param, while kpt need ${TRUST_DOMAIN_ALIASES} to be splitting params for a list. If we remove quotes, the lint will complain.
     # eval will translate the quoted TRUST_DOMAIN_ALIASES into params to workaround both.
     run eval kpt cfg set asm anthos.servicemesh.trustDomainAliases "${TRUST_DOMAIN_ALIASES}"
-  fi
-
-  if [[ -n "${_CI_ENVIRON_PROJECT_NUMBER}" ]]; then
-    run kpt cfg set asm gcloud.project.environProjectNumber "${_CI_ENVIRON_PROJECT_NUMBER}"
   fi
 }
 
