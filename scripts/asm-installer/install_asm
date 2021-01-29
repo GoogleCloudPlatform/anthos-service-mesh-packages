@@ -1611,7 +1611,7 @@ init_meshconfig_managed() {
   info "Initializing meshconfig managed API..."
   FULL_LOGS_BUCKET_ID="projects/${PROJECT_ID}/locations/$(find_best_region)/buckets/${LOGS_BUCKET}"
   run curl --request POST --fail \
-    --data '{"prepare_istiod": true,"logs_destination":"'${FULL_LOGS_BUCKET_ID}'"}' \
+    --data '{"prepare_istiod": true,"logs_destination":"'"${FULL_LOGS_BUCKET_ID}"'"}' \
     "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
     --header "X-Server-Timeout: 600" \
     --header "Content-Type: application/json" \
