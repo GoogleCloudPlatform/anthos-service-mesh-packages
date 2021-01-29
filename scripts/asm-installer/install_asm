@@ -365,6 +365,11 @@ warn() {
   info "[WARNING]: ${1}" >&2
 }
 
+warn_pause() {
+  warn "${1}"
+  sleep 2
+}
+
 error() {
   info "[ERROR]: ${1}" >&2
 }
@@ -1275,11 +1280,13 @@ validate_node_pool() {
   done
 
   if [[ "$MAX_CPU" -lt "$TOTAL_CPU_REQ" ]]; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+    { read -r -d '' MSG; warn_pause "${MSG}"; } <<EOF || true
+
 ASM requires you to have at least ${TOTAL_CPU_REQ} vCPUs in node pools whose
 machine type is at least ${MACHINE_CPU_REQ} vCPUs.
-${CLUSTER_LOCATION}/${CLUSTER_NAME} does not meet this requirement. Please retry
-with a cluster that meets resource requirements.
+${CLUSTER_LOCATION}/${CLUSTER_NAME} does not meet this requirement. ASM
+may not function as expected.
+
 EOF
   fi
 }
@@ -1321,14 +1328,19 @@ check_istio_deployed(){
   local ISTIOD_COUNT; ISTIOD_COUNT="$(get_istio_deployment_count)";
   info "Found ${ISTIOD_COUNT} deployment(s)."
   if [[ "$ISTIOD_COUNT" -eq 0 ]]; then
-    fatal "${MODE} mode specified but no istiod deployment found. (Expected >=1.)"
+    warn_pause "${MODE} mode specified but no istiod deployment found. (Expected >=1.)"
   fi
 }
 
 check_istio_not_deployed(){
   local ISTIOD_COUNT; ISTIOD_COUNT="$(get_istio_deployment_count)";
   if [[ "$ISTIOD_COUNT" -ne 0 ]]; then
-    fatal "Install mode specified, but ${ISTIOD_COUNT} existing istiod deployment(s) found. (Expected 0.)"
+    { read -r -d '' MSG; warn_pause "${MSG}"; } <<EOF || true
+
+Install mode specified, but ${ISTIOD_COUNT} existing istiod deployment(s) found. (Expected 0.)
+Installation may overwrite existing control planes with the same revision.
+
+EOF
   fi
 }
 
