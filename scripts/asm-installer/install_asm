@@ -1848,8 +1848,9 @@ bind_user_to_cluster_admin(){
   info "Querying for core/account..."
   local GCLOUD_USER; GCLOUD_USER="$(gcloud config get-value core/account)"
   info "Binding ${GCLOUD_USER} to cluster admin role..."
+  local PREFIX; PREFIX="$(echo "${GCLOUD_USER}" | cut -f 1 -d @)"
   local YAML; YAML="$(retry 5 kubectl create \
-    clusterrolebinding cluster-admin-binding \
+    clusterrolebinding "${PREFIX}-cluster-admin-binding" \
     --clusterrole=cluster-admin \
     --user="${GCLOUD_USER}" \
     --dry-run -o yaml)"
