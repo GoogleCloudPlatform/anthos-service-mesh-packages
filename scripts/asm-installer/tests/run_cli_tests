@@ -219,28 +219,6 @@ test_main() {
   fi
 
   #################
-  # Should fail to install if Istio installed
-  #################
-
-  CMD="-l this_should_pass_has_istio_right_namespace"
-  CMD="${CMD} -n this_should_pass"
-  CMD="${CMD} -p this_should_pass"
-  CMD="${CMD} -m install"
-  CMD="${CMD} -c mesh_ca"
-  CMD="${CMD} -e --only_validate"
-
-  RETVAL=0
-  clear_variables
-  _="$(main ${CMD})" || RETVAL="${?}"
-
-  if [[ "${RETVAL}" -ne 0 ]]; then
-    echo "Fails on installing with Istio: PASS"
-  else
-    echo "Fails on installing with Istio: FAIL"
-    ((++FAILURES))
-  fi
-
-  #################
   # Should fail to do anything if it's in the wrong namespace
   #################
 
