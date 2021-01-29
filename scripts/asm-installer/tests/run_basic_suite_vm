@@ -4,6 +4,7 @@ set -o pipefail
 
 SPATH="$(readlink -f "$0")"
 SDIR="$(dirname "${SPATH}")"; export SDIR;
+SCRIPT_NAME="${0##*/}"
 
 # shellcheck source=common.sh
 . "${SDIR}/common.sh"
@@ -14,69 +15,8 @@ main() {
   # CLI setup
   parse_args "$@"
 
-  # Cluster setup
-  if [[ -n "${SERVICE_ACCOUNT}" ]]; then
-    echo "Authorizing service acount..."
-    auth_service_account
-  fi
-
-  local CLUSTER_NAME; CLUSTER_NAME="basic-suite-vm-${BUILD_ID::8}";
-  local NAMESPACE; NAMESPACE="namespace-${BUILD_ID}"
-  echo "Creating cluster ${CLUSTER_NAME}..."
-  create_working_cluster "${PROJECT_ID}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}"
-  # this trap isn't tested for all circumstances so caveat emptor
-  trap 'cleanup "${PROJECT_ID}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}" "${NAMESPACE}"; exit 1;' ERR
-
-  # Demo app setup
-  echo "Installing and verifying demo app..."
-  install_demo_app "${NAMESPACE}"
-
-  local GATEWAY; GATEWAY="$(kube_ingress "${NAMESPACE}")";
-  verify_demo_app "$GATEWAY"
-
-  # Test starts here
-  echo "Installing ASM for VM with MeshCA..."
-  if [[ -n "${SERVICE_ACCOUNT}" ]]; then
-    echo "../install_asm \
-      -l ${CLUSTER_LOCATION} \
-      -n ${CLUSTER_NAME} \
-      -p ${PROJECT_ID} \
-      -m install \
-      -o vm \
-      -o hub-meshca \
-      -c mesh_ca \
-      -s ${SERVICE_ACCOUNT} \
-      -k ${KEY_FILE} -v -e"
-    ../install_asm \
-      -l "${CLUSTER_LOCATION}" \
-      -n "${CLUSTER_NAME}" \
-      -p "${PROJECT_ID}" \
-      -m install \
-      -o vm \
-      -o hub-meshca \
-      -c mesh_ca \
-      -s "${SERVICE_ACCOUNT}" \
-      -k "${KEY_FILE}" -v -e
-  else
-    echo "../install_asm \
-      -l ${CLUSTER_LOCATION} \
-      -n ${CLUSTER_NAME} \
-      -p ${PROJECT_ID} \
-      -m install \
-      -o vm \
-      -o hub-meshca \
-      -c mesh_ca -v -e"
-    ../install_asm \
-      -l "${CLUSTER_LOCATION}" \
-      -n "${CLUSTER_NAME}" \
-      -p "${PROJECT_ID}" \
-      -m install \
-      -o vm \
-      -o hub-meshca \
-      -c mesh_ca -v -e
-  fi
-
-  sleep 5
+  run_basic_test "install" "mesh_ca" "-o vm -o hub-meshca --enable-registration --enable-gcp-components"; RETVAL=$?;
+  trap 'cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"' ERR
 
   echo "Verifying east-west gateway is installed and running..."
   kubectl wait --for=condition=available --timeout=600s \
@@ -96,38 +36,7 @@ main() {
     fatal "GCE Identity Provider cannot be found."
   fi
 
-  echo "Installing Istio manifests for demo app..."
-  install_demo_app_istio_manifests "${NAMESPACE}"
-
-  echo "Performing a rolling restart of the demo app..."
-  roll "${NAMESPACE}"
-
-  local SUCCESS; SUCCESS=0;
-  echo "Getting istio ingress IP..."
-  GATEWAY="$(istio_ingress)"
-  echo "Got ${GATEWAY}"
-  echo "Verifying demo app via Istio ingress..."
-  set +e
-  verify_demo_app "${GATEWAY}" || SUCCESS=1
-  set -e
-
-  if [[ "${SUCCESS}" -eq 1 ]]; then
-    echo "Failed to verify, restarting and trying again..."
-    roll "${NAMESPACE}"
-
-    echo "Getting istio ingress IP..."
-    GATEWAY="$(istio_ingress)"
-    echo "Got ${GATEWAY}"
-    echo "Verifying demo app via Istio ingress..."
-    set +e
-    verify_demo_app "${GATEWAY}" || SUCCESS=1
-    set -e
-  fi
-
-  # Cluster teardown
-  echo "Deleting cluster ${CLUSTER_NAME} and associated resources..."
-  cleanup "${PROJECT_ID}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}" "${NAMESPACE}"
-  exit "$SUCCESS"
+  cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"
 }
 
 main "$@"
