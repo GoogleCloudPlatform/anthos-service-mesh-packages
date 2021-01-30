@@ -20,7 +20,7 @@ RESULT="$(gcloud container clusters list \
 if [[ -n "${RESULT}" ]]; then
   echo "Long term test cluster exists already."
   configure_kubectl "${LT_CLUSTER_NAME}" "${LT_PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
-  kubectl delete validatingwebhookconfiguration istiod-istio-system
+  kubectl delete validatingwebhookconfiguration istiod-istio-system || true
   remove_ns istio-system || true
   remove_ns asm-system || true
   exit

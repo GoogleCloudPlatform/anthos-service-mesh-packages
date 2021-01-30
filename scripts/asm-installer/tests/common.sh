@@ -286,7 +286,7 @@ cleanup_lt_cluster() {
 
   set +e
   remove_ns "${NAMESPACE}" || true
-  "${DIR}"/istio*/bin/istioctl x uninstall --revision "${REV}" -y
+  "${DIR}"/istio*/bin/istioctl x uninstall --purge -y
 }
 
 cleanup() {

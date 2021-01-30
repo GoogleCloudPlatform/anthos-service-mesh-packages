@@ -153,6 +153,12 @@ main() {
     exit_if_apis_not_enabled
   fi
 
+  if can_register_cluster; then
+    register_cluster
+  elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 ]]; then
+    exit_if_cluster_unregistered
+  fi
+
   # Managed must be able to set IAM permissions on a generated user, so the flow
   # is a bit different
   if is_managed; then
@@ -184,12 +190,6 @@ main() {
     add_cluster_labels
   elif should_validate; then
     exit_if_cluster_unlabeled
-  fi
-
-  if can_register_cluster; then
-    register_cluster
-  elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 ]]; then
-    exit_if_cluster_unregistered
   fi
 
   if ! is_managed; then
@@ -312,7 +312,7 @@ retry() {
   shift 1
   for i in $(seq 0 "${MAX_TRIES}"); do
     if [[ "${i}" -eq "${MAX_TRIES}" ]]; then
-      false
+      break
     fi
     { "${@}" && return 0; } || true
     warn "Failed, retrying...($((i+1)) of ${MAX_TRIES})"
@@ -1715,6 +1715,15 @@ get_cluster_labels() {
 }
 
 is_cluster_registered() {
+  local WANT
+  WANT="//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
+  local LIST; LIST="$(gcloud container hub memberships list --project "${PROJECT_ID}" --format=json | grep "${WANT}")"
+
+  if [[ -z "${LIST}" ]]; then
+    false
+    return
+  fi
+
   local IDENTITY_PROVIDER
   IDENTITY_PROVIDER="$(retry 2 kubectl get memberships.hub.gke.io \
     membership -ojson 2>/dev/null | jq .spec.identity_provider)"
