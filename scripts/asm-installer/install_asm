@@ -44,6 +44,8 @@ OPTIONS_DIRECTORY="${PACKAGE_DIRECTORY}/options"; readonly OPTIONS_DIRECTORY;
 OPERATOR_MANIFEST="${PACKAGE_DIRECTORY}/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
 BETA_CRD_MANIFEST="${OPTIONS_DIRECTORY}/v1beta1-crds.yaml"; readonly BETA_CRD_MANIFEST;
 MANAGED_MANIFEST="${OPTIONS_DIRECTORY}/managed-control-plane.yaml"; readonly MANAGED_MANIFEST;
+EXPOSE_ISTIOD_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_SERVICE;
+CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
 
 SCRIPT_NAME="${0##*/}"
 
@@ -1940,15 +1942,19 @@ EOF
     >"${EXPANDED_YAML}"
 
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
-    info "Installing ASM CanonicalService controller in asm-system namespace..."
-    retry 3 run kubectl apply -f asm/canonical-service/controller.yaml
-    info "Waiting for deployment..."
-    retry 3 run kubectl wait --for=condition=available --timeout=600s \
-        deployment/canonical-service-controller-manager -n asm-system
-    info "...done!"
+    install_canonical_controller
   fi
 
   outro
+}
+
+install_canonical_controller() {
+  info "Installing ASM CanonicalService controller in asm-system namespace..."
+  retry 3 run kubectl apply -f "${CANONICAL_CONTROLLER_MANIFEST}"
+  info "Waiting for deployment..."
+  retry 3 run kubectl wait --for=condition=available --timeout=600s \
+      deployment/canonical-service-controller-manager -n asm-system
+  info "...done!"
 }
 
 start_managed_control_plane() {
@@ -1976,6 +1982,10 @@ install_managed_components() {
   info "Installing ASM managed control plane components..."
   # shellcheck disable=SC2086
   retry 5 run ./"${ISTIOCTL_REL_PATH}" install $PARAMS
+
+  if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
+    install_canonical_controller
+  fi
 }
 
 outro() {
