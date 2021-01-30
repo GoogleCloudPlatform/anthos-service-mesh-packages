@@ -44,6 +44,7 @@ K8S_MINOR=0
 ### File related constants ###
 ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
 ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
+CRD_REL_PATH="${ISTIO_FOLDER_NAME}/manifests/charts/base/crds/crd-all.gen.yaml"; readonly CRD_REL_PATH;
 PACKAGE_DIRECTORY="asm/istio"; readonly PACKAGE_DIRECTORY;
 VALIDATION_FIX_SERVICE="${PACKAGE_DIRECTORY}/istiod-service.yaml"; readonly VALIDATION_FIX_SERVICE;
 OPTIONS_DIRECTORY="${PACKAGE_DIRECTORY}/options"; readonly OPTIONS_DIRECTORY;
@@ -240,6 +241,7 @@ EOF
   if [[ "${MANAGED}" -eq 1 ]]; then
     start_managed_control_plane
     configure_package
+    install_crds
     install_managed_components
     outro
     return 0
@@ -2066,6 +2068,10 @@ EOF
     --header "X-Server-Timeout: 600" \
     --header "Content-Type: application/json" \
     -K <(auth_header "$(get_auth_token)")
+}
+
+install_crds() {
+  retry 2 run kubectl apply -f "${CRD_REL_PATH}"
 }
 
 install_managed_components() {
