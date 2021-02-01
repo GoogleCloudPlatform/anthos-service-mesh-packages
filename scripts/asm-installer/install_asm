@@ -2082,7 +2082,7 @@ install_managed_components() {
 
   info "Installing ASM managed control plane components..."
   # shellcheck disable=SC2086
-  retry 5 run ./"${ISTIOCTL_REL_PATH}" install $PARAMS
+  retry 5 run "$(istioctl_path)" install $PARAMS
 
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
     install_canonical_controller
