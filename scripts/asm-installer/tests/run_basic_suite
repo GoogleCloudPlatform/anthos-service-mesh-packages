@@ -13,98 +13,12 @@ cd "${SDIR}"
 
 main() {
   # CLI setup
-  date +"%T"
   parse_args "$@"
 
-  if [[ -n "${SERVICE_ACCOUNT}" ]]; then
-    echo "Authorizing service acount..."
-    auth_service_account
-  fi
+  run_basic_test "install" "mesh_ca"; RETVAL=$?;
+  cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"
 
-  local NAMESPACE; NAMESPACE="$(uniq_name "${SCRIPT_NAME}" "${BUILD_ID}")"
-  local OUTPUT_DIR; OUTPUT_DIR="$(mktemp -d)"
-
-  configure_kubectl "${LT_CLUSTER_NAME}" "${PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
-  # Demo app setup
-  echo "Installing and verifying demo app..."
-  install_demo_app "${NAMESPACE}"
-
-  local GATEWAY; GATEWAY="$(kube_ingress "${NAMESPACE}")";
-  verify_demo_app "$GATEWAY"
-
-  if [[ -n "${KEY_FILE}" && -n "${SERVICE_ACCOUNT}" ]]; then
-    KEY_FILE="-k ${KEY_FILE}"
-    SERVICE_ACCOUNT="-s ${SERVICE_ACCOUNT}"
-  fi
-
-  mkfifo "${NAMESPACE}"
-
-  # Test starts here
-  echo "Installing ASM with MeshCA..."
-  echo "_CI_REVISION_PREFIX=${NAMESPACE} \
-  ../install_asm ${KEY_FILE} ${SERVICE_ACCOUNT} \
-    -l ${LT_CLUSTER_LOCATION} \
-    -n ${LT_CLUSTER_NAME} \
-    -p ${PROJECT_ID} \
-    -m install \
-    -c mesh_ca -v \
-    --output-dir ${OUTPUT_DIR}"
-  # shellcheck disable=SC2086
-  _CI_REVISION_PREFIX="${NAMESPACE}" \
-    ../install_asm ${KEY_FILE} ${SERVICE_ACCOUNT} \
-    -l "${LT_CLUSTER_LOCATION}" \
-    -n "${LT_CLUSTER_NAME}" \
-    -p "${PROJECT_ID}" \
-    -m install \
-    -c mesh_ca -v -e \
-    --output-dir "${OUTPUT_DIR}" \
-    2>&1 | tee "${NAMESPACE}" &
-
-  LABEL="$(grep -o -m 1 'istio.io/rev=\S*' "${NAMESPACE}")"
-  REV="$(echo "${LABEL}" | cut -f 2 -d =)"
-  echo "Got label ${LABEL}"
-  rm "${NAMESPACE}"
-
-  sleep 5
-  echo "Installing Istio manifests for demo app..."
-  install_demo_app_istio_manifests "${NAMESPACE}"
-
-  echo "Performing a rolling restart of the demo app..."
-  label_with_revision "${NAMESPACE}" "${LABEL}"
-  roll "${NAMESPACE}"
-
-  local SUCCESS; SUCCESS=0;
-  echo "Getting istio ingress IP..."
-  GATEWAY="$(istio_ingress)"
-  echo "Got ${GATEWAY}"
-  echo "Verifying demo app via Istio ingress..."
-  set +e
-  verify_demo_app "${GATEWAY}" || SUCCESS=1
-  set -e
-
-  if [[ "${SUCCESS}" -eq 1 ]]; then
-    echo "Failed to verify, restarting and trying again..."
-    roll "${NAMESPACE}"
-
-    echo "Getting istio ingress IP..."
-    GATEWAY="$(istio_ingress)"
-    echo "Got ${GATEWAY}"
-    echo "Verifying demo app via Istio ingress..."
-    set +e
-    verify_demo_app "${GATEWAY}" || SUCCESS=1
-    set -e
-  fi
-
-  # check validation webhook
-  echo "Verifying istiod service exists..."
-  if ! does_istiod_exist; then
-    echo "Could not find istiod service."
-  fi
-
-  # Cluster teardown
-  cleanup_lt_cluster "${NAMESPACE}" "${OUTPUT_DIR}" "${REV}"
-  date +"%T"
-  exit "$SUCCESS"
+  exit "${RETVAL}"
 }
 
 main "$@"

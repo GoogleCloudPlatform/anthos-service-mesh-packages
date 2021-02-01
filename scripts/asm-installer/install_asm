@@ -44,6 +44,7 @@ K8S_MINOR=0
 ### File related constants ###
 ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
 ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
+CRD_REL_PATH="${ISTIO_FOLDER_NAME}/manifests/charts/base/crds/crd-all.gen.yaml"; readonly CRD_REL_PATH;
 PACKAGE_DIRECTORY="asm/istio"; readonly PACKAGE_DIRECTORY;
 VALIDATION_FIX_SERVICE="${PACKAGE_DIRECTORY}/istiod-service.yaml"; readonly VALIDATION_FIX_SERVICE;
 OPTIONS_DIRECTORY="${PACKAGE_DIRECTORY}/options"; readonly OPTIONS_DIRECTORY;
@@ -153,6 +154,12 @@ main() {
     exit_if_apis_not_enabled
   fi
 
+  if can_register_cluster; then
+    register_cluster
+  elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 ]]; then
+    exit_if_cluster_unregistered
+  fi
+
   # Managed must be able to set IAM permissions on a generated user, so the flow
   # is a bit different
   if is_managed; then
@@ -184,12 +191,6 @@ main() {
     add_cluster_labels
   elif should_validate; then
     exit_if_cluster_unlabeled
-  fi
-
-  if can_register_cluster; then
-    register_cluster
-  elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 ]]; then
-    exit_if_cluster_unregistered
   fi
 
   if ! is_managed; then
@@ -237,6 +238,7 @@ main() {
   if [[ "${MANAGED}" -eq 1 ]]; then
     start_managed_control_plane
     configure_package
+    install_crds
     install_managed_components
     outro
     return 0
@@ -309,7 +311,7 @@ retry() {
   shift 1
   for i in $(seq 0 "${MAX_TRIES}"); do
     if [[ "${i}" -eq "${MAX_TRIES}" ]]; then
-      false
+      break
     fi
     { "${@}" && return 0; } || true
     warn "Failed, retrying...($((i+1)) of ${MAX_TRIES})"
@@ -1691,9 +1693,6 @@ EOF
 required_cluster_labels() {
   local VERSION_TAG
   VERSION_TAG="${RELEASE//\./-}"
-  if is_managed; then
-    VERSION_TAG="asm-managed"
-  fi
   cat <<EOF
 asmv=${VERSION_TAG}
 mesh_id=proj-${PROJECT_NUMBER}
@@ -1711,6 +1710,15 @@ get_cluster_labels() {
 }
 
 is_cluster_registered() {
+  local WANT
+  WANT="//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
+  local LIST; LIST="$(gcloud container hub memberships list --project "${PROJECT_ID}" --format=json | grep "${WANT}")"
+
+  if [[ -z "${LIST}" ]]; then
+    false
+    return
+  fi
+
   local IDENTITY_PROVIDER
   IDENTITY_PROVIDER="$(retry 2 kubectl get memberships.hub.gke.io \
     membership -ojson 2>/dev/null | jq .spec.identity_provider)"
@@ -2060,6 +2068,10 @@ EOF
     --header "X-Server-Timeout: 600" \
     --header "Content-Type: application/json" \
     -K <(auth_header "$(get_auth_token)")
+}
+
+install_crds() {
+  retry 2 run kubectl apply -f "${CRD_REL_PATH}"
 }
 
 install_managed_components() {
