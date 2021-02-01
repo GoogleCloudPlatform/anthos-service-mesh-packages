@@ -22,6 +22,7 @@ if [[ -n "${RESULT}" ]]; then
   configure_kubectl "${LT_CLUSTER_NAME}" "${LT_PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
   remove_ns istio-system || true
   remove_ns asm-system || true
+  cleanup_old_test_namespaces
   exit
 fi
 
