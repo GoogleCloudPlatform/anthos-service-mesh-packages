@@ -154,6 +154,8 @@ install_demo_app() {
   kubectl get ns "${NAMESPACE}" > /dev/null \
     || kubectl create namespace "${NAMESPACE}"
 
+  kubectl label ns "${NAMESPACE}" scriptaro-test=true || true
+
   kubectl -n "${NAMESPACE}" apply -f - <<EOF
 $(get_demo_yaml "kubernetes" )
 EOF
@@ -284,6 +286,28 @@ cleanup_lt_cluster() {
 
   remove_ns "${NAMESPACE}" || true
   "${DIR}"/istio*/bin/istioctl x uninstall --revision "${REV}" -y
+}
+
+cleanup_old_test_namespaces() {
+  local NOW_TS;NOW_TS="$(date +%s)"
+  local CREATE_TS
+
+  while read -r isodate ns; do
+    CREATE_TS="$(date -d "${isodate}" +%s)"
+    if ((NOW_TS - CREATE_TS > 86400)); then
+      echo "Deleting old namespace ${ns}"
+      remove_ns "${ns}" || true
+    fi
+  done <<EOF
+$(get_labeled_clusters)
+EOF
+}
+
+get_labeled_clusters() {
+  kubectl get ns \
+    -l scriptaro-test=true \
+    -o jsonpath='{range .items[*]}{.metadata.creationTimestamp}{"\t"}{.metadata.name}{"\n"}{end}' \
+    || true
 }
 
 cleanup() {
@@ -486,7 +510,7 @@ is_cluster_registered() {
 remove_ns() {
   local NS; NS="$1"
   kubectl get ns "$NS" || return
-  kubectl delete ns "$NS"
+  kubectl delete ns "$NS" --wait=false
 }
 #
 ### functions for interacting with OSS Istio
@@ -508,6 +532,7 @@ ${OSS_VERSION}/istio-${OSS_VERSION}-linux-amd64.tar.gz" | tar xz
   rm -r "${TMPDIR}"
 
   kubectl create ns "${ISTIO_NAMESPACE}"
+  kubectl label ns "${ISTIO_NAMESPACE}" scriptaro-test=true
 
   kubectl apply -f - <<EOF
 apiVersion: install.istio.io/v1alpha1
