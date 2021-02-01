@@ -57,6 +57,12 @@ steps:
   - '-c'
   - >
     ./tests/setup_longterm_cluster
+  env:
+  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
+  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
+  - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
+  - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
+  - 'KEY_FILE=${_KEY_FILE}'
   waitFor:
   - 'fetch-secrets'
 

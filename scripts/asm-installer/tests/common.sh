@@ -284,26 +284,33 @@ configure_kubectl() {
 cleanup_lt_cluster() {
   local NAMESPACE; NAMESPACE="$1"
   local DIR; DIR="$2"
-  local REV; REV="$3"
 
   set +e
   remove_ns "${NAMESPACE}" || true
   "${DIR}"/istio*/bin/istioctl x uninstall --purge -y
+  set -e
 }
 
 cleanup_old_test_namespaces() {
+  local DIR; DIR="${1}"
   local NOW_TS;NOW_TS="$(date +%s)"
   local CREATE_TS
+  local NSS; NSS=""
+
+  "${DIR}"/istio*/bin/istioctl x uninstall --purge -y
 
   while read -r isodate ns; do
     CREATE_TS="$(date -d "${isodate}" +%s)"
     if ((NOW_TS - CREATE_TS > 86400)); then
       echo "Deleting old namespace ${ns}"
-      remove_ns "${ns}" || true
+      NSS="${ns} ${NSS}"
     fi
   done <<EOF
 $(get_labeled_clusters)
 EOF
+  if [[ -n "${NSS}" ]]; then
+    remove_ns ${NSS}
+  fi
 }
 
 get_labeled_clusters() {
@@ -511,9 +518,7 @@ is_cluster_registered() {
 }
 
 remove_ns() {
-  local NS; NS="$1"
-  kubectl get ns "$NS" || return
-  kubectl delete ns "$NS" --wait=false
+  kubectl delete ns ${1} || true
 }
 #
 ### functions for interacting with OSS Istio
