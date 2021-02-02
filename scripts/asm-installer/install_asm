@@ -1710,6 +1710,12 @@ get_cluster_labels() {
 }
 
 is_cluster_registered() {
+
+  if ! kubectl api-resources --api-group=hub.gke.io | grep -q memberships; then
+    false
+    return
+  fi
+
   local WANT
   WANT="//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
   local LIST; LIST="$(gcloud container hub memberships list --project "${PROJECT_ID}" --format=json | grep "${WANT}")"
