@@ -103,4 +103,3 @@ spec:
         clusterName: "cn-PROJECTID-us-central1-c-asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
       meshID: "proj-PROJECT_NUMBER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh-id"}
       network: "NETWORK_ID" # {"$ref":"#/definitions/io.k8s.cli.substitutions.network"}
-
