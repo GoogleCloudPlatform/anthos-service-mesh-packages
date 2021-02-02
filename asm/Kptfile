@@ -112,7 +112,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.tag
-          value: ASM_IMAGE_TAG
+          value: 1.8.2-asm.2
           isSet: true
     io.k8s.cli.setters.anthos.servicemesh.rev:
       x-k8s-cli:
@@ -132,6 +132,12 @@ openAPI:
         setter:
           name: anthos.servicemesh.hubMembershipID
           value: MEMBERSHIP_ID
+    io.k8s.cli.setters.anthos.servicemesh.controlplane.validation-url:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.controlplane.validation-url
+          value: VALIDATION_URL
     io.k8s.cli.substitutions.network:
       type: string
       x-k8s-cli:
@@ -229,6 +235,15 @@ openAPI:
             ref: '#/definitions/io.k8s.cli.setters.gcloud.container.cluster'
           - marker: us-central1-c
             ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.location'
+    io.k8s.cli.substitutions.validation-url:
+      type: string
+      x-k8s-cli:
+        substitution:
+          name: validation-url
+          pattern: "VALIDATION_URL"
+          values:
+          - marker: VALIDATION_URL
+            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.controlplane.validation-url'
     io.k8s.cli.substitutions.cluster-name:
       type: string
       x-k8s-cli:

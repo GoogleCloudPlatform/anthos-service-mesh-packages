@@ -1,6 +1,8 @@
-#!/bin/bash
-set -CeEu
-set -o pipefail
+LT_CLUSTER_NAME="long-term-test-cluster"
+LT_CLUSTER_LOCATION="us-central1-c"
+LT_PROJECT_ID="asm-scriptaro-oss"
+LT_NAMESPACE=""
+OUTPUT_DIR=""
 
 BUILD_ID="${BUILD_ID:=}"; export BUILD_ID;
 PROJECT_ID="${PROJECT_ID:=}"; export PROJECT_ID;
@@ -33,6 +35,13 @@ fatal_with_usage() {
   warn "$1"
   usage
   exit 2
+}
+
+uniq_name() {
+  TEST_NAME="${1}"
+  BUILD_ID="${2}"
+  HASH="$(echo "${TEST_NAME}/${BUILD_ID}" | sha256sum)"
+  echo "${HASH::16}"
 }
 
 arg_required() {
@@ -147,6 +156,8 @@ install_demo_app() {
   kubectl get ns "${NAMESPACE}" > /dev/null \
     || kubectl create namespace "${NAMESPACE}"
 
+  kubectl label ns "${NAMESPACE}" scriptaro-test=true || true
+
   kubectl -n "${NAMESPACE}" apply -f - <<EOF
 $(get_demo_yaml "kubernetes" )
 EOF
@@ -255,11 +266,56 @@ create_working_cluster() {
 
   KUBECONFIG="$(mktemp)"
   export KUBECONFIG
+  configure_kubectl  "${CLUSTER_NAME}" "${PROJECT_ID}" "${CLUSTER_LOCATION}"
+
+}
+
+configure_kubectl() {
+  local CLUSTER_NAME; CLUSTER_NAME="${1}";
+  local PROJECT_ID; PROJECT_ID="${2}";
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="${3}";
 
   gcloud container clusters get-credentials \
     "${CLUSTER_NAME}" \
     --project "${PROJECT_ID}" \
     --zone="${CLUSTER_LOCATION}"
+}
+
+cleanup_lt_cluster() {
+  local NAMESPACE; NAMESPACE="$1"
+  local DIR; DIR="$2"
+
+  set +e
+  "${DIR}"/istio*/bin/istioctl x uninstall --purge -y
+  remove_ns "${NAMESPACE} istio-system asm-system" || true
+  set -e
+}
+
+cleanup_old_test_namespaces() {
+  local DIR; DIR="${1}"
+  local NOW_TS;NOW_TS="$(date +%s)"
+  local CREATE_TS
+  local NSS; NSS="istio-system asm-system"
+
+  "${DIR}"/istio*/bin/istioctl x uninstall --purge -y
+
+  while read -r isodate ns; do
+    CREATE_TS="$(date -d "${isodate}" +%s)"
+    if ((NOW_TS - CREATE_TS > 86400)); then
+      NSS="${ns} ${NSS}"
+    fi
+  done <<EOF
+$(get_labeled_clusters)
+EOF
+  echo "Deleting old namespaces ${NSS}"
+  remove_ns ${NSS}
+}
+
+get_labeled_clusters() {
+  kubectl get ns \
+    -l scriptaro-test=true \
+    -o jsonpath='{range .items[*]}{.metadata.creationTimestamp}{"\t"}{.metadata.name}{"\n"}{end}' \
+    || true
 }
 
 cleanup() {
@@ -321,6 +377,10 @@ cleanup() {
 
   # all of the resources are now deleted except for the cluster
   delete_cluster "${PROJECT_ID}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}"
+
+  # we should delete only the membership for the cluster. It should be okay for
+  # now, as we register new memebership during tests.
+  cleanup_all_memberships
 }
 
 delete_cluster() {
@@ -353,6 +413,22 @@ delete_cluster_async() {
 
   return "$?"
 }
+
+cleanup_all_memberships() {
+  echo "Deleting all memberships in ${PROJECT_ID}..."
+  local MEMBERSHIPS
+  MEMBERSHIPS="$(gcloud container hub memberships list --project "${PROJECT_ID}" \
+   --format='value(name)')"
+  while read -r MEMBERSHIP; do
+    if [[ -n "${MEMBERSHIP}" ]]; then
+      gcloud container hub memberships delete "${MEMBERSHIP}" --quiet \
+     --project "${PROJECT_ID}"
+    fi
+  done <<EOF
+${MEMBERSHIPS}
+EOF
+}
+
 #
 ### kubectl convenience functions
 auth_service_account() {
@@ -429,10 +505,18 @@ does_istiod_exist(){
   return "${RETVAL}"
 }
 
+is_cluster_registered() {
+  local IDENTITY_PROVIDER
+  IDENTITY_PROVIDER="$(kubectl get memberships.hub.gke.io \
+    membership -ojson 2>/dev/null | jq .spec.identity_provider)"
+
+  if [[ -z "${IDENTITY_PROVIDER}" ]] || [[ "${IDENTITY_PROVIDER}" = 'null' ]]; then
+    false
+  fi
+}
+
 remove_ns() {
-  local NS; NS="$1"
-  kubectl get ns "$NS" || return
-  kubectl delete ns "$NS"
+  kubectl delete ns ${1} || true
 }
 #
 ### functions for interacting with OSS Istio
@@ -454,6 +538,7 @@ ${OSS_VERSION}/istio-${OSS_VERSION}-linux-amd64.tar.gz" | tar xz
   rm -r "${TMPDIR}"
 
   kubectl create ns "${ISTIO_NAMESPACE}"
+  kubectl label ns "${ISTIO_NAMESPACE}" scriptaro-test=true
 
   kubectl apply -f - <<EOF
 apiVersion: install.istio.io/v1alpha1
@@ -478,4 +563,105 @@ EOF
     fatal "Timed out waiting for Istio to finish installing."
   fi
   echo "Done."
+}
+
+run_basic_test() {
+  local MODE; MODE="${1}";
+  local CA; CA="${2}";
+  shift 2 # increment this if more arguments are added
+  local EXTRA_FLAGS; EXTRA_FLAGS="${*}"
+
+  date +"%T"
+
+  if [[ -n "${SERVICE_ACCOUNT}" ]]; then
+    echo "Authorizing service acount..."
+    auth_service_account
+  fi
+
+  LT_NAMESPACE="$(uniq_name "${SCRIPT_NAME}" "${BUILD_ID}")"
+  OUTPUT_DIR="$(mktemp -d)"
+
+  configure_kubectl "${LT_CLUSTER_NAME}" "${PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
+  # Demo app setup
+  echo "Installing and verifying demo app..."
+  install_demo_app "${LT_NAMESPACE}"
+
+  local GATEWAY; GATEWAY="$(kube_ingress "${LT_NAMESPACE}")";
+  verify_demo_app "$GATEWAY"
+
+  if [[ -n "${KEY_FILE}" && -n "${SERVICE_ACCOUNT}" ]]; then
+    KEY_FILE="-k ${KEY_FILE}"
+    SERVICE_ACCOUNT="-s ${SERVICE_ACCOUNT}"
+  fi
+
+  mkfifo "${LT_NAMESPACE}"
+
+  trap 'remove_ns "${LT_NAMESPACE}"; rm "${LT_NAMESPACE}"; exit 1' ERR
+
+  # Test starts here
+  echo "Installing ASM with MeshCA..."
+  echo "_CI_REVISION_PREFIX=${LT_NAMESPACE} \
+  ../install_asm ${KEY_FILE} ${SERVICE_ACCOUNT} \
+    -l ${LT_CLUSTER_LOCATION} \
+    -n ${LT_CLUSTER_NAME} \
+    -p ${PROJECT_ID} \
+    -m ${MODE} \
+    -c ${CA} -v \
+    --output-dir ${OUTPUT_DIR} \
+    ${EXTRA_FLAGS}"
+  # shellcheck disable=SC2086
+  _CI_REVISION_PREFIX="${LT_NAMESPACE}" \
+    ../install_asm ${KEY_FILE} ${SERVICE_ACCOUNT} \
+    -l "${LT_CLUSTER_LOCATION}" \
+    -n "${LT_CLUSTER_NAME}" \
+    -p "${PROJECT_ID}" \
+    -m "${MODE}" \
+    -c "${CA}" -v \
+    --output-dir "${OUTPUT_DIR}" \
+    ${EXTRA_FLAGS} 2>&1 | tee "${LT_NAMESPACE}" &
+
+  LABEL="$(grep -o -m 1 'istio.io/rev=\S*' "${LT_NAMESPACE}")"
+  REV="$(echo "${LABEL}" | cut -f 2 -d =)"
+  echo "Got label ${LABEL}"
+  rm "${LT_NAMESPACE}"
+
+  sleep 5
+  echo "Installing Istio manifests for demo app..."
+  install_demo_app_istio_manifests "${LT_NAMESPACE}"
+
+  echo "Performing a rolling restart of the demo app..."
+  label_with_revision "${LT_NAMESPACE}" "${LABEL}"
+  roll "${LT_NAMESPACE}"
+
+  local SUCCESS; SUCCESS=0;
+  echo "Getting istio ingress IP..."
+  GATEWAY="$(istio_ingress)"
+  echo "Got ${GATEWAY}"
+  echo "Verifying demo app via Istio ingress..."
+  set +e
+  verify_demo_app "${GATEWAY}" || SUCCESS=1
+  set -e
+
+  if [[ "${SUCCESS}" -eq 1 ]]; then
+    echo "Failed to verify, restarting and trying again..."
+    roll "${LT_NAMESPACE}"
+
+    echo "Getting istio ingress IP..."
+    GATEWAY="$(istio_ingress)"
+    echo "Got ${GATEWAY}"
+    echo "Verifying demo app via Istio ingress..."
+    set +e
+    verify_demo_app "${GATEWAY}" || SUCCESS=1
+    set -e
+  fi
+
+  # check validation webhook
+  echo "Verifying istiod service exists..."
+  if ! does_istiod_exist; then
+    echo "Could not find istiod service."
+  fi
+
+  date +"%T"
+
+  return "$SUCCESS"
 }

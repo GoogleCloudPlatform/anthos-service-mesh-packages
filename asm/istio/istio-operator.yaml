@@ -11,16 +11,56 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+#
 apiVersion: install.istio.io/v1alpha1
 kind: IstioOperator
 spec:
-  profile: asm-gcp
+  profile: empty
   hub: gcr.io/gke-release/asm # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}
-  tag: ASM_IMAGE_TAG # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
+  tag: 1.8.2-asm.2 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
+  meshConfig:
+    trustDomainAliases: # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases"}
+    - "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
+    trustDomain: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
+    defaultConfig:
+      proxyMetadata:
+        CA_PROVIDER: "GoogleCA"
+        PLUGINS: "GoogleTokenExchange"
+        USE_TOKEN_FOR_CSR: "true"
+        GCE_METADATA_HOST: "metadata.google.internal"
+    # Protocol detection timeout is not supported
+    protocolDetectionTimeout: 0s
+    # Locality load balancing is not supported
+    localityLbSetting:
+      enabled: false
   components:
-    pilot:
+    base:
+      enabled: true
+    egressGateways:
+    - enabled: false
+      name: istio-egressgateway
       k8s:
+        hpaSpec:
+          maxReplicas: 5
+          minReplicas: 2
+    ingressGateways:
+    - enabled: true
+      name: istio-ingressgateway
+      k8s:
+        hpaSpec:
+          maxReplicas: 5
+          minReplicas: 2
+    # The default profile is tuned to fit on smaller clusters.
+    # Increase cpu req to ensure we can handle larger scale clusters.
+    pilot:
+      enabled: true
+      k8s:
+        resources:
+          requests:
+            cpu: 500m
+        hpaSpec:
+          minReplicas: 2
+        replicaCount: 2
         env:
         - name: SPIFFE_BUNDLE_ENDPOINTS
           value: "PROJECT_ID.svc.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json" # {"$ref":"#/definitions/io.k8s.cli.substitutions.spiffe-bundle-endpoints"}
@@ -30,14 +70,31 @@ spec:
           value: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.token-audiences"}
         - name: PILOT_ENABLE_WORKLOAD_ENTRY_AUTOREGISTRATION
           value: "true"
-  meshConfig:
-    trustDomain: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
-    defaultConfig:
-      proxyMetadata:
-        GCE_METADATA_HOST: "metadata.google.internal"
   values:
+    # Protocol sniffing is not supported
+    pilot:
+      enableProtocolSniffingForOutbound: false
+      enableProtocolSniffingForInbound: false
+    # Enable telemetry v2 backend by Stackdriver.
+    # Prometheus is also supported with --set values.telemetry.v2.prometheus.enabled=true --set prometheus.enabled=true
+    telemetry:
+      enabled: true
+      v2:
+        enabled: true
+        prometheus:
+          enabled: false
+        stackdriver:
+          enabled: true
+          inboundAccessLogging: "FULL"
+          outboundAccessLogging: "ERRORS_ONLY"
+          topology: true
+    sidecarInjectorWebhook:
+      rewriteAppHTTPProbe: true
     global:
-      # Enable SDS
+      caAddress: "meshca.googleapis.com:443"
+      pilotCertProvider: kubernetes
+      sts:
+        servicePort: 15463
       sds:
         token:
           aud: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
