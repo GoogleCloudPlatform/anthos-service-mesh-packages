@@ -27,8 +27,8 @@ spec:
         hpaSpec:
           maxReplicas: 5
           minReplicas: 2
+        # Rename the service to still use istio-ingressgateway
         overlays:
-        # Overlay service to still use istio-ingressgateway
         - apiVersion: extensions/v1beta1
           kind: Service
           name: istio-ingressgateway-ASM_REV # {"$ref":"#/definitions/io.k8s.cli.substitutions.istio-ingressgateway-deploy-name"}
