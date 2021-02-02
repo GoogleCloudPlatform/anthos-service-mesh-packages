@@ -110,9 +110,6 @@ USE_HUB_WIP=0
 ENVIRON_PROJECT_ID=""
 HUB_MEMBERSHIP_ID=""
 
-# Environment variable used by VM
-USE_VM=0
-
 main() {
   init
   parse_args "${@}"
@@ -242,10 +239,6 @@ main() {
     install_managed_components
     outro
     return 0
-  fi
-
-  if [[ "${USE_VM}" -eq 1 ]]; then
-    register_gce_identity_provider
   fi
 
   configure_package
@@ -681,9 +674,6 @@ parse_args() {
         if [[ "${2}" == "hub-meshca" ]]; then
           USE_HUB_WIP=1
         fi
-        if [[ "${2}" == "vm" ]]; then
-          USE_VM=1
-        fi
         shift 2
         ;;
       --co | --custom_overlay | --custom-overlay)
@@ -828,10 +818,6 @@ validate_args() {
     if [[ "${CUSTOM_CA}" -eq 1 ]]; then
       fatal "Specifying a custom CA with managed control plane is not supported."
     fi
-
-    if [[ "${USE_VM}" -eq 1 ]]; then
-      fatal "Adding VM workloads with managed control plane is not supported."
-    fi
   fi
 
   local MISSING_ARGS=0
@@ -883,10 +869,6 @@ EOF
   fi
   if [[ "${CA}" == "citadel" && "${USE_HUB_WIP}" -eq 1 ]]; then
     fatal "Hub Workload Identity Pool is only supported for Mesh CA"
-  fi
-
-  if [[ "${USE_VM}" -eq 1 && "${USE_HUB_WIP}" -eq 0 ]]; then
-    fatal "Hub Workload Identity Pool is required to add VM workloads. Run the script with the -o hub-meshca option."
   fi
 
   if [[ "${CUSTOM_CA}" -eq 1 ]]; then
@@ -2037,11 +2019,6 @@ EOF
     install_canonical_controller
   fi
 
-  if [[ "${USE_VM}" -eq 1 ]]; then
-    info "Exposing the control plane for VM workloads..."
-    retry 3 run kubectl apply -f "${EXPOSE_ISTIOD_SERVICE}"
-  fi
-
   outro
 }
 
@@ -2099,20 +2076,11 @@ install_managed_components() {
 
   info "Installing ASM managed control plane components..."
   # shellcheck disable=SC2086
-<<<<<<< HEAD
-  retry 5 run ./"${ISTIOCTL_REL_PATH}" install $PARAMS
-=======
   retry 5 run "$(istioctl_path)" install $PARAMS
-
->>>>>>> master
 
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
     install_canonical_controller
   fi
-<<<<<<< HEAD
-=======
-
->>>>>>> master
 }
 
 outro() {
