@@ -2002,7 +2002,7 @@ EOF
 
   info "Installing ASM control plane..."
   # shellcheck disable=SC2086
-  retry 5 run "$(istioctl_path)" install --skip-confirmation $PARAMS
+  retry 5 run "$(istioctl_path)" install $PARAMS
 
   # Prevent the stderr buffer from ^ messing up the terminal output below
   sleep 1
