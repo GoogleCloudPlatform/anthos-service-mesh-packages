@@ -44,13 +44,14 @@ K8S_MINOR=0
 ### File related constants ###
 ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
 ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
-CRD_REL_PATH="${ISTIO_FOLDER_NAME}/manifests/charts/base/crds/crd-all.gen.yaml"; readonly CRD_REL_PATH;
+BASE_REL_PATH="${ISTIO_FOLDER_NAME}/manifests/charts/base/files/gen-istio-cluster.yaml"; readonly BASE_REL_PATH;
 PACKAGE_DIRECTORY="asm/istio"; readonly PACKAGE_DIRECTORY;
 VALIDATION_FIX_SERVICE="${PACKAGE_DIRECTORY}/istiod-service.yaml"; readonly VALIDATION_FIX_SERVICE;
 OPTIONS_DIRECTORY="${PACKAGE_DIRECTORY}/options"; readonly OPTIONS_DIRECTORY;
 OPERATOR_MANIFEST="${PACKAGE_DIRECTORY}/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
 BETA_CRD_MANIFEST="${OPTIONS_DIRECTORY}/v1beta1-crds.yaml"; readonly BETA_CRD_MANIFEST;
 MANAGED_MANIFEST="${OPTIONS_DIRECTORY}/managed-control-plane.yaml"; readonly MANAGED_MANIFEST;
+MANAGED_WEBHOOKS="${OPTIONS_DIRECTORY}/managed-control-plane-webhooks.yaml"; readonly MANAGED_WEBHOOKS;
 EXPOSE_ISTIOD_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_SERVICE;
 CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
 
@@ -238,7 +239,6 @@ main() {
   if [[ "${MANAGED}" -eq 1 ]]; then
     start_managed_control_plane
     configure_package
-    install_crds
     install_managed_components
     outro
     return 0
@@ -2070,23 +2070,42 @@ EOF
     -K <(auth_header "$(get_auth_token)")
 }
 
-install_crds() {
-  retry 2 run kubectl apply -f "${CRD_REL_PATH}"
+server-side_apply() {
+  local FILE; FILE="${1}";
+  run kubectl apply -f "${FILE}" \
+    --record=false \
+    --overwrite=false \
+    --force-conflicts=true \
+    --server-side
 }
 
 install_managed_components() {
-  PARAMS="--set revision=${REVISION_LABEL}"
+  local URL
+  URL="$(kubectl get mutatingwebhookconfiguration istiod-asm-managed -ojson | jq .webhooks[0].clientConfig.url -r)"
+  # shellcheck disable=SC2001
+  URL="$(echo "${URL}" | sed 's/inject.*$/validate/g')"
+
+  run kpt cfg set asm anthos.servicemesh.controlplane.validation-url "${URL}"
+
+  info "Configuring base installation for managed control plane..."
+
+  server-side_apply "${BASE_REL_PATH}"
+  run kubectl replace -f "${MANAGED_WEBHOOKS}"
+
   PARAMS="-f ${MANAGED_MANIFEST}"
   PARAMS="${PARAMS} -c ${KUBECONFIG}"
   PARAMS="${PARAMS} --skip-confirmation"
+  PARAMS="${PARAMS} --set revision=${REVISION_LABEL}"
 
   info "Installing ASM managed control plane components..."
   # shellcheck disable=SC2086
   retry 5 run "$(istioctl_path)" install $PARAMS
 
+
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
     install_canonical_controller
   fi
+
 }
 
 outro() {
