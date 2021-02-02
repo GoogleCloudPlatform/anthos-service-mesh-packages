@@ -6,7 +6,6 @@ steps:
   dir: 'scripts/asm-installer'
   id: 'build-tester-image'
   args: ['build', '-t', 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}', '.']
-  waitFor: ['-']
 - name: 'gcr.io/cloud-builders/docker'
   dir: 'scripts/asm-installer'
   id: 'publish-tester-image'
@@ -19,18 +18,6 @@ steps:
   entrypoint: 'shellcheck'
   args:
   - '${_SCRIPT_NAME}'
-  waitFor:
-  - 'publish-tester-image'
-
-    # Disabled for now, see #296. We have more users with LTS Linux releases
-    # than non-Bourne shells. Please open an issue if you're affected.
-    #- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
-    #  dir: 'scripts/asm-installer'
-    #  id: 'check-posh-compatibility'
-    #  entrypoint: 'posh'
-    #  args: ['-n', '${_SCRIPT_NAME}']
-    #  waitFor:
-    #  - 'publish-tester-image'
 
 - name: 'gcr.io/cloud-builders/gcloud'
   dir: 'scripts/asm-installer'
@@ -46,8 +33,6 @@ steps:
     --project="${PROJECT_ID}" \
     | tr '_-' '/+' \
     | base64 -d > "${_KEY_FILE}"
-  waitFor:
-  - 'lint-with-shellcheck'
 
 - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
   dir: 'scripts/asm-installer'
@@ -57,8 +42,12 @@ steps:
   - '-c'
   - >
     ./tests/setup_longterm_cluster
-  waitFor:
-  - 'fetch-secrets'
+  env:
+  - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
+  - 'KEY_FILE=${_KEY_FILE}'
+  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
+  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
+  - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
 
   #############
   # FAST TESTS
@@ -71,8 +60,6 @@ steps:
   - '-c'
   - >
     ./tests/run_cli_tests
-  waitFor:
-  - 'setup-long-term-cluster'
   env:
   - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
   - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
@@ -89,8 +76,6 @@ steps:
   - '-c'
   - >
     ./tests/run_print_config_test
-  waitFor:
-  - 'setup-long-term-cluster'
   env:
   - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
   - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
@@ -105,6 +90,60 @@ steps:
   #############
   # SLOW TESTS
   #############
+- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
+  dir: 'scripts/asm-installer'
+  id: 'run-basic-suite'
+  entrypoint: '/bin/bash'
+  args:
+  - '-c'
+  - >
+    ./tests/run_basic_suite
+    --PROJECT_ID "${PROJECT_ID}"
+    --BUILD_ID "${BUILD_ID}"
+  env:
+  - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
+  - 'KEY_FILE=${_KEY_FILE}'
+  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
+  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
+  - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
+  timeout: 600s
+
+- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
+  dir: 'scripts/asm-installer'
+  id: 'run-basic-suite-managed'
+  entrypoint: '/bin/bash'
+  args:
+  - '-c'
+  - >
+    ./tests/run_basic_suite_managed
+    --PROJECT_ID "${PROJECT_ID}"
+    --BUILD_ID "${BUILD_ID}"
+  env:
+  - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
+  - 'KEY_FILE=${_KEY_FILE}'
+  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
+  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
+  - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
+  timeout: 600s
+
+- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
+  dir: 'scripts/asm-installer'
+  id: 'run-install-custom-cert-suite'
+  entrypoint: '/bin/bash'
+  args:
+  - '-c'
+  - >
+    ./tests/run_install_custom_cert_suite
+    --PROJECT_ID "${PROJECT_ID}"
+    --BUILD_ID "${BUILD_ID}"
+  env:
+  - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
+  - 'KEY_FILE=${_KEY_FILE}'
+  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
+  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
+  - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
+  timeout: 600s
+
 
 substitutions:
   _BUCKET_NAME: my-gcs-bucket
