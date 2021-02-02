@@ -317,3 +317,11 @@ openAPI:
           name: anthos.servicemesh.external_ca.ca_name
           value: ""
           isSet: true
+    io.k8s.cli.substitutions.istio-ingressgateway-deploy-name:
+      x-k8s-cli:
+        substitution:
+          name: istio-ingressgateway-deploy-name
+          pattern: istio-ingressgateway-ASM_REV
+          values:
+          - marker: ASM_REV
+            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.rev'
