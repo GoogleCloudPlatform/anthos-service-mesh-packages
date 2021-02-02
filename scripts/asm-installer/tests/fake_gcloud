@@ -47,7 +47,7 @@ exit 0
 fi
 
 if [[ "${*}" == *"this_should_pass"*"resourceLabel"* ]]; then
-  echo 'mesh_id=proj-this_should_pass,asmv=1-8-1-asm-5'
+  echo 'mesh_id=proj-this_should_pass,asmv=1-8-2-asm-2'
   exit 0
 fi
 
