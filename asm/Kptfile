@@ -138,6 +138,12 @@ openAPI:
         setter:
           name: anthos.servicemesh.controlplane.validation-url
           value: VALIDATION_URL
+    io.k8s.cli.setters.anthos.servicemesh.managed-controlplane.cloudrun-addr:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.managed-controlplane.cloudrun-addr
+          value: CLOUDRUN_ADDR
     io.k8s.cli.substitutions.network:
       type: string
       x-k8s-cli:
