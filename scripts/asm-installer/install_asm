@@ -1358,10 +1358,10 @@ EOF
 
   local RAW_YAML; RAW_YAML="${REVISION_LABEL}-manifest-raw.yaml"
   local EXPANDED_YAML; EXPANDED_YAML="${REVISION_LABEL}-manifest-expanded.yaml"
-  print_config > "${RAW_YAML}"
+  print_config >| "${RAW_YAML}"
   run ./"${ISTIOCTL_REL_PATH}" manifest generate \
     <"${RAW_YAML}" \
-    >"${EXPANDED_YAML}"
+    >|"${EXPANDED_YAML}"
 
   if ! does_istiod_exist; then
     info "Installing validation webhook fix..."
