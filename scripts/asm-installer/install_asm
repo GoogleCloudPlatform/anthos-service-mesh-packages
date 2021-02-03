@@ -1924,7 +1924,9 @@ configure_package() {
   info "Configuring kpt package..."
 
   populate_cluster_values
-  populate_environ_info
+  if ! is_managed; then
+    populate_environ_info
+  fi
   run kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
   run kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
   run kpt cfg set asm gcloud.project.environProjectNumber "${PROJECT_NUMBER}"
