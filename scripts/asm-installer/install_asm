@@ -1116,7 +1116,9 @@ handle_multi_yaml_bug() {
   done <<EOF
 ${CUSTOM_OVERLAY}
 EOF
-  CUSTOM_OVERLAY="${CSPLIT_OUTPUT:1:${#CSPLIT_OUTPUT}},"
+  if [[ -n "${CSPLIT_OUTPUT}" ]]; then
+    CUSTOM_OVERLAY="${CSPLIT_OUTPUT:1:${#CSPLIT_OUTPUT}},"
+  fi
 }
 
 validate_cli_dependencies() {
