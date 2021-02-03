@@ -1094,7 +1094,29 @@ EOF
   done <<EOF
 ${OPTIONAL_OVERLAY}
 EOF
+  handle_multi_yaml_bug
 unset OPTIONAL_OVERLAY; readonly CUSTOM_OVERLAY
+}
+
+# This is a workaround for https://github.com/istio/istio/issues/30632
+# which doesn't handle files with multiple operator specs correctly.
+# This will split all of the files based off of the yaml document separator.
+handle_multi_yaml_bug() {
+  local CSPLIT_OUTPUT; CSPLIT_OUTPUT="";
+  local BASE_NAME
+  while read -d ',' -r yaml_file; do
+    BASE_NAME="$(basename "${yaml_file}")"
+    if [[ "$(csplit -z -f "overlay-${BASE_NAME}" -z "${yaml_file}" '/^---$/' '{*}' | wc -l)" -eq 1 ]]; then
+      CSPLIT_OUTPUT="${CSPLIT_OUTPUT},${yaml_file}"
+    else
+      for split_file in overlay-"${BASE_NAME}"*; do
+        CSPLIT_OUTPUT="${CSPLIT_OUTPUT},$(apath -f "${split_file}")"
+      done
+    fi
+  done <<EOF
+${CUSTOM_OVERLAY}
+EOF
+  CUSTOM_OVERLAY="${CSPLIT_OUTPUT:1:${#CSPLIT_OUTPUT}},"
 }
 
 validate_cli_dependencies() {
