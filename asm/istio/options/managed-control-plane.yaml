@@ -43,6 +43,7 @@ spec:
         OUTPUT_CERTS: "/etc/istio/proxy"
         XDS_TOKEN_TYPE: "Istio"
         XDS_HEADER_Cloud-Run-Enable-H2: "y"
+        ISTIO_META_CLOUDRUN_ADDR: "ISTIO_CLOUDRUN_ADDR" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.managed-controlplane.cloudrun-addr"}
   values:
     gateways:
       istio-ingressgateway:
