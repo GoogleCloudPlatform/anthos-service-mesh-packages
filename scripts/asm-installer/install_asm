@@ -2066,9 +2066,12 @@ install_managed_components() {
   local URL
   URL="$(kubectl get mutatingwebhookconfiguration istiod-asm-managed -ojson | jq .webhooks[0].clientConfig.url -r)"
   # shellcheck disable=SC2001
-  URL="$(echo "${URL}" | sed 's/inject.*$/validate/g')"
+  VALIDATION_URL="$(echo "${URL}" | sed 's/inject.*$/validate/g')"
+  # shellcheck disable=SC2001
+  CLOUDRUN_ADDR=$(echo "${URL}" | cut -d'/' -f3)
 
-  run kpt cfg set asm anthos.servicemesh.controlplane.validation-url "${URL}"
+  run kpt cfg set asm anthos.servicemesh.controlplane.validation-url "${VALIDATION_URL}"
+  run kpt cfg set asm anthos.servicemesh.managed-controlplane.cloudrun-addr "${CLOUDRUN_ADDR}"
 
   info "Configuring base installation for managed control plane..."
 
