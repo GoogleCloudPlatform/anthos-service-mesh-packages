@@ -1711,7 +1711,7 @@ get_cluster_labels() {
 
 is_cluster_registered() {
 
-  if ! kubectl api-resources --api-group=hub.gke.io | grep -q memberships; then
+  if ! is_membership_crd_installed; then
     false
     return
   fi
@@ -1786,15 +1786,22 @@ is_workload_identity_enabled() {
   if [[ "${ENABLED}" = 'null' ]]; then false; fi
 }
 
+is_membership_crd_installed() {
+  if ! kubectl api-resources --api-group=hub.gke.io | grep -q memberships; then
+    false
+  fi
+}
+
 populate_environ_info() {
   if [[ -n "${ENVIRON_PROJECT_ID}" && -n "${HUB_MEMBERSHIP_ID}" ]]; then return; fi
-    configure_kubectl
-    local IDENTITY_PROVIDER
-    local IDENTITY
-    IDENTITY_PROVIDER="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.identity_provider)"
-    IDENTITY="$(echo "${IDENTITY_PROVIDER}" | sed 's/^\"https:\/\/gkehub.googleapis.com\/projects\/\(.*\)\/locations\/global\/memberships\/\(.*\)\"$/\1 \2/g')"
-    if [[ -n "${IDENTITY}" ]]; then
-      read -r ENVIRON_PROJECT_ID HUB_MEMBERSHIP_ID <<EOF
+  if ! is_membership_crd_installed; then return; fi
+  configure_kubectl
+  local IDENTITY_PROVIDER
+  local IDENTITY
+  IDENTITY_PROVIDER="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.identity_provider)"
+  IDENTITY="$(echo "${IDENTITY_PROVIDER}" | sed 's/^\"https:\/\/gkehub.googleapis.com\/projects\/\(.*\)\/locations\/global\/memberships\/\(.*\)\"$/\1 \2/g')"
+  if [[ -n "${IDENTITY}" ]]; then
+    read -r ENVIRON_PROJECT_ID HUB_MEMBERSHIP_ID <<EOF
 ${IDENTITY}
 EOF
   fi
