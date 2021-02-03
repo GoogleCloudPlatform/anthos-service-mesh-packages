@@ -22,20 +22,37 @@ ASM_META_VERSION="${MAJOR}.${MINOR}.${POINT}"
 readonly ASM_RELEASE
 readonly ASM_META_VERSION
 
+SERVICE_PROXY_AGENT_BUCKET=\
+"gs://gce-mesh/service-proxy-agent/releases/service-proxy-agent-0.2-asm.tgz"
+readonly SERVICE_PROXY_AGENT_BUCKET
+ASM_REVISION_LABEL_KEY="istio.io/rev"
+readonly ASM_REVISION_LABEL_KEY
+EXPANSION_GATEWAY_NAME="istio-eastwestgateway"
+readonly EXPANSION_GATEWAY_NAME
+ISTIOD_NAME="istiod"
+readonly ISTIOD_NAME
+IDENTITY_PROVIDER_ANNOTATION_KEY="security.cloud.google.com/IdentityProvider"
+readonly IDENTITY_PROVIDER_ANNOTATION_KEY
+
 SCRIPT_NAME="${0##*/}"
 
 PROJECT_NUMBER=""
 
-DNS_IP=""
+### Cluster variables ###
 ROOT_CERT=""
 INGRESS_IP=""
-MESH_AGENT_BUCKET=\
-"gs://gce-mesh/service-proxy-agent/releases/service-proxy-agent-0.2-asm.tgz"
-INSTANCE_IPS=""
+ASM_REVISIONS=""
+NETWORK=""
+MEMBERSHIP_UID=""
+
+### Workload variables ###
+WORKLOAD_LABELS=""
+WORKLOAD_SERVICE_ACCOUNT=""
+WORKLOAD_ASM_REVISION=""
+WORKLOAD_IDENTITY_PROVIDER=""
+CREDENTIAL_IDENTITY_PROVIDER=""
 CANONICAL_SERVICE=""
 CANONICAL_REVISION=""
-
-IP_REGEX="^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$"
 
 ### Command internal toggle ###
 CREATE_GCE_INSTANCE_TEMPLATE=0
@@ -46,10 +63,7 @@ CLUSTER_NAME="${CLUSTER_NAME:=}"
 CLUSTER_LOCATION="${CLUSTER_LOCATION:=}"
 SOURCE_INSTANCE_TEMPLATE="${SOURCE_INSTANCE_TEMPLATE:=}"
 WORKLOAD_NAME="${WORKLOAD_NAME:=}"
-WORKLOAD_LABELS="${WORKLOAD_LABELS:=}"
-WORKLOAD_SERVICE_ACCOUNT="${WORKLOAD_SERVICE_ACCOUNT:=}"
-
-NEW_INSTANCE_TEMPLATE=""
+WORKLOAD_NAMESPACE="${WORKLOAD_NAMESPACE:=}"
 
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT:=}"
 KEY_FILE="${KEY_FILE:=}"
@@ -207,53 +221,57 @@ All options can also be passed via environment variables by using the ALL_CAPS
 name. Options specified via flags take precedence over environment variables.
 
 POSITIONAL ARGUMENTS:
-  NAME                                              Name of the instance
-                                                    template to create.
+  NAME                                                Name of the instance
+                                                      template to create.
 
 OPTIONS:
-  -l|--cluster_location         <LOCATION>          The GCP location of the
-                                                    target cluster.
-  -n|--cluster_name             <NAME>              The name of the target
-                                                    cluster.
-  -p|--project_id               <ID>                The GCP project ID.
-  -w|--workload_name            <WORKLOAD_NAME>     The name of the workload
-                                                    running on the GCE
-                                                    instance(s).
-  -e|--workload_labels          <WORKLOAD_LABELS>   (optional) The
-                                                    labels of the workload,
-                                                    comma separated.
-  -i|--source_instance_template <TEMPLATE>          (optional) The name of the
-                                                    source GCE instance
-                                                    template.
-  -s|--service_account          <SERVICE_ACCOUNT>   (optional) The name of a
-                                                    service account used to run
-                                                    the script.
-  -k|--key_file                 <FILE PATH>         (optional) The key file for
-                                                    a service account. Required
-                                                    if --service_account is
-                                                    passed.
+  -l|--cluster_location         <LOCATION>            The GCP location of the
+                                                      target cluster.
+  -n|--cluster_name             <NAME>                The name of the target
+                                                      cluster.
+  -p|--project_id               <ID>                  The GCP project ID.
+  -w|--workloadgroup_name       <WORKLOAD_NAME>       The name of the
+                                                      WorkloadGroup for GCE VM
+                                                      workloads.
+  -ns|--workloadgroup_namespace <WORKLOAD_NAMESPACE>  (optional)The namespace of
+                                                      the WorkloadGroup for GCE
+                                                      VM workloads. Default to
+                                                      the "default" namespace if
+                                                      not specified.
+  -i|--source_instance_template <TEMPLATE>            (optional) The name of the
+                                                      source GCE instance
+                                                      template.
+  -s|--service_account          <SERVICE_ACCOUNT>     (optional) The name of a
+                                                      service account used to
+                                                      run the script.
+  -k|--key_file                 <FILE PATH>           (optional) The key file
+                                                      for a service account.
+                                                      Required if
+                                                      --service_account is
+                                                      passed.
 
 FLAGS:
 
-  -v|--verbose                                      Print commands before and
-                                                    after execution.
-     --dry_run                                      Print commands, but don't
-                                                    execute them.
-     --only_validate                                Run validation but don't
-                                                    install.
-  -h|--help                                         Show this message and exit.
+  -v|--verbose                                        Print commands before and
+                                                      after execution.
+     --dry_run                                        Print commands, but don't
+                                                      execute them.
+     --only_validate                                  Run validation but don't
+                                                      install.
+  -h|--help                                           Show this message and
+                                                      exit.
 
 EXAMPLE:
 The following invocation will prepare a GCE VM template named "my_vm_template"
-in project "my_project" based on the configurations in ASM cluster "my_cluster"
-in zone "us-central1-c":
+in project "my_project" based on the WorkloadGroup "my_workload" in namespace
+"foo" in ASM cluster "my_cluster" in zone "us-central1-c":
   $> ${SCRIPT_NAME} create_gce_instance_template my_vm_template \\
       -n my_cluster \\
       -p my_project \\
       -l us-central1-c \\
       -i base_vm_template \\
-      -w checkout \\
-      -e app=checkout
+      -w my_workload \\
+      -ns foo
 EOF
 }
 
@@ -321,14 +339,14 @@ parse_args_create_gce_instance_template() {
         SOURCE_INSTANCE_TEMPLATE="${2}"
         shift 2
         ;;
-      -w | --workload_name | --workload-name)
+      -w | --workloadgroup_name | --workloadgroup-name)
         arg_required "${@}"
         WORKLOAD_NAME="${2}"
         shift 2
         ;;
-      -e | --workload_labels | --workload-labels)
+      -ns | --workloadgroup_namespace | --workloadgroup-namespace)
         arg_required "${@}"
-        WORKLOAD_LABELS="${2}"
+        WORKLOAD_NAMESPACE="${2}"
         shift 2
         ;;
       -s | --service_account | --service-account)
@@ -394,10 +412,8 @@ ONLY_VALIDATE
 VERBOSE
 EOF
 
-  local LABEL_PAT
-  LABEL_PAT="^([^=,[:space:]]+)=([^=,[:space:]]+)(,([^=,[:space:]]+)=([^=,[:space:]]+))*$"
-  if [[ -n "${WORKLOAD_LABELS}" && ! "${WORKLOAD_LABELS}" =~ $LABEL_PAT ]]; then
-    fatal "Workload labels ${WORKLOAD_LABELS} are not specified in the correct format. Example: app=label,env=prod"
+  if [[ -z "${WORKLOAD_NAMESPACE}" ]]; then
+    WORKLOAD_NAMESPACE="default"
   fi
 
   if [[ -n "$SERVICE_ACCOUNT" && -z "$KEY_FILE" || -z "$SERVICE_ACCOUNT" && -n "$KEY_FILE" ]]; then
@@ -429,6 +445,7 @@ validate_dependencies() {
   PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" \
     --format="value(projectNumber)")"
   validate_asm_cluster
+  validate_workloadgroup
 
   if [[ "${CREATE_GCE_INSTANCE_TEMPLATE}" -eq 1 ]]; then
     validate_gce_instance_template
@@ -452,7 +469,6 @@ curl
 jq
 tr
 awk
-xargs
 printf
 kubectl
 EOF
@@ -465,7 +481,6 @@ EOF
     fatal "One or more dependencies were not found. Please install them and retry."
   fi
 
-  local OS
   # shellcheck disable=SC2064
   trap "$(shopt -p nocasematch)" RETURN
   shopt -s nocasematch
@@ -495,9 +510,7 @@ EOF
 validate_asm_cluster() {
   validate_cluster
   configure_kubectl
-  validate_asm_installation
-  validate_project_namespace
-  validate_retrieve_istio_dns
+  validate_retrieve_asm_installation
 }
 
 validate_cluster() {
@@ -506,7 +519,7 @@ validate_cluster() {
   info "Confirming cluster information for ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
   RESULT="$(gcloud container clusters list \
     --project="${PROJECT_ID}" \
-    --filter="name = ${CLUSTER_NAME} and location = ${CLUSTER_LOCATION}" \
+    --filter="name = ${CLUSTER_NAME} AND location = ${CLUSTER_LOCATION}" \
     --format="value(name)" || true)"
   if [[ -z "${RESULT}" ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
@@ -518,62 +531,164 @@ EOF
   fi
 }
 
-validate_asm_installation() {
+validate_retrieve_asm_installation() {
   info "Checking for istio-system namespace..."
   if [ "$(retry 2 kubectl get ns | grep -c istio-system || true)" -eq 0 ]; then
     fatal "istio-system namespace cannot be found in the cluster. Please install ASM and retry."
   fi
 
   info "Verifying ASM installation..."
-  local ASM_DEPLOYMENT; ASM_DEPLOYMENT="istiod,istio-ingressgateway"
-  for deploy in $(echo "${ASM_DEPLOYMENT}" | tr ',' '\n'); do
-    local DEPLOY_NAME
-    DEPLOY_NAME="$(retry 2 kubectl get deployment -n istio-system | \
-      grep "${deploy}" | awk '{print $1}' || true)"
-    if [ -z "${DEPLOY_NAME}" ]; then
-      fatal "${deploy} cannot be found in the cluster. Please re-install ASM and retry."
+  local SUPPORTED_VERSION_INSTALLED=0
+  local EXPANSION_GATEWAY_INSTALLED=0
+  for deploy in $(kubectl get deployment -n istio-system --no-headers -o custom-columns=":metadata.name"); do
+    if [[ "${deploy}" =~ ^$ISTIOD_NAME ]]; then
+      if [[ "$(retry 2 kubectl get deployment "${deploy}" -n istio-system \
+        -o=jsonpath="{.spec.template.spec.containers[0].image}")" \
+        =~ $ASM_RELEASE ]]; then
+        local CURR_REVISION
+        CURR_REVISION="$(retry 2 kubectl get deployment "${deploy}" \
+          -n istio-system -ojson | jq -r \
+          '.metadata.labels["'"${ASM_REVISION_LABEL_KEY}"'"]')"
+        ASM_REVISIONS="${CURR_REVISION},${ASM_REVISIONS}"
+        SUPPORTED_VERSION_INSTALLED=1
+      fi
     fi
-    if ! [[ "$(retry 2 kubectl get deployment "${DEPLOY_NAME}" \
-      -n istio-system \
-      -o=jsonpath="{.spec.template.spec.containers[0].image}")" \
-      =~ $ASM_RELEASE ]]; then
-      fatal "${deploy} is not in ASM version ${ASM_RELEASE}. Please install ASM ${ASM_RELEASE} and retry."
+    if [[ "${deploy}" =~ ^$EXPANSION_GATEWAY_NAME ]]; then
+      EXPANSION_GATEWAY_INSTALLED=1
     fi
   done
-}
 
-validate_project_namespace() {
-  info "Checking for ${PROJECT_ID} namespace..."
-  if [ "$(retry 2 kubectl get ns | grep -c "${PROJECT_ID}" || true)" -eq 0 ]; then
-    fatal \
-"${PROJECT_ID} namespace cannot be found in the cluster. Please create the
-namespace. For example:
-  kubectl create ns ${PROJECT_ID}"
+  if [[ "${SUPPORTED_VERSION_INSTALLED}" -eq 0 ]]; then
+    fatal "ASM ${ASM_RELEASE} version is not found. Please install ASM ${ASM_RELEASE} and retry."
+  fi
+
+  if [[ "${EXPANSION_GATEWAY_INSTALLED}" -eq 0 ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+${EXPANSION_GATEWAY_NAME} is not found in the cluster.
+Please use install_asm with "--option vm" when you install ASM.
+EOF
   fi
 }
 
-validate_retrieve_istio_dns() {
+validate_workloadgroup() {
+  info "Checking for WorkloadGroup ${WORKLOAD_NAME} in namespace ${WORKLOAD_NAMESPACE}..."
   local RESULT; RESULT=""
-
-  RESULT="$(kubectl get service istio-dns -n kube-system || true)"
+  RESULT="$(retry 2 kubectl get workloadgroups.networking.istio.io "${WORKLOAD_NAME}" \
+    -n "${WORKLOAD_NAMESPACE}" || true)"
   if [[ -z "${RESULT}" ]]; then
-    fatal "istio-dns service not found on the cluster. Please follow the user
-guide and create a DNS service for VMs."
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Unable to find WorkloadGroup ${WORKLOAD_NAME} in namespace ${WORKLOAD_NAMESPACE}.
+Please verify the name and namespace of the WorkloadGroup and try again.
+EOF
   fi
 
-  if [[ "${CREATE_GCE_INSTANCE_TEMPLATE}" -eq 0 ]]; then
-    return 0
+  parse_workloadgroup
+  validate_workload_asm_revision
+  validate_workloadgroup_identity_provider
+  validate_workload_service_account
+}
+
+parse_workloadgroup() {
+  retrieve_workload_asm_revision
+  retrieve_workload_labels
+  retrieve_workload_service_account
+}
+
+validate_workloadgroup_identity_provider() {
+  info "Verifying the identity provider of the WorkloadGroup..."
+  WORKLOAD_IDENTITY_PROVIDER="$(retry 2 kubectl get workloadgroups.networking.istio.io \
+    "${WORKLOAD_NAME}" -n "${WORKLOAD_NAMESPACE}" -ojson \
+    | jq -r '.spec.metadata.annotations["'"${IDENTITY_PROVIDER_ANNOTATION_KEY}"'"]')"
+  if [[ -z "${WORKLOAD_IDENTITY_PROVIDER}" ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Unable to find the identity provider for WorkloadGroup ${WORKLOAD_NAME} in
+namespace ${WORKLOAD_NAMESPACE}.
+Please make sure an IdentityProvider is specified in the WorkloadGroup.
+EOF
   fi
 
-  # Only looking for an IP format matching from the kubernetes field that
-  # includes the DNS IP address.
-  info "Retrieving the Istio DNS service IP address..."
-  local RETVAL
-  { DNS_IP=$(watch_for_result 15 "${IP_REGEX}" kubectl get service \
-  istio-dns -n kube-system \
-  -o jsonpath='{.status.loadBalancer.ingress[0].ip}'); RETVAL="$?"; } || true
-  if [[ "${RETVAL}" -ne 0 ]]; then
-    fatal "Failed to retrieve the Istio DNS IP address."
+  local RESULT; RESULT=""
+  RESULT="$(retry 2 kubectl get identityproviders.security.cloud.google.com \
+    "${WORKLOAD_IDENTITY_PROVIDER}" || true)"
+  if [[ -z "${RESULT}" ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Unable to find identity provider ${WORKLOAD_IDENTITY_PROVIDER} in the cluster.
+To see the available identity providers in the cluster, run:
+  kubectl get identityproviders.security.cloud.google.com
+EOF
+  fi
+}
+
+retrieve_workload_asm_revision() {
+  info "Retrieving the ASM revision for the WorkloadGroup..."
+  WORKLOAD_ASM_REVISION="$(retry 2 kubectl get namespace "${WORKLOAD_NAMESPACE}" -ojson \
+    | jq -r '.metadata.labels["'${ASM_REVISION_LABEL_KEY}'"]')"
+  if [[ -z "${WORKLOAD_ASM_REVISION}" ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Unable to find an ASM revision for the namespace of the WorkloadGroup. To apply
+a revision label on the namespace, replace <REVISION> with an available revision
+name and run:
+  kubectl label namespace "${WORKLOAD_NAMESPACE}" istio-injection- \
+  istio.io/rev=<REVISION> --overwrite
+EOF
+  fi
+}
+
+retrieve_workload_labels() {
+  info "Retrieving labels from the WorkloadGroup..."
+  WORKLOAD_LABELS="$(retry 2 kubectl get workloadgroups.networking.istio.io \
+    "${WORKLOAD_NAME}" -n "${WORKLOAD_NAMESPACE}" -ojson | jq -r '.spec.metadata.labels')"
+}
+
+retrieve_workload_service_account() {
+  info "Retrieving service account from the WorkloadGroup..."
+  WORKLOAD_SERVICE_ACCOUNT="$(retry 2 kubectl get workloadgroups.networking.istio.io \
+    "${WORKLOAD_NAME}" -n "${WORKLOAD_NAMESPACE}" -ojsonpath="{.spec.template.serviceAccount}")"
+  if [[ -z "${WORKLOAD_SERVICE_ACCOUNT}" ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Unable to find the service account for WorkloadGroup ${WORKLOAD_NAME} in
+namespace ${WORKLOAD_NAMESPACE}.
+Please make sure a service account is specified in the WorkloadGroup.
+EOF
+  fi
+}
+
+validate_workload_asm_revision() {
+  info "Verifying the ASM revision for the WorkloadGroup..."
+
+  local WORKLOAD_REVISION_FOUND=0
+  ASM_REVISIONS="$(strip_last_char "${ASM_REVISIONS}")"
+  for rev in $(echo "${ASM_REVISIONS}" | tr ',' '\n'); do
+    if [[ "${WORKLOAD_ASM_REVISION}" == "${rev}" ]]; then
+      WORKLOAD_REVISION_FOUND=1
+      break
+    fi
+  done
+
+  if [[ "${WORKLOAD_REVISION_FOUND}" -eq 0 ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+ASM revision ${WORKLOAD_ASM_REVISION} for the workload is not found in the
+cluster. Please verify the value of ${ASM_REVISION_LABEL_KEY} label on namespace
+${WORKLOAD_NAMESPACE} and try again.
+EOF
+  fi
+}
+
+validate_workload_service_account() {
+  info "Verifying the workload service account..."
+
+  local RESULT; RESULT=""
+  RESULT="$(gcloud iam service-accounts list \
+    --project="${PROJECT_ID}" \
+    --filter="email = ${WORKLOAD_SERVICE_ACCOUNT}" \
+    --format="value(name)" || true)"
+  if [[ -z "${RESULT}" ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Unable to find ${WORKLOAD_SERVICE_ACCOUNT} in the project.
+Please verify the spelling in the WorkloadGroup and try again.
+To see a list of your service accounts, in this project, run:
+  gcloud iam service-accounts list --format='value(email)' --project="${PROJECT_ID}"
+EOF
   fi
 }
 
@@ -621,7 +736,7 @@ extract_canonical_service_label() {
   local SERVICE_ISTIO_IO_CANONICAL_NAME; SERVICE_ISTIO_IO_CANONICAL_NAME=""
   local APP_KUBERNETES_IO_NAME; APP_KUBERNETES_IO_NAME=""
   local APP; APP=""
-  for label in $(echo "${WORKLOAD_LABELS}" | tr ',' '\n'); do
+  for label in $(echo "${WORKLOAD_LABELS}" | jq -r '. as $k|keys[]|[., $k[.]]|map(tostring+"=")|add'); do
     IFS='=' read -r -a pair <<< "${label}"
     if [[ "${pair[0]}" == "service.istio.io/canonical-name" ]]; then
       SERVICE_ISTIO_IO_CANONICAL_NAME="${pair[1]}"
@@ -649,7 +764,7 @@ extract_canonical_service_revision() {
   local SERVICE_ISTIO_IO_CANONICAL_REVISION; SERVICE_ISTIO_IO_CANONICAL_REVISION=""
   local APP_KUBERNETES_IO_VERSION; APP_KUBERNETES_IO_VERSION=""
   local VERSION; VERSION=""
-  for label in $(echo "${WORKLOAD_LABELS}" | tr ',' '\n'); do
+  for label in $(echo "${WORKLOAD_LABELS}" | jq -r '. as $k|keys[]|[., $k[.]]|map(tostring+"=")|add'); do
     IFS='=' read -r -a pair <<< "${label}"
     if [[ "${pair[0]}" == "service.istio.io/canonical-revision" ]]; then
       SERVICE_ISTIO_IO_CANONICAL_REVISION="${pair[1]}"
@@ -677,25 +792,62 @@ retrieve_cluster_root_cert() {
   info "Retrieving the cluster's root certificate..."
 
   local ISTIOD; ISTIOD=""
-  ISTIOD=$(kubectl get pods -oname -lapp=istiod -n istio-system | head -n 1 || true)
-  ROOT_CERT=$(kubectl exec -it -n istio-system "${ISTIOD}" \
+  ISTIOD="$(retry 2 kubectl get pods -oname -lapp=istiod -n istio-system | head -n 1)"
+  ROOT_CERT="$(retry 2 run kubectl exec -it -n istio-system "${ISTIOD}" \
     -- cat /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
-    | awk 'NF {sub(/\r/, ""); printf "%s\n",$0;}' || true)
+    | awk 'NF {sub(/\r/, ""); printf "%s\n",$0;}')"
   if [[ -z "${ROOT_CERT}" ]]; then
     fatal "Error retrieving the cluster's root certificate from Istiod pod ${ISTIOD}. Please try again."
   fi
 }
 
-retrieve_ingressgateway() {
-  info "Retrieving the cluster's Istio ingress gateway IP..."
+retrieve_eastwestgateway() {
+  info "Retrieving the cluster's Istio eastwest gateway IP..."
 
-  local RETVAL
-  { INGRESS_IP=$(watch_for_result 15 "${IP_REGEX}" kubectl get service \
-    istio-ingressgateway -n istio-system \
-    -o jsonpath='{.status.loadBalancer.ingress[0].ip}'); RETVAL="$?"; } || true
-  if [[ "${RETVAL}" -ne 0 ]]; then
-    fatal "Failed to retrieve the Istio ingress gateway IP address."
+  INGRESS_IP="$(retry 2 run kubectl get service "${EXPANSION_GATEWAY_NAME}" \
+    -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}')"
+  if [[ -z "${INGRESS_IP}" ]]; then
+    fatal "Failed to retrieve the Istio eastwest gateway IP address. Please try again."
   fi
+}
+
+retrieve_cluster_network() {
+  info "Retrieving the cluster's network name..."
+
+  NETWORK="$(retry 2 run gcloud container clusters describe "${CLUSTER_NAME}" \
+    --zone="${CLUSTER_LOCATION}" \
+    --project="${PROJECT_ID}" \
+    --format="value(network)")"
+}
+
+retrieve_identity_provider() {
+  retrieve_membership_uid
+
+  CREDENTIAL_IDENTITY_PROVIDER="${MEMBERSHIP_UID}@${WORKLOAD_IDENTITY_PROVIDER}@${WORKLOAD_NAMESPACE}"
+}
+
+retrieve_membership_uid() {
+  info "Retrieving the Environ membership's unique ID..."
+
+  local WANT_GKE_URL
+  WANT_GKE_URL="//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
+  local MEMBERSHIPS
+  MEMBERSHIPS="$(gcloud container hub memberships list --project "${PROJECT_ID}" \
+   --format='value(name)')"
+  while read -r MEMBERSHIP; do
+    if [[ -n "${MEMBERSHIP}" ]]; then
+      local CURR_CLUSTER_URL
+      CURR_CLUSTER_URL="$(retry 2 gcloud container hub memberships describe \
+        "${MEMBERSHIP}" --project "${PROJECT_ID}" \
+        --format="value(endpoint.gkeCluster.resourceLink)")"
+      if [[ "${CURR_CLUSTER_URL}" == "${MEMBERSHIP}" ]]; then
+        MEMBERSHIP_UID="$(retry 2 run gcloud container hub memberships describe \
+          "${MEMBERSHIP}" --project "${PROJECT_ID}" --format="value(uniqueId)")"
+      fi
+    fi
+  done <<EOF
+${MEMBERSHIPS}
+EOF
 }
 
 # Generate GCE service proxy definition for the instance template
@@ -707,17 +859,19 @@ gen_gce_service_proxy() {
     --arg canonical_service "${CANONICAL_SERVICE}" \
     --arg canonical_revision "${CANONICAL_REVISION}" \
     --arg project_number "${PROJECT_NUMBER}" \
+    --arg workload_namespace "${WORKLOAD_NAMESPACE}" \
+    --arg service_account "${WORKLOAD_SERVICE_ACCOUNT}" \
+    --arg credential_identity_provider "${CREDENTIAL_IDENTITY_PROVIDER}" \
+    --arg network "${NETWORK}" \
     --arg asm_meta_version "${ASM_META_VERSION}" '{
   "mode": "ON",
   "proxy-spec": {
-    "access-log": "/var/log/envoy/access.log",
-    "network": "default",
-    "tracing": "ON",
+    "network": $network,
     "api-server" : ($ingress_ip+":15012"),
-    "log-level": "debug"
+    "log-level": "info"
   },
   "labels": {
-    "workload-pool": ($project_id+".svc.id.goog")
+    "workload-pool": ($project_id+".hub.id.goog")
   },
   "asm-labels": {
     "service.istio.io/canonical-name": $canonical_service,
@@ -726,18 +880,23 @@ gen_gce_service_proxy() {
   "asm-env": {
     "ISTIO_META_WORKLOAD_NAME": $workload_name,
     "ISTIO_META_MESH_ID": ("proj-"+$project_number),
+    "ISTIO_META_NETWORK": $network,
     "ISTIO_META_ISTIO_VERSION": $asm_meta_version,
-    "POD_NAMESPACE": $project_id,
+    "POD_NAMESPACE": $workload_namespace,
     "CANONICAL_SERVICE": $canonical_service,
     "CANONICAL_REVISION": $canonical_revision,
-    "USE_TOKEN_FOR_CSR": "true"
+    "USE_TOKEN_FOR_CSR": "true",
+    "ISTIO_META_DNS_CAPTURE": "true",
+    "ISTIO_META_AUTO_REGISTER_GROUP": $workload_name,
+    "SERVICE_ACCOUNT": $service_account,
+    "CREDENTIAL_IDENTITY_PROVIDER": $credential_identity_provider
   },
   "service": {}
 }')
 
   # Append each workload label pair into asm_labels field of GCE_SERVICE_PROXY
   # as a valid JSON object.
-  for label in $(echo "${WORKLOAD_LABELS}" | tr ',' '\n'); do
+  for label in $(echo "${WORKLOAD_LABELS}" | jq -r '. as $k|keys[]|[., $k[.]]|map(tostring+"=")|add'); do
     IFS='=' read -r -a pair <<< "${label}"
     PROXY=$(jq --arg key "${pair[0]}" \
     --arg value "${pair[1]}" \
@@ -771,10 +930,7 @@ gen_startup_script() {
   SCRIPT='# Scripts below are added by Google Cloud Anthos Service Mesh for VM Installation.
 if ! grep -Fq "'"${ISTIOD_ENTRY}"'" /etc/hosts; then
   echo "'"${ISTIOD_ENTRY}"' # Added by Google Cloud for Anthos Service Mesh for VM Installation" | sudo tee -a /etc/hosts
-fi
-sudo apt-get install resolvconf -y
-echo "nameserver '"${DNS_IP}"' # Added by Google Cloud for Anthos Service Mesh for VM Installation" | sudo tee -a /etc/resolvconf/resolv.conf.d/head
-sudo systemctl restart resolvconf'
+fi'
   readonly SCRIPT
 
   if [[ -n "${EXISTING_STARTUP_SCRIPT}" ]]; then
@@ -787,9 +943,8 @@ sudo systemctl restart resolvconf'
 # Generate metadata for the instance tempalte.
 gen_instance_template_metadata() {
   local EXISTING_METADATA; EXISTING_METADATA="${1}";
-  jq -n --arg mesh_agent_bucket "${MESH_AGENT_BUCKET}" \
+  jq -n --arg service_proxy_agent_bucket "${SERVICE_PROXY_AGENT_BUCKET}" \
   --arg root_cert "${ROOT_CERT}"\
-  --arg startup_script "${STARTUP_SCRIPT}" \
   --arg declaration "${GCE_SOFTWARE_DECLARATION}"\
   --arg gce_service_proxy "${GCE_SERVICE_PROXY}" '[{
 "value": "true",
@@ -800,7 +955,7 @@ gen_instance_template_metadata() {
   "key": "enable-osconfig"
 },
 {
-  "value": $mesh_agent_bucket,
+  "value": $service_proxy_agent_bucket,
   "key": "service-proxy-agent-bucket"
 },
 {
@@ -814,10 +969,6 @@ gen_instance_template_metadata() {
 {
   "value": $gce_service_proxy,
   "key": "gce-service-proxy"
-},
-{
-  "value": $startup_script,
-  "key": "startup-script"
 }]' | jq ". + [${EXISTING_METADATA}]"
 }
 
@@ -1019,7 +1170,9 @@ main() {
   extract_canonical_service_revision
   if [[ "${CREATE_GCE_INSTANCE_TEMPLATE}" -eq 1 ]]; then
     retrieve_cluster_root_cert
-    retrieve_ingressgateway
+    retrieve_eastwestgateway
+    retrieve_cluster_network
+    retrieve_identity_provider
     create_gce_instance_template
     success_message_create_gce_instance_template
   fi
