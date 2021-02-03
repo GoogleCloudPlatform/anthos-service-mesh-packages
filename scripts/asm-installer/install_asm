@@ -98,6 +98,7 @@ main() {
   set_up_project
   set_up_cluster
   configure_package
+  handle_multi_yaml_bug
   if [[ "${PRINT_CONFIG}" -eq 1 ]]; then
     print_config >&3
     return 0
@@ -703,6 +704,29 @@ validate_dependencies() {
   fi
 }
 
+# This is a workaround for https://github.com/istio/istio/issues/30632
+# which doesn't handle files with multiple operator specs correctly.
+# This will split all of the files based off of the yaml document separator.
+handle_multi_yaml_bug() {
+  local CSPLIT_OUTPUT; CSPLIT_OUTPUT="";
+  local BASE_NAME
+  while read -d ',' -r yaml_file; do
+    BASE_NAME="$(basename "${yaml_file}")"
+    if [[ "$(csplit -z -f "overlay-${BASE_NAME}" -z "${yaml_file}" '/^---$/' '{*}' | wc -l)" -eq 1 ]]; then
+      CSPLIT_OUTPUT="${CSPLIT_OUTPUT},${yaml_file}"
+    else
+      for split_file in overlay-"${BASE_NAME}"*; do
+        CSPLIT_OUTPUT="${CSPLIT_OUTPUT},$(apath -f "${split_file}")"
+      done
+    fi
+  done <<EOF
+${CUSTOM_OVERLAY}
+EOF
+  if [[ -n "${CSPLIT_OUTPUT}" ]]; then
+    CUSTOM_OVERLAY="${CSPLIT_OUTPUT:1:${#CSPLIT_OUTPUT}},"
+  fi
+}
+
 validate_cli_dependencies() {
   local NOTFOUND; NOTFOUND="";
   local EXITCODE; EXITCODE=0;
@@ -723,6 +747,8 @@ kpt
 kubectl
 sed
 tr
+head
+csplit
 EOF
 
   if [[ "${CUSTOM_CA}" -eq 1 ]]; then
@@ -779,7 +805,7 @@ EOF
   done <<EOF
 ${OPTIONAL_OVERLAY}
 EOF
-unset OPTIONAL_OVERLAY; readonly CUSTOM_OVERLAY
+  unset OPTIONAL_OVERLAY
 }
 
 download_asm() {
