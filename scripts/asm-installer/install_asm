@@ -1140,6 +1140,7 @@ kubectl
 sed
 tr
 head
+csplit
 EOF
 
   if [[ "${CUSTOM_CA}" -eq 1 ]]; then
