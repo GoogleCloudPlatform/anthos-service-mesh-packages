@@ -6,12 +6,21 @@ BUCKET_URL="https://storage.googleapis.com"
 BUCKET_PATH="csm-artifacts/asm"; readonly BUCKET_PATH
 
 CURRENT_RELEASE="release-1.8-asm"; readonly CURRENT_RELEASE
-all_releases() {
+prod_releases() {
   cat << EOF
 release 1.8
 release 1.7
 release 1.6
 EOF
+}
+
+all_releases() {
+  while read -r type version; do
+    echo "${type}-${version}-asm" "${version}"
+  done <<EOF
+$(prod_releases)
+EOF
+  echo "master unstable"
 }
 
 main() {
@@ -25,22 +34,24 @@ EOF
 }
 
 publish_script() {
-  local TYPE; TYPE="${1}"
+  local BRANCH_NAME; BRANCH_NAME="${1}"
   local VERSION; VERSION="${2}"
-  local BRANCH_NAME; BRANCH_NAME="${TYPE}-${VERSION}-asm"
   local FILE_NAME; FILE_NAME="install_asm_${VERSION}"
   local FILE_PATH; FILE_PATH="${BUCKET_PATH}/${FILE_NAME}"
   local FILE_URI; FILE_URI="${BUCKET_URL}/${FILE_PATH}"
 
   git checkout "${BRANCH_NAME}"
 
-  curl -O "${FILE_URI}.sha256"
-  if sha256sum -c --ignore-missing "${FILE_NAME}.sha256" >/dev/null 2>/dev/null; then
-    echo "No changes in ${FILE_NAME}, skipping"
+  if curl -O "${FILE_URI}.sha256"; then
+    if sha256sum -c --ignore-missing "${FILE_NAME}.sha256" >/dev/null 2>/dev/null; then
+      echo "No changes in ${FILE_NAME}, skipping"
+      rm "${FILE_NAME}.sha256"
+      return
+    fi
     rm "${FILE_NAME}.sha256"
-    return
+  else
+      echo "New file {FILE_NAME}"
   fi
-  rm "${FILE_NAME}.sha256"
 
   sha256sum install_asm >| install_asm.sha256
   mv install_asm "${FILE_NAME}"
