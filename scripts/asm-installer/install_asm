@@ -2041,10 +2041,10 @@ EOF
 
   local RAW_YAML; RAW_YAML="${REVISION_LABEL}-manifest-raw.yaml"
   local EXPANDED_YAML; EXPANDED_YAML="${REVISION_LABEL}-manifest-expanded.yaml"
-  print_config > "${RAW_YAML}"
+  print_config >| "${RAW_YAML}"
   run "$(istioctl_path)" manifest generate \
     <"${RAW_YAML}" \
-    >"${EXPANDED_YAML}"
+    >|"${EXPANDED_YAML}"
 
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
     install_canonical_controller
