@@ -1,0 +1,75 @@
+#!/bin/bash
+set -CeEu
+set -o pipefail
+
+SPATH="$(readlink -f "$0")"
+SDIR="$(dirname "${SPATH}")"; export SDIR;
+
+# shellcheck source=common.sh
+. "${SDIR}/common.sh"
+
+cd "${SDIR}"
+
+main() {
+  local RETVAL; RETVAL=0;
+  local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(mktemp)"
+
+  trap 'rm "${CUSTOM_OVERLAY}"' ERR EXIT
+
+  cat <<EOF >|"${CUSTOM_OVERLAY}"
+---
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+spec:
+  components:
+    base:
+      enabled: false
+---
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+spec:
+  components:
+    base:
+      enabled: true
+EOF
+
+  echo "../install_asm \
+    -l us-central1-c \
+    -n long-term-test-cluster \
+    -p asm-scriptaro-oss \
+    --print-config \
+    --option egressgateways \
+    --custom_overlay ${CUSTOM_OVERLAY} \
+    -m install"
+
+  CONFIG="$(../install_asm \
+    -l us-central1-c \
+    -n long-term-test-cluster \
+    -p asm-scriptaro-oss \
+    --print-config \
+    --option egressgateways \
+    --custom_overlay ${CUSTOM_OVERLAY} \
+    -m install)"
+
+  if ! echo "${CONFIG}" | grep egressGateways: -A 2 | tail -n 1 | grep 'enabled: true' -q; then
+    echo "Print config doesn't pick up --option files!"
+    RETVAL=1
+  fi
+
+  if ! echo "${CONFIG}" | grep base: -A 1 | grep 'enabled: true' -q; then
+    echo "Not handling multi-component yaml properly!"
+    RETVAL=1
+  fi
+
+  trap - ERR EXIT
+  rm "${CUSTOM_OVERLAY}"
+
+  if [[ "${RETVAL}" -ne 0 ]]; then
+    echo FAILED
+    exit "${RETVAL}"
+  fi
+
+  echo PASSED
+}
+
+main "$@"
