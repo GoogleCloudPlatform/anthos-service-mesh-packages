@@ -2090,7 +2090,6 @@ server-side_apply() {
   run kubectl apply -f "${FILE}" \
     --record=false \
     --overwrite=false \
-    --force-conflicts=true \
     --server-side
 }
 
