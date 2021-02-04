@@ -231,10 +231,10 @@ OPTIONS:
   -n|--cluster_name             <NAME>                The name of the target
                                                       cluster.
   -p|--project_id               <ID>                  The GCP project ID.
-  -w|--workloadgroup_name       <WORKLOAD_NAME>       The name of the
+  -w|--workload_name            <WORKLOAD_NAME>       The name of the
                                                       WorkloadGroup for GCE VM
                                                       workloads.
-  -ns|--workloadgroup_namespace <WORKLOAD_NAMESPACE>  (optional)The namespace of
+  -ns|--workload_namespace      <WORKLOAD_NAMESPACE>  (optional)The namespace of
                                                       the WorkloadGroup for GCE
                                                       VM workloads. Default to
                                                       the "default" namespace if
@@ -340,12 +340,12 @@ parse_args_create_gce_instance_template() {
         SOURCE_INSTANCE_TEMPLATE="${2}"
         shift 2
         ;;
-      -w | --workloadgroup_name | --workloadgroup-name)
+      -w | --workload_name | --workload-name)
         arg_required "${@}"
         WORKLOAD_NAME="${2}"
         shift 2
         ;;
-      -ns | --workloadgroup_namespace | --workloadgroup-namespace)
+      -ns | --workload_namespace | --workload-namespace)
         arg_required "${@}"
         WORKLOAD_NAMESPACE="${2}"
         shift 2
