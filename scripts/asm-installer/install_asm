@@ -2015,7 +2015,7 @@ does_istiod_exist(){
 }
 
 install_asm() {
-  if ! does_istiod_exist; then
+  if ! does_istiod_exist && [[ "${_CI_NO_REVISION}" -ne 1 ]]; then
     info "Installing validation webhook fix..."
     retry 3 run kubectl apply -f "${VALIDATION_FIX_SERVICE}"
   fi
