@@ -16,7 +16,7 @@ fi
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"
 MINOR="${MINOR:=8}"
-POINT="${POINT:=1}"
+POINT="${POINT:=2}"
 ASM_RELEASE="${MAJOR}.${MINOR}"
 ASM_META_VERSION="${MAJOR}.${MINOR}.${POINT}"
 readonly ASM_RELEASE
@@ -44,6 +44,7 @@ INGRESS_IP=""
 ASM_REVISIONS=""
 NETWORK=""
 MEMBERSHIP_UID=""
+GKE_URL=""
 
 ### Workload variables ###
 WORKLOAD_LABELS=""
@@ -444,6 +445,9 @@ validate_dependencies() {
   validate_project
   PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" \
     --format="value(projectNumber)")"
+  GKE_URL=\
+"//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
+  readonly GKE_URL
   validate_asm_cluster
   validate_workloadgroup
 
@@ -510,6 +514,7 @@ EOF
 validate_asm_cluster() {
   validate_cluster
   configure_kubectl
+  validate_cluster_registration
   validate_retrieve_asm_installation
 }
 
@@ -567,6 +572,45 @@ validate_retrieve_asm_installation() {
 ${EXPANSION_GATEWAY_NAME} is not found in the cluster.
 Please use install_asm with "--option vm" when you install ASM.
 EOF
+  fi
+}
+
+validate_cluster_registration() {
+  info "Verifying cluster Environ membership..."
+  if ! is_cluster_registered; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Cluster is not registered to an environ. Please run the install_asm script with
+'--enable_registration' flag to allow the script to register to the current
+project's environ on your behalf.
+EOF
+  fi
+}
+
+is_cluster_registered() {
+  if ! is_membership_crd_installed; then
+    false
+    return
+  fi
+
+  local LIST; LIST="$(gcloud container hub memberships list --project "${PROJECT_ID}" --format=json | grep "${GKE_URL}")"
+
+  if [[ -z "${LIST}" ]]; then
+    false
+    return
+  fi
+
+  local IDENTITY_PROVIDER
+  IDENTITY_PROVIDER="$(retry 2 kubectl get memberships.hub.gke.io \
+    membership -ojson 2>/dev/null | jq .spec.identity_provider)"
+
+  if [[ -z "${IDENTITY_PROVIDER}" ]] || [[ "${IDENTITY_PROVIDER}" = 'null' ]]; then
+    false
+  fi
+}
+
+is_membership_crd_installed() {
+  if ! kubectl api-resources --api-group=hub.gke.io | grep -q memberships; then
+    false
   fi
 }
 
@@ -829,10 +873,8 @@ retrieve_identity_provider() {
 retrieve_membership_uid() {
   info "Retrieving the Environ membership's unique ID..."
 
-  local WANT_GKE_URL
-  WANT_GKE_URL="//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
   local MEMBERSHIPS
-  MEMBERSHIPS="$(gcloud container hub memberships list --project "${PROJECT_ID}" \
+  MEMBERSHIPS="$(retry 2 gcloud container hub memberships list --project "${PROJECT_ID}" \
    --format='value(name)')"
   while read -r MEMBERSHIP; do
     if [[ -n "${MEMBERSHIP}" ]]; then
@@ -840,7 +882,7 @@ retrieve_membership_uid() {
       CURR_CLUSTER_URL="$(retry 2 gcloud container hub memberships describe \
         "${MEMBERSHIP}" --project "${PROJECT_ID}" \
         --format="value(endpoint.gkeCluster.resourceLink)")"
-      if [[ "${CURR_CLUSTER_URL}" == "${MEMBERSHIP}" ]]; then
+      if [[ "${CURR_CLUSTER_URL}" == "${GKE_URL}" ]]; then
         MEMBERSHIP_UID="$(retry 2 run gcloud container hub memberships describe \
           "${MEMBERSHIP}" --project "${PROJECT_ID}" --format="value(uniqueId)")"
       fi
@@ -914,7 +956,13 @@ gce_software_declaration() {
       "desired_state": "INSTALLED",
       "installSteps": [{
           "scriptRun": {
-            "script": "#!/bin/bash\nSERVICE_PROXY_AGENT_BUCKET=$(curl \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/service-proxy-agent-bucket\" -H \"Metadata-Flavor: Google\")\nARCHIVE_NAME=$(basename ${SERVICE_PROXY_AGENT_BUCKET})\nexport SERVICE_PROXY_AGENT_DIRECTORY=$(mktemp -d)\nsudo gsutil cp ${SERVICE_PROXY_AGENT_BUCKET} ${SERVICE_PROXY_AGENT_DIRECTORY}\nsudo tar -xzf ${SERVICE_PROXY_AGENT_DIRECTORY}/${ARCHIVE_NAME} -C ${SERVICE_PROXY_AGENT_DIRECTORY}\n${SERVICE_PROXY_AGENT_DIRECTORY}/service-proxy-agent/service-proxy-agent-bootstrap.sh"
+            "script": "#!/bin/bash
+SERVICE_PROXY_AGENT_BUCKET=$(curl \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/gce-service-proxy-agent-bucket\" -H \"Metadata-Flavor: Google\")
+ARCHIVE_NAME=$(basename ${SERVICE_PROXY_AGENT_BUCKET})
+export SERVICE_PROXY_AGENT_DIRECTORY=$(mktemp -d)
+sudo gsutil cp ${SERVICE_PROXY_AGENT_BUCKET} ${SERVICE_PROXY_AGENT_DIRECTORY}
+sudo tar -xzf ${SERVICE_PROXY_AGENT_DIRECTORY}/${ARCHIVE_NAME} -C ${SERVICE_PROXY_AGENT_DIRECTORY}
+${SERVICE_PROXY_AGENT_DIRECTORY}/service-proxy-agent/service-proxy-agent-bootstrap.sh"
           }
         }
       ]
@@ -956,7 +1004,7 @@ gen_instance_template_metadata() {
 },
 {
   "value": $service_proxy_agent_bucket,
-  "key": "service-proxy-agent-bucket"
+  "key": "gce-service-proxy-agent-bucket"
 },
 {
   "value": $declaration,
@@ -1064,7 +1112,6 @@ create_gce_instance_template() {
 
   # Create the instance template creation request.
   local INSTANCE_TEMPLATE_REQ; INSTANCE_TEMPLATE_REQ="";
-  local EXISTING_STARTUP_SCRIPT; EXISTING_STARTUP_SCRIPT="";
   local EXISTING_METADATA; EXISTING_METADATA="";
   if [[ -z "${SOURCE_INSTANCE_TEMPLATE}" ]]; then
     INSTANCE_TEMPLATE_REQ="$(gen_default_instance_template)"
@@ -1078,17 +1125,10 @@ create_gce_instance_template() {
       | jq --arg name "${NEW_INSTANCE_TEMPLATE}" \
       '.name=$name | .properties.disks[].deviceName=$name' || true)"
 
-    # Extract the existing startup script, if there is one.
-    EXISTING_STARTUP_SCRIPT="$(echo "${INSTANCE_TEMPLATE_REQ}" \
-      | jq '.properties.metadata.items | .[]? | select(.key=="startup-script") | .value' \
-      | sed -e 's/^"//' -e 's/"$//')"
-
     # Extract the existing metadata except the startup-script.
     EXISTING_METADATA="$(echo "${INSTANCE_TEMPLATE_REQ}" \
       | jq '.properties.metadata.items | .[]? | select(.key!="startup-script")')"
   fi
-
-  local STARTUP_SCRIPT; STARTUP_SCRIPT="$(gen_startup_script "${EXISTING_STARTUP_SCRIPT}")";
 
   local METADATA; METADATA="$(gen_instance_template_metadata "${EXISTING_METADATA}")";
 
