@@ -739,16 +739,20 @@ cleanup_instance_template() {
 
 cleanup_old_workload_service_accounts() {
   while read -r email; do
-    delete_service_account "${email}"
+    if [[ -n "${email}" ]]; then
+      delete_service_account "${email}"
+    fi
   done <<EOF
-$(gcloud iam service-accounts list --filter="email:vm-*" --format="value(email)" --project "${PROJECT_ID}")
+$(gcloud iam service-accounts list --filter="email:^vm-*" --format="value(email)" --project "${PROJECT_ID}")
 EOF
 }
 
 cleanup_old_instance_templates() {
   while read -r it; do
-    gcloud compute instance-templates delete "${it}" --quiet --project "${PROJECT_ID}"
+    if [[ -n "${it}" ]]; then
+      gcloud compute instance-templates delete "${it}" --quiet --project "${PROJECT_ID}"
+    fi
   done <<EOF
-$(gcloud compute instance-templates list --filter="name:asm-*" --format="value(name)" --project "${PROJECT_ID}")
+$(gcloud compute instance-templates list --filter="name:^vm-*" --format="value(name)" --project "${PROJECT_ID}")
 EOF
 }
