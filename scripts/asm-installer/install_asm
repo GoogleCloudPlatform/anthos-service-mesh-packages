@@ -1735,17 +1735,7 @@ get_cluster_labels() {
 }
 
 is_cluster_registered() {
-
   if ! is_membership_crd_installed; then
-    false
-    return
-  fi
-
-  local WANT
-  WANT="//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
-  local LIST; LIST="$(gcloud container hub memberships list --project "${PROJECT_ID}" --format=json | grep "${WANT}")"
-
-  if [[ -z "${LIST}" ]]; then
     false
     return
   fi
@@ -1754,8 +1744,22 @@ is_cluster_registered() {
   IDENTITY_PROVIDER="$(retry 2 kubectl get memberships.hub.gke.io \
     membership -ojson 2>/dev/null | jq .spec.identity_provider)"
 
-  if [[ -z "${IDENTITY_PROVIDER}" ]] || [[ "${IDENTITY_PROVIDER}" = 'null' ]]; then
+  if [[ -z "${IDENTITY_PROVIDER}" ]] || [[ "${IDENTITY_PROVIDER}" == 'null' ]]; then
     false
+  fi
+
+  populate_environ_info
+
+  local WANT
+  WANT="//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
+  local LIST
+  LIST="$(gcloud container hub memberships list --project "${ENVIRON_PROJECT_ID}" \
+    --format=json | grep "${WANT}")"
+  if [[ -z "${LIST}" ]]; then
+    { read -r -d '' MSG; warn "${MSG}"; } <<EOF || true
+Cluster is registered in the project ${ENVIRON_PROJECT_ID}, but the script is
+unable to verify in the project. The script will continue to execute.
+EOF
   fi
 }
 
