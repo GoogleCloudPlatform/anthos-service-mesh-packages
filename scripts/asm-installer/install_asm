@@ -1750,21 +1750,15 @@ is_cluster_registered() {
 
   populate_environ_info
 
-  if [[ "${PROJECT_ID}" == "${ENVIRON_PROJECT_ID}" ]]; then
-    local WANT
-    WANT="//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
-    local LIST
-    LIST="$(gcloud container hub memberships list --project "${PROJECT_ID}" \
-      --format=json | grep "${WANT}")"
-    if [[ -z "${LIST}" ]]; then
-      false
-      return
-    fi
-  else
+  local WANT
+  WANT="//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
+  local LIST
+  LIST="$(gcloud container hub memberships list --project "${ENVIRON_PROJECT_ID}" \
+    --format=json | grep "${WANT}")"
+  if [[ -z "${LIST}" ]]; then
     { read -r -d '' MSG; warn "${MSG}"; } <<EOF || true
-Cluster is registered in the project ${ENVIRON_PROJECT_ID}. Verifying Environ
-membership in another Environ project is not supported at this time. The script
-will continue to execute.
+Cluster is registered in the project ${ENVIRON_PROJECT_ID}, but the script is
+unable to verify in the project. The script will continue to execute.
 EOF
   fi
 }
