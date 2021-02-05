@@ -673,27 +673,41 @@ run_basic_test() {
   return "$SUCCESS"
 }
 
+# pass in the NAME of the service account
+create_service_account() {
+  local SVC_ACCT_NAME; SVC_ACCT_NAME="$1"
+  echo "Creating service account ${SVC_ACCT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com..."
+  gcloud iam service-accounts create "${SVC_ACCT_NAME}" --project "${PROJECT_ID}"
+}
+
+# pass in the EMAIL of the service account
+delete_service_account() {
+  local SVC_ACCT_EMAIL; SVC_ACCT_EMAIL="$1"
+  echo "Deleting service account ${SVC_ACCT_EMAIL}..."
+  gcloud iam service-accounts delete "${SVC_ACCT_EMAIL}" \
+    --quiet --project "${PROJECT_ID}"
+}
+
 create_workload_service_account() {
-  WORKLOAD_SERVICE_ACCOUNT_NAME="vm-${LT_NAMESPACE}"
+  local WORKLOAD_SERVICE_ACCOUNT_NAME="vm-${LT_NAMESPACE}"
   WORKLOAD_SERVICE_ACCOUNT="${WORKLOAD_SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
-  echo "Creating service account ${WORKLOAD_SERVICE_ACCOUNT}..."
-  gcloud iam service-accounts create "${WORKLOAD_SERVICE_ACCOUNT_NAME}" --project "${PROJECT_ID}"
+  create_service_account "${WORKLOAD_SERVICE_ACCOUNT_NAME}"
 }
 
 create_instance_template() {
   INSTANCE_TEMPLATE_NAME="vm-${LT_NAMESPACE}"
   
   echo "Creating instance template ${INSTANCE_TEMPLATE_NAME}..."
-  echo "../../../asm/vm/asm_vm create_gce_instance_template \
-      ${INSTANCE_TEMPLATE_NAME} ${KEY_FILE} ${SERVICE_ACCOUNT} \
+  echo "../../../asm/vm/asm_vm create_gce_instance_template ${INSTANCE_TEMPLATE_NAME} \
+      ${KEY_FILE} ${SERVICE_ACCOUNT} \
       --cluster_location ${LT_CLUSTER_LOCATION} \
       --cluster_name ${LT_CLUSTER_NAME} \
       --project_id ${PROJECT_ID} \
       --workload_name ${WORKLOAD_NAME} \
       --workload_namespace ${LT_NAMESPACE}"
   
-  ../../../asm/vm/asm_vm create_gce_instance_template \
-    "${INSTANCE_TEMPLATE_NAME}" "${KEY_FILE}" "${SERVICE_ACCOUNT}" \
+  ../../../asm/vm/asm_vm create_gce_instance_template "${INSTANCE_TEMPLATE_NAME}" \
+    "${KEY_FILE}" "${SERVICE_ACCOUNT}" \
     --cluster_location "${LT_CLUSTER_LOCATION}" \
     --cluster_name "${LT_CLUSTER_NAME}" \
     --project_id "${PROJECT_ID}" \
@@ -714,12 +728,27 @@ verify_instance_template() {
 
 cleanup_workload_service_account() {
   echo "Deleting service account ${WORKLOAD_SERVICE_ACCOUNT}..."
-  gcloud iam service-accounts delete "${WORKLOAD_SERVICE_ACCOUNT}" \
-    --quiet --project "${PROJECT_ID}"
+  delete_service_account "${WORKLOAD_SERVICE_ACCOUNT}"
 }
 
 cleanup_instance_template() {
   echo "Deleting instance template ${INSTANCE_TEMPLATE_NAME}..."
   gcloud compute instance-templates delete "${INSTANCE_TEMPLATE_NAME}" \
     --quiet --project "${PROJECT_ID}"
+}
+
+cleanup_old_workload_service_accounts() {
+  while read -r email; do
+    delete_service_account "${email}"
+  done <<EOF
+$(gcloud iam service-accounts list --filter="email:vm-*" --format="value(email)" --project "${PROJECT_ID}")
+EOF
+}
+
+cleanup_old_instance_templates() {
+  while read -r it; do
+    gcloud compute instance-templates delete "${it}" --quiet --project "${PROJECT_ID}"
+  done <<EOF
+$(gcloud compute instance-templates list --filter="name:asm-*" --format="value(name)" --project "${PROJECT_ID}")
+EOF
 }

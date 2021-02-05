@@ -46,7 +46,7 @@ NETWORK=""
 MEMBERSHIP_UID=""
 GKE_URL=""
 ENVIRON_PROJECT_ID=""
-HUB_MEMBERSHIP_ID=""
+ENVIRON_MEMBERSHIP_ID=""
 
 ### Workload variables ###
 WORKLOAD_LABELS=""
@@ -236,11 +236,11 @@ OPTIONS:
   -w|--workload_name            <WORKLOAD_NAME>       The name of the
                                                       WorkloadGroup for GCE VM
                                                       workloads.
-  --workload_namespace          <WORKLOAD_NAMESPACE>  (optional)The namespace of
-                                                      the WorkloadGroup for GCE
-                                                      VM workloads. Default to
-                                                      the "default" namespace if
-                                                      not specified.
+  --workload_namespace          <WORKLOAD_NAMESPACE>  (optional) The namespace
+                                                      of the WorkloadGroup for
+                                                      GCE VM workloads. Default
+                                                      to the "default" namespace
+                                                      if not specified.
   -i|--source_instance_template <TEMPLATE>            (optional) The name of the
                                                       source GCE instance
                                                       template.
@@ -614,7 +614,7 @@ is_cluster_registered() {
 }
 
 populate_environ_info() {
-  if [[ -n "${ENVIRON_PROJECT_ID}" && -n "${HUB_MEMBERSHIP_ID}" ]]; then return; fi
+  if [[ -n "${ENVIRON_PROJECT_ID}" && -n "${ENVIRON_MEMBERSHIP_ID}" ]]; then return; fi
   if ! is_membership_crd_installed; then return; fi
   configure_kubectl
   local IDENTITY_PROVIDER
@@ -622,7 +622,7 @@ populate_environ_info() {
   IDENTITY_PROVIDER="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.identity_provider)"
   IDENTITY="$(echo "${IDENTITY_PROVIDER}" | sed 's/^\"https:\/\/gkehub.googleapis.com\/projects\/\(.*\)\/locations\/global\/memberships\/\(.*\)\"$/\1 \2/g')"
   if [[ -n "${IDENTITY}" ]]; then
-    read -r ENVIRON_PROJECT_ID HUB_MEMBERSHIP_ID <<EOF
+    read -r ENVIRON_PROJECT_ID ENVIRON_MEMBERSHIP_ID <<EOF
 ${IDENTITY}
 EOF
   fi
