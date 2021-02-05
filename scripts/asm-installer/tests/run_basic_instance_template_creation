@@ -4,11 +4,9 @@ set -o pipefail
 
 SPATH="$(readlink -f "$0")"
 SDIR="$(dirname "${SPATH}")"; export SDIR;
-CDIR="$(dirname "${SDIR}")"; export CDIR;
 SCRIPT_NAME="${0##*/}"
 
 # shellcheck source=common.sh
-. "${CDIR}/common.sh"
 . "${SDIR}/common.sh"
 
 cd "${SDIR}"

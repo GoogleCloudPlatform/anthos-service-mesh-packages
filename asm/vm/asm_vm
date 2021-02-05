@@ -950,42 +950,29 @@ gen_gce_service_proxy() {
 
 # Define the GCE software declaration for OS config.
 gce_software_declaration() {
-  jq -n '{
+  jq -n --arg ingress_ip "${INGRESS_IP}" '{
   "softwareRecipes": [{
       "name": "install-gce-service-proxy-agent",
       "desired_state": "INSTALLED",
       "installSteps": [{
           "scriptRun": {
-            "script": "#!/bin/bash
+            "script": ("#!/bin/bash
+ISTIOD_ENTRY=\""+$ingress_ip+" istiod.istio-system.svc\"
+if ! grep -Fq ${ISTIOD_ENTRY} /etc/hosts; then
+  echo \"${ISTIOD_ENTRY} # Added by Google Cloud for Anthos Service Mesh\" | sudo tee -a /etc/hosts
+fi
 SERVICE_PROXY_AGENT_BUCKET=$(curl \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/gce-service-proxy-agent-bucket\" -H \"Metadata-Flavor: Google\")
 ARCHIVE_NAME=$(basename ${SERVICE_PROXY_AGENT_BUCKET})
 export SERVICE_PROXY_AGENT_DIRECTORY=$(mktemp -d)
 sudo gsutil cp ${SERVICE_PROXY_AGENT_BUCKET} ${SERVICE_PROXY_AGENT_DIRECTORY}
 sudo tar -xzf ${SERVICE_PROXY_AGENT_DIRECTORY}/${ARCHIVE_NAME} -C ${SERVICE_PROXY_AGENT_DIRECTORY}
-${SERVICE_PROXY_AGENT_DIRECTORY}/service-proxy-agent/service-proxy-agent-bootstrap.sh"
+${SERVICE_PROXY_AGENT_DIRECTORY}/service-proxy-agent/service-proxy-agent-bootstrap.sh")
           }
         }
       ]
     }
   ]
 }'
-}
-
-# Generate startup script for the instance template.
-gen_startup_script() {
-  local EXISTING_STARTUP_SCRIPT; EXISTING_STARTUP_SCRIPT="${1}";
-  ISTIOD_ENTRY="${INGRESS_IP} istiod.istio-system.svc"; readonly ISTIOD_ENTRY;
-  SCRIPT='# Scripts below are added by Google Cloud Anthos Service Mesh for VM Installation.
-if ! grep -Fq "'"${ISTIOD_ENTRY}"'" /etc/hosts; then
-  echo "'"${ISTIOD_ENTRY}"' # Added by Google Cloud for Anthos Service Mesh for VM Installation" | sudo tee -a /etc/hosts
-fi'
-  readonly SCRIPT
-
-  if [[ -n "${EXISTING_STARTUP_SCRIPT}" ]]; then
-    echo -e "${EXISTING_STARTUP_SCRIPT}\n${SCRIPT}"
-  else
-    echo -e "#!/bin/bash\n${SCRIPT}"
-  fi
 }
 
 # Generate metadata for the instance tempalte.
