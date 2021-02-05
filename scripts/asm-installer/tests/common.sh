@@ -695,11 +695,11 @@ create_instance_template() {
   
   ../../../asm/vm/asm_vm create_gce_instance_template \
     "${INSTANCE_TEMPLATE_NAME}" \
-    -l "${LT_CLUSTER_LOCATION}" \
-    -n "${LT_CLUSTER_NAME}" \
-    -p "${PROJECT_ID}" \
-    -w "${WORKLOAD_NAME}" \
-    -ns "${LT_NAMESPACE}" \
+    --cluster_location "${LT_CLUSTER_LOCATION}" \
+    --cluster_name "${LT_CLUSTER_NAME}" \
+    --project_id "${PROJECT_ID}" \
+    --workload_name "${WORKLOAD_NAME}" \
+    --workload_namespace "${LT_NAMESPACE}" \
     "${KEY_FILE}" "${SERVICE_ACCOUNT}"
 }
 
