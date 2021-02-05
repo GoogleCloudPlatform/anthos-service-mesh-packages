@@ -26,6 +26,17 @@ if [[ "${*}" == *"get-credentials"* ]]; then
   echo "${*}" >| "${KUBECONFIG}"
   exit 0
 fi
+if [[ "${*}" == *"auth list"* ]]; then
+  if [[ "${*}" == *"sa"* ]]; then
+    echo "account@project.iam.gserviceaccount.com"
+    exit 0
+  fi
+  if [[ "${*}" == *"notloggedin"* ]]; then
+    exit 1
+  fi
+  echo "user@domain"
+  exit 0
+fi
 if [[ "${*}" == *"this_should_fail"* ]]; then
   exit 1
 fi

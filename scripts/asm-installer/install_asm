@@ -60,6 +60,7 @@ SCRIPT_NAME="${0##*/}"
 PROJECT_NUMBER=""
 GKE_CLUSTER_URI=""
 GCE_NETWORK_NAME=""
+GCLOUD_USER_OR_SA=""
 KPT_URL=""
 KUBECONFIG=""
 APATH=""
@@ -133,6 +134,7 @@ main() {
   fi
 
   if should_validate || can_modify_at_all; then
+    local_iam_user > /dev/null
     validate_gcp_resources
     configure_kubectl
   fi
@@ -1525,17 +1527,30 @@ iam_user() {
 }
 
 local_iam_user() {
-  ACCOUNT_TYPE="user"
-  if is_sa; then
-    ACCOUNT_TYPE="serviceAccount"
+  if [[ -n "${GCLOUD_USER_OR_SA}" ]]; then
+    echo "${GCLOUD_USER_OR_SA}"
+    return
   fi
+
   info "Getting account information..."
   local ACCOUNT_NAME
   ACCOUNT_NAME="$(retry 3 gcloud auth list \
     --project="${PROJECT_ID}" \
     --filter="status:ACTIVE" \
     --format="value(account)")"
-  echo "${ACCOUNT_TYPE}:${ACCOUNT_NAME}"
+  if [[ -z "${ACCOUNT_NAME}" ]]; then
+    fatal "Failed to get account name from gcloud. Please authorize and re-try installation."
+  fi
+
+  local ACCOUNT_TYPE
+  ACCOUNT_TYPE="user"
+  if is_sa || [[ "${ACCOUNT_NAME}" = *.iam.gserviceaccount.com ]]; then
+    ACCOUNT_TYPE="serviceAccount"
+  fi
+
+  GCLOUD_USER_OR_SA="${ACCOUNT_TYPE}:${ACCOUNT_NAME}"
+
+  echo "${GCLOUD_USER_OR_SA}"
 }
 
 istioctl_path() {
@@ -2157,13 +2172,11 @@ outro() {
     info "For more information, see:"
     info "https://cloud.google.com/service-mesh/docs/proxy-injection"
   fi
-  if ! is_sa; then
-    info "The ASM package used for installation can be found at:"
-    info "${OUTPUT_DIR}/asm"
-    info "The version of istioctl that matches the installation can be found at:"
-    info "${OUTPUT_DIR}/${ISTIOCTL_REL_PATH}"
-  fi
-  if ! is_managed && ! is_sa; then
+  info "The ASM package used for installation can be found at:"
+  info "${OUTPUT_DIR}/asm"
+  info "The version of istioctl that matches the installation can be found at:"
+  info "${OUTPUT_DIR}/${ISTIOCTL_REL_PATH}"
+  if ! is_managed; then
     info "The combined configuration generated for installation can be found at:"
     info "${OUTPUT_DIR}/${RAW_YAML}"
     info "The full, expanded set of kubernetes resources can be found at:"
