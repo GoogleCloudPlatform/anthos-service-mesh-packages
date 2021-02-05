@@ -707,7 +707,7 @@ create_instance_template() {
       --workload_namespace ${LT_NAMESPACE}"
   
   ../../../asm/vm/asm_vm create_gce_instance_template "${INSTANCE_TEMPLATE_NAME}" \
-    "${KEY_FILE}" "${SERVICE_ACCOUNT}" \
+    ${KEY_FILE} ${SERVICE_ACCOUNT} \
     --cluster_location "${LT_CLUSTER_LOCATION}" \
     --cluster_name "${LT_CLUSTER_NAME}" \
     --project_id "${PROJECT_ID}" \
@@ -743,16 +743,16 @@ cleanup_old_workload_service_accounts() {
       delete_service_account "${email}"
     fi
   done <<EOF
-$(gcloud iam service-accounts list --filter="email:^vm-*" --format="value(email)" --project "${PROJECT_ID}")
+$(gcloud iam service-accounts list --filter="email:^vm-*" --format="value(email)" --project "${LT_PROJECT_ID}")
 EOF
 }
 
 cleanup_old_instance_templates() {
   while read -r it; do
     if [[ -n "${it}" ]]; then
-      gcloud compute instance-templates delete "${it}" --quiet --project "${PROJECT_ID}"
+      gcloud compute instance-templates delete "${it}" --quiet --project "${LT_PROJECT_ID}"
     fi
   done <<EOF
-$(gcloud compute instance-templates list --filter="name:^vm-*" --format="value(name)" --project "${PROJECT_ID}")
+$(gcloud compute instance-templates list --filter="name:^vm-*" --format="value(name)" --project "${LT_PROJECT_ID}")
 EOF
 }
