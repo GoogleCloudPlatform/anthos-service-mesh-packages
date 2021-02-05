@@ -35,6 +35,7 @@ IDENTITY_PROVIDER_ANNOTATION_KEY="security.cloud.google.com/IdentityProvider"
 readonly IDENTITY_PROVIDER_ANNOTATION_KEY
 
 SCRIPT_NAME="${0##*/}"
+APATH=""
 
 PROJECT_NUMBER=""
 
@@ -74,6 +75,19 @@ KEY_FILE="${KEY_FILE:=}"
 DRY_RUN="${DRY_RUN:=0}"
 ONLY_VALIDATE="${ONLY_VALIDATE:=0}"
 VERBOSE="${VERBOSE:=0}"
+
+init() {
+  # BSD-style readlink apparently doesn't have the same -f toggle on readlink
+  case "$(uname)" in
+    Linux ) APATH="readlink";;
+    Darwin) APATH="stat";;
+    *);;
+  esac
+}
+
+apath() {
+  "${APATH}" "${@}"
+}
 
 ### Convenience functions ###
 
@@ -1199,6 +1213,7 @@ To create a managed instance group from the instance template, run:
 }
 
 main() {
+  init
   parse_args "${@}"
   validate_args
 
