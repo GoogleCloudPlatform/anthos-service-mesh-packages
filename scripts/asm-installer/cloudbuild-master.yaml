@@ -19,6 +19,7 @@ steps:
   - '-e'
   - 'SC2230'
   - '${_SCRIPT_NAME}'
+  - '${_ASM_VM_SCRIPT_NAME}'
 
 - name: 'gcr.io/cloud-builders/gcloud'
   dir: 'scripts/asm-installer'
@@ -187,6 +188,7 @@ substitutions:
   _CLUSTER_LOCATION: us-central1-c
   _IMAGE_NAME: gcloud-with-kpt
   _SCRIPT_NAME: install_asm
+  _ASM_VM_SCRIPT_NAME: ../../asm/vm/asm_vm
   _ASM_PKG_BRANCH: ""
   _SERVICE_ACCOUNT: asm-installer
   _SECRET_NAME: asm-installer-creds

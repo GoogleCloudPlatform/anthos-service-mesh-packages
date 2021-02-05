@@ -45,6 +45,8 @@ ASM_REVISIONS=""
 NETWORK=""
 MEMBERSHIP_UID=""
 GKE_URL=""
+ENVIRON_PROJECT_ID=""
+HUB_MEMBERSHIP_ID=""
 
 ### Workload variables ###
 WORKLOAD_LABELS=""
@@ -234,7 +236,7 @@ OPTIONS:
   -w|--workload_name            <WORKLOAD_NAME>       The name of the
                                                       WorkloadGroup for GCE VM
                                                       workloads.
-  -ns|--workload_namespace      <WORKLOAD_NAMESPACE>  (optional)The namespace of
+  --workload_namespace          <WORKLOAD_NAMESPACE>  (optional)The namespace of
                                                       the WorkloadGroup for GCE
                                                       VM workloads. Default to
                                                       the "default" namespace if
@@ -272,7 +274,7 @@ in project "my_project" based on the WorkloadGroup "my_workload" in namespace
       -l us-central1-c \\
       -i base_vm_template \\
       -w my_workload \\
-      -ns foo
+      --workload_namespace foo
 EOF
 }
 
@@ -345,7 +347,7 @@ parse_args_create_gce_instance_template() {
         WORKLOAD_NAME="${2}"
         shift 2
         ;;
-      -ns | --workload_namespace | --workload-namespace)
+      --workload_namespace | --workload-namespace)
         arg_required "${@}"
         WORKLOAD_NAMESPACE="${2}"
         shift 2
@@ -515,7 +517,7 @@ validate_asm_cluster() {
   validate_cluster
   configure_kubectl
   validate_cluster_registration
-  validate_retrieve_asm_installation
+  validate_asm_installation
 }
 
 validate_cluster() {
@@ -536,7 +538,7 @@ EOF
   fi
 }
 
-validate_retrieve_asm_installation() {
+validate_asm_installation() {
   info "Checking for istio-system namespace..."
   if [ "$(retry 2 kubectl get ns | grep -c istio-system || true)" -eq 0 ]; then
     fatal "istio-system namespace cannot be found in the cluster. Please install ASM and retry."
@@ -592,19 +594,37 @@ is_cluster_registered() {
     return
   fi
 
-  local LIST; LIST="$(gcloud container hub memberships list --project "${PROJECT_ID}" --format=json | grep "${GKE_URL}")"
-
-  if [[ -z "${LIST}" ]]; then
-    false
-    return
-  fi
-
   local IDENTITY_PROVIDER
   IDENTITY_PROVIDER="$(retry 2 kubectl get memberships.hub.gke.io \
     membership -ojson 2>/dev/null | jq .spec.identity_provider)"
 
-  if [[ -z "${IDENTITY_PROVIDER}" ]] || [[ "${IDENTITY_PROVIDER}" = 'null' ]]; then
+  if [[ -z "${IDENTITY_PROVIDER}" ]] || [[ "${IDENTITY_PROVIDER}" == 'null' ]]; then
     false
+  fi
+
+  populate_environ_info
+
+  local LIST
+  LIST="$(gcloud container hub memberships list --project "${ENVIRON_PROJECT_ID}" \
+    --format=json | grep "${GKE_URL}")"
+  if [[ -z "${LIST}" ]]; then
+    false
+    return
+  fi
+}
+
+populate_environ_info() {
+  if [[ -n "${ENVIRON_PROJECT_ID}" && -n "${HUB_MEMBERSHIP_ID}" ]]; then return; fi
+  if ! is_membership_crd_installed; then return; fi
+  configure_kubectl
+  local IDENTITY_PROVIDER
+  local IDENTITY
+  IDENTITY_PROVIDER="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.identity_provider)"
+  IDENTITY="$(echo "${IDENTITY_PROVIDER}" | sed 's/^\"https:\/\/gkehub.googleapis.com\/projects\/\(.*\)\/locations\/global\/memberships\/\(.*\)\"$/\1 \2/g')"
+  if [[ -n "${IDENTITY}" ]]; then
+    read -r ENVIRON_PROJECT_ID HUB_MEMBERSHIP_ID <<EOF
+${IDENTITY}
+EOF
   fi
 }
 
@@ -672,7 +692,7 @@ retrieve_workload_asm_revision() {
 Unable to find an ASM revision for the namespace of the WorkloadGroup. To apply
 a revision label on the namespace, replace <REVISION> with an available revision
 name and run:
-  kubectl label namespace "${WORKLOAD_NAMESPACE}" istio-injection- \
+  kubectl label namespace ${WORKLOAD_NAMESPACE} istio-injection- \
   istio.io/rev=<REVISION> --overwrite
 EOF
   fi
@@ -865,31 +885,30 @@ retrieve_cluster_network() {
 }
 
 retrieve_identity_provider() {
-  retrieve_membership_uid
+  info "Retrieving the identity provider of the workload..."
 
-  CREDENTIAL_IDENTITY_PROVIDER="${MEMBERSHIP_UID}@${WORKLOAD_IDENTITY_PROVIDER}@${WORKLOAD_NAMESPACE}"
-}
-
-retrieve_membership_uid() {
-  info "Retrieving the Environ membership's unique ID..."
-
+  populate_environ_info
+  
   local MEMBERSHIPS
-  MEMBERSHIPS="$(retry 2 gcloud container hub memberships list --project "${PROJECT_ID}" \
+  MEMBERSHIPS="$(retry 2 gcloud container hub memberships list --project "${ENVIRON_PROJECT_ID}" \
    --format='value(name)')"
   while read -r MEMBERSHIP; do
     if [[ -n "${MEMBERSHIP}" ]]; then
       local CURR_CLUSTER_URL
       CURR_CLUSTER_URL="$(retry 2 gcloud container hub memberships describe \
-        "${MEMBERSHIP}" --project "${PROJECT_ID}" \
+        "${MEMBERSHIP}" --project "${ENVIRON_PROJECT_ID}" \
         --format="value(endpoint.gkeCluster.resourceLink)")"
       if [[ "${CURR_CLUSTER_URL}" == "${GKE_URL}" ]]; then
         MEMBERSHIP_UID="$(retry 2 run gcloud container hub memberships describe \
-          "${MEMBERSHIP}" --project "${PROJECT_ID}" --format="value(uniqueId)")"
+          "${MEMBERSHIP}" --project "${ENVIRON_PROJECT_ID}" --format="value(uniqueId)")"
+        break
       fi
     fi
   done <<EOF
 ${MEMBERSHIPS}
 EOF
+
+  CREDENTIAL_IDENTITY_PROVIDER="${MEMBERSHIP_UID}@${WORKLOAD_IDENTITY_PROVIDER}@${WORKLOAD_NAMESPACE}"
 }
 
 # Generate GCE service proxy definition for the instance template

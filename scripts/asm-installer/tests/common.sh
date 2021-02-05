@@ -673,10 +673,11 @@ run_basic_test() {
   return "$SUCCESS"
 }
 
-create_service_account() {
-  WORKLOAD_SERVICE_ACCOUNT="vm-${LT_NAMESPACE}@${PROJECT_ID}.iam.gserviceaccount.com"
+create_workload_service_account() {
+  WORKLOAD_SERVICE_ACCOUNT_NAME="vm-${LT_NAMESPACE}"
+  WORKLOAD_SERVICE_ACCOUNT="${WORKLOAD_SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
   echo "Creating service account ${WORKLOAD_SERVICE_ACCOUNT}..."
-  gcloud iam service-accounts create "${LT_NAMESPACE}" --project "${PROJECT_ID}"
+  gcloud iam service-accounts create "${WORKLOAD_SERVICE_ACCOUNT_NAME}" --project "${PROJECT_ID}"
 }
 
 create_instance_template() {
@@ -709,11 +710,11 @@ verify_instance_template() {
     --filter="name=${INSTANCE_TEMPLATE_NAME}" --format="value(name)")"
   if [[ -z "${VAL}" ]]; then
     fail "Cannot find instance template ${INSTANCE_TEMPLATE_NAME} in the project."
-    return 1
+    false
   fi
 }
 
-cleanup_service_account() {
+cleanup_workload_service_account() {
   echo "Deleting service account ${WORKLOAD_SERVICE_ACCOUNT}..."
   gcloud iam service-accounts delete "${WORKLOAD_SERVICE_ACCOUNT}" \
     --quiet --project "${PROJECT_ID}"

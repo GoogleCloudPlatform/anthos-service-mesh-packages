@@ -15,10 +15,10 @@ main() {
   # CLI setup
   parse_args "$@"
 
-  run_basic_test "install" "mesh_ca" "-o vm -o hub-meshca --enable-registration --enable-gcp-components"
+  run_basic_test "install" "mesh_ca" "-o vm -o hub-meshca"
   trap 'cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"' ERR
 
-  create_service_account
+  create_workload_service_account
   
   echo "Applying WorkloadGroup ${WORKLOAD_NAME} in namespace ${LT_NAMESPACE}..."
   kubectl apply -f - <<EOF
@@ -39,12 +39,12 @@ spec:
 EOF
 
   create_instance_template
-  trap 'cleanup_service_account' ERR
+  trap 'cleanup_workload_service_account' ERR
 
   verify_instance_template
 
   cleanup_instance_template
-  cleanup_service_account
+  cleanup_workload_service_account
   cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"
 }
 
