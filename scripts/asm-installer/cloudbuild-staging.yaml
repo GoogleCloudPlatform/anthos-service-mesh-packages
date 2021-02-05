@@ -18,6 +18,8 @@ steps:
   id: 'lint-with-shellcheck'
   entrypoint: 'shellcheck'
   args:
+  - '-e'
+  - 'SC2230'
   - '${_SCRIPT_NAME}'
   waitFor:
   - 'publish-tester-image'

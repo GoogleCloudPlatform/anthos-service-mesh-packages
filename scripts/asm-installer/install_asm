@@ -64,6 +64,9 @@ GCLOUD_USER_OR_SA=""
 KPT_URL=""
 KUBECONFIG=""
 APATH=""
+AKUBECTL=""
+AKPT=""
+AGCLOUD=""
 ABS_OVERLAYS=""
 
 ### Option variables ###
@@ -274,10 +277,10 @@ init() {
     Darwin) APATH="stat";;
     *);;
   esac
-}
 
-apath() {
-  "${APATH}" "${@}"
+  AKUBECTL="$(which kubectl || true)"
+  AGCLOUD="$(which gcloud || true)"
+  AKPT="$(which kpt || true)"
 }
 
 ### Convenience functions ###
@@ -301,6 +304,35 @@ run() {
   { "${@}"; RETVAL="$?"; } || true
   return $RETVAL
 }
+
+apath() {
+  "${APATH}" "${@}"
+}
+
+gcloud() {
+  run "${AGCLOUD}" "${@}"
+}
+
+kubectl() {
+  run "${AKUBECTL}" "${@}"
+}
+
+kpt() {
+  run "${AKPT}" "${@}"
+}
+
+istioctl() {
+  run "$(istioctl_path)" "${@}"
+}
+
+istioctl_path() {
+  if [[ -n "${_CI_ISTIOCTL_REL_PATH}" && -f "${_CI_ISTIOCTL_REL_PATH}" ]]; then
+    echo "${_CI_ISTIOCTL_REL_PATH}"
+  else
+    echo "./${ISTIOCTL_REL_PATH}"
+  fi
+}
+
 
 #######
 # retry takes an integer N as the first argument, and a list of arguments
@@ -352,7 +384,7 @@ strip_last_char() {
 
 configure_kubectl(){
   info "Fetching/writing GCP credentials to kubeconfig file..."
-  retry 2 run gcloud container clusters get-credentials "${CLUSTER_NAME}" \
+  retry 2 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
     --project="${PROJECT_ID}" \
     --zone="${CLUSTER_LOCATION}"
 
@@ -1036,7 +1068,7 @@ set_kpt_package_url() {
 
 auth_service_account() {
   info "Authorizing ${SERVICE_ACCOUNT} with ${KEY_FILE}..."
-  run gcloud auth activate-service-account \
+  gcloud auth activate-service-account \
     --project="${PROJECT_ID}" \
     "${SERVICE_ACCOUNT}" \
     --key-file="${KEY_FILE}"
@@ -1136,11 +1168,11 @@ validate_cli_dependencies() {
     fi
   done <<EOF
 awk
-gcloud
+$AGCLOUD
 grep
 jq
 kpt
-kubectl
+$AKUBECTL
 sed
 tr
 head
@@ -1195,7 +1227,7 @@ EOF
   fi
 
   info "Downloading ASM kpt package..."
-  retry 3 run kpt pkg get --auto-set=false "${KPT_URL}" asm
+  retry 3 kpt pkg get --auto-set=false "${KPT_URL}" asm
 }
 
 necessary_files_exist() {
@@ -1378,7 +1410,7 @@ EOF
 
 validate_istio_version() {
   info "Checking existing Istio version(s)..."
-  local VERSION_OUTPUT; VERSION_OUTPUT="$(retry 3 "$(istioctl_path)" version -o json)"
+  local VERSION_OUTPUT; VERSION_OUTPUT="$(retry 3 istioctl version -o json)"
   if [[ -z "${VERSION_OUTPUT}" ]]; then
     fatal "Couldn't validate existing Istio versions."
   fi
@@ -1401,7 +1433,7 @@ validate_istio_version() {
 
 validate_asm_version() {
   info "Checking existing ASM version(s)..."
-  local VERSION_OUTPUT; VERSION_OUTPUT="$(retry 3 "$(istioctl_path)" version -o json)"
+  local VERSION_OUTPUT; VERSION_OUTPUT="$(retry 3 istioctl version -o json)"
   if [[ -z "${VERSION_OUTPUT}" ]]; then
     fatal "Couldn't validate existing Istio versions."
   fi
@@ -1495,7 +1527,7 @@ bind_user_to_iam_policy(){
   local GCLOUD_MEMBER; GCLOUD_MEMBER="${2}"
   info "Binding ${GCLOUD_MEMBER} to required IAM roles..."
   while read -r role; do
-  retry 3 run gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
+  retry 3 gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
     --member "${GCLOUD_MEMBER}" \
     --role="${role}" >/dev/null
   done <<EOF
@@ -1506,7 +1538,7 @@ EOF
 exit_if_out_of_iam_policy() {
   local GCLOUD_MEMBER; GCLOUD_MEMBER="$(iam_user)";
   local MEMBER_ROLES
-  MEMBER_ROLES="$(run gcloud projects \
+  MEMBER_ROLES="$(gcloud projects \
     get-iam-policy "${PROJECT_ID}" \
     --flatten='bindings[].members' \
     --filter="bindings.members:$(iam_user)" \
@@ -1563,14 +1595,6 @@ local_iam_user() {
   GCLOUD_USER_OR_SA="${ACCOUNT_TYPE}:${ACCOUNT_NAME}"
 
   echo "${GCLOUD_USER_OR_SA}"
-}
-
-istioctl_path() {
-  if [[ -n "${_CI_ISTIOCTL_REL_PATH}" && -f "${_CI_ISTIOCTL_REL_PATH}" ]]; then
-    echo "${_CI_ISTIOCTL_REL_PATH}"
-  else
-    echo "./${ISTIOCTL_REL_PATH}"
-  fi
 }
 
 required_iam_roles() {
@@ -1706,7 +1730,7 @@ add_cluster_labels(){
   fi
 
   info "Adding labels to ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
-  retry 2 run gcloud container clusters update "${CLUSTER_NAME}" \
+  retry 2 gcloud container clusters update "${CLUSTER_NAME}" \
     --project="${PROJECT_ID}" \
     --zone="${CLUSTER_LOCATION}" \
     --update-labels="${LABELS}"
@@ -1802,7 +1826,7 @@ register_cluster() {
   local MEMBERSHIP_NAME
   MEMBERSHIP_NAME="$(generate_membership_name)"
   info "Registering the cluster as ${MEMBERSHIP_NAME}..."
-  retry 2 run gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
+  retry 2 gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
     --project="${PROJECT_ID}" \
     --gke-uri="${GKE_CLUSTER_URI}" \
     --enable-workload-identity
@@ -1858,7 +1882,7 @@ enable_workload_identity(){
   if is_workload_identity_enabled; then return; fi
   info "Enabling Workload Identity on ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
   info "(This could take awhile, up to 10 minutes)"
-  retry 2 run gcloud container clusters update "${CLUSTER_NAME}" \
+  retry 2 gcloud container clusters update "${CLUSTER_NAME}" \
     --project="${PROJECT_ID}" \
     --zone="${CLUSTER_LOCATION}" \
     --workload-pool="${WORKLOAD_POOL}"
@@ -1894,7 +1918,7 @@ is_stackdriver_enabled() {
 
 enable_stackdriver_kubernetes(){
   info "Enabling Stackdriver on ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
-  retry 2 run gcloud container clusters update "${CLUSTER_NAME}" \
+  retry 2 gcloud container clusters update "${CLUSTER_NAME}" \
     --project="${PROJECT_ID}" \
     --zone="${CLUSTER_LOCATION}" \
     --enable-stackdriver-kubernetes
@@ -1933,7 +1957,7 @@ bind_user_to_cluster_admin(){
     --clusterrole=cluster-admin \
     --user="${GCLOUD_USER}" \
     --dry-run -o yaml)"
-  retry 3 run kubectl apply -f - <<EOF
+  retry 3 kubectl apply -f - <<EOF
 ${YAML}
 EOF
 }
@@ -1953,14 +1977,14 @@ ensure_istio_namespace_exists(){
   info "Checking for istio-system namespace..."
   if [ "$(retry 2 kubectl get ns | grep -c istio-system || true)" -eq 0 ]; then
     info "Creating istio-system namespace..."
-    retry 2 run kubectl create ns istio-system
+    retry 2 kubectl create ns istio-system
   fi
 }
 
 register_gce_identity_provider() {
   info "Registering GCE Identity Provider in the cluster..."
-  retry 3 run kubectl apply -f asm/identity-provider/identityprovider-crd.yaml
-  retry 3 run kubectl apply -f asm/identity-provider/googleidp.yaml
+  retry 3 kubectl apply -f asm/identity-provider/identityprovider-crd.yaml
+  retry 3 kubectl apply -f asm/identity-provider/googleidp.yaml
 }
 
 ### Installation functions ###
@@ -1969,29 +1993,29 @@ configure_package() {
 
   populate_cluster_values
   populate_environ_info
-  run kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
-  run kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
-  run kpt cfg set asm gcloud.project.environProjectNumber "${PROJECT_NUMBER}"
+  kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
+  kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
+  kpt cfg set asm gcloud.project.environProjectNumber "${PROJECT_NUMBER}"
   if [[ -n "${_CI_ENVIRON_PROJECT_NUMBER}" ]]; then
-    run kpt cfg set asm gcloud.project.environProjectNumber "${_CI_ENVIRON_PROJECT_NUMBER}"
+    kpt cfg set asm gcloud.project.environProjectNumber "${_CI_ENVIRON_PROJECT_NUMBER}"
   fi
-  run kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
-  run kpt cfg set asm gcloud.compute.network "${GCE_NETWORK_NAME}"
-  run kpt cfg set asm anthos.servicemesh.rev "${REVISION_LABEL}"
-  run kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
+  kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
+  kpt cfg set asm gcloud.compute.network "${GCE_NETWORK_NAME}"
+  kpt cfg set asm anthos.servicemesh.rev "${REVISION_LABEL}"
+  kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
   if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then
-    run kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
+    kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
   fi
   if [[ -n "${_CI_ASM_IMAGE_TAG}" ]]; then
-    run kpt cfg set asm anthos.servicemesh.tag "${_CI_ASM_IMAGE_TAG}"
+    kpt cfg set asm anthos.servicemesh.tag "${_CI_ASM_IMAGE_TAG}"
   fi
 
   if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
-    run kpt cfg set asm gcloud.project.environProjectID "${ENVIRON_PROJECT_ID}"
-    run kpt cfg set asm anthos.servicemesh.hubMembershipID "${HUB_MEMBERSHIP_ID}"
+    kpt cfg set asm gcloud.project.environProjectID "${ENVIRON_PROJECT_ID}"
+    kpt cfg set asm anthos.servicemesh.hubMembershipID "${HUB_MEMBERSHIP_ID}"
   fi
   if [[ -n "${CA_NAME}" && "${CA}" = "gcp_cas" ]]; then
-    run kpt cfg set asm anthos.servicemesh.external_ca.ca_name "${CA_NAME}"
+    kpt cfg set asm anthos.servicemesh.external_ca.ca_name "${CA_NAME}"
   fi
 
   if [[ "${CA}" == "mesh_ca" && -n "${_CI_TRUSTED_GCP_PROJECTS}" ]]; then
@@ -2016,12 +2040,12 @@ print_config() {
 ${CUSTOM_OVERLAY}
 EOF
   # shellcheck disable=SC2086
-  run "$(istioctl_path)" profile dump ${PARAMS}
+  istioctl profile dump ${PARAMS}
 }
 
 install_secrets() {
   info "Installing certificates into the cluster..."
-  run kubectl create secret generic cacerts -n istio-system \
+  kubectl create secret generic cacerts -n istio-system \
     --from-file="${CA_CERT}" \
     --from-file="${CA_KEY}" \
     --from-file="${CA_ROOT}" \
@@ -2035,7 +2059,7 @@ init_gcp_cas() {
   local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
   local CA_PROJECT; CA_PROJECT=$(echo "${CA_NAME}" | cut -f2 -d/)
 
-  retry 3 run gcloud beta privateca subordinates add-iam-policy-binding "${NAME}" \
+  retry 3 gcloud beta privateca subordinates add-iam-policy-binding "${NAME}" \
     --location "${CA_LOCATION}" \
     --project "${CA_PROJECT}" \
     --member "serviceAccount:${WORKLOAD_IDENTITY}" \
@@ -2054,7 +2078,7 @@ does_istiod_exist(){
 install_asm() {
   if ! does_istiod_exist && [[ "${_CI_NO_REVISION}" -ne 1 ]]; then
     info "Installing validation webhook fix..."
-    retry 3 run kubectl apply -f "${VALIDATION_FIX_SERVICE}"
+    retry 3 kubectl apply -f "${VALIDATION_FIX_SERVICE}"
   fi
 
   local PARAMS
@@ -2077,7 +2101,7 @@ EOF
 
   info "Installing ASM control plane..."
   # shellcheck disable=SC2086
-  retry 5 run "$(istioctl_path)" install $PARAMS
+  retry 5 istioctl install $PARAMS
 
   # Prevent the stderr buffer from ^ messing up the terminal output below
   sleep 1
@@ -2086,7 +2110,7 @@ EOF
   local RAW_YAML; RAW_YAML="${REVISION_LABEL}-manifest-raw.yaml"
   local EXPANDED_YAML; EXPANDED_YAML="${REVISION_LABEL}-manifest-expanded.yaml"
   print_config >| "${RAW_YAML}"
-  run "$(istioctl_path)" manifest generate \
+  istioctl manifest generate \
     <"${RAW_YAML}" \
     >|"${EXPANDED_YAML}"
 
@@ -2096,7 +2120,7 @@ EOF
 
   if [[ "${USE_VM}" -eq 1 ]]; then
     info "Exposing the control plane for VM workloads..."
-    retry 3 run kubectl apply -f "${EXPOSE_ISTIOD_SERVICE}"
+    retry 3 kubectl apply -f "${EXPOSE_ISTIOD_SERVICE}"
   fi
 
   outro
@@ -2104,9 +2128,9 @@ EOF
 
 install_canonical_controller() {
   info "Installing ASM CanonicalService controller in asm-system namespace..."
-  retry 3 run kubectl apply -f "${CANONICAL_CONTROLLER_MANIFEST}"
+  retry 3 kubectl apply -f "${CANONICAL_CONTROLLER_MANIFEST}"
   info "Waiting for deployment..."
-  retry 3 run kubectl wait --for=condition=available --timeout=600s \
+  retry 3 kubectl wait --for=condition=available --timeout=600s \
       deployment/canonical-service-controller-manager -n asm-system
   info "...done!"
 }
@@ -2129,7 +2153,7 @@ EOF
 
 server-side_apply() {
   local FILE; FILE="${1}";
-  run kubectl apply -f "${FILE}" \
+  kubectl apply -f "${FILE}" \
     --record=false \
     --overwrite=false \
     --server-side
@@ -2143,13 +2167,13 @@ install_managed_components() {
   # shellcheck disable=SC2001
   CLOUDRUN_ADDR=$(echo "${URL}" | cut -d'/' -f3)
 
-  run kpt cfg set asm anthos.servicemesh.controlplane.validation-url "${VALIDATION_URL}"
-  run kpt cfg set asm anthos.servicemesh.managed-controlplane.cloudrun-addr "${CLOUDRUN_ADDR}"
+  kpt cfg set asm anthos.servicemesh.controlplane.validation-url "${VALIDATION_URL}"
+  kpt cfg set asm anthos.servicemesh.managed-controlplane.cloudrun-addr "${CLOUDRUN_ADDR}"
 
   info "Configuring base installation for managed control plane..."
 
   server-side_apply "${BASE_REL_PATH}"
-  run kubectl replace -f "${MANAGED_WEBHOOKS}"
+  kubectl replace -f "${MANAGED_WEBHOOKS}"
 
   PARAMS="-f ${MANAGED_MANIFEST}"
   PARAMS="${PARAMS} -c ${KUBECONFIG}"
@@ -2158,7 +2182,7 @@ install_managed_components() {
 
   info "Installing ASM managed control plane components..."
   # shellcheck disable=SC2086
-  retry 5 run "$(istioctl_path)" install $PARAMS
+  retry 5 istioctl install $PARAMS
 
 
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
