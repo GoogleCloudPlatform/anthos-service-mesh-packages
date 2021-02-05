@@ -152,7 +152,7 @@ steps:
   args:
   - '-c'
   - >
-    ./tests/vm/run_basic_instance_template_creation
+    ./tests/run_basic_instance_template_creation
     --PROJECT_ID "${PROJECT_ID}"
     --BUILD_ID "${BUILD_ID}"
   env:
