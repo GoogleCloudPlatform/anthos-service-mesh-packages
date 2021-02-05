@@ -4,6 +4,7 @@ LT_PROJECT_ID="asm-scriptaro-oss"
 LT_NAMESPACE=""
 OUTPUT_DIR=""
 
+_EXTRA_FLAGS="${_EXTRA_FLAGS:=}"; export _EXTRA_FLAGS;
 BUILD_ID="${BUILD_ID:=}"; export BUILD_ID;
 PROJECT_ID="${PROJECT_ID:=}"; export PROJECT_ID;
 CLUSTER_LOCATION="${CLUSTER_LOCATION:=us-central1-c}"; export CLUSTER_LOCATION;
@@ -618,7 +619,7 @@ run_basic_test() {
     -m "${MODE}" \
     -c "${CA}" -v \
     --output-dir "${OUTPUT_DIR}" \
-    ${EXTRA_FLAGS} 2>&1 | tee "${LT_NAMESPACE}" &
+    ${EXTRA_FLAGS} ${_EXTRA_FLAGS} 2>&1 | tee "${LT_NAMESPACE}" &
 
   LABEL="$(grep -o -m 1 'istio.io/rev=\S*' "${LT_NAMESPACE}")"
   REV="$(echo "${LABEL}" | cut -f 2 -d =)"

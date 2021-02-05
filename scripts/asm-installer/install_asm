@@ -29,31 +29,25 @@ _CI_TRUSTED_GCP_PROJECTS="${_CI_TRUSTED_GCP_PROJECTS:=}"
 _CI_ENVIRON_PROJECT_NUMBER="${_CI_ENVIRON_PROJECT_NUMBER:=}"
 
 ### Internal variables ###
-MAJOR="${MAJOR:=1}"
-MINOR="${MINOR:=8}"
-POINT="${POINT:=2}"
-REV="${REV:=2}"
-RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
-RELEASE_LINE="${MAJOR}.${MINOR}."
-PREVIOUS_RELEASE_LINE="${MAJOR}.$(( MINOR - 1 ))."
-REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}-${REV}"
-KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=release-${MAJOR}.${MINOR}-asm}"
-readonly RELEASE; readonly RELEASE_LINE; readonly KPT_BRANCH;
+MAJOR="${MAJOR:=1}"; readonly MAJOR;
+MINOR="${MINOR:=8}"; readonly MINOR;
+POINT="${POINT:=2}"; readonly POINT;
+REV="${REV:=2}"; readonly REV;
 K8S_MINOR=0
 
 ### File related constants ###
-ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
-ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
-BASE_REL_PATH="${ISTIO_FOLDER_NAME}/manifests/charts/base/files/gen-istio-cluster.yaml"; readonly BASE_REL_PATH;
-PACKAGE_DIRECTORY="asm/istio"; readonly PACKAGE_DIRECTORY;
-VALIDATION_FIX_SERVICE="${PACKAGE_DIRECTORY}/istiod-service.yaml"; readonly VALIDATION_FIX_SERVICE;
-OPTIONS_DIRECTORY="${PACKAGE_DIRECTORY}/options"; readonly OPTIONS_DIRECTORY;
-OPERATOR_MANIFEST="${PACKAGE_DIRECTORY}/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
-BETA_CRD_MANIFEST="${OPTIONS_DIRECTORY}/v1beta1-crds.yaml"; readonly BETA_CRD_MANIFEST;
-MANAGED_MANIFEST="${OPTIONS_DIRECTORY}/managed-control-plane.yaml"; readonly MANAGED_MANIFEST;
-MANAGED_WEBHOOKS="${OPTIONS_DIRECTORY}/managed-control-plane-webhooks.yaml"; readonly MANAGED_WEBHOOKS;
-EXPOSE_ISTIOD_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_SERVICE;
-CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
+ISTIO_FOLDER_NAME=""
+ISTIOCTL_REL_PATH=""
+BASE_REL_PATH=""
+PACKAGE_DIRECTORY=""
+VALIDATION_FIX_SERVICE=""
+OPTIONS_DIRECTORY=""
+OPERATOR_MANIFEST=""
+BETA_CRD_MANIFEST=""
+MANAGED_MANIFEST=""
+MANAGED_WEBHOOKS=""
+EXPOSE_ISTIOD_SERVICE=""
+CANONICAL_CONTROLLER_MANIFEST=""
 
 SCRIPT_NAME="${0##*/}"
 
@@ -65,6 +59,11 @@ KPT_URL=""
 KUBECONFIG=""
 APATH=""
 ABS_OVERLAYS=""
+RELEASE=""
+REVISION_LABEL=""
+RELEASE_LINE=""
+PREVIOUS_RELEASE_LINE=""
+KPT_BRANCH=""
 
 ### Option variables ###
 PROJECT_ID="${PROJECT_ID:=}"
@@ -271,6 +270,31 @@ init() {
     Darwin) APATH="stat";;
     *);;
   esac
+  if [[ "${POINT}" == "alpha" ]]; then
+    RELEASE="${MAJOR}.${MINOR}-alpha.${REV}"
+    REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}"
+    KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=master}"
+  else
+    RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
+    REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}-${REV}"
+    KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=release-${MAJOR}.${MINOR}-asm}"
+  fi
+  RELEASE_LINE="${MAJOR}.${MINOR}."
+  PREVIOUS_RELEASE_LINE="${MAJOR}.$(( MINOR - 1 ))."
+  readonly RELEASE; readonly RELEASE_LINE; readonly PREVIOUS_RELEASE_LINE; readonly KPT_BRANCH;
+
+  ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
+  ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
+  BASE_REL_PATH="${ISTIO_FOLDER_NAME}/manifests/charts/base/files/gen-istio-cluster.yaml"; readonly BASE_REL_PATH;
+  PACKAGE_DIRECTORY="asm/istio"; readonly PACKAGE_DIRECTORY;
+  VALIDATION_FIX_SERVICE="${PACKAGE_DIRECTORY}/istiod-service.yaml"; readonly VALIDATION_FIX_SERVICE;
+  OPTIONS_DIRECTORY="${PACKAGE_DIRECTORY}/options"; readonly OPTIONS_DIRECTORY;
+  OPERATOR_MANIFEST="${PACKAGE_DIRECTORY}/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
+  BETA_CRD_MANIFEST="${OPTIONS_DIRECTORY}/v1beta1-crds.yaml"; readonly BETA_CRD_MANIFEST;
+  MANAGED_MANIFEST="${OPTIONS_DIRECTORY}/managed-control-plane.yaml"; readonly MANAGED_MANIFEST;
+  MANAGED_WEBHOOKS="${OPTIONS_DIRECTORY}/managed-control-plane-webhooks.yaml"; readonly MANAGED_WEBHOOKS;
+  EXPOSE_ISTIOD_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_SERVICE;
+  CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
 }
 
 apath() {
@@ -297,6 +321,18 @@ run() {
   local RETVAL
   { "${@}"; RETVAL="$?"; } || true
   return $RETVAL
+}
+
+apath() {
+  "${APATH}" "${@}"
+}
+
+istioctl_path() {
+  if [[ -n "${_CI_ISTIOCTL_REL_PATH}" && -f "${_CI_ISTIOCTL_REL_PATH}" ]]; then
+    echo "${_CI_ISTIOCTL_REL_PATH}"
+  else
+    echo "./${ISTIOCTL_REL_PATH}"
+  fi
 }
 
 #######
