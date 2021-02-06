@@ -17,12 +17,9 @@ kind: IstioOperator
 spec:
   components:
     ingressGateways:
-    # Disable istio-ingressgateway to avoid downtime from in-place upgrade
-    - name: istio-ingressgateway
-      enabled: false
-    # Workaround to use revision based deployments for istio-ingressgateway
-    - name: istio-ingressgateway-ASM_REV # {"$ref":"#/definitions/io.k8s.cli.substitutions.istio-ingressgateway-deploy-name"}
+    - name: INGRESSGATEWAY_NAME-ASM_REV # {"$ref":"#/definitions/io.k8s.cli.substitutions.custom-ingressgateway-deploy-name"}
       enabled: true
+      namespace: istio-system # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.custom-ingressgateway-namespace"}
       k8s:
         hpaSpec:
           maxReplicas: 5
@@ -56,7 +53,7 @@ spec:
         overlays:
         - apiVersion: extensions/v1beta1
           kind: Service
-          name: istio-ingressgateway-ASM_REV # {"$ref":"#/definitions/io.k8s.cli.substitutions.istio-ingressgateway-deploy-name"}
+          name: INGRESSGATEWAY_NAME-ASM_REV # {"$ref":"#/definitions/io.k8s.cli.substitutions.custom-ingressgateway-deploy-name"}
           patches:
           - path: metadata.name
-            value: istio-ingressgateway
+            value: INGRESSGATEWAY_NAME # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.custom-ingressgateway-name"}
