@@ -187,7 +187,7 @@ main() {
   fi
 
   if can_modify_gcp_iam_roles; then
-    bind_user_to_iam_policy "$(required_iam_roles)" "$(iam_user)"
+    bind_user_to_iam_policy "$(required_iam_roles_istiod_service_account)" "$(iam_user)"
   elif should_validate; then
     exit_if_out_of_iam_policy
   fi
@@ -491,8 +491,7 @@ can_modify_gcp_apis() {
 }
 
 can_modify_gcp_iam_roles() {
-  if [[ "${ENABLE_ALL}" -eq 0 && "${ENABLE_GCP_IAM_ROLES}" -eq 0 ]] && \
-    ! is_managed ||
+  if [[ "${ENABLE_ALL}" -eq 0 && "${ENABLE_GCP_IAM_ROLES}" -eq 0 ]] ||
     ! can_modify_at_all; then false; fi
 }
 
@@ -1568,7 +1567,7 @@ exit_if_out_of_iam_policy() {
     --flatten='bindings[].members' \
     --filter="bindings.members:$(iam_user)" \
     --format='value(bindings.role)')"
-  local REQUIRED; REQUIRED="$(required_iam_roles)";
+  local REQUIRED; REQUIRED="$(required_iam_roles_istiod_service_account)";
 
   local NOTFOUND; NOTFOUND="$(find_missing_strings "${REQUIRED}" "${MEMBER_ROLES}")"
 
@@ -1636,6 +1635,14 @@ roles/iam.serviceAccountAdmin
 roles/iam.serviceAccountKeyAdmin
 roles/gkehub.admin
 roles/privateca.admin
+EOF
+}
+
+required_iam_roles_istiod_service_account() {
+  cat <<EOF
+roles/container.admin
+roles/monitoring.metricWriter
+roles/serviceusage.serviceUsageConsumer
 EOF
 }
 
