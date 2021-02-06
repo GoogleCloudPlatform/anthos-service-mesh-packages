@@ -4,7 +4,13 @@ LT_PROJECT_ID="asm-scriptaro-oss"
 LT_NAMESPACE=""
 OUTPUT_DIR=""
 
+### vm related variables
+WORKLOAD_NAME="vm"
+WORKLOAD_SERVICE_ACCOUNT=""
+INSTANCE_TEMPLATE_NAME=""
+
 _EXTRA_FLAGS="${_EXTRA_FLAGS:=}"; export _EXTRA_FLAGS;
+
 BUILD_ID="${BUILD_ID:=}"; export BUILD_ID;
 PROJECT_ID="${PROJECT_ID:=}"; export PROJECT_ID;
 CLUSTER_LOCATION="${CLUSTER_LOCATION:=us-central1-c}"; export CLUSTER_LOCATION;
@@ -665,4 +671,88 @@ run_basic_test() {
   date +"%T"
 
   return "$SUCCESS"
+}
+
+# pass in the NAME of the service account
+create_service_account() {
+  local SVC_ACCT_NAME; SVC_ACCT_NAME="$1"
+  echo "Creating service account ${SVC_ACCT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com..."
+  gcloud iam service-accounts create "${SVC_ACCT_NAME}" --project "${PROJECT_ID}"
+}
+
+# pass in the EMAIL of the service account
+delete_service_account() {
+  local SVC_ACCT_EMAIL; SVC_ACCT_EMAIL="$1"
+  echo "Deleting service account ${SVC_ACCT_EMAIL}..."
+  gcloud iam service-accounts delete "${SVC_ACCT_EMAIL}" \
+    --quiet --project "${PROJECT_ID}"
+}
+
+create_workload_service_account() {
+  local WORKLOAD_SERVICE_ACCOUNT_NAME="vm-${LT_NAMESPACE}"
+  WORKLOAD_SERVICE_ACCOUNT="${WORKLOAD_SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+  create_service_account "${WORKLOAD_SERVICE_ACCOUNT_NAME}"
+}
+
+create_instance_template() {
+  INSTANCE_TEMPLATE_NAME="vm-${LT_NAMESPACE}"
+  
+  echo "Creating instance template ${INSTANCE_TEMPLATE_NAME}..."
+  echo "../../../asm/vm/asm_vm create_gce_instance_template ${INSTANCE_TEMPLATE_NAME} \
+      ${KEY_FILE} ${SERVICE_ACCOUNT} \
+      --cluster_location ${LT_CLUSTER_LOCATION} \
+      --cluster_name ${LT_CLUSTER_NAME} \
+      --project_id ${PROJECT_ID} \
+      --workload_name ${WORKLOAD_NAME} \
+      --workload_namespace ${LT_NAMESPACE}"
+  
+  ../../../asm/vm/asm_vm create_gce_instance_template "${INSTANCE_TEMPLATE_NAME}" \
+    ${KEY_FILE} ${SERVICE_ACCOUNT} \
+    --cluster_location "${LT_CLUSTER_LOCATION}" \
+    --cluster_name "${LT_CLUSTER_NAME}" \
+    --project_id "${PROJECT_ID}" \
+    --workload_name "${WORKLOAD_NAME}" \
+    --workload_namespace "${LT_NAMESPACE}"
+}
+
+verify_instance_template() {
+  # TODO(jasonwzm): include more sophisticated test for proxy config.
+  local VAL
+  VAL="$(gcloud compute instance-templates list \
+    --filter="name=${INSTANCE_TEMPLATE_NAME}" --format="value(name)")"
+  if [[ -z "${VAL}" ]]; then
+    fail "Cannot find instance template ${INSTANCE_TEMPLATE_NAME} in the project."
+    false
+  fi
+}
+
+cleanup_workload_service_account() {
+  echo "Deleting service account ${WORKLOAD_SERVICE_ACCOUNT}..."
+  delete_service_account "${WORKLOAD_SERVICE_ACCOUNT}"
+}
+
+cleanup_instance_template() {
+  echo "Deleting instance template ${INSTANCE_TEMPLATE_NAME}..."
+  gcloud compute instance-templates delete "${INSTANCE_TEMPLATE_NAME}" \
+    --quiet --project "${PROJECT_ID}"
+}
+
+cleanup_old_workload_service_accounts() {
+  while read -r email; do
+    if [[ -n "${email}" ]]; then
+      delete_service_account "${email}"
+    fi
+  done <<EOF
+$(gcloud iam service-accounts list --filter="email:^vm-*" --format="value(email)" --project "${LT_PROJECT_ID}")
+EOF
+}
+
+cleanup_old_instance_templates() {
+  while read -r it; do
+    if [[ -n "${it}" ]]; then
+      gcloud compute instance-templates delete "${it}" --quiet --project "${LT_PROJECT_ID}"
+    fi
+  done <<EOF
+$(gcloud compute instance-templates list --filter="name:^vm-*" --format="value(name)" --project "${LT_PROJECT_ID}")
+EOF
 }

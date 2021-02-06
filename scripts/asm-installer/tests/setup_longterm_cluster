@@ -32,8 +32,10 @@ if [[ -n "${RESULT}" ]]; then
   configure_kubectl "${LT_CLUSTER_NAME}" "${LT_PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
   kubectl delete validatingwebhookconfiguration istiod-istio-system || true
   cleanup_old_test_namespaces "${OUTPUT_DIR}"
+  cleanup_old_instance_templates
+  cleanup_old_workload_service_accounts
 else
-echo "Creating long term test cluster"
+  echo "Creating long term test cluster"
   gcloud beta container \
     --project "${LT_PROJECT_ID}" \
     clusters create "${LT_CLUSTER_NAME}" \
