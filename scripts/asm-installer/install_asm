@@ -215,12 +215,6 @@ main() {
     fi
   fi
 
-  if can_modify_cluster_roles; then
-    bind_user_to_cluster_admin
-  elif should_validate; then
-    exit_if_not_cluster_admin
-  fi
-
   if should_validate && ! is_managed; then
     ensure_istio_namespace_exists
   fi
@@ -474,12 +468,6 @@ can_modify_at_all() {
   if [[ "${ONLY_VALIDATE}" -eq 1 || "${PRINT_CONFIG}" -eq 1 ]]; then false; fi
 }
 
-can_modify_cluster_roles() {
-  if [[ "${ENABLE_ALL}" -eq 0 && "${ENABLE_CLUSTER_ROLES}" -eq 0 ]] && \
-    ! is_managed || \
-    ! can_modify_at_all; then false; fi
-}
-
 can_modify_cluster_labels() {
   if [[ "${ENABLE_ALL}" -eq 0 && "${ENABLE_CLUSTER_LABELS}" -eq 0 ]] \
     || ! can_modify_at_all; then false; fi
@@ -642,8 +630,6 @@ FLAGS:
 
   -e|--enable_all                     Allow the script to perform all of the
                                       individual enable actions below.
-     --enable_cluster_roles           Allow the script to attempt to set
-                                      the necessary cluster roles.
      --enable_cluster_labels          Allow the script to attempt to set
                                       necessary cluster labels.
      --enable_gcp_apis                Allow the script to enable GCP APIs on
@@ -752,10 +738,6 @@ parse_args() {
         ;;
       -e | --enable_all | --enable-all)
         ENABLE_ALL=1
-        shift 1
-        ;;
-      --enable_cluster_roles | --enable-cluster-roles)
-        ENABLE_CLUSTER_ROLES=1
         shift 1
         ;;
       --enable_cluster_labels | --enable-cluster-labels)
@@ -960,7 +942,6 @@ EOF
   done <<EOF
 DRY_RUN
 ENABLE_ALL
-ENABLE_CLUSTER_ROLES
 ENABLE_CLUSTER_LABELS
 ENABLE_GCP_APIS
 ENABLE_GCP_IAM_ROLES
@@ -973,7 +954,7 @@ ONLY_ENABLE
 VERBOSE
 EOF
 
-  if [[ "${ENABLE_ALL}" -eq 1 || "${ENABLE_CLUSTER_ROLES}" -eq 1 || \
+  if [[ "${ENABLE_ALL}" -eq 1 || \
     "${ENABLE_CLUSTER_LABELS}" -eq 1 || "${ENABLE_GCP_APIS}" -eq 1 || \
     "${ENABLE_GCP_IAM_ROLES}" -eq 1 || "${ENABLE_GCP_COMPONENTS}" -eq 1 || \
     "${ENABLE_REGISTRATION}" -eq 1 ]]; then
@@ -1955,44 +1936,6 @@ exit_if_stackdriver_not_enabled() {
 Cloud Operations (Stackdriver)  is not enabled on ${CLUSTER_NAME}.
 Please enable it and retry, or run the script with the
 '--enable_gcp_components' flag to allow the script to enable it on your behalf.
-$(enable_common_message)
-EOF
-  fi
-}
-
-is_user_cluster_admin() {
-  local GCLOUD_USER; GCLOUD_USER="$(gcloud config get-value core/account)"
-  local ROLES
-  ROLES="$(\
-    kubectl get clusterrolebinding \
-    --all-namespaces \
-    -o jsonpath='{range .items[?(@.subjects[0].name=="'"${GCLOUD_USER}"'")]}[{.roleRef.name}]{end}'\
-    2>/dev/null)"
-
-  if ! echo "${ROLES}" | grep -q cluster-admin; then false; fi
-}
-
-bind_user_to_cluster_admin(){
-  info "Querying for core/account..."
-  local GCLOUD_USER; GCLOUD_USER="$(gcloud config get-value core/account)"
-  info "Binding ${GCLOUD_USER} to cluster admin role..."
-  local PREFIX; PREFIX="$(echo "${GCLOUD_USER}" | cut -f 1 -d @)"
-  local YAML; YAML="$(retry 5 kubectl create \
-    clusterrolebinding "${PREFIX}-cluster-admin-binding" \
-    --clusterrole=cluster-admin \
-    --user="${GCLOUD_USER}" \
-    --dry-run -o yaml)"
-  retry 3 kubectl apply -f - <<EOF
-${YAML}
-EOF
-}
-
-exit_if_not_cluster_admin() {
-  if ! is_user_cluster_admin; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-Current user must have the cluster-admin role on ${CLUSTER_NAME}.
-Please add the cluster role binding and retry, or run the script with the
-'--enable_cluster_roles' flag to allow the script to enable it on your behalf.
 $(enable_common_message)
 EOF
   fi
