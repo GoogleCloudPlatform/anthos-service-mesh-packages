@@ -128,9 +128,8 @@ main() {
 
   validate_args
 
-  if ! only_enable; then
-    set_up_local_workspace
-  fi
+  set_up_local_workspace
+  configure_kubectl
 
   validate_cli_dependencies
 
@@ -141,7 +140,6 @@ main() {
   if should_validate || can_modify_at_all; then
     local_iam_user > /dev/null
     validate_gcp_resources
-    configure_kubectl
   fi
 
   if needs_asm && ! necessary_files_exist; then
@@ -193,6 +191,7 @@ main() {
     fi
   fi
 
+  get_project_number
   if can_modify_cluster_labels; then
     add_cluster_labels
   elif should_validate; then
@@ -237,7 +236,6 @@ main() {
   fi
 
   if [[ "${PRINT_CONFIG}" -eq 1 && "${USE_HUB_WIP}" -eq 1 ]]; then
-    configure_kubectl
     populate_environ_info
   fi
 
@@ -376,9 +374,6 @@ retry() {
     { "${@}" && return 0; } || true
     warn "Failed, retrying...($((i+1)) of ${MAX_TRIES})"
     sleep 2
-    if [[ "$1" == "kubectl" ]]; then
-      configure_kubectl
-    fi
   done
   false
 }
@@ -414,9 +409,17 @@ configure_kubectl(){
     --project="${PROJECT_ID}" \
     --zone="${CLUSTER_LOCATION}"
 
-  info "Verifying connectivity (20s)..."
+  if ! hash nc; then
+     warn "nc command not found, not verifying connection to Kube API server."
+     return
+  fi
+
+  info "Verifying connectivity (10s)..."
+  local ADDR
+  ADDR="$(kubectl config view --minify=true -ojson | jq .clusters[0].cluster.server -r)"
+
   local RETVAL; RETVAL=0;
-  kubectl cluster-info --request-timeout='20s' 1>/dev/null 2>/dev/null || RETVAL=$?
+  run nc -zvw 10 "${ADDR:8:${#ADDR}}" 443 || RETVAL=$?
   if [[ "${RETVAL}" -ne 0 ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Couldn't connect to ${CLUSTER_NAME}.
@@ -1265,8 +1268,6 @@ necessary_files_exist() {
 }
 
 validate_gcp_resources() {
-  validate_project
-  PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format="value(projectNumber)")"
   validate_cluster
 }
 
@@ -1285,15 +1286,14 @@ EOF
   fi
 }
 
-validate_project() {
+get_project_number() {
   local RESULT; RESULT=""
 
   info "Checking for project ${PROJECT_ID}..."
-  RESULT=$(gcloud projects list \
-    --filter="project_id=${PROJECT_ID}" \
-    --format="value(project_id)" || true)
 
-  if [[ -z "${RESULT}" ]]; then
+  PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format="value(projectNumber)")"
+
+  if [[ -z "${PROJECT_NUMBER}" ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Unable to find project ${PROJECT_ID}. Please verify the spelling and try
 again. To see a list of your projects, run:
@@ -1897,7 +1897,6 @@ is_membership_crd_installed() {
 populate_environ_info() {
   if [[ -n "${ENVIRON_PROJECT_ID}" && -n "${HUB_MEMBERSHIP_ID}" ]]; then return; fi
   if ! is_membership_crd_installed; then return; fi
-  configure_kubectl
   local IDENTITY_PROVIDER
   local IDENTITY
   IDENTITY_PROVIDER="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.identity_provider)"
