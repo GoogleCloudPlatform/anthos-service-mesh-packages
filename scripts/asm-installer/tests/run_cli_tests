@@ -40,7 +40,6 @@ clear_variables() {
   ENABLE_GCP_IAM_ROLES=0; export ENABLE_GCP_IAM_ROLES;
   ENABLE_GCP_COMPONENTS=0; export ENABLE_GCP_COMPONENTS;
   ENABLE_CLUSTER_LABELS=0; export ENABLE_CLUSTER_LABELS;
-  ENABLE_CLUSTER_ROLES=0; export ENABLE_CLUSTER_ROLES;
   PRINT_CONFIG=0; export PRINT_CONFIG;
   SERVICE_ACCOUNT=""; export SERVICE_ACCOUNT;
   KEY_FILE=""; export KEY_FILE;
@@ -309,8 +308,7 @@ test_main() {
   clear_variables
   parse_args ${CMD}
 
-  if can_modify_cluster_roles \
-    || can_modify_cluster_labels \
+  if can_modify_cluster_labels \
     || can_modify_gcp_apis \
     || can_modify_gcp_components \
     || can_modify_gcp_iam_roles; then
@@ -325,7 +323,6 @@ test_main() {
   parse_args ${CMD} -e
 
   if ! can_modify_at_all \
-    || ! can_modify_cluster_roles \
     || ! can_modify_cluster_labels \
     || ! can_modify_gcp_apis \
     || ! can_modify_gcp_components \
@@ -341,7 +338,6 @@ test_main() {
   parse_args ${CMD} --enable-cluster-labels
 
   if ! can_modify_at_all \
-    || can_modify_cluster_roles \
     || ! can_modify_cluster_labels \
     || can_modify_gcp_apis \
     || can_modify_gcp_components \
@@ -354,26 +350,9 @@ test_main() {
   echo "***"
 
   clear_variables
-  parse_args ${CMD} --enable-cluster-roles
-
-  if ! can_modify_at_all \
-    || ! can_modify_cluster_roles \
-    || can_modify_cluster_labels \
-    || can_modify_gcp_apis \
-    || can_modify_gcp_components \
-    || can_modify_gcp_iam_roles; then
-    echo "Permissions with --enable-cluster-roles flag: FAIL"
-    ((++FAILURES))
-  else
-    echo "Permissions with --enable-cluster-roles flag: PASS"
-  fi
-  echo "***"
-
-  clear_variables
   parse_args ${CMD} --enable-gcp-apis
 
   if ! can_modify_at_all \
-    || can_modify_cluster_roles \
     || can_modify_cluster_labels \
     || ! can_modify_gcp_apis \
     || can_modify_gcp_components \
@@ -389,7 +368,6 @@ test_main() {
   parse_args ${CMD} --enable-gcp-components
 
   if ! can_modify_at_all \
-    || can_modify_cluster_roles \
     || can_modify_cluster_labels \
     || can_modify_gcp_apis \
     || ! can_modify_gcp_components \
@@ -405,7 +383,6 @@ test_main() {
   parse_args ${CMD} --enable-gcp-iam-roles
 
   if ! can_modify_at_all \
-    || can_modify_cluster_roles \
     || can_modify_cluster_labels \
     || can_modify_gcp_apis \
     || can_modify_gcp_components \
@@ -421,7 +398,6 @@ test_main() {
   parse_args ${CMD} --managed
 
   if ! can_modify_at_all \
-    || ! can_modify_cluster_roles \
     || can_modify_cluster_labels \
     || can_modify_gcp_apis \
     || ! can_modify_gcp_components \
