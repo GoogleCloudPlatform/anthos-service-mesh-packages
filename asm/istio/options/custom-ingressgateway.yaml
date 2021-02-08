@@ -14,6 +14,8 @@
 
 apiVersion: install.istio.io/v1alpha1
 kind: IstioOperator
+metadata:
+  name: INGRESSGATEWAY_NAME # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.custom-ingressgateway-name"}
 spec:
   components:
     ingressGateways:
