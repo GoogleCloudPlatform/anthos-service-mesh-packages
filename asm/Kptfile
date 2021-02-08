@@ -337,6 +337,7 @@ openAPI:
         setter:
           name: anthos.servicemesh.custom-ingressgateway-name
           value: "INGRESSGATEWAY_NAME"
+          isSet: true
     io.k8s.cli.setters.anthos.servicemesh.custom-ingressgateway-namespace:
       type: string
       x-k8s-cli:
