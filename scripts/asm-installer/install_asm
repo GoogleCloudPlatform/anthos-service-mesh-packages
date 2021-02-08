@@ -184,12 +184,13 @@ main() {
       fatal "Couldn't initialize meshconfig, do you have the required permission resourcemanager.projects.setIamPolicy?"
     fi
     unset MANAGED_SERVICE_JSON
-  fi
-
-  if can_modify_gcp_iam_roles; then
-    bind_user_to_iam_policy "$(required_iam_roles)" "$(iam_user)"
-  elif should_validate; then
-    exit_if_out_of_iam_policy
+    bind_user_to_iam_policy "$(required_iam_roles_mcp_sa)" "$(iam_user)"
+  else
+    if can_modify_gcp_iam_roles; then
+      bind_user_to_iam_policy "$(required_iam_roles)" "$(iam_user)"
+    elif should_validate; then
+      exit_if_out_of_iam_policy
+    fi
   fi
 
   if can_modify_cluster_labels; then
@@ -1620,6 +1621,14 @@ local_iam_user() {
   GCLOUD_USER_OR_SA="${ACCOUNT_TYPE}:${ACCOUNT_NAME}"
 
   echo "${GCLOUD_USER_OR_SA}"
+}
+
+required_iam_roles_mcp_sa() {
+  cat <<EOF
+roles/serviceusage.serviceUsageConsumer
+roles/container.admin
+roles/monitoring.metricWriter
+EOF
 }
 
 required_iam_roles() {
