@@ -437,7 +437,7 @@ can_modify_gcp_components() {
 }
 
 can_register_cluster() {
-  if [[ "${ENABLE_ALL}" -eq 0 && "${ENABLE_REGISTRATION}" -eq 0 ]] \
+  if [[ "${ENABLE_REGISTRATION}" -eq 0 ]] \
     || ! can_modify_at_all; then false; fi
 }
 
@@ -571,8 +571,9 @@ FLAGS:
   The following several flags all relate to allowing the script to create, set,
   or enable required APIs, roles, or services. These can all be performed
   manually before running the script if desired. To allow the script to perform
-  every necessary action, pass the -e|--enable_all flag. All of these flags
-  are incompatible with --only_validate.
+  every necessary action, pass the -e|--enable_all flag. --enable_registration
+  is not included in --enable_all and must be passed separately.
+  All of these flags are incompatible with --only_validate.
 
   -e|--enable_all                     Allow the script to perform all of the
                                       individual enable actions below.
@@ -586,8 +587,9 @@ FLAGS:
                                       IAM permissions
      --enable_gcp_components          Allow the script to enable required GCP
                                       managed services and components
+
      --enable_registration            Allow the script to register the cluster
-                                      to an environ
+                                      to an environ (experimental)
 
      --managed                        Provision a remote, managed control plane
                                       instead of installing one in-cluster.
