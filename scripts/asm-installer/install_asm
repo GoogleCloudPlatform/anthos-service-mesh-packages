@@ -503,7 +503,7 @@ can_modify_gcp_components() {
 }
 
 can_register_cluster() {
-  if [[ "${ENABLE_ALL}" -eq 0 && "${ENABLE_REGISTRATION}" -eq 0 ]] \
+  if [[ "${ENABLE_REGISTRATION}" -eq 0 ]] \
     || ! can_modify_at_all; then false; fi
 }
 
