@@ -9,6 +9,8 @@ OUTPUT_DIR=""
 WORKLOAD_NAME="vm"
 WORKLOAD_SERVICE_ACCOUNT=""
 INSTANCE_TEMPLATE_NAME=""
+SOURCE_INSTANCE_TEMPLATE_NAME="vm-source"
+CREATE_FROM_SOURCE=0
 
 _EXTRA_FLAGS="${_EXTRA_FLAGS:=}"; export _EXTRA_FLAGS;
 
@@ -698,45 +700,133 @@ create_workload_service_account() {
   create_service_account "${WORKLOAD_SERVICE_ACCOUNT_NAME}"
 }
 
-create_instance_template() {
+create_new_instance_template() {
   INSTANCE_TEMPLATE_NAME="vm-${LT_NAMESPACE}"
   
   echo "Creating instance template ${INSTANCE_TEMPLATE_NAME}..."
-  echo "../../../asm/vm/asm_vm create_gce_instance_template ${INSTANCE_TEMPLATE_NAME} \
+  if [[ "${CREATE_FROM_SOURCE}" -eq 0 ]]; then
+    echo "../../../asm/vm/asm_vm create_gce_instance_template ${INSTANCE_TEMPLATE_NAME} \
+        ${KEY_FILE} ${SERVICE_ACCOUNT} \
+        --cluster_location ${LT_CLUSTER_LOCATION} \
+        --cluster_name ${LT_CLUSTER_NAME} \
+        --project_id ${PROJECT_ID} \
+        --workload_name ${WORKLOAD_NAME} \
+        --workload_namespace ${LT_NAMESPACE}"
+    
+    ../../../asm/vm/asm_vm create_gce_instance_template "${INSTANCE_TEMPLATE_NAME}" \
       ${KEY_FILE} ${SERVICE_ACCOUNT} \
-      --cluster_location ${LT_CLUSTER_LOCATION} \
-      --cluster_name ${LT_CLUSTER_NAME} \
-      --project_id ${PROJECT_ID} \
-      --workload_name ${WORKLOAD_NAME} \
-      --workload_namespace ${LT_NAMESPACE}"
-  
-  ../../../asm/vm/asm_vm create_gce_instance_template "${INSTANCE_TEMPLATE_NAME}" \
-    ${KEY_FILE} ${SERVICE_ACCOUNT} \
-    --cluster_location "${LT_CLUSTER_LOCATION}" \
-    --cluster_name "${LT_CLUSTER_NAME}" \
+      --cluster_location "${LT_CLUSTER_LOCATION}" \
+      --cluster_name "${LT_CLUSTER_NAME}" \
+      --project_id "${PROJECT_ID}" \
+      --workload_name "${WORKLOAD_NAME}" \
+      --workload_namespace "${LT_NAMESPACE}"
+  else
+    echo "../../../asm/vm/asm_vm create_gce_instance_template ${INSTANCE_TEMPLATE_NAME} \
+        ${KEY_FILE} ${SERVICE_ACCOUNT} \
+        --cluster_location ${LT_CLUSTER_LOCATION} \
+        --cluster_name ${LT_CLUSTER_NAME} \
+        --project_id ${PROJECT_ID} \
+        --workload_name ${WORKLOAD_NAME} \
+        --workload_namespace ${LT_NAMESPACE} \
+        --source_instance_template ${SOURCE_INSTANCE_TEMPLATE_NAME}"
+    
+    ../../../asm/vm/asm_vm create_gce_instance_template "${INSTANCE_TEMPLATE_NAME}" \
+      ${KEY_FILE} ${SERVICE_ACCOUNT} \
+      --cluster_location "${LT_CLUSTER_LOCATION}" \
+      --cluster_name "${LT_CLUSTER_NAME}" \
+      --project_id "${PROJECT_ID}" \
+      --workload_name "${WORKLOAD_NAME}" \
+      --workload_namespace "${LT_NAMESPACE}" \
+      --source_instance_template "${SOURCE_INSTANCE_TEMPLATE_NAME}"
+  fi
+}
+
+create_source_instance_template() {
+  echo "Creating source instance template ${SOURCE_INSTANCE_TEMPLATE_NAME}..."
+
+  # Create an instance template with a metadata entry and a label entry
+  gcloud compute instance-templates create "${SOURCE_INSTANCE_TEMPLATE_NAME}" \
     --project_id "${PROJECT_ID}" \
-    --workload_name "${WORKLOAD_NAME}" \
-    --workload_namespace "${LT_NAMESPACE}"
+    --metadata="testKey=testValue" \
+    --labels="testlabel=testvalue"
 }
 
 verify_instance_template() {
-  # TODO(jasonwzm): include more sophisticated test for proxy config.
   local VAL
-  VAL="$(gcloud compute instance-templates list \
+  VAL="$(gcloud compute instance-templates list --project_id "${PROJECT_ID}" \
     --filter="name=${INSTANCE_TEMPLATE_NAME}" --format="value(name)")"
   if [[ -z "${VAL}" ]]; then
     fail "Cannot find instance template ${INSTANCE_TEMPLATE_NAME} in the project."
     false
   fi
+
+  local SVC_ACCT
+  SVC_ACCT="$(gcloud compute instance-templates describe "${INSTANCE_TEMPLATE_NAME}" \
+    --project_id "${PROJECT_ID}" --format=json | jq -r '.properties.serviceAccounts[].email' | \
+    grep "${WORKLOAD_SERVICE_ACCOUNT}")"
+  if [[ -z "${SVC_ACCT}" ]]; then
+    fail "Instance template created does not use workload service account ${WORKLOAD_SERVICE_ACCOUNT}."
+    false
+  fi
+
+  local SERVICE_PROXY_CONFIG
+  SERVICE_PROXY_CONFIG="$(gcloud compute instance-templates describe "${INSTANCE_TEMPLATE_NAME}" \
+    --project_id "${PROJECT_ID}" --format=json | \
+    jq -r '.properties.metadata.items[] | select(.key == "gce-service-proxy").value')"
+
+  if [[ "$(echo "${SERVICE_PROXY_CONFIG}" | jq -r '."asm-env"."POD_NAMESPACE"')" \
+    != "${LT_NAMESPACE}" ]]; then
+    fail "Instance template created does not set the workload namespace to ${LT_NAMESPACE}."
+    false
+  fi
+
+  if [[ "$(echo "${SERVICE_PROXY_CONFIG}" | jq -r '."asm-env"."ISTIO_META_WORKLOAD_NAME"')" \
+    != "${WORKLOAD_NAME}" ]]; then
+    fail "Instance template created does not set the workload name to ${WORKLOAD_NAME}."
+    false
+  fi
+
+  if [[ "$(echo "${SERVICE_PROXY_CONFIG}" | jq -r '."asm-env"."CANONICAL_SERVICE"')" \
+    != "${WORKLOAD_NAME}" ]]; then
+    fail "Instance template created does not set the canonical service name to ${WORKLOAD_NAME}."
+    false
+  fi
+
+  if [[ "$(echo "${SERVICE_PROXY_CONFIG}" | jq -r '."asm-env"."SERVICE_ACCOUNT"')" \
+    != "${WORKLOAD_SERVICE_ACCOUNT}" ]]; then
+    fail "Instance template created does not set workload service account to ${WORKLOAD_SERVICE_ACCOUNT}."
+    false
+  fi
+}
+
+verify_instance_template_with_source() {
+  verify_instance_template
+
+  local KEYVAL
+  KEYVAL="$(gcloud compute instance-templates describe "${INSTANCE_TEMPLATE_NAME}" \
+    --project_id "${PROJECT_ID}" --format=json | \
+    jq -r '.properties.metadata.items[] | select(.key == "testKey").value')"
+  if [[ "${KEYVAL}" != "testValue" ]]; then
+    fail "Custom metadata does not have a key testKey with value testValue."
+    false
+  fi
+
+  local LABELVAL
+  LABELVAL="$(gcloud compute instance-templates describe "${INSTANCE_TEMPLATE_NAME}" \
+    --project_id "${PROJECT_ID}" --format=json | jq -r '.properties.labels.testlabel')"
+  if [[ -z "${LABELVAL}" ]] || [[ "${LABELVAL}" == 'null' ]]; then
+    fail "Label testlabel:testvalue is not found in the label field."
+    false
+  fi
 }
 
 cleanup_workload_service_account() {
-  echo "Deleting service account ${WORKLOAD_SERVICE_ACCOUNT}..."
   delete_service_account "${WORKLOAD_SERVICE_ACCOUNT}"
 }
 
-cleanup_instance_template() {
-  echo "Deleting instance template ${INSTANCE_TEMPLATE_NAME}..."
+delete_instance_template() {
+  local TEMPLATE; TEMPLATE="$1"
+  echo "Deleting instance template ${TEMPLATE}..."
   gcloud compute instance-templates delete "${INSTANCE_TEMPLATE_NAME}" \
     --quiet --project "${PROJECT_ID}"
 }
@@ -744,7 +834,7 @@ cleanup_instance_template() {
 cleanup_old_workload_service_accounts() {
   while read -r email; do
     if [[ -n "${email}" ]]; then
-      delete_service_account "${email}"
+      gcloud iam service-accounts delete "${email}" --quiet --project "${LT_PROJECT_ID}"
     fi
   done <<EOF
 $(gcloud iam service-accounts list --filter="email:^vm-*" --format="value(email)" --project "${LT_PROJECT_ID}")
