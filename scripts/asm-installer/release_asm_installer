@@ -2,6 +2,12 @@
 set -eEuC
 set -o pipefail
 
+if [[ "${_DEBUG}" -eq 1 ]]; then
+  gsutil() {
+    echo "DEBUG: would have run 'gsutil ${*}'"
+  }
+fi
+
 BUCKET_URL="https://storage.googleapis.com"
 BUCKET_PATH="csm-artifacts/asm"; readonly BUCKET_PATH
 
@@ -14,13 +20,39 @@ release 1.6
 EOF
 }
 
+staging_releases() {
+  cat << EOF
+staging 1.9
+staging 1.8
+EOF
+}
+
+other_releases() {
+  cat << EOF
+master unstable
+EOF
+}
+
+# all_releases should write two strings to stdout: <branch-name> <file-suffix>
+# <file_suffix> is the string that comes after "install_asm" in the GCS bucket
+# e.g. the pair "branch" "demo" will check out the git branch "branch" and
+# upload a file called "install_asm_demo" to the GCS bucket.
 all_releases() {
   while read -r type version; do
     echo "${type}-${version}-asm" "${version}"
   done <<EOF
 $(prod_releases)
 EOF
-  echo "master unstable"
+  while read -r type version; do
+    echo "${type}-${version}-asm" "staging_${version}"
+  done <<EOF
+$(staging_releases)
+EOF
+  while read -r type version; do
+    echo "${type}" "${version}"
+  done <<EOF
+$(other_releases)
+EOF
 }
 
 main() {
