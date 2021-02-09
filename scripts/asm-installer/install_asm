@@ -148,7 +148,7 @@ main() {
     download_asm
   fi
 
-  if needs_asm ; then
+  if needs_asm; then
     organize_kpt_files
   fi
 
@@ -1143,7 +1143,7 @@ validate_dependencies() {
   fi
 }
 
-organize_kpt_files () {
+organize_kpt_files() {
   local ABS_YAML
   while read -d ',' -r yaml_file; do
     ABS_YAML="${OPTIONS_DIRECTORY}/${yaml_file}.yaml"
