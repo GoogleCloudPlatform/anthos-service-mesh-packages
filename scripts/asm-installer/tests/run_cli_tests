@@ -51,6 +51,10 @@ clear_variables() {
   _SLEEP_TIME=0; export _SLEEP_TIME;
 }
 
+nc() {
+  return 0
+}
+
 kubectl() {
   local RETVAL; RETVAL=0;
   echo "Intercepted kubectl ${*}" >&2
