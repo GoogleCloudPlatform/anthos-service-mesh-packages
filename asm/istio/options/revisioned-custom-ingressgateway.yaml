@@ -26,31 +26,6 @@ spec:
         hpaSpec:
           maxReplicas: 5
           minReplicas: 2
-        env:
-        - name: ISTIO_META_ROUTER_MODE
-          value: standard
-        service:
-          ports:
-          - name: status-port
-            port: 15021
-            protocol: TCP
-            targetPort: 15021
-          - name: http2
-            port: 80
-            protocol: TCP
-            targetPort: 8080
-          - name: https
-            port: 443
-            protocol: TCP
-            targetPort: 8443
-          - name: tcp-istiod
-            port: 15012
-            protocol: TCP
-            targetPort: 15012
-          - name: tls
-            port: 15443
-            protocol: TCP
-            targetPort: 15443
         # Rename the service to still use istio-ingressgateway
         overlays:
         - apiVersion: extensions/v1beta1
