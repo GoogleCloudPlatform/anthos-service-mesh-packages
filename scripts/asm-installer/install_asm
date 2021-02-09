@@ -1962,7 +1962,7 @@ configure_package() {
   if [[ "${CA}" == "mesh_ca" && -n "${_CI_TRUSTED_GCP_PROJECTS}" ]]; then
     # Gather the trust domain aliases from projects.
     TRUST_DOMAIN_ALIASES="${PROJECT_ID}.svc.id.goog"
-    while read -d ',' -r trusted_gcp_project; do
+    while IFS=',' read -r trusted_gcp_project; do
       TRUST_DOMAIN_ALIASES="${TRUST_DOMAIN_ALIASES} ${trusted_gcp_project}.svc.id.goog"
     done <<EOF
 ${_CI_TRUSTED_GCP_PROJECTS}
