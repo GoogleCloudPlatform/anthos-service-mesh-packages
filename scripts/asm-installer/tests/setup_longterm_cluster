@@ -14,10 +14,11 @@ RESULT="$(gcloud container clusters list \
   --filter="name = ${LT_CLUSTER_NAME} and location = ${LT_CLUSTER_LOCATION}" \
   --format="value(name)" || true)"
 
+# TODO: Not depend on a cluster to retrieve ASM package.
 OUTPUT_DIR=$(mktemp -d)
 ../install_asm \
-  -l ${LT_CLUSTER_LOCATION} \
-  -n "${LT_CLUSTER_NAME}" \
+  -l "${LT_CLUSTER_LOCATION}" \
+  -n long-term-test-cluster \
   -p "${LT_PROJECT_ID}" \
   -m install \
   --print-config \
