@@ -139,7 +139,10 @@ main() {
 
   if needs_asm && ! necessary_files_exist; then
     download_asm
-    validate_kpt_files
+  fi
+
+  if needs_asm; then
+    organize_kpt_files
   fi
 
   if should_validate && ! is_managed; then
@@ -1064,13 +1067,13 @@ validate_dependencies() {
   fi
 }
 
-validate_kpt_files () {
+organize_kpt_files() {
   local ABS_YAML
   while read -d ',' -r yaml_file; do
     ABS_YAML="${OPTIONS_DIRECTORY}/${yaml_file}.yaml"
     if [[ ! -f "${ABS_YAML}" ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-Couldn't find remote yaml file ${yaml_file}.
+Couldn't find yaml file ${yaml_file}.
 See directory $(apath -f "${OPTIONS_DIRECTORY}") for available options.
 EOF
     fi
