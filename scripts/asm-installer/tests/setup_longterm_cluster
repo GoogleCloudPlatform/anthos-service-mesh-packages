@@ -9,10 +9,6 @@ SDIR="$(dirname "${SPATH}")"
 . "${SDIR}/common.sh"
 cd "${SDIR}"
 
-LT_CLUSTER_NAME="long-term-test-cluster"
-LT_CLUSTER_LOCATION="us-central1-c"
-LT_PROJECT_ID="asm-scriptaro-oss"
-
 RESULT="$(gcloud container clusters list \
   --project="${LT_PROJECT_ID}" \
   --filter="name = ${LT_CLUSTER_NAME} and location = ${LT_CLUSTER_LOCATION}" \
