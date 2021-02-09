@@ -39,7 +39,7 @@ else
     \
     --zone "${LT_CLUSTER_LOCATION}" \
     --no-enable-basic-auth \
-    --cluster-version "1.17.14-gke.400" \
+    --cluster-version "1.17.14-gke.1600" \
     --release-channel "regular" \
     --machine-type "e2-standard-4" \
     --image-type "COS" \
