@@ -9,20 +9,14 @@ SDIR="$(dirname "${SPATH}")"
 . "${SDIR}/common.sh"
 cd "${SDIR}"
 
-EXPECTED_CLUSTER_NAMES="$1"
-
-if [[ "${EXPECTED_CLUSTER_NAMES}" =~ ^- ]]; then
-  fatal "Specify cluster names directly after the script name."
-fi
-
-for cluster in $(echo "${EXPECTED_CLUSTER_NAMES}" | tr ',' '\n'); do
+setup_cluster() {
+  local cluster; cluster="$1"
   
   RESULT="$(gcloud container clusters list \
     --project="${LT_PROJECT_ID}" \
     --filter="name = ${cluster} and location = ${LT_CLUSTER_LOCATION}" \
     --format="value(name)" || true)"
 
-  # TODO: Not depend on a cluster to retrieve ASM package.
   OUTPUT_DIR=$(mktemp -d)
   ../install_asm \
     -l "${LT_CLUSTER_LOCATION}" \
@@ -82,5 +76,7 @@ for cluster in $(echo "${EXPECTED_CLUSTER_NAMES}" | tr ',' '\n'); do
     -p "${LT_PROJECT_ID}" \
     -m install \
     --only-enable -e
+}
 
-done
+setup_cluster "${LT_CLUSTER_NAME}"
+setup_cluster "long-term-test-cluster-environ"

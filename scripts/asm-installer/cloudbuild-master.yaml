@@ -44,7 +44,6 @@ steps:
   - '-c'
   - >
     ./tests/setup_longterm_cluster
-    long-term-test-cluster,long-term-test-cluster-environ
   env:
   - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
   - 'KEY_FILE=${_KEY_FILE}'
