@@ -9,68 +9,78 @@ SDIR="$(dirname "${SPATH}")"
 . "${SDIR}/common.sh"
 cd "${SDIR}"
 
-RESULT="$(gcloud container clusters list \
-  --project="${LT_PROJECT_ID}" \
-  --filter="name = ${LT_CLUSTER_NAME} and location = ${LT_CLUSTER_LOCATION}" \
-  --format="value(name)" || true)"
+EXPECTED_CLUSTER_NAMES="$1"
 
-# TODO: Not depend on a cluster to retrieve ASM package.
-OUTPUT_DIR=$(mktemp -d)
-../install_asm \
-  -l "${LT_CLUSTER_LOCATION}" \
-  -n long-term-test-cluster \
-  -p "${LT_PROJECT_ID}" \
-  -m install \
-  --print-config \
-  -D "${OUTPUT_DIR}" > /dev/null
-
-if [[ -n "${RESULT}" ]]; then
-  echo "Long term test cluster exists already."
-  configure_kubectl "${LT_CLUSTER_NAME}" "${LT_PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
-  kubectl delete validatingwebhookconfiguration istiod-istio-system || true
-  cleanup_old_test_namespaces "${OUTPUT_DIR}"
-  cleanup_old_instance_templates
-  cleanup_old_workload_service_accounts
-else
-  echo "Creating long term test cluster"
-  gcloud beta container \
-    --project "${LT_PROJECT_ID}" \
-    clusters create "${LT_CLUSTER_NAME}" \
-    \
-    --zone "${LT_CLUSTER_LOCATION}" \
-    --no-enable-basic-auth \
-    --cluster-version "1.17.14-gke.1600" \
-    --release-channel "regular" \
-    --machine-type "e2-standard-4" \
-    --image-type "COS" \
-    --disk-type "pd-standard" \
-    --disk-size "100" \
-    --metadata disable-legacy-endpoints=true \
-    --scopes "https://www.googleapis.com/auth/devstorage.read_only","https://www.googleapis.com/auth/logging.write","https://www.googleapis.com/auth/monitoring","https://www.googleapis.com/auth/servicecontrol","https://www.googleapis.com/auth/service.management.readonly","https://www.googleapis.com/auth/trace.append" \
-    --num-nodes "4" \
-    --enable-stackdriver-kubernetes \
-    --enable-ip-alias \
-    --network "projects/${LT_PROJECT_ID}/global/networks/default" \
-    --subnetwork "projects/${LT_PROJECT_ID}/regions/us-central1/subnetworks/default" \
-    --default-max-pods-per-node "110" \
-    --enable-autoscaling \
-    --min-nodes "4" \
-    --max-nodes "100" \
-    --no-enable-master-authorized-networks \
-    --addons HorizontalPodAutoscaling,HttpLoadBalancing \
-    --enable-autoupgrade \
-    --enable-autorepair \
-    --max-surge-upgrade 1 \
-    --max-unavailable-upgrade 0 \
-    --workload-pool "${LT_PROJECT_ID}.svc.id.goog" \
-    --enable-shielded-nodes
+if [[ "${EXPECTED_CLUSTER_NAMES}" =~ ^- ]]; then
+  fatal "Specify cluster names directly after the script name."
 fi
 
-echo "Performing necessary cluster setup"
+for cluster in $(echo "${EXPECTED_CLUSTER_NAMES}" | tr ',' '\n'); do
+  
+  RESULT="$(gcloud container clusters list \
+    --project="${LT_PROJECT_ID}" \
+    --filter="name = ${cluster} and location = ${LT_CLUSTER_LOCATION}" \
+    --format="value(name)" || true)"
 
-../install_asm \
-  -l ${LT_CLUSTER_LOCATION} \
-  -n "${LT_CLUSTER_NAME}" \
-  -p "${LT_PROJECT_ID}" \
-  -m install \
-  --only-enable -e
+  # TODO: Not depend on a cluster to retrieve ASM package.
+  OUTPUT_DIR=$(mktemp -d)
+  ../install_asm \
+    -l "${LT_CLUSTER_LOCATION}" \
+    -n "${LT_CLUSTER_NAME}" \
+    -p "${LT_PROJECT_ID}" \
+    -m install \
+    --print-config \
+    -D "${OUTPUT_DIR}" > /dev/null
+
+  if [[ -n "${RESULT}" ]]; then
+    echo "Long term test cluster ${cluster} exists already."
+    configure_kubectl "${cluster}" "${LT_PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
+    kubectl delete validatingwebhookconfiguration istiod-istio-system || true
+    cleanup_old_test_namespaces "${OUTPUT_DIR}"
+    cleanup_old_instance_templates
+    cleanup_old_workload_service_accounts
+  else
+    echo "Creating long term test cluster ${cluster}"
+    gcloud beta container \
+      --project "${LT_PROJECT_ID}" \
+      clusters create "${cluster}" \
+      \
+      --zone "${LT_CLUSTER_LOCATION}" \
+      --no-enable-basic-auth \
+      --cluster-version "1.17.14-gke.1600" \
+      --release-channel "regular" \
+      --machine-type "e2-standard-4" \
+      --image-type "COS" \
+      --disk-type "pd-standard" \
+      --disk-size "100" \
+      --metadata disable-legacy-endpoints=true \
+      --scopes "https://www.googleapis.com/auth/devstorage.read_only","https://www.googleapis.com/auth/logging.write","https://www.googleapis.com/auth/monitoring","https://www.googleapis.com/auth/servicecontrol","https://www.googleapis.com/auth/service.management.readonly","https://www.googleapis.com/auth/trace.append" \
+      --num-nodes "4" \
+      --enable-stackdriver-kubernetes \
+      --enable-ip-alias \
+      --network "projects/${LT_PROJECT_ID}/global/networks/default" \
+      --subnetwork "projects/${LT_PROJECT_ID}/regions/us-central1/subnetworks/default" \
+      --default-max-pods-per-node "110" \
+      --enable-autoscaling \
+      --min-nodes "4" \
+      --max-nodes "100" \
+      --no-enable-master-authorized-networks \
+      --addons HorizontalPodAutoscaling,HttpLoadBalancing \
+      --enable-autoupgrade \
+      --enable-autorepair \
+      --max-surge-upgrade 1 \
+      --max-unavailable-upgrade 0 \
+      --workload-pool "${LT_PROJECT_ID}.svc.id.goog" \
+      --enable-shielded-nodes
+  fi
+
+  echo "Performing necessary cluster setup on ${cluster}"
+
+  ../install_asm \
+    -l "${LT_CLUSTER_LOCATION}" \
+    -n "${cluster}" \
+    -p "${LT_PROJECT_ID}" \
+    -m install \
+    --only-enable -e
+
+done

@@ -59,6 +59,7 @@ steps:
   - '-c'
   - >
     ./tests/setup_longterm_cluster
+    long-term-test-cluster
   env:
   - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
   - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
