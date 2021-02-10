@@ -17,8 +17,8 @@ kind: IstioOperator
 spec:
   revision: "asm-managed"
   profile: asm-gcp
-  hub: gcr.io/wlhe-cr
-  tag: asm-cr
+  hub: gcr.io/wlhe-cr/asm
+  tag: 1.9-alpha.1612961842
   components:
     base:
       enabled: false
@@ -41,7 +41,7 @@ spec:
         CA_ROOT_CA: "/etc/ssl/certs/ca-certificates.crt"
         XDS_ROOT_CA: "/etc/ssl/certs/ca-certificates.crt"
         OUTPUT_CERTS: "/etc/istio/proxy"
-        XDS_TOKEN_TYPE: "Istio"
+        XDS_AUTH_PROVIDER: "gcp"
         XDS_HEADER_Cloud-Run-Enable-H2: "y"
         ISTIO_META_CLOUDRUN_ADDR: "ISTIO_CLOUDRUN_ADDR" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.managed-controlplane.cloudrun-addr"}
   values:
