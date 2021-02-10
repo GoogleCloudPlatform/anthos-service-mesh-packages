@@ -13,6 +13,11 @@ else
   set -u
 fi
 
+### These are hooks for Cloud Build to be able to use debug/staging images
+### when necessary. Don't set these environment variables unless you're testing
+### in CI/CD.
+_CI_ASM_IMAGE_TAG="${_CI_ASM_IMAGE_TAG:=}"
+
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"
 MINOR="${MINOR:=8}"
@@ -561,9 +566,10 @@ validate_asm_installation() {
   local EXPANSION_GATEWAY_INSTALLED=0
   for deploy in $(kubectl get deployment -n istio-system --no-headers -o custom-columns=":metadata.name"); do
     if [[ "${deploy}" =~ ^$ISTIOD_NAME ]]; then
-      if [[ "$(retry 2 kubectl get deployment "${deploy}" -n istio-system \
-        -o=jsonpath="{.spec.template.spec.containers[0].image}")" \
-        =~ $ASM_RELEASE ]]; then
+      local IMAGE_NAME
+      IMAGE_NAME="$(retry 2 kubectl get deployment "${deploy}" -n istio-system \
+        -o=jsonpath="{.spec.template.spec.containers[0].image}")"
+      if [[ "${IMAGE_NAME}" =~ $ASM_RELEASE ]] || [[ "${IMAGE_NAME}" =~ $_CI_ASM_IMAGE_TAG ]]; then
         local CURR_REVISION
         CURR_REVISION="$(retry 2 kubectl get deployment "${deploy}" \
           -n istio-system -ojson | jq -r \
