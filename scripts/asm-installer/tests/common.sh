@@ -750,14 +750,14 @@ create_source_instance_template() {
 
   # Create an instance template with a metadata entry and a label entry
   gcloud compute instance-templates create "${SOURCE_INSTANCE_TEMPLATE_NAME}" \
-    --project_id "${PROJECT_ID}" \
+    --project "${PROJECT_ID}" \
     --metadata="testKey=testValue" \
     --labels="testlabel=testvalue"
 }
 
 verify_instance_template() {
   local VAL
-  VAL="$(gcloud compute instance-templates list --project_id "${PROJECT_ID}" \
+  VAL="$(gcloud compute instance-templates list --project "${PROJECT_ID}" \
     --filter="name=${INSTANCE_TEMPLATE_NAME}" --format="value(name)")"
   if [[ -z "${VAL}" ]]; then
     fail "Cannot find instance template ${INSTANCE_TEMPLATE_NAME} in the project."
@@ -766,7 +766,7 @@ verify_instance_template() {
 
   local SVC_ACCT
   SVC_ACCT="$(gcloud compute instance-templates describe "${INSTANCE_TEMPLATE_NAME}" \
-    --project_id "${PROJECT_ID}" --format=json | jq -r '.properties.serviceAccounts[].email' | \
+    --project "${PROJECT_ID}" --format=json | jq -r '.properties.serviceAccounts[].email' | \
     grep "${WORKLOAD_SERVICE_ACCOUNT}")"
   if [[ -z "${SVC_ACCT}" ]]; then
     fail "Instance template created does not use workload service account ${WORKLOAD_SERVICE_ACCOUNT}."
@@ -775,7 +775,7 @@ verify_instance_template() {
 
   local SERVICE_PROXY_CONFIG
   SERVICE_PROXY_CONFIG="$(gcloud compute instance-templates describe "${INSTANCE_TEMPLATE_NAME}" \
-    --project_id "${PROJECT_ID}" --format=json | \
+    --project "${PROJECT_ID}" --format=json | \
     jq -r '.properties.metadata.items[] | select(.key == "gce-service-proxy").value')"
 
   if [[ "$(echo "${SERVICE_PROXY_CONFIG}" | jq -r '."asm-env"."POD_NAMESPACE"')" \
@@ -808,7 +808,7 @@ verify_instance_template_with_source() {
 
   local KEYVAL
   KEYVAL="$(gcloud compute instance-templates describe "${INSTANCE_TEMPLATE_NAME}" \
-    --project_id "${PROJECT_ID}" --format=json | \
+    --project "${PROJECT_ID}" --format=json | \
     jq -r '.properties.metadata.items[] | select(.key == "testKey").value')"
   if [[ "${KEYVAL}" != "testValue" ]]; then
     fail "Custom metadata does not have a key testKey with value testValue."
@@ -817,7 +817,7 @@ verify_instance_template_with_source() {
 
   local LABELVAL
   LABELVAL="$(gcloud compute instance-templates describe "${INSTANCE_TEMPLATE_NAME}" \
-    --project_id "${PROJECT_ID}" --format=json | jq -r '.properties.labels.testlabel')"
+    --project "${PROJECT_ID}" --format=json | jq -r '.properties.labels.testlabel')"
   if [[ -z "${LABELVAL}" ]] || [[ "${LABELVAL}" == 'null' ]]; then
     fail "Label testlabel:testvalue is not found in the label field."
     false
