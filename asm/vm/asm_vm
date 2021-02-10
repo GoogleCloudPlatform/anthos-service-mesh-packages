@@ -566,10 +566,10 @@ validate_asm_installation() {
   local EXPANSION_GATEWAY_INSTALLED=0
   for deploy in $(kubectl get deployment -n istio-system --no-headers -o custom-columns=":metadata.name"); do
     if [[ "${deploy}" =~ ^$ISTIOD_NAME ]]; then
-      local IMAGE_VERSION
-      IMAGE_VERSION="$(retry 2 kubectl get deployment "${deploy}" -n istio-system \
+      local IMAGE_NAME
+      IMAGE_NAME="$(retry 2 kubectl get deployment "${deploy}" -n istio-system \
         -o=jsonpath="{.spec.template.spec.containers[0].image}")"
-      if [[ "${IMAGE_VERSION}" =~ $ASM_RELEASE ]] || [[ "${IMAGE_VERSION}" =~ $_CI_ASM_IMAGE_TAG ]]; then
+      if [[ "${IMAGE_NAME}" =~ $ASM_RELEASE ]] || [[ "${IMAGE_NAME}" =~ $_CI_ASM_IMAGE_TAG ]]; then
         local CURR_REVISION
         CURR_REVISION="$(retry 2 kubectl get deployment "${deploy}" \
           -n istio-system -ojson | jq -r \
