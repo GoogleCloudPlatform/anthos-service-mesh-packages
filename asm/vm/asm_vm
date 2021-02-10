@@ -1038,14 +1038,15 @@ gen_gce_service_proxy() {
 
 # Define the GCE software declaration for OS config.
 gce_software_declaration() {
-  jq -n --arg ingress_ip "${INGRESS_IP}" '{
+  jq -n --arg ingress_ip "${INGRESS_IP}"\
+  --arg asm_revision "${WORKLOAD_ASM_REVISION}" '{
   "softwareRecipes": [{
       "name": "install-gce-service-proxy-agent",
       "desired_state": "INSTALLED",
       "installSteps": [{
           "scriptRun": {
             "script": ("#!/bin/bash
-ISTIOD_ENTRY=\""+$ingress_ip+" istiod.istio-system.svc\"
+ISTIOD_ENTRY=\""+$ingress_ip+" istiod-"+$asm_revision+".istio-system.svc\"
 if ! grep -Fq ${ISTIOD_ENTRY} /etc/hosts; then
   echo \"${ISTIOD_ENTRY} # Added by Google Cloud for Anthos Service Mesh\" | sudo tee -a /etc/hosts
 fi
@@ -1069,6 +1070,7 @@ gen_instance_template_metadata() {
   jq -n --arg service_proxy_agent_bucket "${SERVICE_PROXY_AGENT_BUCKET}" \
   --arg root_cert "${ROOT_CERT}"\
   --arg declaration "${GCE_SOFTWARE_DECLARATION}"\
+  --arg asm_revision "${WORKLOAD_ASM_REVISION}"\
   --arg gce_service_proxy "${GCE_SERVICE_PROXY}" '[{
 "value": "true",
 "key": "enable-guest-attributes"
@@ -1088,6 +1090,10 @@ gen_instance_template_metadata() {
 {
   "value": $root_cert,
   "key": "rootcert"
+},
+{
+  "value": $asm_revision,
+  "key": "asm-revision"
 },
 {
   "value": $gce_service_proxy,
