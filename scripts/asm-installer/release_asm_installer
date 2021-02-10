@@ -2,6 +2,7 @@
 set -eEuC
 set -o pipefail
 
+_DEBUG="${_DEBUG:=}"
 if [[ "${_DEBUG}" -eq 1 ]]; then
   gsutil() {
     echo "DEBUG: would have run 'gsutil ${*}'"
