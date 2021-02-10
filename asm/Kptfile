@@ -120,6 +120,24 @@ openAPI:
           name: anthos.servicemesh.rev
           value: ASM_REV
           isSet: true
+    io.k8s.cli.setters.anthos.servicemesh.istiodHost:
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.istiodHost
+          value: istiod.istio-system.svc.cluster.local
+          isSet: true
+    io.k8s.cli.setters.anthos.servicemesh.istiod-vs-name:
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.istiod-vs-name
+          value: istiod-vs
+          isSet: true
+    io.k8s.cli.setters.anthos.servicemesh.istiod-dr-name:
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.istiod-dr-name
+          value: istiod-dr
+          isSet: true
     io.k8s.cli.setters.anthos.servicemesh.canonicalServiceHub:
       x-k8s-cli:
         setter:
