@@ -23,11 +23,11 @@ spec:
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
-  name: istiod-vs
+  name: istiod-vs # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.istiod-vs-name"}
   namespace: istio-system
 spec:
   hosts:
-  - istiod.istio-system.svc.cluster.local
+  - istiod.istio-system.svc.cluster.local # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.istiodHost"}
   gateways:
   - istiod-gateway
   tcp:
@@ -35,24 +35,24 @@ spec:
     - port: 15012
     route:
     - destination:
-        host: istiod.istio-system.svc.cluster.local
+        host: istiod.istio-system.svc.cluster.local # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.istiodHost"}
         port:
           number: 15012
   - match:
     - port: 15017
     route:
     - destination:
-        host: istiod.istio-system.svc.cluster.local
+        host: istiod.istio-system.svc.cluster.local # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.istiodHost"}
         port:
           number: 443
 ---
 apiVersion: networking.istio.io/v1alpha3
 kind: DestinationRule
 metadata:
-  name: istiod-dr
+  name: istiod-dr # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.istiod-dr-name"}
   namespace: istio-system
 spec:
-  host: istiod.istio-system.svc.cluster.local
+  host: istiod.istio-system.svc.cluster.local # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.istiodHost"}
   trafficPolicy:
     portLevelSettings:
     - port:
