@@ -1049,7 +1049,7 @@ gce_software_declaration() {
           "scriptRun": {
             "script": ("#!/bin/bash
 ISTIOD_ENTRY=\""+$ingress_ip+" istiod-"+$asm_revision+".istio-system.svc\"
-if ! grep -Fq ${ISTIOD_ENTRY} /etc/hosts; then
+if ! grep -Fq \"${ISTIOD_ENTRY}\" /etc/hosts; then
   echo \"${ISTIOD_ENTRY} # Added by Google Cloud for Anthos Service Mesh\" | sudo tee -a /etc/hosts
 fi
 SERVICE_PROXY_AGENT_BUCKET=$(curl \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/gce-service-proxy-agent-bucket\" -H \"Metadata-Flavor: Google\")
@@ -1072,7 +1072,6 @@ gen_instance_template_metadata() {
   jq -n --arg service_proxy_agent_bucket "${SERVICE_PROXY_AGENT_BUCKET}" \
   --arg root_cert "${ROOT_CERT}"\
   --arg declaration "${GCE_SOFTWARE_DECLARATION}"\
-  --arg asm_revision "${WORKLOAD_ASM_REVISION}"\
   --arg gce_service_proxy "${GCE_SERVICE_PROXY}" '[{
 "value": "true",
 "key": "enable-guest-attributes"
@@ -1092,10 +1091,6 @@ gen_instance_template_metadata() {
 {
   "value": $root_cert,
   "key": "rootcert"
-},
-{
-  "value": $asm_revision,
-  "key": "asm-revision"
 },
 {
   "value": $gce_service_proxy,
