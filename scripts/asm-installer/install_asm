@@ -1313,8 +1313,8 @@ configure_package() {
   run kpt cfg set asm anthos.servicemesh.rev "${REVISION_LABEL}"
   if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then
     run kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
-    run kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
   fi
+  run kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
 }
 
 print_config() {
