@@ -1675,7 +1675,7 @@ EOF
 enable_gcloud_apis(){
   info "Enabling required APIs..."
   # shellcheck disable=SC2046
-  retry 3 gcloud services enable --project="${PROJECT_ID}" $(required_apis | tr '\n' ' ')
+  retry 3 gcloud services enable --project="${PROJECT_ID}" $(required_apis | tr '\n' ' ') --verbosity debug
 }
 
 get_enabled_apis() {

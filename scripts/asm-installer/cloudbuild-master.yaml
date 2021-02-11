@@ -21,6 +21,18 @@ steps:
   - '${_SCRIPT_NAME}'
   - '${_ASM_VM_SCRIPT_NAME}'
 
+- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
+  dir: 'scripts/asm-installer'
+  id: 'use-staging-meshconfig-api'
+  entrypoint: '/bin/bash'
+  args:
+  - '-c'
+  - |
+    sed -i 's/meshconfig\.googleapis\.com/staging-meshconfig.sandbox.googleapis.com/g' install_asm
+    sed -i 's/meshconfig\.googleapis\.com/staging-meshconfig.sandbox.googleapis.com/g' ./tests/fake_gcloud
+  waitFor:
+  - 'lint-with-shellcheck'
+
 - name: 'gcr.io/cloud-builders/gcloud'
   dir: 'scripts/asm-installer'
   id: 'fetch-secrets'
@@ -43,7 +55,7 @@ steps:
   args:
   - '-c'
   - >
-    ./tests/setup_longterm_cluster
+    echo "./tests/setup_longterm_cluster"
   env:
   - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
   - 'KEY_FILE=${_KEY_FILE}'

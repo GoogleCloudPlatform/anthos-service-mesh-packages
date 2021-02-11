@@ -625,7 +625,9 @@ run_basic_test() {
     -m "${MODE}" \
     -c "${CA}" -v \
     --output-dir "${OUTPUT_DIR}" \
-    ${EXTRA_FLAGS} ${_EXTRA_FLAGS} 2>&1 | tee "${LT_NAMESPACE}" &
+    ${EXTRA_FLAGS} ${_EXTRA_FLAGS} 2>&1 || true | tee "${LT_NAMESPACE}" &
+
+  kubectl logs -l app=istio-ingressgateway -n istio-system
 
   LABEL="$(grep -o -m 1 'istio.io/rev=\S*' "${LT_NAMESPACE}")"
   REV="$(echo "${LABEL}" | cut -f 2 -d =)"
