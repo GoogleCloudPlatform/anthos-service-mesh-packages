@@ -2062,6 +2062,12 @@ configure_package() {
     kpt cfg set asm anthos.servicemesh.external_ca.ca_name "${CA_NAME}"
   fi
 
+  if [[ "${USE_VM}" -eq 1 ]]; then
+    kpt cfg set asm anthos.servicemesh.istiodHost "istiod-${REVISION_LABEL}.istio-system.svc.cluster.local"
+    kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${REVISION_LABEL}"
+    kpt cfg set asm anthos.servicemesh.istiod-dr-name "istiod-dr-${REVISION_LABEL}"
+  fi
+
   if [[ "${CA}" == "mesh_ca" && -n "${_CI_TRUSTED_GCP_PROJECTS}" ]]; then
     # Gather the trust domain aliases from projects.
     TRUST_DOMAIN_ALIASES="${PROJECT_ID}.svc.id.goog"
@@ -2164,7 +2170,14 @@ EOF
 
   if [[ "${USE_VM}" -eq 1 ]]; then
     info "Exposing the control plane for VM workloads..."
-    retry 3 kubectl apply -f "${EXPOSE_ISTIOD_SERVICE}"
+    expose_istiod
+
+    # The default istiod service is exposed so that any fallback on the VM side
+    # to use the default Istiod service can still connect to the control plane.
+    kpt cfg set asm anthos.servicemesh.istiodHost "istiod.istio-system.svc.cluster.local"
+    kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs"
+    kpt cfg set asm anthos.servicemesh.istiod-dr-name "istiod-dr"
+    expose_istiod
   fi
 
   outro
@@ -2177,6 +2190,10 @@ install_canonical_controller() {
   retry 3 kubectl wait --for=condition=available --timeout=600s \
       deployment/canonical-service-controller-manager -n asm-system
   info "...done!"
+}
+
+expose_istiod() {
+  retry 3 kubectl apply -f "${EXPOSE_ISTIOD_SERVICE}"
 }
 
 start_managed_control_plane() {

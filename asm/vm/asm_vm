@@ -991,6 +991,7 @@ gen_gce_service_proxy() {
     --arg project_number "${PROJECT_NUMBER}" \
     --arg workload_namespace "${WORKLOAD_NAMESPACE}" \
     --arg service_account "${WORKLOAD_SERVICE_ACCOUNT}" \
+    --arg asm_revision "${WORKLOAD_ASM_REVISION}"\
     --arg credential_identity_provider "${CREDENTIAL_IDENTITY_PROVIDER}" \
     --arg network "${NETWORK}" \
     --arg asm_meta_version "${ASM_META_VERSION}" '{
@@ -1019,7 +1020,8 @@ gen_gce_service_proxy() {
     "ISTIO_META_DNS_CAPTURE": "true",
     "ISTIO_META_AUTO_REGISTER_GROUP": $workload_name,
     "SERVICE_ACCOUNT": $service_account,
-    "CREDENTIAL_IDENTITY_PROVIDER": $credential_identity_provider
+    "CREDENTIAL_IDENTITY_PROVIDER": $credential_identity_provider,
+    "ASM_REVISION": $asm_revision
   },
   "service": {}
 }')
