@@ -1756,15 +1756,19 @@ auth_header() {
 
 add_cluster_labels(){
   local LABELS; LABELS="$(get_cluster_labels)";
-  local REQUIRED; REQUIRED="$(required_cluster_labels)";
-  local NOTFOUND; NOTFOUND="$(find_missing_strings "${REQUIRED}" "${LABELS}")"
+
+  local VERSION_TAG
+  VERSION_TAG="${RELEASE//\./-}"
+  local WANT; WANT="$(mesh_id_label; echo "asmv=${VERSION_TAG}")";
+
+  local NOTFOUND; NOTFOUND="$(find_missing_strings "${WANT}" "${LABELS}")"
+
   if [[ -z "${NOTFOUND}" ]]; then return 0; fi
 
   if [[ -n "${LABELS}" ]]; then
-    LABELS="${LABELS},${NOTFOUND}"
-  else
-    LABELS="${NOTFOUND}"
+    LABELS="${LABELS},"
   fi
+  LABELS="${LABELS}${NOTFOUND}"
 
   info "Adding labels to ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
   retry 2 gcloud container clusters update "${CLUSTER_NAME}" \
@@ -1775,7 +1779,7 @@ add_cluster_labels(){
 
 exit_if_cluster_unlabeled() {
   local LABELS; LABELS="$(get_cluster_labels)";
-  local REQUIRED; REQUIRED="$(required_cluster_labels)";
+  local REQUIRED; REQUIRED="$(mesh_id_label)";
   local NOTFOUND; NOTFOUND="$(find_missing_strings "${REQUIRED}" "${LABELS}")"
 
   if [[ -n "${NOTFOUND}" ]]; then
@@ -1791,13 +1795,8 @@ EOF
   fi
 }
 
-required_cluster_labels() {
-  local VERSION_TAG
-  VERSION_TAG="${RELEASE//\./-}"
-  cat <<EOF
-asmv=${VERSION_TAG}
-mesh_id=proj-${PROJECT_NUMBER}
-EOF
+mesh_id_label() {
+  echo "mesh_id=proj-${PROJECT_NUMBER}"
 }
 
 get_cluster_labels() {
