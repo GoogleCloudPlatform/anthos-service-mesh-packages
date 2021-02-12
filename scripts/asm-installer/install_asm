@@ -60,6 +60,7 @@ SCRIPT_NAME="${0##*/}"
 PROJECT_NUMBER=""
 GKE_CLUSTER_URI=""
 GCE_NETWORK_NAME=""
+GCLOUD_USER_OR_SA=""
 KPT_URL=""
 KUBECONFIG=""
 APATH=""
@@ -133,13 +134,17 @@ main() {
   fi
 
   if should_validate || can_modify_at_all; then
+    local_iam_user > /dev/null
     validate_gcp_resources
     configure_kubectl
   fi
 
   if needs_asm && ! necessary_files_exist; then
     download_asm
-    validate_kpt_files
+  fi
+
+  if needs_asm; then
+    organize_kpt_files
   fi
 
   if should_validate && ! is_managed; then
@@ -177,12 +182,13 @@ main() {
       fatal "Couldn't initialize meshconfig, do you have the required permission resourcemanager.projects.setIamPolicy?"
     fi
     unset MANAGED_SERVICE_JSON
-  fi
-
-  if can_modify_gcp_iam_roles; then
-    bind_user_to_iam_policy "$(required_iam_roles)" "$(iam_user)"
-  elif should_validate; then
-    exit_if_out_of_iam_policy
+    bind_user_to_iam_policy "$(required_iam_roles_mcp_sa)" "$(iam_user)"
+  else
+    if can_modify_gcp_iam_roles; then
+      bind_user_to_iam_policy "$(required_iam_roles)" "$(iam_user)"
+    elif should_validate; then
+      exit_if_out_of_iam_policy
+    fi
   fi
 
   if can_modify_cluster_labels; then
@@ -437,7 +443,7 @@ can_modify_gcp_components() {
 }
 
 can_register_cluster() {
-  if [[ "${ENABLE_ALL}" -eq 0 && "${ENABLE_REGISTRATION}" -eq 0 ]] \
+  if [[ "${ENABLE_REGISTRATION}" -eq 0 ]] \
     || ! can_modify_at_all; then false; fi
 }
 
@@ -571,8 +577,9 @@ FLAGS:
   The following several flags all relate to allowing the script to create, set,
   or enable required APIs, roles, or services. These can all be performed
   manually before running the script if desired. To allow the script to perform
-  every necessary action, pass the -e|--enable_all flag. All of these flags
-  are incompatible with --only_validate.
+  every necessary action, pass the -e|--enable_all flag. --enable_registration
+  is not included in --enable_all and must be passed separately.
+  All of these flags are incompatible with --only_validate.
 
   -e|--enable_all                     Allow the script to perform all of the
                                       individual enable actions below.
@@ -586,8 +593,9 @@ FLAGS:
                                       IAM permissions
      --enable_gcp_components          Allow the script to enable required GCP
                                       managed services and components
+
      --enable_registration            Allow the script to register the cluster
-                                      to an environ
+                                      to an environ (experimental)
 
      --managed                        Provision a remote, managed control plane
                                       instead of installing one in-cluster.
@@ -1062,13 +1070,13 @@ validate_dependencies() {
   fi
 }
 
-validate_kpt_files () {
+organize_kpt_files() {
   local ABS_YAML
   while read -d ',' -r yaml_file; do
     ABS_YAML="${OPTIONS_DIRECTORY}/${yaml_file}.yaml"
     if [[ ! -f "${ABS_YAML}" ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-Couldn't find remote yaml file ${yaml_file}.
+Couldn't find yaml file ${yaml_file}.
 See directory $(apath -f "${OPTIONS_DIRECTORY}") for available options.
 EOF
     fi
@@ -1519,17 +1527,30 @@ iam_user() {
 }
 
 local_iam_user() {
-  ACCOUNT_TYPE="user"
-  if is_sa; then
-    ACCOUNT_TYPE="serviceAccount"
+  if [[ -n "${GCLOUD_USER_OR_SA}" ]]; then
+    echo "${GCLOUD_USER_OR_SA}"
+    return
   fi
+
   info "Getting account information..."
   local ACCOUNT_NAME
   ACCOUNT_NAME="$(retry 3 gcloud auth list \
     --project="${PROJECT_ID}" \
     --filter="status:ACTIVE" \
     --format="value(account)")"
-  echo "${ACCOUNT_TYPE}:${ACCOUNT_NAME}"
+  if [[ -z "${ACCOUNT_NAME}" ]]; then
+    fatal "Failed to get account name from gcloud. Please authorize and re-try installation."
+  fi
+
+  local ACCOUNT_TYPE
+  ACCOUNT_TYPE="user"
+  if is_sa || [[ "${ACCOUNT_NAME}" = *.iam.gserviceaccount.com ]]; then
+    ACCOUNT_TYPE="serviceAccount"
+  fi
+
+  GCLOUD_USER_OR_SA="${ACCOUNT_TYPE}:${ACCOUNT_NAME}"
+
+  echo "${GCLOUD_USER_OR_SA}"
 }
 
 istioctl_path() {
@@ -1538,6 +1559,14 @@ istioctl_path() {
   else
     echo "./${ISTIOCTL_REL_PATH}"
   fi
+}
+
+required_iam_roles_mcp_sa() {
+  cat <<EOF
+roles/serviceusage.serviceUsageConsumer
+roles/container.admin
+roles/monitoring.metricWriter
+EOF
 }
 
 required_iam_roles() {
@@ -1960,7 +1989,7 @@ configure_package() {
   if [[ "${CA}" == "mesh_ca" && -n "${_CI_TRUSTED_GCP_PROJECTS}" ]]; then
     # Gather the trust domain aliases from projects.
     TRUST_DOMAIN_ALIASES="${PROJECT_ID}.svc.id.goog"
-    while read -d ',' -r trusted_gcp_project; do
+    while IFS=',' read -r trusted_gcp_project; do
       TRUST_DOMAIN_ALIASES="${TRUST_DOMAIN_ALIASES} ${trusted_gcp_project}.svc.id.goog"
     done <<EOF
 ${_CI_TRUSTED_GCP_PROJECTS}
@@ -2015,7 +2044,7 @@ does_istiod_exist(){
 }
 
 install_asm() {
-  if ! does_istiod_exist; then
+  if ! does_istiod_exist && [[ "${_CI_NO_REVISION}" -ne 1 ]]; then
     info "Installing validation webhook fix..."
     retry 3 run kubectl apply -f "${VALIDATION_FIX_SERVICE}"
   fi
@@ -2143,13 +2172,11 @@ outro() {
     info "For more information, see:"
     info "https://cloud.google.com/service-mesh/docs/proxy-injection"
   fi
-  if ! is_sa; then
-    info "The ASM package used for installation can be found at:"
-    info "${OUTPUT_DIR}/asm"
-    info "The version of istioctl that matches the installation can be found at:"
-    info "${OUTPUT_DIR}/${ISTIOCTL_REL_PATH}"
-  fi
-  if ! is_managed && ! is_sa; then
+  info "The ASM package used for installation can be found at:"
+  info "${OUTPUT_DIR}/asm"
+  info "The version of istioctl that matches the installation can be found at:"
+  info "${OUTPUT_DIR}/${ISTIOCTL_REL_PATH}"
+  if ! is_managed; then
     info "The combined configuration generated for installation can be found at:"
     info "${OUTPUT_DIR}/${RAW_YAML}"
     info "The full, expanded set of kubernetes resources can be found at:"

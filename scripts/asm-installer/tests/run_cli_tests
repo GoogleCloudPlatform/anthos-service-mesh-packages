@@ -48,18 +48,33 @@ clear_variables() {
   DRY_RUN=0; export DRY_RUN;
   ONLY_VALIDATE=0; export ONLY_VALIDATE;
   VERBOSE=0; export VERBOSE;
+  _SLEEP_TIME=0; export _SLEEP_TIME;
 }
 
 kubectl() {
   local RETVAL; RETVAL=0;
+  echo "Intercepted kubectl ${*}" >&2
   "${KUBE}" ${@} || RETVAL="${?}"
   return "${RETVAL}"
 }
 
 gcloud() {
   local RETVAL; RETVAL=0;
+  echo "Intercepted gcloud ${*}" >&2
   "${GCL}" ${@} || RETVAL="${?}"
   return "${RETVAL}"
+}
+
+FATAL_EXITS=1
+fatal() {
+  echo "[FATAL(fake)]: ${1}" >&2
+  if [[ "${FATAL_EXITS}" -eq 1 ]]; then
+    exit 1
+  fi
+}
+
+sleep() {
+  echo "sleeping ${*}" >&2
 }
 
 curl() {
@@ -99,6 +114,7 @@ test_main() {
     echo "Passes on good case: FAIL"
     ((++FAILURES))
   fi
+  echo "***"
 
   #################
   # Should fail on non-existing project
@@ -121,7 +137,7 @@ test_main() {
     echo "Fails on nonexisting projects: FAIL"
     ((++FAILURES))
   fi
-
+  echo "***"
 
   #################
   # Should fail on non-existing cluster
@@ -144,6 +160,7 @@ test_main() {
     echo "Fails on nonexisting clusters: FAIL"
     ((++FAILURES))
   fi
+  echo "***"
 
   #################
   # Should fail on bad CA or MODE
@@ -166,6 +183,7 @@ test_main() {
     echo "Fails on bad mode: FAIL"
     ((++FAILURES))
   fi
+  echo "***"
 
 
   CMD="-l this_should_pass"
@@ -185,6 +203,7 @@ test_main() {
     echo "Fails on bad CA: FAIL"
     ((++FAILURES))
   fi
+  echo "***"
 
   #################
   # Should fail on with only one of key/service account
@@ -208,6 +227,7 @@ test_main() {
     echo "Fails on only SA: FAIL"
     ((++FAILURES))
   fi
+  echo "***"
 
 
   CMD="-l this_should_pass"
@@ -228,6 +248,7 @@ test_main() {
     echo "Fails on only key: FAIL"
     ((++FAILURES))
   fi
+  echo "***"
 
   #################
   # Should fail to do anything if it's in the wrong namespace
@@ -250,6 +271,7 @@ test_main() {
     echo "Fails on migrating with Istio outside of istio-system: FAIL"
     ((++FAILURES))
   fi
+  echo "***"
 
   #################
   # Should fail if enable* passed with only-validate
@@ -272,6 +294,7 @@ test_main() {
     echo "Fails on using enable* with --only-validate: FAIL"
     ((++FAILURES))
   fi
+  echo "***"
 
   #################
   # Below we're testing that what permissions we use match the flags
@@ -296,6 +319,7 @@ test_main() {
   else
     echo "Permissions with no flags: PASS"
   fi
+  echo "***"
 
   clear_variables
   parse_args ${CMD} -e
@@ -311,6 +335,7 @@ test_main() {
   else
     echo "Permissions with --enable-all flag: PASS"
   fi
+  echo "***"
 
   clear_variables
   parse_args ${CMD} --enable-cluster-labels
@@ -326,6 +351,7 @@ test_main() {
   else
     echo "Permissions with --enable-cluster-labels flag: PASS"
   fi
+  echo "***"
 
   clear_variables
   parse_args ${CMD} --enable-cluster-roles
@@ -341,6 +367,7 @@ test_main() {
   else
     echo "Permissions with --enable-cluster-roles flag: PASS"
   fi
+  echo "***"
 
   clear_variables
   parse_args ${CMD} --enable-gcp-apis
@@ -356,6 +383,7 @@ test_main() {
   else
     echo "Permissions with --enable-gcp-apis flag: PASS"
   fi
+  echo "***"
 
   clear_variables
   parse_args ${CMD} --enable-gcp-components
@@ -371,6 +399,7 @@ test_main() {
   else
     echo "Permissions with --enable-gcp-components flag: PASS"
   fi
+  echo "***"
 
   clear_variables
   parse_args ${CMD} --enable-gcp-iam-roles
@@ -386,6 +415,7 @@ test_main() {
   else
     echo "Permissions with --enable-gcp-iam-roles flag: PASS"
   fi
+  echo "***"
 
   clear_variables
   parse_args ${CMD} --managed
@@ -401,6 +431,7 @@ test_main() {
   else
     echo "Permissions with --managed flag: PASS"
   fi
+  echo "***"
 
   #################
   # find_missing_strings shouldn't return anything with a trailing comma
@@ -421,7 +452,46 @@ EOF
   else
     echo "find_missing_strings is formatted properly: PASS"
   fi
+  echo "***"
 
+  #################
+  # local_iam_user should pick type correctly when domain is gserviceaccount.com
+  #################
+
+  PROJECT_ID="user"
+  TYPE="$(local_iam_user | cut -f 1 -d":")"
+  echo "Got type ${TYPE}"
+
+  if [[ "${TYPE}" != "user" ]]; then
+    echo "local_iam_user detects user: FAIL"
+    ((++FAILURES))
+  else
+    echo "local_iam_user detects user: PASS"
+  fi
+  echo "***"
+
+  PROJECT_ID="sa"
+  TYPE="$(local_iam_user | cut -f 1 -d":")"
+  echo "Got type ${TYPE}"
+
+  if [[ "${TYPE}" != "serviceAccount" ]]; then
+    echo "local_iam_user detects SA: FAIL"
+    ((++FAILURES))
+  else
+    echo "local_iam_user detects SA: PASS"
+  fi
+  echo "***"
+
+  PROJECT_ID="notloggedin"
+
+  FATAL_EXITS=0
+  if [[ "$(local_iam_user)" != "user:" ]]; then
+    echo "local_iam_user detects not logged in state: FAIL"
+    ((++FAILURES))
+  else
+    echo "local_iam_user detects not logged in state: PASS"
+  fi
+  echo "***"
 
 
   #################
