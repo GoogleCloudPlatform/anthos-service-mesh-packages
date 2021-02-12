@@ -1596,7 +1596,6 @@ compute.googleapis.com
 monitoring.googleapis.com
 logging.googleapis.com
 cloudtrace.googleapis.com
-meshca.googleapis.com
 meshtelemetry.googleapis.com
 meshconfig.googleapis.com
 iamcredentials.googleapis.com
@@ -1604,8 +1603,16 @@ gkeconnect.googleapis.com
 gkehub.googleapis.com
 cloudresourcemanager.googleapis.com
 stackdriver.googleapis.com
-privateca.googleapis.com
 EOF
+  case "${CA}" in
+   mesh_ca)
+     echo meshca.googleapis.com
+     ;;
+   gcp_cas)
+     echo privateca.googleapis.com
+     ;;
+    *);;
+  esac
 }
 # [END required_apis]
 
