@@ -88,13 +88,14 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.tag
-          value: 1.6.11-asm.1
+          value: 1.6.14-asm.1
           isSet: true
     io.k8s.cli.setters.anthos.servicemesh.rev:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.rev
-          value: asm-1611-1
+          value: asm-1614-1
+          isSet: true
     io.k8s.cli.setters.anthos.servicemesh.canonicalServiceHub:
       x-k8s-cli:
         setter:
