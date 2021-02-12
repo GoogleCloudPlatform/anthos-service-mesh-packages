@@ -63,7 +63,7 @@ steps:
     while IFS='|' read -r CLUSTER_NAME CREATE_TIME ZONE; do
       CREATE_TIME="$(date -d "$${CREATE_TIME}" +%s)"
       SEC_DIFF="$(echo "$${NOW} - $${CREATE_TIME}" | bc)"
-      if [[ "$${SEC_DIFF}" -gt 7200 ]]; then
+      if [[ "$${SEC_DIFF}" -gt 7200 && "$${CLUSTER_NAME}" = "ephem-"* ]]; then
         gcloud beta container \
           --project "${PROJECT_ID}" \
           clusters delete -q "$${CLUSTER_NAME}" \
