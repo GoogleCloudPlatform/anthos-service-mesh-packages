@@ -1096,11 +1096,13 @@ handle_multi_yaml_bug() {
   local BASE_NAME
   while read -d ',' -r yaml_file; do
     BASE_NAME="$(basename "${yaml_file}")"
-    if [[ "$(csplit -z -f "overlay-${BASE_NAME}" -z "${yaml_file}" '/^---$/' '{*}' | wc -l)" -eq 1 ]]; then
+    if [[ "$(csplit -f "overlay-${BASE_NAME}" "${yaml_file}" '/^---$/' '{*}' | wc -l)" -eq 1 ]]; then
       CSPLIT_OUTPUT="${CSPLIT_OUTPUT},${yaml_file}"
     else
       for split_file in overlay-"${BASE_NAME}"*; do
-        CSPLIT_OUTPUT="${CSPLIT_OUTPUT},$(apath -f "${split_file}")"
+        if [[ -s "${split_file}" ]]; then
+          CSPLIT_OUTPUT="${CSPLIT_OUTPUT},$(apath -f "${split_file}")"
+        fi
       done
     fi
   done <<EOF
