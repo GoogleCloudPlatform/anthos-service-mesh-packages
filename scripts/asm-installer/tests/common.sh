@@ -1,4 +1,5 @@
 LT_CLUSTER_NAME="${_LT_CLUSTER_NAME:=long-term-test-cluster}"
+LT_ENVIRON_CLUSTER_NAME="long-term-test-cluster-environ"
 LT_CLUSTER_LOCATION="us-central1-c"
 LT_PROJECT_ID="asm-scriptaro-oss"
 LT_NAMESPACE=""
@@ -427,9 +428,12 @@ cleanup_all_memberships() {
   MEMBERSHIPS="$(gcloud container hub memberships list --project "${PROJECT_ID}" \
    --format='value(name)')"
   while read -r MEMBERSHIP; do
-    if [[ -n "${MEMBERSHIP}" ]]; then
-      gcloud container hub memberships delete "${MEMBERSHIP}" --quiet \
-     --project "${PROJECT_ID}"
+    if [[ -n "${MEMBERSHIP}" ]] && [[ "${MEMBERSHIP}" != "${LT_ENVIRON_CLUSTER_NAME}" ]]; then
+      local GKE_URL
+      GKE_URL="$(gcloud container hub memberships describe "${MEMBERSHIP}" \
+        --project "${PROJECT_ID}" --format="value(endpoint.gkeCluster.resourceLink)")"
+      gcloud container hub memberships unregister "${MEMBERSHIP}" --quiet \
+        --project "${PROJECT_ID}" --gke-uri "${GKE_URL}"
     fi
   done <<EOF
 ${MEMBERSHIPS}
