@@ -17,15 +17,19 @@ fi
 ### when necessary. Don't set these environment variables unless you're testing
 ### in CI/CD.
 _CI_ASM_IMAGE_TAG="${_CI_ASM_IMAGE_TAG:=}"
+_CI_ASM_PKG_LOCATION="${_CI_ASM_PKG_LOCATION:=}"
+_CI_ISTIOCTL_REL_PATH="${_CI_ISTIOCTL_REL_PATH:=}"
 
 ### Internal variables ###
-MAJOR="${MAJOR:=1}"
-MINOR="${MINOR:=8}"
-POINT="${POINT:=2}"
+MAJOR="${MAJOR:=1}"; readonly MAJOR;
+MINOR="${MINOR:=8}"; readonly MINOR;
+POINT="${POINT:=2}"; readonly POINT;
+REV="${REV:=2}"; readonly REV;
 ASM_RELEASE="${MAJOR}.${MINOR}"
 ASM_META_VERSION="${MAJOR}.${MINOR}.${POINT}"
 readonly ASM_RELEASE
 readonly ASM_META_VERSION
+RELEASE=""
 
 SERVICE_PROXY_AGENT_BUCKET="${SERVICE_PROXY_AGENT_BUCKET:=gs://gce-mesh/service-proxy-agent/releases/service-proxy-agent-0.2-asm.tgz}"
 readonly SERVICE_PROXY_AGENT_BUCKET
@@ -40,6 +44,16 @@ readonly IDENTITY_PROVIDER_ANNOTATION_KEY
 
 SCRIPT_NAME="${0##*/}"
 APATH=""
+AKUBECTL=""
+AKPT=""
+AGCLOUD=""
+ISTIO_FOLDER_NAME=""
+ISTIOCTL_REL_PATH=""
+PACKAGE_DIRECTORY=""
+KPT_BRANCH=""
+KPT_URL=""
+EXPOSE_ISTIOD_SERVICE=""
+EXPANSION_GATEWAY_FILE=""
 
 PROJECT_NUMBER=""
 
@@ -86,10 +100,53 @@ init() {
     Darwin) APATH="stat";;
     *);;
   esac
+
+  if [[ "${POINT}" == "alpha" ]]; then
+    RELEASE="${MAJOR}.${MINOR}-alpha.${REV}"
+    KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=master}"
+  else
+    RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
+    KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=release-${MAJOR}.${MINOR}-asm}"
+  fi
+  readonly RELEASE; readonly KPT_BRANCH;
+
+  PACKAGE_DIRECTORY="asm/istio"; readonly PACKAGE_DIRECTORY;
+  ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
+  ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
+  EXPOSE_ISTIOD_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_SERVICE;
+  EXPANSION_GATEWAY_FILE="${PACKAGE_DIRECTORY}/expansion/vm-eastwest-gateway.yaml"; readonly EXPANSION_GATEWAY_FILE;
+
+  AKUBECTL="$(which kubectl || true)"
+  AGCLOUD="$(which gcloud || true)"
+  AKPT="$(which kpt || true)"
 }
 
 apath() {
   "${APATH}" "${@}"
+}
+
+gcloud() {
+  run "${AGCLOUD}" "${@}"
+}
+
+kubectl() {
+  run "${AKUBECTL}" "${@}"
+}
+
+kpt() {
+  run "${AKPT}" "${@}"
+}
+
+istioctl() {
+  run "$(istioctl_path)" "${@}"
+}
+
+istioctl_path() {
+  if [[ -n "${_CI_ISTIOCTL_REL_PATH}" && -f "${_CI_ISTIOCTL_REL_PATH}" ]]; then
+    echo "${_CI_ISTIOCTL_REL_PATH}"
+  else
+    echo "./${ISTIOCTL_REL_PATH}"
+  fi
 }
 
 ### Convenience functions ###
@@ -487,13 +544,13 @@ validate_cli_dependencies() {
       NOTFOUND="${dependency},${NOTFOUND}"
     fi
   done <<EOF
-gcloud
+$AGCLOUD
 curl
 jq
 tr
 awk
 printf
-kubectl
+$AKUBECTL
 EOF
 
   if [[ -n "${NOTFOUND}" ]]; then
@@ -1208,6 +1265,57 @@ To create a managed instance group from the instance template, run:
   --zone <ZONE>
 *****************************
 "
+}
+
+#######
+# set_up_local_workspace does everything that the script needs to avoid
+# polluting the environment or current working directory
+#######
+set_up_local_workspace() {
+  info "Setting up necessary files..."
+  if [[ -z "${OUTPUT_DIR}" ]]; then
+    info "Creating temp directory..."
+    OUTPUT_DIR="$(mktemp -d)"
+    info "Created ${OUTPUT_DIR}"
+    if [[ -z "${OUTPUT_DIR}" ]]; then
+      fatal "Encountered error when running mktemp -d!"
+    fi
+  else
+    OUTPUT_DIR="$(apath -f "${OUTPUT_DIR}")"
+  fi
+  pushd "$OUTPUT_DIR" > /dev/null
+}
+
+set_kpt_package_url() {
+  KPT_URL="https://github.com/GoogleCloudPlatform/anthos-service-mesh-packages"
+  KPT_URL="${KPT_URL}.git/asm@${KPT_BRANCH}"
+  readonly KPT_URL;
+}
+
+download_asm() {
+  local OS
+
+  case "$(uname)" in
+    Linux ) OS="linux-amd64";;
+    Darwin) OS="osx";;
+    *     ) fatal "$(uname) is not a supported OS.";;
+  esac
+
+  info "Downloading ASM.."
+  local TARBALL; TARBALL="istio-${RELEASE}-${OS}.tar.gz"
+  if [[ -z "${_CI_ASM_PKG_LOCATION}" ]]; then
+    curl -L "https://storage.googleapis.com/gke-release/asm/${TARBALL}" \
+      | tar xz
+  else
+    local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
+    run curl -L "https://storage.googleapis.com/${_CI_ASM_PKG_LOCATION}/asm/${TARBALL}" \
+      --header @- <<EOF | tar xz
+Authorization: Bearer ${TOKEN}
+EOF
+  fi
+
+  info "Downloading ASM kpt package..."
+  retry 3 kpt pkg get --auto-set=false "${KPT_URL}" asm
 }
 
 main() {
