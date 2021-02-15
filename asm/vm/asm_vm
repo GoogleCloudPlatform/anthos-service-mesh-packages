@@ -185,6 +185,7 @@ retry() {
   for i in $(seq 0 "${MAX_TRIES}"); do
     if [[ "${i}" -eq "${MAX_TRIES}" ]]; then
       false
+      return
     fi
     { "${@}" && return 0; } || true
     warn "Failed, retrying...($((i+1)) of ${MAX_TRIES})"
@@ -552,6 +553,7 @@ jq
 tr
 awk
 printf
+tail
 $AKUBECTL
 EOF
 
@@ -941,7 +943,7 @@ retrieve_cluster_root_cert() {
   info "Retrieving the cluster's root certificate..."
 
   local ISTIOD; ISTIOD=""
-  ISTIOD="$(retry 2 kubectl get pods -oname -lapp=istiod -n istio-system | head -n 1)"
+  ISTIOD="$(retry 2 kubectl get pods -oname -lapp=istiod -n istio-system | awk '{print $1}' | tail -n 1)"
   ROOT_CERT="$(retry 2 run kubectl exec -it -n istio-system "${ISTIOD}" \
     -- cat /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
     | awk 'NF {sub(/\r/, ""); printf "%s\n",$0;}')"

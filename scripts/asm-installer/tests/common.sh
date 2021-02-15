@@ -761,16 +761,7 @@ verify_instance_template() {
     --filter="name=${INSTANCE_TEMPLATE_NAME}" --format="value(name)")"
   if [[ -z "${VAL}" ]]; then
     fail "Cannot find instance template ${INSTANCE_TEMPLATE_NAME} in the project."
-    false
-  fi
-
-  local SVC_ACCT
-  SVC_ACCT="$(gcloud compute instance-templates describe "${INSTANCE_TEMPLATE_NAME}" \
-    --project "${PROJECT_ID}" --format=json | jq -r '.properties.serviceAccounts[].email' | \
-    grep "${WORKLOAD_SERVICE_ACCOUNT}")"
-  if [[ -z "${SVC_ACCT}" ]]; then
-    fail "Instance template created does not use workload service account ${WORKLOAD_SERVICE_ACCOUNT}."
-    false
+    return 1
   fi
 
   local SERVICE_PROXY_CONFIG
@@ -781,25 +772,25 @@ verify_instance_template() {
   if [[ "$(echo "${SERVICE_PROXY_CONFIG}" | jq -r '."asm-env"."POD_NAMESPACE"')" \
     != "${LT_NAMESPACE}" ]]; then
     fail "Instance template created does not set the workload namespace to ${LT_NAMESPACE}."
-    false
+    return 1
   fi
 
   if [[ "$(echo "${SERVICE_PROXY_CONFIG}" | jq -r '."asm-env"."ISTIO_META_WORKLOAD_NAME"')" \
     != "${WORKLOAD_NAME}" ]]; then
     fail "Instance template created does not set the workload name to ${WORKLOAD_NAME}."
-    false
+    return 1
   fi
 
   if [[ "$(echo "${SERVICE_PROXY_CONFIG}" | jq -r '."asm-env"."CANONICAL_SERVICE"')" \
     != "${WORKLOAD_NAME}" ]]; then
     fail "Instance template created does not set the canonical service name to ${WORKLOAD_NAME}."
-    false
+    return 1
   fi
 
   if [[ "$(echo "${SERVICE_PROXY_CONFIG}" | jq -r '."asm-env"."SERVICE_ACCOUNT"')" \
     != "${WORKLOAD_SERVICE_ACCOUNT}" ]]; then
     fail "Instance template created does not set workload service account to ${WORKLOAD_SERVICE_ACCOUNT}."
-    false
+    return 1
   fi
 }
 
@@ -812,7 +803,7 @@ verify_instance_template_with_source() {
     jq -r '.properties.metadata.items[] | select(.key == "testKey").value')"
   if [[ "${KEYVAL}" != "testValue" ]]; then
     fail "Custom metadata does not have a key testKey with value testValue."
-    false
+    return 1
   fi
 
   local LABELVAL
@@ -820,7 +811,7 @@ verify_instance_template_with_source() {
     --project "${PROJECT_ID}" --format=json | jq -r '.properties.labels.testlabel')"
   if [[ -z "${LABELVAL}" ]] || [[ "${LABELVAL}" == 'null' ]]; then
     fail "Label testlabel:testvalue is not found in the label field."
-    false
+    return 1
   fi
 }
 
@@ -831,11 +822,12 @@ cleanup_workload_service_account() {
 delete_instance_template() {
   local TEMPLATE; TEMPLATE="$1"
   echo "Deleting instance template ${TEMPLATE}..."
-  gcloud compute instance-templates delete "${INSTANCE_TEMPLATE_NAME}" \
+  gcloud compute instance-templates delete "${TEMPLATE}" \
     --quiet --project "${PROJECT_ID}"
 }
 
 cleanup_old_workload_service_accounts() {
+  echo "Cleaning up all existing service accounts for VM workload..."
   while read -r email; do
     if [[ -n "${email}" ]]; then
       gcloud iam service-accounts delete "${email}" --quiet --project "${LT_PROJECT_ID}"
@@ -846,6 +838,7 @@ EOF
 }
 
 cleanup_old_instance_templates() {
+  echo "Cleaning up all instance templates for VM workload..."
   while read -r it; do
     if [[ -n "${it}" ]]; then
       gcloud compute instance-templates delete "${it}" --quiet --project "${LT_PROJECT_ID}"
