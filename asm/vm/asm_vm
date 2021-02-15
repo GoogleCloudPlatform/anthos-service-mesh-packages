@@ -700,6 +700,12 @@ populate_environ_info() {
 is_membership_crd_installed() {
   if ! kubectl api-resources --api-group=hub.gke.io | grep -q memberships; then
     false
+    return
+  fi
+
+  if [[ "$(retry 2 kubectl get memberships.hub.gke.io -ojsonpath="{..metadata.name}" \
+    | grep -w -c membership || true)" -eq 0 ]]; then
+    false
   fi
 }
 
