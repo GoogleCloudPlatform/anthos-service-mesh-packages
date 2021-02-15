@@ -26,9 +26,11 @@ MINOR="${MINOR:=8}"; readonly MINOR;
 POINT="${POINT:=2}"; readonly POINT;
 REV="${REV:=2}"; readonly REV;
 ASM_RELEASE="${MAJOR}.${MINOR}"
-ASM_META_VERSION="${MAJOR}.${MINOR}.${POINT}"
+ASM_META_VERSION="${ASM_RELEASE}.0"
+ASM_REVISION_PREFIX="${ASM_REVISION_PREFIX:=asm-${MAJOR}${MINOR}}"
 readonly ASM_RELEASE
 readonly ASM_META_VERSION
+readonly ASM_REVISION_PREFIX
 RELEASE=""
 
 SERVICE_PROXY_AGENT_BUCKET="${SERVICE_PROXY_AGENT_BUCKET:=gs://gce-mesh/service-proxy-agent/releases/service-proxy-agent-0.2-asm.tgz}"
@@ -183,6 +185,7 @@ retry() {
   for i in $(seq 0 "${MAX_TRIES}"); do
     if [[ "${i}" -eq "${MAX_TRIES}" ]]; then
       false
+      return
     fi
     { "${@}" && return 0; } || true
     warn "Failed, retrying...($((i+1)) of ${MAX_TRIES})"
@@ -550,6 +553,7 @@ jq
 tr
 awk
 printf
+tail
 $AKUBECTL
 EOF
 
@@ -795,6 +799,14 @@ EOF
 validate_workload_asm_revision() {
   info "Verifying the ASM revision for the WorkloadGroup..."
 
+  if ! [[ "${WORKLOAD_ASM_REVISION}" =~ ^${ASM_REVISION_PREFIX} ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Adding VM workloads to ASM ${WORKLOAD_ASM_REVISION} revision is not supported.
+Please make sure to label your WorkloadGroup with an ASM revision starting with
+${ASM_REVISION_PREFIX} and try again.
+EOF
+  fi
+
   local WORKLOAD_REVISION_FOUND=0
   ASM_REVISIONS="$(strip_last_char "${ASM_REVISIONS}")"
   for rev in $(echo "${ASM_REVISIONS}" | tr ',' '\n'); do
@@ -931,7 +943,7 @@ retrieve_cluster_root_cert() {
   info "Retrieving the cluster's root certificate..."
 
   local ISTIOD; ISTIOD=""
-  ISTIOD="$(retry 2 kubectl get pods -oname -lapp=istiod -n istio-system | head -n 1)"
+  ISTIOD="$(retry 2 kubectl get pods -oname -lapp=istiod -n istio-system | awk '{print $1}' | tail -n 1)"
   ROOT_CERT="$(retry 2 run kubectl exec -it -n istio-system "${ISTIOD}" \
     -- cat /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
     | awk 'NF {sub(/\r/, ""); printf "%s\n",$0;}')"
@@ -940,13 +952,13 @@ retrieve_cluster_root_cert() {
   fi
 }
 
-retrieve_eastwestgateway() {
-  info "Retrieving the cluster's Istio eastwest gateway IP..."
+retrieve_expansiongateway() {
+  info "Retrieving the cluster's ${EXPANSION_GATEWAY_NAME} IP..."
 
   INGRESS_IP="$(retry 2 run kubectl get service "${EXPANSION_GATEWAY_NAME}" \
     -n istio-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}')"
   if [[ -z "${INGRESS_IP}" ]]; then
-    fatal "Failed to retrieve the Istio eastwest gateway IP address. Please try again."
+    fatal "Failed to retrieve the ${EXPANSION_GATEWAY_NAME} IP address. Please try again."
   fi
 }
 
@@ -963,7 +975,7 @@ retrieve_identity_provider() {
   info "Retrieving the identity provider of the workload..."
 
   populate_environ_info
-  
+
   local MEMBERSHIPS
   MEMBERSHIPS="$(retry 2 gcloud container hub memberships list --project "${ENVIRON_PROJECT_ID}" \
    --format='value(name)')"
@@ -1122,6 +1134,7 @@ gen_default_instance_template() {
   jq -n \
   --arg project_id "${PROJECT_ID}" \
   --arg project_number "${PROJECT_NUMBER}" \
+  --arg service_account "${WORKLOAD_SERVICE_ACCOUNT}" \
   --arg instance_template "${NEW_INSTANCE_TEMPLATE}" '{
   "name": $instance_template,
   "properties": {
@@ -1172,7 +1185,7 @@ gen_default_instance_template() {
     },
     "serviceAccounts": [
       {
-        "email": ($project_number+"-compute@developer.gserviceaccount.com"),
+        "email": $service_account,
         "scopes": [
           "https://www.googleapis.com/auth/cloud-platform"
         ]
@@ -1346,7 +1359,7 @@ main() {
   extract_canonical_service_revision
   if [[ "${CREATE_GCE_INSTANCE_TEMPLATE}" -eq 1 ]]; then
     retrieve_cluster_root_cert
-    retrieve_eastwestgateway
+    retrieve_expansiongateway
     retrieve_cluster_network
     retrieve_identity_provider
     create_gce_instance_template

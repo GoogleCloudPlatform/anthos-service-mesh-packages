@@ -32,18 +32,29 @@ spec:
     annotations:
       security.cloud.google.com/IdentityProvider: google
     labels:
-      app: vm
+      app: ${WORKLOAD_NAME}
       version: v1
   template:
     serviceAccount: ${WORKLOAD_SERVICE_ACCOUNT}
 EOF
 
-  create_instance_template; RETVAL=$?;
+  create_new_instance_template; RETVAL=$?;
   trap 'cleanup_workload_service_account' ERR
 
   verify_instance_template
 
-  cleanup_instance_template
+  delete_instance_template "${INSTANCE_TEMPLATE_NAME}"
+
+  create_source_instance_template
+
+  CREATE_FROM_SOURCE=1
+  create_new_instance_template; RETVAL=$?;
+  trap 'delete_instance_template "${SOURCE_INSTANCE_TEMPLATE_NAME}"' ERR
+
+  verify_instance_template_with_source
+
+  delete_instance_template "${INSTANCE_TEMPLATE_NAME}"
+  delete_instance_template "${SOURCE_INSTANCE_TEMPLATE_NAME}"
   cleanup_workload_service_account
   cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"
 }
