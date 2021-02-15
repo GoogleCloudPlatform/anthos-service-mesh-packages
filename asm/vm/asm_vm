@@ -1529,8 +1529,6 @@ EOF
   retry 3 kpt pkg get --auto-set=false "${KPT_URL}" asm
 }
 
-<<<<<<< HEAD
-=======
 install_expansion_gateway() {
   info "Installing the expansion gateway..."
   retry 5 istioctl install -f "${EXPANSION_GATEWAY_FILE}"
@@ -1571,7 +1569,6 @@ mesh.
 "
 }
 
->>>>>>> 7968c05 ([VM Script]Prepare cluster for VM workloads)
 main() {
   init
   parse_args "${@}"
