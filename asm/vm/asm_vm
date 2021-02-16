@@ -22,9 +22,9 @@ _CI_ISTIOCTL_REL_PATH="${_CI_ISTIOCTL_REL_PATH:=}"
 
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
-MINOR="${MINOR:=8}"; readonly MINOR;
-POINT="${POINT:=2}"; readonly POINT;
-REV="${REV:=2}"; readonly REV;
+MINOR="${MINOR:=9}"; readonly MINOR;
+POINT="${POINT:=0}"; readonly POINT;
+REV="${REV:=1}"; readonly REV;
 ASM_RELEASE="${MAJOR}.${MINOR}"
 ASM_META_VERSION="${ASM_RELEASE}.0"
 ASM_REVISION_PREFIX="${ASM_REVISION_PREFIX:=asm-${MAJOR}${MINOR}}"
