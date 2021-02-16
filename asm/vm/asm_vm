@@ -1619,7 +1619,7 @@ enable_service_mesh_feature() {
 
   local RESPONSE
   RESPONSE="$(run curl -s -H "X-Goog-User-Project: ${PROJECT_ID}"  \
-    "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features?feature_id=servicemesh" \
+    "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features/servicemesh" \
     -H @- <<EOF
 Authorization: Bearer ${TOKEN}
 EOF
