@@ -31,8 +31,8 @@ _CI_ENVIRON_PROJECT_NUMBER="${_CI_ENVIRON_PROJECT_NUMBER:=}"
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=9}"; readonly MINOR;
-POINT="${POINT:=alpha}"; readonly POINT;
-REV="${REV:=1613029499}"; readonly REV;
+POINT="${POINT:=0}"; readonly POINT;
+REV="${REV:=1}"; readonly REV;
 K8S_MINOR=0
 
 ### File related constants ###
