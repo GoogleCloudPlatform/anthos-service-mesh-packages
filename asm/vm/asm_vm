@@ -1058,15 +1058,20 @@ gen_gce_service_proxy() {
 
 # Define the GCE software declaration for OS config.
 gce_software_declaration() {
+  local ISTIOD_SVC="istiod"
+  if [ -n "${WORKLOAD_ASM_REVISION}" ] && [ "${WORKLOAD_ASM_REVISION}" != "default" ]; then
+    ISTIOD_SVC="istiod-${WORKLOAD_ASM_REVISION}"
+  fi
+
   jq -n --arg ingress_ip "${INGRESS_IP}"\
-  --arg asm_revision "${WORKLOAD_ASM_REVISION}" '{
+  --arg istiod_svc "${ISTIOD_SVC}" '{
   "softwareRecipes": [{
       "name": "install-gce-service-proxy-agent",
       "desired_state": "INSTALLED",
       "installSteps": [{
           "scriptRun": {
             "script": ("#!/bin/bash
-ISTIOD_ENTRY=\""+$ingress_ip+" istiod-"+$asm_revision+".istio-system.svc\"
+ISTIOD_ENTRY=\""+$ingress_ip+" "+istiod_svc+".istio-system.svc\"
 if ! grep -Fq \"${ISTIOD_ENTRY}\" /etc/hosts; then
   echo \"${ISTIOD_ENTRY} # Added by Google Cloud for Anthos Service Mesh\" | sudo tee -a /etc/hosts
 fi
