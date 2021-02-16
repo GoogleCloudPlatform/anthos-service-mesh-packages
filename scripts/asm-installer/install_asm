@@ -2053,9 +2053,7 @@ enable_service_mesh_feature() {
   retry 2 run curl -s -H "Content-Type: application/json" \
     -XPOST "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features?feature_id=servicemesh"\
     -d '{servicemesh_feature_spec: {}}' \
-    -H @- <<EOF
-Authorization: Bearer ${TOKEN}
-EOF
+    -K <(auth_header "$(get_auth_token)")
 }
 
 exit_if_service_mesh_feature_not_enabled() {
@@ -2076,11 +2074,8 @@ is_service_mesh_feature_enabled() {
 
   local RESPONSE
   RESPONSE="$(run curl -s -H "X-Goog-User-Project: ${PROJECT_ID}"  \
-    "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features?feature_id=servicemesh" \
-    -H @- <<EOF
-Authorization: Bearer ${TOKEN}
-EOF
-)"
+    "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features/servicemesh" \
+    -K <(auth_header "$(get_auth_token)"))"
 
   if [[ "$(echo "${RESPONSE}" | jq -r '.featureState.lifecycleState')" != "ENABLED" ]]; then
     false
