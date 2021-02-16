@@ -679,6 +679,14 @@ tail
 $AKUBECTL
 EOF
 
+  if [[ "${PREPARE_CLUSTER}" -eq 1 ]]; then
+    EXITCODE=0
+    hash kpt 2>/dev/null || EXITCODE=$?
+    if [[ "${EXITCODE}" -ne 0 ]]; then
+      NOTFOUND="kpt,${NOTFOUND}"
+    fi
+  fi
+
   if [[ -n "${NOTFOUND}" ]]; then
     NOTFOUND="$(strip_last_char "${NOTFOUND}")"
     for dep in $(echo "${NOTFOUND}" | tr ' ' '\n'); do
@@ -749,12 +757,14 @@ validate_asm_installation() {
   local SUPPORTED_VERSION_INSTALLED=0
   local EXPANSION_GATEWAY_INSTALLED=0
   local AUTOREGISTRATION_ENABLED=0
+  local ENVIRON_WORKLOAD_IDENTITY_USED=0
   for deploy in $(kubectl get deployment -n istio-system --no-headers -o custom-columns=":metadata.name"); do
     if [[ "${deploy}" =~ ^$ISTIOD_NAME ]]; then
       local IMAGE_NAME
       IMAGE_NAME="$(retry 2 kubectl get deployment "${deploy}" -n istio-system \
         -o=jsonpath="{.spec.template.spec.containers[0].image}")"
-      if [[ "${IMAGE_NAME}" =~ $ASM_RELEASE ]] || [[ "${IMAGE_NAME}" =~ $_CI_ASM_IMAGE_TAG ]]; then
+      if [[ "${IMAGE_NAME}" =~ $ASM_RELEASE ]] || \
+        [[ -n "${_CI_ASM_IMAGE_TAG}" && "${IMAGE_NAME}" =~ $_CI_ASM_IMAGE_TAG ]]; then
         local CURR_REVISION
         CURR_REVISION="$(retry 2 kubectl get deployment "${deploy}" \
           -n istio-system -ojson | jq -r \
@@ -768,6 +778,11 @@ validate_asm_installation() {
           -ojsonpath='{.spec.template.spec.containers[].env[?(@.name=="'"${AUTOREGISTRATION_KEY}"'")].value}')"
         if [[ "${AUTOREG_VAL}" == "true" ]]; then
           AUTOREGISTRATION_ENABLED=1
+        fi
+
+        # verify environ workload identity is being used.
+        if is_environ_workload_identity_used "${CURR_REVISION}"; then
+          ENVIRON_WORKLOAD_IDENTITY_USED=1
         fi
       fi
     fi
@@ -783,8 +798,16 @@ validate_asm_installation() {
   if [[ "${AUTOREGISTRATION_ENABLED}" -eq 0 ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 VM auto-registration is not enabled in any of your ASM installation in the
-cluster. Please use "install_asm" script to install and make sure none of the
+cluster. Please use install_asm script to install and make sure none of the
 values set in your custom overlay, if any, overrides the default values.
+EOF
+  fi
+
+  if [[ "${ENVIRON_WORKLOAD_IDENTITY_USED}" -eq 0 ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+The Environ workload identity is not used in any of your ASM installation in the
+cluster. Please make sure "--option hub-meshca" is included when you
+use the install_asm script.
 EOF
   fi
 
@@ -792,7 +815,8 @@ EOF
     if [[ "${CREATE_GCE_INSTANCE_TEMPLATE}" -eq 1 ]] || [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
       { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 ${EXPANSION_GATEWAY_NAME} is not found in the cluster.
-Please use install_asm with "--option vm" when you install ASM.
+Please use install_asm script with "--option vm" when you install ASM or run
+the current script with the "prepare_cluster" subcommand.
 EOF
     fi
     if [[ "${PREPARE_CLUSTER}" -eq 1 ]]; then
@@ -889,6 +913,24 @@ is_membership_crd_installed() {
 
   if [[ "$(retry 2 kubectl get memberships.hub.gke.io -ojsonpath="{..metadata.name}" \
     | grep -w -c membership || true)" -eq 0 ]]; then
+    false
+  fi
+}
+
+# verifies if a control plane revision uses environ workload identity.
+is_environ_workload_identity_used() {
+  local CURR_REVISION; CURR_REVISION="${1}";
+
+  local CONFIGMAP; CONFIGMAP="istio-${CURR_REVISION}";
+  if [[ "$(retry 2 kubectl get configmap -n istio-system \
+    | grep -w -c "${CONFIGMAP}" || true)" -eq 0 ]]; then
+    false
+    return
+  fi
+
+  if [[ "$(retry 2 kubectl get configmap "${CONFIGMAP}" -n istio-system \
+    -ojsonpath='{.data.mesh}' | grep -x -c "^trustDomain: ${PROJECT_ID}.hub.id.goog$" \
+    || true)" -eq 0 ]]; then
     false
   fi
 }
@@ -1001,6 +1043,14 @@ EOF
 ASM revision ${WORKLOAD_ASM_REVISION} for the workload is not found in the
 cluster. Please verify the value of ${ASM_REVISION_LABEL_KEY} label on namespace
 ${WORKLOAD_NAMESPACE} and try again.
+EOF
+  fi
+
+  if ! is_environ_workload_identity_used "${WORKLOAD_ASM_REVISION}"; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+ASM revision ${WORKLOAD_ASM_REVISION} for the workload is not using Environ
+workload identity. Please make sure "--option hub-meshca" is included when you
+use the install_asm script.
 EOF
   fi
 }
@@ -1484,15 +1534,12 @@ To create a managed instance group from the instance template, run:
 #######
 set_up_local_workspace() {
   info "Setting up necessary files..."
+  local OUTPUT_DIR
+  info "Creating temp directory..."
+  OUTPUT_DIR="$(mktemp -d)"
+  info "Created ${OUTPUT_DIR}"
   if [[ -z "${OUTPUT_DIR}" ]]; then
-    info "Creating temp directory..."
-    OUTPUT_DIR="$(mktemp -d)"
-    info "Created ${OUTPUT_DIR}"
-    if [[ -z "${OUTPUT_DIR}" ]]; then
-      fatal "Encountered error when running mktemp -d!"
-    fi
-  else
-    OUTPUT_DIR="$(apath -f "${OUTPUT_DIR}")"
+    fatal "Encountered error when running mktemp -d!"
   fi
   pushd "$OUTPUT_DIR" > /dev/null
 }
@@ -1558,13 +1605,54 @@ install_google_identity_provider() {
   retry 3 kubectl apply -f asm/identity-provider/googleidp.yaml
 }
 
+enable_service_mesh_feature() {
+  info "Enabling the service mesh feature..."
+
+  local TOKEN
+  TOKEN="$(retry 2 gcloud \
+    --project="${PROJECT_ID}" auth print-access-token)"
+
+  local RESPONSE
+  RESPONSE="$(run curl -s -H "X-Goog-User-Project: ${PROJECT_ID}"  \
+    "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features?feature_id=servicemesh" \
+    -H @- <<EOF
+Authorization: Bearer ${TOKEN}
+EOF
+)"
+
+  if [[ "$(echo "${RESPONSE}" | jq -r '.featureState.lifecycleState')" == "ENABLED" ]]; then
+    info "The service mesh feature is already enabled."
+  elif [[ "$(echo "${RESPONSE}" | jq -r '.error.code')" -eq 404 ]]; then
+    run curl -s -H "Content-Type: application/json" \
+      -XPOST "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features?feature_id=servicemesh"\
+      -d '{servicemesh_feature_spec: {}}' \
+      -H @- <<EOF
+  Authorization: Bearer ${TOKEN}
+EOF
+  elif [[ "$(echo "${RESPONSE}" | jq -r '.error.code')" -eq 403 ]]; then
+    local ERR_MSG
+    ERR_MSG="$(echo "${RESPONSE}" | jq -r '.error.message')"
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF
+Permission was denied when enabling service mesh feature. Please run install_asm
+script to install Anthos Service Mesh to enable all the required permissions.
+Original error message was:
+${ERR_MSG}
+EOF
+  else
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF
+Unknown message was returned.
+${RESPONSE}
+EOF
+  fi
+}
+
 success_message_prepare_cluster() {
   info "
 *****************************
 The cluster is ready for adding VM workloads.
 
-Please follow the Anthos Service Mesh GCE VM user guide to add GCE VMs to your
-mesh.
+Please follow the Anthos Service Mesh for GCE VM user guide to add GCE VMs to
+your mesh.
 *****************************
 "
 }
@@ -1607,6 +1695,7 @@ main() {
         install_google_identity_provider
       fi
     fi
+    enable_service_mesh_feature
     success_message_prepare_cluster
   fi
 
