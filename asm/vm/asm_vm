@@ -1632,7 +1632,7 @@ EOF
       -XPOST "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features?feature_id=servicemesh"\
       -d '{servicemesh_feature_spec: {}}' \
       -H @- <<EOF
-  Authorization: Bearer ${TOKEN}
+Authorization: Bearer ${TOKEN}
 EOF
   elif [[ "$(echo "${RESPONSE}" | jq -r '.error.code')" -eq 403 ]]; then
     local ERR_MSG
