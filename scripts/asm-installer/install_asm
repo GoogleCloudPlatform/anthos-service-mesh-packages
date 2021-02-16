@@ -212,9 +212,15 @@ main() {
         init_gcp_cas
       fi
       enable_stackdriver_kubernetes
+      if [[ "${USE_VM}" -eq 1 ]]; then
+        enable_service_mesh_feature
+      fi
     elif should_validate; then
       exit_if_no_workload_identity
       exit_if_stackdriver_not_enabled
+      if [[ "${USE_VM}" -eq 1 ]]; then
+        exit_if_service_mesh_feature_not_enabled
+      fi
     fi
   fi
 
@@ -2035,6 +2041,50 @@ register_gce_identity_provider() {
   info "Registering GCE Identity Provider in the cluster..."
   retry 3 kubectl apply -f asm/identity-provider/identityprovider-crd.yaml
   retry 3 kubectl apply -f asm/identity-provider/googleidp.yaml
+}
+
+enable_service_mesh_feature() {
+  info "Enabling the service mesh feature..."
+
+  local TOKEN
+  TOKEN="$(retry 2 gcloud \
+    --project="${PROJECT_ID}" auth print-access-token)"
+
+  retry 2 run curl -s -H "Content-Type: application/json" \
+    -XPOST "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features?feature_id=servicemesh"\
+    -d '{servicemesh_feature_spec: {}}' \
+    -H @- <<EOF
+Authorization: Bearer ${TOKEN}
+EOF
+}
+
+exit_if_service_mesh_feature_not_enabled() {
+  if ! is_service_mesh_feature_enabled; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+The service mesh feature is not enabled on project ${PROJECT_ID}.
+Please run the script with the '--enable_gcp_components' flag to allow the
+script to enable it on your behalf.
+$(enable_common_message)
+EOF
+  fi
+}
+
+is_service_mesh_feature_enabled() {
+  local TOKEN
+  TOKEN="$(retry 2 gcloud \
+    --project="${PROJECT_ID}" auth print-access-token)"
+
+  local RESPONSE
+  RESPONSE="$(run curl -s -H "X-Goog-User-Project: ${PROJECT_ID}"  \
+    "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features?feature_id=servicemesh" \
+    -H @- <<EOF
+Authorization: Bearer ${TOKEN}
+EOF
+)"
+
+  if [[ "$(echo "${RESPONSE}" | jq -r '.featureState.lifecycleState')" != "ENABLED" ]]; then
+    false
+  fi
 }
 
 ### Installation functions ###
