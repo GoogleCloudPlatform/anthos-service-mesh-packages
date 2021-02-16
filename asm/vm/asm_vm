@@ -23,8 +23,13 @@ _CI_ISTIOCTL_REL_PATH="${_CI_ISTIOCTL_REL_PATH:=}"
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=9}"; readonly MINOR;
+<<<<<<< HEAD
 POINT="${POINT:=0}"; readonly POINT;
 REV="${REV:=1}"; readonly REV;
+=======
+POINT="${POINT:=alpha}"; readonly POINT;
+REV="${REV:=1613029499}"; readonly REV;
+>>>>>>> 51e6c54 (update asm_vm to 1.9)
 ASM_RELEASE="${MAJOR}.${MINOR}"
 ASM_META_VERSION="${ASM_RELEASE}.0"
 ASM_REVISION_PREFIX="${ASM_REVISION_PREFIX:=asm-${MAJOR}${MINOR}}"
