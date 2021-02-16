@@ -33,7 +33,7 @@ readonly ASM_META_VERSION
 readonly ASM_REVISION_PREFIX
 RELEASE=""
 
-SERVICE_PROXY_AGENT_BUCKET="${SERVICE_PROXY_AGENT_BUCKET:=gs://gce-mesh/service-proxy-agent/releases/service-proxy-agent-0.2-asm.tgz}"
+SERVICE_PROXY_AGENT_BUCKET="${SERVICE_PROXY_AGENT_BUCKET:=gs://gce-service-proxy-canary/service-proxy-agent/releases/asm-87c5b3d1.tgz}"
 readonly SERVICE_PROXY_AGENT_BUCKET
 ASM_REVISION_LABEL_KEY="istio.io/rev"
 readonly ASM_REVISION_LABEL_KEY
