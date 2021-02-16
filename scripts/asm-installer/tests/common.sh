@@ -847,3 +847,38 @@ cleanup_old_instance_templates() {
 $(gcloud compute instance-templates list --filter="name:^vm-*" --format="value(name)" --project "${LT_PROJECT_ID}")
 EOF
 }
+
+delete_service_mesh_feature() {
+  echo "Removing the service mesh feature from the project ${PROJECT_ID}..."
+
+  local TOKEN
+  TOKEN="$(retry 2 gcloud \
+    --project="${PROJECT_ID}" auth print-access-token)"
+
+  local RESPONSE
+  RESPONSE="$(run curl -s -H "X-Goog-User-Project: ${PROJECT_ID}"  \
+    -X DELETE \
+    "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features/servicemesh" \
+    -H @- <<EOF
+Authorization: Bearer ${TOKEN}
+EOF
+)"
+}
+
+is_service_mesh_feature_enabled() {
+  local TOKEN
+  TOKEN="$(retry 2 gcloud \
+    --project="${PROJECT_ID}" auth print-access-token)"
+  
+  local RESPONSE
+  RESPONSE="$(run curl -s -H "X-Goog-User-Project: ${PROJECT_ID}"  \
+    "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features/servicemesh" \
+    -H @- <<EOF
+Authorization: Bearer ${TOKEN}
+EOF
+)"
+
+  if [[ "$(echo "${RESPONSE}" | jq -r '.featureState.lifecycleState')" != "ENABLED" ]]; then
+    false
+  fi
+}

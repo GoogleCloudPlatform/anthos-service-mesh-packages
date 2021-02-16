@@ -2052,6 +2052,7 @@ should_enable_service_mesh_feature() {
 enable_service_mesh_feature() {
   info "Enabling the service mesh feature..."
 
+  # IAM permission: gkehub.features.create
   retry 2 run curl -s -H "Content-Type: application/json" \
     -XPOST "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features?feature_id=servicemesh"\
     -d '{servicemesh_feature_spec: {}}' \
@@ -2071,6 +2072,7 @@ EOF
 
 is_service_mesh_feature_enabled() {
   local RESPONSE
+  # IAM permission: gkehub.features.get
   RESPONSE="$(run curl -s -H "X-Goog-User-Project: ${PROJECT_ID}"  \
     "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features/servicemesh" \
     -K <(auth_header "$(get_auth_token)"))"

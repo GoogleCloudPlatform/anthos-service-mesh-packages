@@ -57,6 +57,7 @@ EOF
   delete_instance_template "${SOURCE_INSTANCE_TEMPLATE_NAME}"
   cleanup_workload_service_account
   cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"
+  delete_service_mesh_feature
 }
 
 main "$@"
