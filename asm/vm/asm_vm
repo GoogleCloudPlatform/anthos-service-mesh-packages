@@ -1070,6 +1070,10 @@ ISTIOD_ENTRY=\""+$ingress_ip+" istiod-"+$asm_revision+".istio-system.svc\"
 if ! grep -Fq \"${ISTIOD_ENTRY}\" /etc/hosts; then
   echo \"${ISTIOD_ENTRY} # Added by Google Cloud for Anthos Service Mesh\" | sudo tee -a /etc/hosts
 fi
+DEFAULT_ISTIOD_ENTRY=\""+$ingress_ip+" istiod.istio-system.svc\"
+if ! grep -Fq \"${DEFAULT_ISTIOD_ENTRY}\" /etc/hosts; then
+  echo \"${DEFAULT_ISTIOD_ENTRY} # Added by Google Cloud for Anthos Service Mesh\" | sudo tee -a /etc/hosts
+fi
 SERVICE_PROXY_AGENT_BUCKET=$(curl \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/gce-service-proxy-agent-bucket\" -H \"Metadata-Flavor: Google\")
 ARCHIVE_NAME=$(basename ${SERVICE_PROXY_AGENT_BUCKET})
 export SERVICE_PROXY_AGENT_DIRECTORY=$(mktemp -d)
