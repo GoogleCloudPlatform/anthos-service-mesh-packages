@@ -1222,9 +1222,8 @@ create_gce_instance_template() {
       | jq --arg name "${NEW_INSTANCE_TEMPLATE}" \
       '.name=$name | .properties.disks[].deviceName=$name' || true)"
 
-    # Extract the existing metadata except the startup-script.
     EXISTING_METADATA="$(echo "${INSTANCE_TEMPLATE_REQ}" \
-      | jq '.properties.metadata.items | .[]? | select(.key!="startup-script")')"
+      | jq '.properties.metadata.items')"
   fi
 
   local METADATA; METADATA="$(gen_instance_template_metadata "${EXISTING_METADATA}")";
