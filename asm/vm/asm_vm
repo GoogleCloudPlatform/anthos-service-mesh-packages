@@ -916,6 +916,9 @@ uses_environ_workload_identity() {
   local CURR_REVISION; CURR_REVISION="${1}";
 
   local CONFIGMAP; CONFIGMAP="istio-${CURR_REVISION}";
+  if [ "${CURR_REVISION}" == "default" ]; then
+      CONFIGMAP="istio"
+  fi
   if [[ "$(retry 2 kubectl get configmap -n istio-system \
     | grep -w -c "${CONFIGMAP}" || true)" -eq 0 ]]; then
     false
