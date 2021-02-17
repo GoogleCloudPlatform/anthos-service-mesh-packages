@@ -15,7 +15,7 @@ main() {
   # CLI setup
   parse_args "$@"
 
-  run_basic_test "install" "mesh_ca" "-o vm -o hub-meshca"; RETVAL=$?;
+  run_basic_test "install" "mesh_ca" "-o vm -o hub-meshca --enable_gcp_components"; RETVAL=$?;
   trap 'cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"' ERR
 
   echo "Verifying east-west gateway is installed and running..."
@@ -36,7 +36,13 @@ main() {
     fatal "GCE Identity Provider cannot be found."
   fi
 
+  echo "Verifying service mesh feature is enabled..."
+  if ! is_service_mesh_feature_enabled; then
+    fatal "Service mesh feature is not enabled."
+  fi
+
   cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"
+  delete_service_mesh_feature
 }
 
 main "$@"

@@ -15,7 +15,7 @@ main() {
   # CLI setup
   parse_args "$@"
 
-  run_basic_test "install" "mesh_ca" "-o vm -o hub-meshca"; RETVAL=$?;
+  run_basic_test "install" "mesh_ca" "-o vm -o hub-meshca --enable_gcp_components"; RETVAL=$?;
   trap 'cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"' ERR
 
   create_workload_service_account
@@ -57,6 +57,7 @@ EOF
   delete_instance_template "${SOURCE_INSTANCE_TEMPLATE_NAME}"
   cleanup_workload_service_account
   cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"
+  delete_service_mesh_feature
 }
 
 main "$@"
