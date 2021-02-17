@@ -43,6 +43,8 @@ ISTIOD_NAME="istiod"
 readonly ISTIOD_NAME
 IDENTITY_PROVIDER_ANNOTATION_KEY="security.cloud.google.com/IdentityProvider"
 readonly IDENTITY_PROVIDER_ANNOTATION_KEY
+AUTOREGISTRATION_KEY="PILOT_ENABLE_WORKLOAD_ENTRY_AUTOREGISTRATION"
+readonly AUTOREGISTRATION_KEY
 
 SCRIPT_NAME="${0##*/}"
 APATH=""
@@ -79,6 +81,10 @@ CANONICAL_REVISION=""
 
 ### Command internal toggle ###
 CREATE_GCE_INSTANCE_TEMPLATE=0
+PREPARE_CLUSTER=0
+
+INSTALL_EXPANSION_GATEWAY=0
+INSTALL_IDENTITY_PROVIDER=0
 
 ### Option variables ###
 PROJECT_ID="${PROJECT_ID:=}"
@@ -270,6 +276,8 @@ fatal_with_usage() {
   warn "${1}"
   if [[ "${CREATE_GCE_INSTANCE_TEMPLATE}" -eq 1 ]]; then
     usage_create_gce_instance_template >&2
+  elif [[ "${PREPARE_CLUSTER}" -eq 1 ]]; then
+    usage_prepare_cluster >&2
   else
     usage_asm_vm >&2
   fi
@@ -284,6 +292,9 @@ ASM VM command line utility to add GCE instances to Anthos Service Mesh.
 
 COMMANDS:
   create_gce_instance_template   Create a new GCE instance template for ASM VMs.
+  prepare_cluster                Set up and validate the existing ASM
+                                 installation in the cluster to allow VM
+                                 workloads to be added.
 
 OPTIONS:
   -h|--help                      Show this message and exit.
@@ -355,6 +366,51 @@ in project "my_project" based on the WorkloadGroup "my_workload" in namespace
 EOF
 }
 
+usage_prepare_cluster() {
+  cat << EOF
+usage: ${SCRIPT_NAME} prepare_cluster [OPTION]...
+
+Set up and validate the current ASM installation in the cluster to allow VM
+workloads to be added. All options can also be passed via environment variables
+by using the ALL_CAPS name. Options specified via flags take precedence over
+environment variables.
+
+OPTIONS:
+  -l|--cluster_location         <LOCATION>            The GCP location of the
+                                                      target cluster.
+  -n|--cluster_name             <NAME>                The name of the target
+                                                      cluster.
+  -p|--project_id               <ID>                  The GCP project ID.
+  -s|--service_account          <SERVICE_ACCOUNT>     (optional) The name of a
+                                                      service account used to
+                                                      run the script.
+  -k|--key_file                 <FILE PATH>           (optional) The key file
+                                                      for a service account.
+                                                      Required if
+                                                      --service_account is
+                                                      passed.
+
+FLAGS:
+
+  -v|--verbose                                        Print commands before and
+                                                      after execution.
+     --dry_run                                        Print commands, but don't
+                                                      execute them.
+     --only_validate                                  Run validation but don't
+                                                      install.
+  -h|--help                                           Show this message and
+                                                      exit.
+
+EXAMPLE:
+The following invocation will prepare the ASM cluster "my_cluster" in zone
+"us-central1-c" in project "my_project" to allow VM workloads to be added:
+  $> ${SCRIPT_NAME} prepare_cluster \\
+      -n my_cluster \\
+      -p my_project \\
+      -l us-central1-c
+EOF
+}
+
 arg_required() {
   if [[ ! "${2:-}" || "${2:0:1}" = '-' ]]; then
     fatal "Option ${1} requires an argument."
@@ -371,9 +427,14 @@ parse_args() {
   fi
 
   case "${1}" in
-    create_gce_instance_template)
+    create_gce_instance_template | create-gce-instance-template)
       CREATE_GCE_INSTANCE_TEMPLATE=1; readonly CREATE_GCE_INSTANCE_TEMPLATE;
       parse_args_create_gce_instance_template "${@}"
+      shift 1
+      ;;
+    prepare_cluster | prepare-cluster)
+      PREPARE_CLUSTER=1; readonly PREPARE_CLUSTER;
+      parse_args_prepare_cluster "${@}"
       shift 1
       ;;
     -h | --help)
@@ -462,6 +523,62 @@ parse_args_create_gce_instance_template() {
   done
 }
 
+parse_args_prepare_cluster() {
+  # shellcheck disable=SC2064
+  trap "$(shopt -p nocasematch)" RETURN
+  shopt -s nocasematch
+
+  shift 1
+  while [[ ${#} != 0 ]]; do
+    case "${1}" in
+      -l | --cluster_location | --cluster-location)
+        arg_required "${@}"
+        CLUSTER_LOCATION="${2}"
+        shift 2
+        ;;
+      -n | --cluster_name | --cluster-name)
+        arg_required "${@}"
+        CLUSTER_NAME="${2}"
+        shift 2
+        ;;
+      -p | --project_id | --project-id)
+        arg_required "${@}"
+        PROJECT_ID="${2}"
+        shift 2
+        ;;
+      -s | --service_account | --service-account)
+        arg_required "${@}"
+        SERVICE_ACCOUNT="${2}"
+        shift 2
+        ;;
+      -k | --key_file | --key-file)
+        arg_required "${@}"
+        KEY_FILE="${2}"
+        shift 2
+        ;;
+      --dry_run | --dry-run)
+        DRY_RUN=1
+        shift 1
+        ;;
+      --only_validate | --only-validate)
+        ONLY_VALIDATE=1
+        shift 1
+        ;;
+      -v | --verbose)
+        VERBOSE=1
+        shift 1
+        ;;
+      -h | --help)
+        usage
+        exit
+        ;;
+      *)
+        fatal_with_usage "Unknown option ${1}"
+        ;;
+    esac
+  done
+}
+
 validate_args() {
   local MISSING_ARGS; MISSING_ARGS=0
   while read -r REQUIRED_ARG; do
@@ -474,8 +591,17 @@ validate_args() {
 CLUSTER_LOCATION
 CLUSTER_NAME
 PROJECT_ID
-WORKLOAD_NAME
 EOF
+
+  if [[ "${CREATE_GCE_INSTANCE_TEMPLATE}" -eq 1 ]]; then
+    if [[ -z "${WORKLOAD_NAME}" ]]; then
+      MISSING_ARGS=1
+      warn "Missing value for WORKLOAD_NAME"
+    fi
+    if [[ -z "${WORKLOAD_NAMESPACE}" ]]; then
+      WORKLOAD_NAMESPACE="default"
+    fi
+  fi
 
   if [[ "${MISSING_ARGS}" -ne 0 ]]; then
     fatal_with_usage "Missing one or more required options."
@@ -491,10 +617,6 @@ DRY_RUN
 ONLY_VALIDATE
 VERBOSE
 EOF
-
-  if [[ -z "${WORKLOAD_NAMESPACE}" ]]; then
-    WORKLOAD_NAMESPACE="default"
-  fi
 
   if [[ -n "$SERVICE_ACCOUNT" && -z "$KEY_FILE" || -z "$SERVICE_ACCOUNT" && -n "$KEY_FILE" ]]; then
     fatal "Service account and key file must be used together."
@@ -528,9 +650,9 @@ validate_dependencies() {
 "//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
   readonly GKE_URL
   validate_asm_cluster
-  validate_workloadgroup
 
   if [[ "${CREATE_GCE_INSTANCE_TEMPLATE}" -eq 1 ]]; then
+    validate_workloadgroup
     validate_gce_instance_template
   fi
 }
@@ -556,6 +678,12 @@ printf
 tail
 $AKUBECTL
 EOF
+
+  if [[ "${PREPARE_CLUSTER}" -eq 1 ]]; then
+    if ! hash kpt 2>/dev/null; then
+      NOTFOUND="kpt,${NOTFOUND}"
+    fi
+  fi
 
   if [[ -n "${NOTFOUND}" ]]; then
     NOTFOUND="$(strip_last_char "${NOTFOUND}")"
@@ -596,6 +724,7 @@ validate_asm_cluster() {
   configure_kubectl
   validate_cluster_registration
   validate_asm_installation
+  validate_google_identity_provider
 }
 
 validate_cluster() {
@@ -625,18 +754,34 @@ validate_asm_installation() {
   info "Verifying ASM installation..."
   local SUPPORTED_VERSION_INSTALLED=0
   local EXPANSION_GATEWAY_INSTALLED=0
+  local AUTOREGISTRATION_ENABLED=0
+  local ENVIRON_WORKLOAD_IDENTITY_USED=0
   for deploy in $(kubectl get deployment -n istio-system --no-headers -o custom-columns=":metadata.name"); do
     if [[ "${deploy}" =~ ^$ISTIOD_NAME ]]; then
       local IMAGE_NAME
       IMAGE_NAME="$(retry 2 kubectl get deployment "${deploy}" -n istio-system \
         -o=jsonpath="{.spec.template.spec.containers[0].image}")"
-      if [[ "${IMAGE_NAME}" =~ $ASM_RELEASE ]] || [[ "${IMAGE_NAME}" =~ $_CI_ASM_IMAGE_TAG ]]; then
+      if [[ "${IMAGE_NAME}" =~ $ASM_RELEASE ]] || \
+        [[ -n "${_CI_ASM_IMAGE_TAG}" && "${IMAGE_NAME}" =~ $_CI_ASM_IMAGE_TAG ]]; then
         local CURR_REVISION
         CURR_REVISION="$(retry 2 kubectl get deployment "${deploy}" \
           -n istio-system -ojson | jq -r \
           '.metadata.labels["'"${ASM_REVISION_LABEL_KEY}"'"]')"
         ASM_REVISIONS="${CURR_REVISION},${ASM_REVISIONS}"
         SUPPORTED_VERSION_INSTALLED=1
+
+        # verify the auto-registration feature is enabled.
+        local AUTOREG_VAL
+        AUTOREG_VAL="$(retry 2 kubectl get deployment "${deploy}" -n istio-system \
+          -ojsonpath='{.spec.template.spec.containers[].env[?(@.name=="'"${AUTOREGISTRATION_KEY}"'")].value}')"
+        if [[ "${AUTOREG_VAL}" == "true" ]]; then
+          AUTOREGISTRATION_ENABLED=1
+        fi
+
+        # verify environ workload identity is being used.
+        if uses_environ_workload_identity "${CURR_REVISION}"; then
+          ENVIRON_WORKLOAD_IDENTITY_USED=1
+        fi
       fi
     fi
     if [[ "${deploy}" =~ ^$EXPANSION_GATEWAY_NAME ]]; then
@@ -648,11 +793,66 @@ validate_asm_installation() {
     fatal "ASM ${ASM_RELEASE} version is not found. Please install ASM ${ASM_RELEASE} and retry."
   fi
 
-  if [[ "${EXPANSION_GATEWAY_INSTALLED}" -eq 0 ]]; then
+  if [[ "${AUTOREGISTRATION_ENABLED}" -eq 0 ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-${EXPANSION_GATEWAY_NAME} is not found in the cluster.
-Please use install_asm with "--option vm" when you install ASM.
+VM auto-registration is not enabled in any of your ASM installations in the
+cluster. Please install ASM and make sure none of the values set in your custom
+overlay overrides the default values.
 EOF
+  fi
+
+  if [[ "${ENVIRON_WORKLOAD_IDENTITY_USED}" -eq 0 ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+The environ workload identity is not used in any of your ASM installation in the
+cluster. Please install ASM with VM support.
+EOF
+  fi
+
+  if [[ "${EXPANSION_GATEWAY_INSTALLED}" -eq 0 ]]; then
+    if [[ "${CREATE_GCE_INSTANCE_TEMPLATE}" -eq 1 ]] || [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
+      { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+${EXPANSION_GATEWAY_NAME} is not found in the cluster.
+Please install ASM with VM support or run the current script with the
+"prepare_cluster" subcommand.
+EOF
+    fi
+    if [[ "${PREPARE_CLUSTER}" -eq 1 ]]; then
+      INSTALL_EXPANSION_GATEWAY=1
+    fi
+  fi
+}
+
+validate_google_identity_provider() {
+  info "Verifying identity providers in the cluster..."
+  if ! is_google_identity_provider_installed; then
+    if [[ "${CREATE_GCE_INSTANCE_TEMPLATE}" -eq 1 ]] || [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
+      { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+GCE identity provider is not found in the cluster. Please install ASM with VM
+support to allow the script to register the google identity provider in your
+cluster or run "prepare_cluster" subcommand of this script.
+EOF
+    fi
+    if [[ "${PREPARE_CLUSTER}" -eq 1 ]]; then
+      INSTALL_IDENTITY_PROVIDER=1
+    fi
+  fi
+}
+
+is_google_identity_provider_installed() {
+  if ! is_idp_crd_installed; then
+    false
+    return
+  fi
+
+  if ! retry 2 kubectl get identityproviders.security.cloud.google.com -ojsonpath="{..metadata.name}" \
+    | grep -w -q google ; then
+    false
+  fi
+}
+
+is_idp_crd_installed() {
+  if ! kubectl api-resources --api-group=security.cloud.google.com | grep -q identityproviders; then
+    false
   fi
 }
 
@@ -660,9 +860,8 @@ validate_cluster_registration() {
   info "Verifying cluster Environ membership..."
   if ! is_cluster_registered; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-Cluster is not registered to an environ. Please run the install_asm script with
-'--enable_registration' flag to allow the script to register to the current
-project's environ on your behalf.
+Cluster is not registered to an environ. Please make sure your cluster is
+registered and try again.
 EOF
   fi
 }
@@ -709,6 +908,23 @@ is_membership_crd_installed() {
 
   if [[ "$(retry 2 kubectl get memberships.hub.gke.io -ojsonpath="{..metadata.name}" \
     | grep -w -c membership || true)" -eq 0 ]]; then
+    false
+  fi
+}
+
+uses_environ_workload_identity() {
+  local CURR_REVISION; CURR_REVISION="${1}";
+
+  local CONFIGMAP; CONFIGMAP="istio-${CURR_REVISION}";
+  if [[ "$(retry 2 kubectl get configmap -n istio-system \
+    | grep -w -c "${CONFIGMAP}" || true)" -eq 0 ]]; then
+    false
+    return
+  fi
+
+  if [[ "$(retry 2 kubectl get configmap "${CONFIGMAP}" -n istio-system \
+    -ojsonpath='{.data.mesh}' | grep -x -c "^trustDomain: ${PROJECT_ID}.hub.id.goog$" \
+    || true)" -eq 0 ]]; then
     false
   fi
 }
@@ -821,6 +1037,14 @@ EOF
 ASM revision ${WORKLOAD_ASM_REVISION} for the workload is not found in the
 cluster. Please verify the value of ${ASM_REVISION_LABEL_KEY} label on namespace
 ${WORKLOAD_NAMESPACE} and try again.
+EOF
+  fi
+
+  if ! uses_environ_workload_identity "${WORKLOAD_ASM_REVISION}"; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+ASM revision ${WORKLOAD_ASM_REVISION} for the workload is not using Environ
+workload identity. Please make sure "--option hub-meshca" is included when you
+use the install_asm script.
 EOF
   fi
 }
@@ -1257,6 +1481,8 @@ Authorization: Bearer ${TOKEN}
 EOF
 )"
 
+  unset TOKEN
+
   local OP_NAME
   OP_NAME="$(echo "${RESPONSE}" | jq '.name' | tr -d '"')"
   if [[ "${OP_NAME}" == "null" ]]; then
@@ -1304,15 +1530,12 @@ To create a managed instance group from the instance template, run:
 #######
 set_up_local_workspace() {
   info "Setting up necessary files..."
+  local OUTPUT_DIR
+  info "Creating temp directory..."
+  OUTPUT_DIR="$(mktemp -d)"
+  info "Created ${OUTPUT_DIR}"
   if [[ -z "${OUTPUT_DIR}" ]]; then
-    info "Creating temp directory..."
-    OUTPUT_DIR="$(mktemp -d)"
-    info "Created ${OUTPUT_DIR}"
-    if [[ -z "${OUTPUT_DIR}" ]]; then
-      fatal "Encountered error when running mktemp -d!"
-    fi
-  else
-    OUTPUT_DIR="$(apath -f "${OUTPUT_DIR}")"
+    fatal "Encountered error when running mktemp -d!"
   fi
   pushd "$OUTPUT_DIR" > /dev/null
 }
@@ -1343,10 +1566,94 @@ download_asm() {
       --header @- <<EOF | tar xz
 Authorization: Bearer ${TOKEN}
 EOF
+    unset TOKEN
   fi
 
   info "Downloading ASM kpt package..."
   retry 3 kpt pkg get --auto-set=false "${KPT_URL}" asm
+}
+
+install_expansion_gateway() {
+  info "Installing the expansion gateway..."
+  retry 5 istioctl install -f "${EXPANSION_GATEWAY_FILE}"
+
+  # Prevent the stderr buffer from ^ messing up the terminal output below
+  sleep 1
+  info "...done!"
+}
+
+expose_istiod() {
+  info "Exposing the control plane for VM workloads..."
+  retry 3 kubectl apply -f "${EXPOSE_ISTIOD_SERVICE}"
+
+  ASM_REVISIONS="$(strip_last_char "${ASM_REVISIONS}")"
+  for rev in $(echo "${ASM_REVISIONS}" | tr ',' '\n'); do
+    kpt cfg set asm anthos.servicemesh.istiodHost "istiod-${rev}.istio-system.svc.cluster.local"
+    kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${rev}"
+    kpt cfg set asm anthos.servicemesh.istiod-dr-name "istiod-dr-${rev}"
+  done
+
+  retry 3 kubectl apply -f "${EXPOSE_ISTIOD_SERVICE}"
+}
+
+install_google_identity_provider() {
+  info "Registering GCE Identity Provider in the cluster..."
+  retry 3 kubectl apply -f asm/identity-provider/identityprovider-crd.yaml
+  retry 3 kubectl apply -f asm/identity-provider/googleidp.yaml
+}
+
+enable_service_mesh_feature() {
+  info "Enabling the service mesh feature..."
+
+  local TOKEN
+  TOKEN="$(retry 2 gcloud \
+    --project="${PROJECT_ID}" auth print-access-token)"
+
+  local RESPONSE
+  RESPONSE="$(run curl -s -H "X-Goog-User-Project: ${PROJECT_ID}"  \
+    "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features/servicemesh" \
+    -H @- <<EOF
+Authorization: Bearer ${TOKEN}
+EOF
+)"
+
+  if [[ "$(echo "${RESPONSE}" | jq -r '.featureState.lifecycleState')" == "ENABLED" ]]; then
+    info "The service mesh feature is already enabled."
+  elif [[ "$(echo "${RESPONSE}" | jq -r '.error.code')" -eq 404 ]]; then
+    run curl -s -H "Content-Type: application/json" \
+      -XPOST "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features?feature_id=servicemesh"\
+      -d '{servicemesh_feature_spec: {}}' \
+      -H @- <<EOF
+Authorization: Bearer ${TOKEN}
+EOF
+  elif [[ "$(echo "${RESPONSE}" | jq -r '.error.code')" -eq 403 ]]; then
+    local ERR_MSG
+    ERR_MSG="$(echo "${RESPONSE}" | jq -r '.error.message')"
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF
+Permission was denied when enabling service mesh feature. Please run install_asm
+script to install Anthos Service Mesh to enable all the required permissions.
+Original error message was:
+${ERR_MSG}
+EOF
+  else
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF
+Unknown message was returned.
+${RESPONSE}
+EOF
+  fi
+
+  unset TOKEN
+}
+
+success_message_prepare_cluster() {
+  info "
+*****************************
+The cluster is ready for adding VM workloads.
+
+Please follow the Anthos Service Mesh for GCE VM user guide to add GCE VMs to
+your mesh.
+*****************************
+"
 }
 
 main() {
@@ -1364,15 +1671,31 @@ main() {
     return 0
   fi
 
-  extract_canonical_service_label
-  extract_canonical_service_revision
   if [[ "${CREATE_GCE_INSTANCE_TEMPLATE}" -eq 1 ]]; then
+    extract_canonical_service_label
+    extract_canonical_service_revision
     retrieve_cluster_root_cert
     retrieve_expansiongateway
     retrieve_cluster_network
     retrieve_identity_provider
     create_gce_instance_template
     success_message_create_gce_instance_template
+  fi
+  if [[ "${PREPARE_CLUSTER}" -eq 1 ]]; then
+    if [[ "${INSTALL_EXPANSION_GATEWAY}" -eq 1 ]] || [[ "${INSTALL_IDENTITY_PROVIDER}" -eq 1 ]]; then
+      set_up_local_workspace
+      set_kpt_package_url
+      download_asm
+      if [[ "${INSTALL_EXPANSION_GATEWAY}" -eq 1 ]]; then
+        install_expansion_gateway
+        expose_istiod
+      fi
+      if [[ "${INSTALL_IDENTITY_PROVIDER}" -eq 1 ]]; then
+        install_google_identity_provider
+      fi
+    fi
+    enable_service_mesh_feature
+    success_message_prepare_cluster
   fi
 
   return 0

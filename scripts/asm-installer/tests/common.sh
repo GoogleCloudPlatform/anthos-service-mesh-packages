@@ -756,6 +756,8 @@ create_source_instance_template() {
 }
 
 verify_instance_template() {
+  echo "Verifying instance template ${INSTANCE_TEMPLATE_NAME}..."
+
   local VAL
   VAL="$(gcloud compute instance-templates list --project "${PROJECT_ID}" \
     --filter="name=${INSTANCE_TEMPLATE_NAME}" --format="value(name)")"
@@ -833,7 +835,7 @@ cleanup_old_workload_service_accounts() {
       gcloud iam service-accounts delete "${email}" --quiet --project "${LT_PROJECT_ID}"
     fi
   done <<EOF
-$(gcloud iam service-accounts list --filter="email:^vm-*" --format="value(email)" --project "${LT_PROJECT_ID}")
+$(gcloud iam service-accounts list --filter="email~^vm-" --format="value(email)" --project "${LT_PROJECT_ID}")
 EOF
 }
 
@@ -844,7 +846,7 @@ cleanup_old_instance_templates() {
       gcloud compute instance-templates delete "${it}" --quiet --project "${LT_PROJECT_ID}"
     fi
   done <<EOF
-$(gcloud compute instance-templates list --filter="name:^vm-*" --format="value(name)" --project "${LT_PROJECT_ID}")
+$(gcloud compute instance-templates list --filter="name~^vm-" --format="value(name)" --project "${LT_PROJECT_ID}")
 EOF
 }
 
