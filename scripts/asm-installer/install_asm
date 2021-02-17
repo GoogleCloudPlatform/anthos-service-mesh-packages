@@ -2113,7 +2113,7 @@ configure_package() {
     kpt cfg set asm anthos.servicemesh.external_ca.ca_name "${CA_NAME}"
   fi
 
-  if [[ "${USE_VM}" -eq 1 ]]; then
+  if [[ "${USE_VM}" -eq 1 ]] && [[ "${_CI_NO_REVISION}" -eq 0 ]]; then
     kpt cfg set asm anthos.servicemesh.istiodHost "istiod-${REVISION_LABEL}.istio-system.svc.cluster.local"
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${REVISION_LABEL}"
     kpt cfg set asm anthos.servicemesh.istiod-dr-name "istiod-dr-${REVISION_LABEL}"
