@@ -10,7 +10,8 @@ on how to use the script.
 
 - `vm-eastwest-gateway.yaml` is a generated `IstioOperator` configuration for
 the expansion gateway deployment to be used when adding VM workloads on the same
-network to the mesh.
+network to the mesh. Using the configuration file, the expansion gateway will be
+installed when there is an existing control plane in the cluster.
 
 - `expose-istiod.yaml` is used to expose the control plane for discovery from
 workloads outside of the cluster.
