@@ -23,13 +23,8 @@ _CI_ISTIOCTL_REL_PATH="${_CI_ISTIOCTL_REL_PATH:=}"
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=9}"; readonly MINOR;
-<<<<<<< HEAD
 POINT="${POINT:=0}"; readonly POINT;
 REV="${REV:=1}"; readonly REV;
-=======
-POINT="${POINT:=alpha}"; readonly POINT;
-REV="${REV:=1613029499}"; readonly REV;
->>>>>>> 51e6c54 (update asm_vm to 1.9)
 ASM_RELEASE="${MAJOR}.${MINOR}"
 ASM_META_VERSION="${ASM_RELEASE}.0"
 ASM_REVISION_PREFIX="${ASM_REVISION_PREFIX:=asm-${MAJOR}${MINOR}}"
@@ -685,9 +680,7 @@ $AKUBECTL
 EOF
 
   if [[ "${PREPARE_CLUSTER}" -eq 1 ]]; then
-    EXITCODE=0
-    hash kpt 2>/dev/null || EXITCODE=$?
-    if [[ "${EXITCODE}" -ne 0 ]]; then
+    if ! hash kpt 2>/dev/null; then
       NOTFOUND="kpt,${NOTFOUND}"
     fi
   fi
@@ -786,7 +779,7 @@ validate_asm_installation() {
         fi
 
         # verify environ workload identity is being used.
-        if is_environ_workload_identity_used "${CURR_REVISION}"; then
+        if uses_environ_workload_identity "${CURR_REVISION}"; then
           ENVIRON_WORKLOAD_IDENTITY_USED=1
         fi
       fi
@@ -802,17 +795,16 @@ validate_asm_installation() {
 
   if [[ "${AUTOREGISTRATION_ENABLED}" -eq 0 ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-VM auto-registration is not enabled in any of your ASM installation in the
-cluster. Please use install_asm script to install and make sure none of the
-values set in your custom overlay, if any, overrides the default values.
+VM auto-registration is not enabled in any of your ASM installations in the
+cluster. Please install ASM and make sure none of the values set in your custom
+overlay overrides the default values.
 EOF
   fi
 
   if [[ "${ENVIRON_WORKLOAD_IDENTITY_USED}" -eq 0 ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-The Environ workload identity is not used in any of your ASM installation in the
-cluster. Please make sure "--option hub-meshca" is included when you
-use the install_asm script.
+The environ workload identity is not used in any of your ASM installation in the
+cluster. Please install ASM with VM support.
 EOF
   fi
 
@@ -820,8 +812,8 @@ EOF
     if [[ "${CREATE_GCE_INSTANCE_TEMPLATE}" -eq 1 ]] || [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
       { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 ${EXPANSION_GATEWAY_NAME} is not found in the cluster.
-Please use install_asm script with "--option vm" when you install ASM or run
-the current script with the "prepare_cluster" subcommand.
+Please install ASM with VM support or run the current script with the
+"prepare_cluster" subcommand.
 EOF
     fi
     if [[ "${PREPARE_CLUSTER}" -eq 1 ]]; then
@@ -835,10 +827,9 @@ validate_google_identity_provider() {
   if ! is_google_identity_provider_installed; then
     if [[ "${CREATE_GCE_INSTANCE_TEMPLATE}" -eq 1 ]] || [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
       { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-GCE identity provider is not found in the cluster. Please run the install_asm
-script with "--option vm" flag to allow the script to register the google
-identity provider in your cluster or run "prepare_cluster" subcommand of this
-script.
+GCE identity provider is not found in the cluster. Please install ASM with VM
+support to allow the script to register the google identity provider in your
+cluster or run "prepare_cluster" subcommand of this script.
 EOF
     fi
     if [[ "${PREPARE_CLUSTER}" -eq 1 ]]; then
@@ -853,8 +844,8 @@ is_google_identity_provider_installed() {
     return
   fi
 
-  if [[ "$(retry 2 kubectl get identityproviders.security.cloud.google.com -ojsonpath="{..metadata.name}" \
-    | grep -w -c google || true)" -eq 0 ]]; then
+  if ! retry 2 kubectl get identityproviders.security.cloud.google.com -ojsonpath="{..metadata.name}" \
+    | grep -w -q google ; then
     false
   fi
 }
@@ -869,9 +860,8 @@ validate_cluster_registration() {
   info "Verifying cluster Environ membership..."
   if ! is_cluster_registered; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-Cluster is not registered to an environ. Please run the install_asm script with
-"--enable_registration" flag to allow the script to register to the current
-project's environ on your behalf.
+Cluster is not registered to an environ. Please make sure your cluster is
+registered and try again.
 EOF
   fi
 }
@@ -922,8 +912,7 @@ is_membership_crd_installed() {
   fi
 }
 
-# verifies if a control plane revision uses environ workload identity.
-is_environ_workload_identity_used() {
+uses_environ_workload_identity() {
   local CURR_REVISION; CURR_REVISION="${1}";
 
   local CONFIGMAP; CONFIGMAP="istio-${CURR_REVISION}";
@@ -1051,7 +1040,7 @@ ${WORKLOAD_NAMESPACE} and try again.
 EOF
   fi
 
-  if ! is_environ_workload_identity_used "${WORKLOAD_ASM_REVISION}"; then
+  if ! uses_environ_workload_identity "${WORKLOAD_ASM_REVISION}"; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 ASM revision ${WORKLOAD_ASM_REVISION} for the workload is not using Environ
 workload identity. Please make sure "--option hub-meshca" is included when you
@@ -1492,6 +1481,8 @@ Authorization: Bearer ${TOKEN}
 EOF
 )"
 
+  unset TOKEN
+
   local OP_NAME
   OP_NAME="$(echo "${RESPONSE}" | jq '.name' | tr -d '"')"
   if [[ "${OP_NAME}" == "null" ]]; then
@@ -1575,6 +1566,7 @@ download_asm() {
       --header @- <<EOF | tar xz
 Authorization: Bearer ${TOKEN}
 EOF
+    unset TOKEN
   fi
 
   info "Downloading ASM kpt package..."
@@ -1649,6 +1641,8 @@ Unknown message was returned.
 ${RESPONSE}
 EOF
   fi
+
+  unset TOKEN
 }
 
 success_message_prepare_cluster() {
