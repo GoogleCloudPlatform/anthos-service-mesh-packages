@@ -1001,6 +1001,12 @@ EOF
 # Generate GCE service proxy definition for the instance template
 gen_gce_service_proxy() {
   local PROXY
+
+  local ASM_META_REVISION="${WORKLOAD_ASM_REVISION}"
+  if [ "${ASM_META_REVISION}" == "default" ]; then
+    ASM_META_REVISION=""
+  fi
+
   PROXY=$(jq -n --arg ingress_ip "${INGRESS_IP}" \
     --arg project_id "${PROJECT_ID}" \
     --arg workload_name "${WORKLOAD_NAME}" \
@@ -1009,7 +1015,7 @@ gen_gce_service_proxy() {
     --arg project_number "${PROJECT_NUMBER}" \
     --arg workload_namespace "${WORKLOAD_NAMESPACE}" \
     --arg service_account "${WORKLOAD_SERVICE_ACCOUNT}" \
-    --arg asm_revision "${WORKLOAD_ASM_REVISION}"\
+    --arg asm_revision "${ASM_META_REVISION}"\
     --arg credential_identity_provider "${CREDENTIAL_IDENTITY_PROVIDER}" \
     --arg network "${NETWORK}" \
     --arg asm_meta_version "${ASM_META_VERSION}" '{
