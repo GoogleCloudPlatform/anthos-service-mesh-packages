@@ -111,7 +111,7 @@ publish_script() {
     sha256sum -c --ignore-missing "${SCRIPT_NAME}.sha256" || echo "Failed to verify ${SCRIPT_NAME}!" >&2
   fi
 
-  git restore ${SCRIPT_NAME}
+  git restore "${SCRIPT_NAME}"
   echo "Published ${FILE_NAME} successfully."
 }
 
