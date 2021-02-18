@@ -1,41 +1,40 @@
-# install\_asm
-This script simplifies the installation of [Anthos Service Mesh] on GKE clusters
-running on Google Cloud Platform.
+# ASM Installer
+
+There are two scripts `install_asm` and `asm_vm` in this folder that simplify
+the installation of the [Anthos Service Mesh] on Google Cloud Platform. This
+document describes how to use the scripts.
 
 [Anthos Service Mesh]: https://cloud.google.com/anthos/service-mesh/
 
-## Prerequisites
+- [ASM Installer](#asm-installer)
+  - [Downloading the scripts](#downloading-the-scripts)
+  - [install\_asm](#install_asm)
+    - [Prerequisites for install\_asm](#prerequisites-for-install_asm)
+    - [Running install\_asm](#running-install_asm)
+    - [Developer notes](#developer-notes)
+      - [General](#general)
+      - [Using Custom Images](#using-custom-images)
+  - [asm\_vm](#asm_vm)
+    - [Prerequisites for asm\_vm](#prerequisites-for-asm_vm)
+    - [Running asm\_vm](#running-asm_vm)
+  - [Release](#release)
 
-This script requires access to the following tools:
- * awk
- * gcloud
- * grep
- * jq
- * kpt
- * kubectl
- * sed
- * tr
+## Downloading the scripts
 
-To verify integrity of the script download, you also need:
- * sha256sum
+Both scripts are located in the same Google Cloud Storage bucket. Therefore, the
+following download instructions also applies to `asm_vm`. Simply replace
+`install_asm` with `asm_vm`.
 
-Google Cloud Shell pre-installs these tools except `kpt`, which
-you can install by using `sudo apt-get install google-cloud-sdk-kpt`.
+To verify integrity of the script download, you need:
 
-In addition, you need a GKE Kubernetes cluster with at least 8 vCPUs that use
-machine types with at least 4 vCPUs. If you are not the Project Owner for
-the GCP Project, you need the following Cloud IAM roles in order to run the
-script successfully:
-* Kubernetes Engine Admin.
-* GKE Hub Admin.
-* Service Usage Admin.
+- sha256sum
 
-## Downloading the script
-
-Download the script by using curl:
+Download the `install_asm` script by using curl:
 `curl -O https://storage.googleapis.com/csm-artifacts/asm/install_asm`
+
 The sha256 of the file is also available:
 `curl -O https://storage.googleapis.com/csm-artifacts/asm/install_asm.sha256`
+
 With both files in the same directory, verify the download by using
 `sha256sum -c install_asm.sha256`. If you see the message `install_asm: OK`
 then verification was successful.
@@ -45,7 +44,37 @@ Optionally, you download the script by cloning this repository by using `git`.
 After downloading the script, you can add the executable bit to the script or
 invoke it directly by using `bash`.
 
-## Running the script
+## install\_asm
+
+This script simplifies the installation of [Anthos Service Mesh] on GKE clusters
+running on Google Cloud Platform.
+
+### Prerequisites for install\_asm
+
+This script requires access to the following tools:
+
+- awk
+- gcloud
+- grep
+- jq
+- kpt
+- kubectl
+- sed
+- tr
+
+Google Cloud Shell pre-installs these tools except `kpt`, which
+you can install by using `sudo apt-get install google-cloud-sdk-kpt`.
+
+In addition, you need a GKE Kubernetes cluster with at least 8 vCPUs that use
+machine types with at least 4 vCPUs. If you are not the Project Owner for
+the GCP Project, you need the following Cloud IAM roles in order to run the
+script successfully:
+
+- Kubernetes Engine Admin.
+- GKE Hub Admin.
+- Service Usage Admin.
+
+### Running install\_asm
 
 Use the script's help flag to see detailed descriptions of its arguments:
 `./install_asm --help`. Pass these arguments by using the CLI flag or
@@ -115,15 +144,16 @@ state, so saving them is recommended.
 
 [Mesh CA]: https://cloud.google.com/service-mesh/docs/overview#security_features
 
-## Developer notes
+### Developer notes
 
-### General
+#### General
 
 You can use the scripts in the tests/ folder to test different scenarios. In
 general, the scripts do the following:
-* Create a 4 node GKE cluster
-* Install the Google Cloud Platform microservices demo
-* Install a variation of Anthos Service Mesh and verify a working gateway.
+
+- Create a 4 node GKE cluster
+- Install the Google Cloud Platform microservices demo
+- Install a variation of Anthos Service Mesh and verify a working gateway.
 
 Important: You must specify a project by using the CLI, and **your project will be billed
 for the used resources**. These tests attempt to clean up resources they create, but
@@ -133,7 +163,7 @@ Warning: The cloudbuild.yaml file is for testing purposes only. Do not use this
 in any project containing production resources. The Cloud Build configuration
 will attempt to delete all GKE clusters older than three hours old.
 
-### Using Custom Images
+#### Using Custom Images
 
 If you would like to use the script with custom packages or images (e.g. for
 testing pre-release versions), you can do so using environment variables.
@@ -158,7 +188,57 @@ _CI_ASM_KPT_BRANCH=master \
 install_asm --flag --flag...
 ```
 
-### Release
+## asm\_vm
+
+This script simplifies adding GCE VM workloads to [Anthos Service Mesh] on GKE
+clusters running on Google Cloud Platform.
+
+### Prerequisites for asm\_vm
+
+This script requires access to the following tools:
+
+- awk
+- gcloud
+- grep
+- jq
+- kpt
+- kubectl
+- printf
+- tail
+- tr
+- curl
+
+Google Cloud Shell pre-installs these tools except `kpt`, which
+you can install by using `sudo apt-get install google-cloud-sdk-kpt`.
+
+### Running asm\_vm
+
+There are two subcommands in `asm_vm`.
+
+- `prepare_cluster` helps you install additional ASM components required to add
+GCE VM workloads to your mesh. It also helps you verify if your cluster is ready
+for adding GCE VM workloads.
+- `create_gce_instance_template` creates a GCE instance template for GCE VMs to
+be added to your mesh.
+
+You can use the `--help` flag to get more details about the available arguments
+for these subcommands. For example,
+`./asm_vm create_gce_instance_template --help`
+
+If the script is running as a service account and not a user, set the
+SERVICE\_ACCOUNT option to the name of the service account, and
+set KEY\_FILE to the file that contains the authentication credentials for that
+account.
+
+The script automatically validates dependencies and requirements before
+installation. Use the `--only_validate` flag to _only_ perform
+validation and stop before taking any actions with side effects.
+
+Use the `--dry-run` flag for the script to display commands with side effects
+instead of executing them, or use the `--verbose` flag to display _and_ execute
+the commands. Combine the --verbose flag with --help to see extended help.
+
+## Release
 
 The release_asm_installer script is used to upload various versions of the
 script into the associated GCS buckets.

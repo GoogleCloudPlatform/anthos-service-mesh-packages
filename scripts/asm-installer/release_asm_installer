@@ -35,9 +35,9 @@ EOF
 }
 
 # all_releases should write two strings to stdout: <branch-name> <file-suffix>
-# <file_suffix> is the string that comes after "install_asm" in the GCS bucket
+# <file_suffix> is the string that comes after the script name in the GCS bucket
 # e.g. the pair "branch" "demo" will check out the git branch "branch" and
-# upload a file called "install_asm_demo" to the GCS bucket.
+# upload a file called "<SCRIPT_NAME>_demo" to the GCS bucket.
 all_releases() {
   while read -r type version; do
     echo "${type}-${version}-asm" "${version}"
@@ -60,7 +60,8 @@ main() {
   setup
 
   while read -r branch version; do
-    publish_script "${branch}" "${version}"
+    publish_script "${branch}" "${version}" install_asm
+    publish_script "${branch}" "${version}" asm_vm
   done <<EOF
 $(all_releases)
 EOF
@@ -69,7 +70,8 @@ EOF
 publish_script() {
   local BRANCH_NAME; BRANCH_NAME="${1}"
   local VERSION; VERSION="${2}"
-  local FILE_NAME; FILE_NAME="install_asm_${VERSION}"
+  local SCRIPT_NAME; SCRIPT_NAME="${3}"
+  local FILE_NAME; FILE_NAME="${SCRIPT_NAME}_${VERSION}"
   local FILE_PATH; FILE_PATH="${BUCKET_PATH}/${FILE_NAME}"
   local FILE_URI; FILE_URI="${BUCKET_URL}/${FILE_PATH}"
 
@@ -86,11 +88,11 @@ publish_script() {
       echo "New file {FILE_NAME}"
   fi
 
-  sha256sum install_asm >| install_asm.sha256
-  mv install_asm "${FILE_NAME}"
-  sha256sum "${FILE_NAME}" >> install_asm.sha256
+  sha256sum "${SCRIPT_NAME}" >| "${SCRIPT_NAME}.sha256"
+  mv "${SCRIPT_NAME}" "${FILE_NAME}"
+  sha256sum "${FILE_NAME}" >> "${SCRIPT_NAME}.sha256"
   gsutil cp "${FILE_NAME}" gs://"${FILE_PATH}"
-  gsutil cp install_asm.sha256 gs://"${FILE_PATH}.sha256"
+  gsutil cp "${SCRIPT_NAME}.sha256" gs://"${FILE_PATH}.sha256"
   gsutil acl ch -u AllUsers:R gs://"${FILE_PATH}" gs://"${FILE_PATH}.sha256"
 
   curl -O "${FILE_URI}"
@@ -99,17 +101,17 @@ publish_script() {
   sha256sum -c --ignore-missing "${FILE_NAME}.sha256" || echo "Failed to verify ${FILE_NAME}!" >&2
 
   if [[ "${BRANCH_NAME}" == "${CURRENT_RELEASE}" ]]; then
-    gsutil cp "${FILE_NAME}" gs://"${BUCKET_PATH}/install_asm"
-    gsutil cp install_asm.sha256 gs://"${BUCKET_PATH}/install_asm.sha256"
-    gsutil acl ch -u AllUsers:R gs://"${BUCKET_PATH}/install_asm" gs://"${BUCKET_PATH}/install_asm.sha256"
+    gsutil cp "${FILE_NAME}" gs://"${BUCKET_PATH}/${SCRIPT_NAME}"
+    gsutil cp "${SCRIPT_NAME}.sha256" gs://"${BUCKET_PATH}/${SCRIPT_NAME}.sha256"
+    gsutil acl ch -u AllUsers:R gs://"${BUCKET_PATH}/${SCRIPT_NAME}" gs://"${BUCKET_PATH}/${SCRIPT_NAME}.sha256"
 
-    curl -O "${BUCKET_URL}/${BUCKET_PATH}/install_asm"
-    curl -O "${BUCKET_URL}/${BUCKET_PATH}/install_asm.sha256"
+    curl -O "${BUCKET_URL}/${BUCKET_PATH}/${SCRIPT_NAME}"
+    curl -O "${BUCKET_URL}/${BUCKET_PATH}/${SCRIPT_NAME}.sha256"
 
-    sha256sum -c --ignore-missing "install_asm.sha256" || echo "Failed to verify install_asm!" >&2
+    sha256sum -c --ignore-missing "${SCRIPT_NAME}.sha256" || echo "Failed to verify ${SCRIPT_NAME}!" >&2
   fi
 
-  git restore install_asm
+  git restore ${SCRIPT_NAME}
   echo "Published ${FILE_NAME} successfully."
 }
 

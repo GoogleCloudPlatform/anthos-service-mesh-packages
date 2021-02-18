@@ -513,7 +513,7 @@ parse_args_create_gce_instance_template() {
         shift 1
         ;;
       -h | --help)
-        usage
+        usage_create_gce_instance_template
         exit
         ;;
       *)
@@ -569,7 +569,7 @@ parse_args_prepare_cluster() {
         shift 1
         ;;
       -h | --help)
-        usage
+        usage_prepare_cluster
         exit
         ;;
       *)
@@ -674,6 +674,7 @@ curl
 jq
 tr
 awk
+grep
 printf
 tail
 $AKUBECTL
