@@ -75,7 +75,7 @@ setup_cluster() {
     -n "${cluster}" \
     -p "${LT_PROJECT_ID}" \
     -m install \
-    --only-enable -e
+    --only-enable -e -v
 }
 
 setup_cluster "${LT_CLUSTER_NAME}"
