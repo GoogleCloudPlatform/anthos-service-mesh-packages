@@ -7,6 +7,10 @@ if [[ "${_DEBUG}" -eq 1 ]]; then
   gsutil() {
     echo "DEBUG: would have run 'gsutil ${*}'"
   }
+
+  git() {
+    echo "DEBUG: would have run 'git ${*}'"
+  }
 fi
 
 BUCKET_URL="https://storage.googleapis.com"
@@ -77,6 +81,8 @@ publish_script() {
 
   git checkout "${BRANCH_NAME}"
 
+  if [[ ! -f "${SCRIPT_NAME}" ]]; then return; fi
+
   if curl -O "${FILE_URI}.sha256"; then
     if sha256sum -c --ignore-missing "${FILE_NAME}.sha256" >/dev/null 2>/dev/null; then
       echo "No changes in ${FILE_NAME}, skipping"
@@ -119,7 +125,11 @@ setup() {
   tmpdir="$(mktemp -d)"
   pushd "${tmpdir}"
   git clone git@github.com:GoogleCloudPlatform/anthos-service-mesh-packages.git
-  cd anthos-service-mesh-packages/scripts/asm-installer
+  if [[ "${_DEBUG}" -ne 1 ]]; then
+    cd anthos-service-mesh-packages/scripts/asm-installer
+  else
+    touch install_asm
+  fi
 }
 
 main
