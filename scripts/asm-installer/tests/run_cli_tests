@@ -341,6 +341,14 @@ test_main() {
   fi
   echo "***"
 
+  if can_register_cluster; then
+    echo "Enable all shouldn't register to environ when unnecessary: FAIL"
+    ((++FAILURES))
+  else
+    echo "Enable all shouldn't register to environ when unnecessary: PASS"
+  fi
+  echo "***"
+
   clear_variables
   parse_args ${CMD} --enable-cluster-labels
 
@@ -348,6 +356,7 @@ test_main() {
     || can_modify_cluster_roles \
     || ! can_modify_cluster_labels \
     || can_modify_gcp_apis \
+    || can_register_cluster \
     || can_modify_gcp_components \
     || can_modify_gcp_iam_roles; then
     echo "Permissions with --enable-cluster-labels flag: FAIL"
@@ -364,6 +373,7 @@ test_main() {
     || ! can_modify_cluster_roles \
     || can_modify_cluster_labels \
     || can_modify_gcp_apis \
+    || can_register_cluster \
     || can_modify_gcp_components \
     || can_modify_gcp_iam_roles; then
     echo "Permissions with --enable-cluster-roles flag: FAIL"
@@ -380,6 +390,7 @@ test_main() {
     || can_modify_cluster_roles \
     || can_modify_cluster_labels \
     || ! can_modify_gcp_apis \
+    || can_register_cluster \
     || can_modify_gcp_components \
     || can_modify_gcp_iam_roles; then
     echo "Permissions with --enable-gcp-apis flag: FAIL"
@@ -396,6 +407,7 @@ test_main() {
     || can_modify_cluster_roles \
     || can_modify_cluster_labels \
     || can_modify_gcp_apis \
+    || can_register_cluster \
     || ! can_modify_gcp_components \
     || can_modify_gcp_iam_roles; then
     echo "Permissions with --enable-gcp-components flag: FAIL"
@@ -412,6 +424,7 @@ test_main() {
     || can_modify_cluster_roles \
     || can_modify_cluster_labels \
     || can_modify_gcp_apis \
+    || can_register_cluster \
     || can_modify_gcp_components \
     || ! can_modify_gcp_iam_roles; then
     echo "Permissions with --enable-gcp-iam-roles flag: FAIL"
@@ -428,12 +441,24 @@ test_main() {
     || ! can_modify_cluster_roles \
     || can_modify_cluster_labels \
     || can_modify_gcp_apis \
+    || can_register_cluster \
     || ! can_modify_gcp_components \
     || ! can_modify_gcp_iam_roles; then
     echo "Permissions with --managed flag: FAIL"
     ((++FAILURES))
   else
     echo "Permissions with --managed flag: PASS"
+  fi
+  echo "***"
+
+  clear_variables
+  parse_args ${CMD} --enable-all --option vm --option hub_meshca
+
+  if ! can_register_cluster; then
+    echo "Enable all registers with environ when necessary: FAIL"
+    ((++FAILURES))
+  else
+    echo "Enable all registers with environ when necessary: PASS"
   fi
   echo "***"
 
