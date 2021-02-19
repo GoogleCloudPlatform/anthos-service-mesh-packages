@@ -179,13 +179,15 @@ main() {
     if can_modify_gcp_iam_roles; then
       bind_user_to_iam_policy "roles/meshconfig.admin" "$(local_iam_user)"
     fi
-    MANAGED_SERVICE_JSON="$(init_meshconfig_managed)"
-    MANAGED_SERVICE_ACCOUNT="$(echo "${MANAGED_SERVICE_JSON}" | jq -r .serviceAccount)"
-    if [[ -z "${MANAGED_SERVICE_JSON}" || "${MANAGED_SERVICE_ACCOUNT}" == "null" ]]; then
-      fatal "Couldn't initialize meshconfig, do you have the required permission resourcemanager.projects.setIamPolicy?"
+    if can_modify_at_all; then
+      MANAGED_SERVICE_JSON="$(init_meshconfig_managed)"
+      MANAGED_SERVICE_ACCOUNT="$(echo "${MANAGED_SERVICE_JSON}" | jq -r .serviceAccount)"
+      if [[ -z "${MANAGED_SERVICE_JSON}" || "${MANAGED_SERVICE_ACCOUNT}" == "null" ]]; then
+        fatal "Couldn't initialize meshconfig, do you have the required permission resourcemanager.projects.setIamPolicy?"
+      fi
+      unset MANAGED_SERVICE_JSON
+      bind_user_to_iam_policy "$(required_iam_roles_mcp_sa)" "$(iam_user)"
     fi
-    unset MANAGED_SERVICE_JSON
-    bind_user_to_iam_policy "$(required_iam_roles_mcp_sa)" "$(iam_user)"
   else
     if can_modify_gcp_iam_roles; then
       bind_user_to_iam_policy "$(required_iam_roles)" "$(iam_user)"
@@ -248,7 +250,7 @@ main() {
     populate_environ_info
   fi
 
-  if [[ "${MANAGED}" -eq 1 ]]; then
+  if can_modify_at_all && [[ "${MANAGED}" -eq 1 ]]; then
     start_managed_control_plane
     configure_package
     install_managed_components
@@ -2166,9 +2168,24 @@ EOF
     # eval will translate the quoted TRUST_DOMAIN_ALIASES into params to workaround both.
     run eval kpt cfg set asm anthos.servicemesh.trustDomainAliases "${TRUST_DOMAIN_ALIASES}"
   fi
+
+  if [[ "${MANAGED}" -eq 1 ]]; then
+    local VALIDATION_URL; local CLOUDRUN_ADDR;
+    read -r VALIDATION_URL CLOUDRUN_ADDR <<EOF
+$(scrape_managed_urls)
+EOF
+
+    kpt cfg set asm anthos.servicemesh.controlplane.validation-url "${VALIDATION_URL}"
+    kpt cfg set asm anthos.servicemesh.managed-controlplane.cloudrun-addr "${CLOUDRUN_ADDR}"
+  fi
 }
 
 print_config() {
+  if [[ "${MANAGED}" -eq 1 ]]; then
+    cat "${MANAGED_MANIFEST}"
+    return
+  fi
+
   PARAMS="-f ${OPERATOR_MANIFEST}"
   while read -d ',' -r yaml_file; do
     PARAMS="${PARAMS} -f ${yaml_file} "
@@ -2306,7 +2323,7 @@ server-side_apply() {
     --server-side
 }
 
-install_managed_components() {
+scrape_managed_urls() {
   local URL
   URL="$(kubectl get mutatingwebhookconfiguration istiod-asm-managed -ojson | jq .webhooks[0].clientConfig.url -r)"
   # shellcheck disable=SC2001
@@ -2314,9 +2331,10 @@ install_managed_components() {
   # shellcheck disable=SC2001
   CLOUDRUN_ADDR=$(echo "${URL}" | cut -d'/' -f3)
 
-  kpt cfg set asm anthos.servicemesh.controlplane.validation-url "${VALIDATION_URL}"
-  kpt cfg set asm anthos.servicemesh.managed-controlplane.cloudrun-addr "${CLOUDRUN_ADDR}"
+  echo "${VALIDATION_URL} ${CLOUDRUN_ADDR}"
+}
 
+install_managed_components() {
   info "Configuring base installation for managed control plane..."
 
   kubectl apply -f "${BASE_REL_PATH}"
@@ -2330,6 +2348,8 @@ install_managed_components() {
   info "Installing ASM managed control plane components..."
   # shellcheck disable=SC2086
   retry 5 istioctl install $PARAMS
+
+  print_config >| managed_control_plane_gateway.yaml
 
 
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
