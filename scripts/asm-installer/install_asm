@@ -687,7 +687,9 @@ FLAGS:
   are incompatible with --only_validate.
 
   -e|--enable_all                     Allow the script to perform all of the
-                                      individual enable actions below.
+                                      individual enable actions below. (Environ
+                                      registration won't happen unless necessary
+                                      for a selected option.)
      --enable_cluster_roles           Allow the script to attempt to set
                                       the necessary cluster roles.
      --enable_cluster_labels          Allow the script to attempt to set
