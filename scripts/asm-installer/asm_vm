@@ -1514,16 +1514,12 @@ success_message_create_gce_instance_template() {
 *****************************
 The GCE Instance Template for ASM VM is now created.
 
-To create a single instance from the instance template, run:
-  gcloud compute instances create <INSTANCE_NAME>\
-  --source-instance-template ${NEW_INSTANCE_TEMPLATE} --project=${PROJECT_ID}
-
 To create a managed instance group from the instance template, run:
   gcloud compute instance-groups managed create <INSTANCE_GROUP_NAME>\
-  --base-instance-name <BASE_NAME>\
-  --size <SIZE>\
   --template ${NEW_INSTANCE_TEMPLATE}\
-  --zone <ZONE>
+  --size <INSTANCE_GROUP_SIZE>\
+  --zone <INSTANCE_GROUP_ZONE>\
+  --project ${PROJECT_ID}
 *****************************
 "
 }
