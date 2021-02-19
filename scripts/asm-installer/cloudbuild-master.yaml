@@ -138,7 +138,7 @@ steps:
   - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
   - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
   - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
-  timeout: 600s
+  timeout: 1200s
 
 substitutions:
   _BUCKET_NAME: my-gcs-bucket
