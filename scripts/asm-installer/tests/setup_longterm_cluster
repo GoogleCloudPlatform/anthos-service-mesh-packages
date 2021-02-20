@@ -67,8 +67,8 @@ fi
 echo "Performing necessary cluster setup"
 
 ../install_asm \
-  -l ${LT_CLUSTER_LOCATION} \
+  -l "${LT_CLUSTER_LOCATION}" \
   -n "${LT_CLUSTER_NAME}" \
   -p "${LT_PROJECT_ID}" \
   -m install \
-  --only-enable -e
+  --only-enable -e -v
