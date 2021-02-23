@@ -11,8 +11,6 @@ cd "${SDIR}"
 
 LT_CLUSTER_NAME="long-term-test-cluster"
 LT_CLUSTER_LOCATION="us-central1-c"
-LT_PROJECT_ID="asm-scriptaro-oss"
-
 RESULT="$(gcloud container clusters list \
   --project="${LT_PROJECT_ID}" \
   --filter="name = ${LT_CLUSTER_NAME} and location = ${LT_CLUSTER_LOCATION}" \
@@ -40,7 +38,6 @@ else
     \
     --zone "${LT_CLUSTER_LOCATION}" \
     --no-enable-basic-auth \
-    --cluster-version "1.17.14-gke.400" \
     --release-channel "regular" \
     --machine-type "e2-standard-4" \
     --image-type "COS" \
