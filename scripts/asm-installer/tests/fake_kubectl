@@ -1,7 +1,21 @@
 #!/bin/bash
 
-FAKE_CONFIG="$(cat "${KUBECONFIG}")"
+FAKE_CONFIG="$(cat "${KUBECONFIG}" 2>/dev/null)"
 
+if [[ "${*}" == *"config"* ]]; then
+  cat <<-EOF
+{
+    "clusters": [
+        {
+            "cluster": {
+                "server": "https://127.0.0.1"
+            }
+        }
+    ]
+}
+EOF
+exit 0
+fi
 if [[ "${*}" == *"version"* ]]; then
   cat <<EOF
 {

@@ -29,31 +29,25 @@ _CI_TRUSTED_GCP_PROJECTS="${_CI_TRUSTED_GCP_PROJECTS:=}"
 _CI_ENVIRON_PROJECT_NUMBER="${_CI_ENVIRON_PROJECT_NUMBER:=}"
 
 ### Internal variables ###
-MAJOR="${MAJOR:=1}"
-MINOR="${MINOR:=8}"
-POINT="${POINT:=2}"
-REV="${REV:=2}"
-RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
-RELEASE_LINE="${MAJOR}.${MINOR}."
-PREVIOUS_RELEASE_LINE="${MAJOR}.$(( MINOR - 1 ))."
-REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}-${REV}"
-KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=release-${MAJOR}.${MINOR}-asm}"
-readonly RELEASE; readonly RELEASE_LINE; readonly KPT_BRANCH;
+MAJOR="${MAJOR:=1}"; readonly MAJOR;
+MINOR="${MINOR:=8}"; readonly MINOR;
+POINT="${POINT:=3}"; readonly POINT;
+REV="${REV:=2}"; readonly REV;
 K8S_MINOR=0
 
 ### File related constants ###
-ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
-ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
-BASE_REL_PATH="${ISTIO_FOLDER_NAME}/manifests/charts/base/files/gen-istio-cluster.yaml"; readonly BASE_REL_PATH;
-PACKAGE_DIRECTORY="asm/istio"; readonly PACKAGE_DIRECTORY;
-VALIDATION_FIX_SERVICE="${PACKAGE_DIRECTORY}/istiod-service.yaml"; readonly VALIDATION_FIX_SERVICE;
-OPTIONS_DIRECTORY="${PACKAGE_DIRECTORY}/options"; readonly OPTIONS_DIRECTORY;
-OPERATOR_MANIFEST="${PACKAGE_DIRECTORY}/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
-BETA_CRD_MANIFEST="${OPTIONS_DIRECTORY}/v1beta1-crds.yaml"; readonly BETA_CRD_MANIFEST;
-MANAGED_MANIFEST="${OPTIONS_DIRECTORY}/managed-control-plane.yaml"; readonly MANAGED_MANIFEST;
-MANAGED_WEBHOOKS="${OPTIONS_DIRECTORY}/managed-control-plane-webhooks.yaml"; readonly MANAGED_WEBHOOKS;
-EXPOSE_ISTIOD_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_SERVICE;
-CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
+ISTIO_FOLDER_NAME=""
+ISTIOCTL_REL_PATH=""
+BASE_REL_PATH=""
+PACKAGE_DIRECTORY=""
+VALIDATION_FIX_SERVICE=""
+OPTIONS_DIRECTORY=""
+OPERATOR_MANIFEST=""
+BETA_CRD_MANIFEST=""
+MANAGED_MANIFEST=""
+MANAGED_WEBHOOKS=""
+EXPOSE_ISTIOD_SERVICE=""
+CANONICAL_CONTROLLER_MANIFEST=""
 
 SCRIPT_NAME="${0##*/}"
 
@@ -65,6 +59,11 @@ KPT_URL=""
 KUBECONFIG=""
 APATH=""
 ABS_OVERLAYS=""
+RELEASE=""
+REVISION_LABEL=""
+RELEASE_LINE=""
+PREVIOUS_RELEASE_LINE=""
+KPT_BRANCH=""
 
 ### Option variables ###
 PROJECT_ID="${PROJECT_ID:=}"
@@ -123,9 +122,8 @@ main() {
 
   validate_args
 
-  if ! only_enable; then
-    set_up_local_workspace
-  fi
+  set_up_local_workspace
+  configure_kubectl
 
   validate_cli_dependencies
 
@@ -136,7 +134,6 @@ main() {
   if should_validate || can_modify_at_all; then
     local_iam_user > /dev/null
     validate_gcp_resources
-    configure_kubectl
   fi
 
   if needs_asm && ! necessary_files_exist; then
@@ -191,6 +188,7 @@ main() {
     fi
   fi
 
+  get_project_number
   if can_modify_cluster_labels; then
     add_cluster_labels
   elif should_validate; then
@@ -235,7 +233,6 @@ main() {
   fi
 
   if [[ "${PRINT_CONFIG}" -eq 1 && "${USE_HUB_WIP}" -eq 1 ]]; then
-    configure_kubectl
     populate_environ_info
   fi
 
@@ -271,6 +268,31 @@ init() {
     Darwin) APATH="stat";;
     *);;
   esac
+  if [[ "${POINT}" == "alpha" ]]; then
+    RELEASE="${MAJOR}.${MINOR}-alpha.${REV}"
+    REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}"
+    KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=master}"
+  else
+    RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
+    REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}-${REV}"
+    KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=release-${MAJOR}.${MINOR}-asm}"
+  fi
+  RELEASE_LINE="${MAJOR}.${MINOR}."
+  PREVIOUS_RELEASE_LINE="${MAJOR}.$(( MINOR - 1 ))."
+  readonly RELEASE; readonly RELEASE_LINE; readonly PREVIOUS_RELEASE_LINE; readonly KPT_BRANCH;
+
+  ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
+  ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
+  BASE_REL_PATH="${ISTIO_FOLDER_NAME}/manifests/charts/base/files/gen-istio-cluster.yaml"; readonly BASE_REL_PATH;
+  PACKAGE_DIRECTORY="asm/istio"; readonly PACKAGE_DIRECTORY;
+  VALIDATION_FIX_SERVICE="${PACKAGE_DIRECTORY}/istiod-service.yaml"; readonly VALIDATION_FIX_SERVICE;
+  OPTIONS_DIRECTORY="${PACKAGE_DIRECTORY}/options"; readonly OPTIONS_DIRECTORY;
+  OPERATOR_MANIFEST="${PACKAGE_DIRECTORY}/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
+  BETA_CRD_MANIFEST="${OPTIONS_DIRECTORY}/v1beta1-crds.yaml"; readonly BETA_CRD_MANIFEST;
+  MANAGED_MANIFEST="${OPTIONS_DIRECTORY}/managed-control-plane.yaml"; readonly MANAGED_MANIFEST;
+  MANAGED_WEBHOOKS="${OPTIONS_DIRECTORY}/managed-control-plane-webhooks.yaml"; readonly MANAGED_WEBHOOKS;
+  EXPOSE_ISTIOD_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_SERVICE;
+  CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
 }
 
 apath() {
@@ -299,6 +321,18 @@ run() {
   return $RETVAL
 }
 
+apath() {
+  "${APATH}" "${@}"
+}
+
+istioctl_path() {
+  if [[ -n "${_CI_ISTIOCTL_REL_PATH}" && -f "${_CI_ISTIOCTL_REL_PATH}" ]]; then
+    echo "${_CI_ISTIOCTL_REL_PATH}"
+  else
+    echo "./${ISTIOCTL_REL_PATH}"
+  fi
+}
+
 #######
 # retry takes an integer N as the first argument, and a list of arguments
 # representing a command afterwards. It will retry the given command up to N
@@ -315,9 +349,6 @@ retry() {
     { "${@}" && return 0; } || true
     warn "Failed, retrying...($((i+1)) of ${MAX_TRIES})"
     sleep 2
-    if [[ "$1" == "kubectl" ]]; then
-      configure_kubectl
-    fi
   done
   false
 }
@@ -353,9 +384,17 @@ configure_kubectl(){
     --project="${PROJECT_ID}" \
     --zone="${CLUSTER_LOCATION}"
 
-  info "Verifying connectivity (20s)..."
+  if ! hash nc; then
+     warn "nc command not found, not verifying connection to Kube API server."
+     return
+  fi
+
+  info "Verifying connectivity (10s)..."
+  local ADDR
+  ADDR="$(kubectl config view --minify=true -ojson | jq .clusters[0].cluster.server -r)"
+
   local RETVAL; RETVAL=0;
-  kubectl cluster-info --request-timeout='20s' 1>/dev/null 2>/dev/null || RETVAL=$?
+  run nc -zvw 10 "${ADDR:8:${#ADDR}}" 443 || RETVAL=$?
   if [[ "${RETVAL}" -ne 0 ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Couldn't connect to ${CLUSTER_NAME}.
@@ -1096,11 +1135,13 @@ handle_multi_yaml_bug() {
   local BASE_NAME
   while read -d ',' -r yaml_file; do
     BASE_NAME="$(basename "${yaml_file}")"
-    if [[ "$(csplit -z -f "overlay-${BASE_NAME}" -z "${yaml_file}" '/^---$/' '{*}' | wc -l)" -eq 1 ]]; then
+    if [[ "$(csplit -f "overlay-${BASE_NAME}" "${yaml_file}" '/^---$/' '{*}' | wc -l)" -eq 1 ]]; then
       CSPLIT_OUTPUT="${CSPLIT_OUTPUT},${yaml_file}"
     else
       for split_file in overlay-"${BASE_NAME}"*; do
-        CSPLIT_OUTPUT="${CSPLIT_OUTPUT},$(apath -f "${split_file}")"
+        if [[ -s "${split_file}" ]]; then
+          CSPLIT_OUTPUT="${CSPLIT_OUTPUT},$(apath -f "${split_file}")"
+        fi
       done
     fi
   done <<EOF
@@ -1195,8 +1236,6 @@ necessary_files_exist() {
 }
 
 validate_gcp_resources() {
-  validate_project
-  PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format="value(projectNumber)")"
   validate_cluster
 }
 
@@ -1215,15 +1254,14 @@ EOF
   fi
 }
 
-validate_project() {
+get_project_number() {
   local RESULT; RESULT=""
 
   info "Checking for project ${PROJECT_ID}..."
-  RESULT=$(gcloud projects list \
-    --filter="project_id=${PROJECT_ID}" \
-    --format="value(project_id)" || true)
 
-  if [[ -z "${RESULT}" ]]; then
+  PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format="value(projectNumber)")"
+
+  if [[ -z "${PROJECT_NUMBER}" ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Unable to find project ${PROJECT_ID}. Please verify the spelling and try
 again. To see a list of your projects, run:
@@ -1485,7 +1523,7 @@ bind_user_to_iam_policy(){
   while read -r role; do
   retry 3 run gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
     --member "${GCLOUD_MEMBER}" \
-    --role="${role}" >/dev/null
+    --role="${role}" --condition=None >/dev/null
   done <<EOF
 ${ROLES}
 EOF
@@ -1594,7 +1632,6 @@ compute.googleapis.com
 monitoring.googleapis.com
 logging.googleapis.com
 cloudtrace.googleapis.com
-meshca.googleapis.com
 meshtelemetry.googleapis.com
 meshconfig.googleapis.com
 iamcredentials.googleapis.com
@@ -1602,8 +1639,16 @@ gkeconnect.googleapis.com
 gkehub.googleapis.com
 cloudresourcemanager.googleapis.com
 stackdriver.googleapis.com
-privateca.googleapis.com
 EOF
+  case "${CA}" in
+   mesh_ca)
+     echo meshca.googleapis.com
+     ;;
+   gcp_cas)
+     echo privateca.googleapis.com
+     ;;
+    *);;
+  esac
 }
 # [END required_apis]
 
@@ -1691,15 +1736,19 @@ auth_header() {
 
 add_cluster_labels(){
   local LABELS; LABELS="$(get_cluster_labels)";
-  local REQUIRED; REQUIRED="$(required_cluster_labels)";
-  local NOTFOUND; NOTFOUND="$(find_missing_strings "${REQUIRED}" "${LABELS}")"
+
+  local VERSION_TAG
+  VERSION_TAG="${RELEASE//\./-}"
+  local WANT; WANT="$(mesh_id_label; echo "asmv=${VERSION_TAG}")";
+
+  local NOTFOUND; NOTFOUND="$(find_missing_strings "${WANT}" "${LABELS}")"
+
   if [[ -z "${NOTFOUND}" ]]; then return 0; fi
 
   if [[ -n "${LABELS}" ]]; then
-    LABELS="${LABELS},${NOTFOUND}"
-  else
-    LABELS="${NOTFOUND}"
+    LABELS="${LABELS},"
   fi
+  LABELS="${LABELS}${NOTFOUND}"
 
   info "Adding labels to ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
   retry 2 run gcloud container clusters update "${CLUSTER_NAME}" \
@@ -1710,7 +1759,7 @@ add_cluster_labels(){
 
 exit_if_cluster_unlabeled() {
   local LABELS; LABELS="$(get_cluster_labels)";
-  local REQUIRED; REQUIRED="$(required_cluster_labels)";
+  local REQUIRED; REQUIRED="$(mesh_id_label)";
   local NOTFOUND; NOTFOUND="$(find_missing_strings "${REQUIRED}" "${LABELS}")"
 
   if [[ -n "${NOTFOUND}" ]]; then
@@ -1726,13 +1775,8 @@ EOF
   fi
 }
 
-required_cluster_labels() {
-  local VERSION_TAG
-  VERSION_TAG="${RELEASE//\./-}"
-  cat <<EOF
-asmv=${VERSION_TAG}
-mesh_id=proj-${PROJECT_NUMBER}
-EOF
+mesh_id_label() {
+  echo "mesh_id=proj-${PROJECT_NUMBER}"
 }
 
 get_cluster_labels() {
@@ -1831,7 +1875,6 @@ is_membership_crd_installed() {
 populate_environ_info() {
   if [[ -n "${ENVIRON_PROJECT_ID}" && -n "${HUB_MEMBERSHIP_ID}" ]]; then return; fi
   if ! is_membership_crd_installed; then return; fi
-  configure_kubectl
   local IDENTITY_PROVIDER
   local IDENTITY
   IDENTITY_PROVIDER="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.identity_provider)"

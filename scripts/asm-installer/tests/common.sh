@@ -4,6 +4,7 @@ LT_PROJECT_ID="asm-scriptaro-oss"
 LT_NAMESPACE=""
 OUTPUT_DIR=""
 
+_EXTRA_FLAGS="${_EXTRA_FLAGS:=}"; export _EXTRA_FLAGS;
 BUILD_ID="${BUILD_ID:=}"; export BUILD_ID;
 PROJECT_ID="${PROJECT_ID:=}"; export PROJECT_ID;
 CLUSTER_LOCATION="${CLUSTER_LOCATION:=us-central1-c}"; export CLUSTER_LOCATION;
@@ -288,6 +289,9 @@ cleanup_lt_cluster() {
   set +e
   "${DIR}"/istio*/bin/istioctl x uninstall --purge -y
   remove_ns "${NAMESPACE} istio-system asm-system" || true
+  # Remove managed control plane webhooks
+  kubectl delete mutatingwebhookconfigurations istiod-asm-managed istiod-asmca istiod-ossmanaged || true
+  kubectl delete validatingwebhookconfigurations istiod-istio-system || true
   set -e
 }
 
@@ -582,6 +586,9 @@ run_basic_test() {
   OUTPUT_DIR="$(mktemp -d)"
 
   configure_kubectl "${LT_CLUSTER_NAME}" "${PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
+
+  trap 'remove_ns "${LT_NAMESPACE}"; rm "${LT_NAMESPACE}"; exit 1' ERR
+
   # Demo app setup
   echo "Installing and verifying demo app..."
   install_demo_app "${LT_NAMESPACE}"
@@ -596,11 +603,11 @@ run_basic_test() {
 
   mkfifo "${LT_NAMESPACE}"
 
-  trap 'remove_ns "${LT_NAMESPACE}"; rm "${LT_NAMESPACE}"; exit 1' ERR
-
   # Test starts here
   echo "Installing ASM with MeshCA..."
   echo "_CI_REVISION_PREFIX=${LT_NAMESPACE} \
+  _CI_CLOUDRUN_IMAGE_HUB="gcr.io/wlhe-cr/asm/cloudrun" \
+  _CI_CLOUDRUN_IMAGE_TAG="1.9.0-asm.1" \
   ../install_asm ${KEY_FILE} ${SERVICE_ACCOUNT} \
     -l ${LT_CLUSTER_LOCATION} \
     -n ${LT_CLUSTER_NAME} \
@@ -611,6 +618,8 @@ run_basic_test() {
     ${EXTRA_FLAGS}"
   # shellcheck disable=SC2086
   _CI_REVISION_PREFIX="${LT_NAMESPACE}" \
+  _CI_CLOUDRUN_IMAGE_HUB="gcr.io/wlhe-cr/asm/cloudrun" \
+  _CI_CLOUDRUN_IMAGE_TAG="1.9.0-asm.1" \
     ../install_asm ${KEY_FILE} ${SERVICE_ACCOUNT} \
     -l "${LT_CLUSTER_LOCATION}" \
     -n "${LT_CLUSTER_NAME}" \
@@ -618,7 +627,7 @@ run_basic_test() {
     -m "${MODE}" \
     -c "${CA}" -v \
     --output-dir "${OUTPUT_DIR}" \
-    ${EXTRA_FLAGS} 2>&1 | tee "${LT_NAMESPACE}" &
+    ${EXTRA_FLAGS} ${_EXTRA_FLAGS} 2>&1 | tee "${LT_NAMESPACE}" &
 
   LABEL="$(grep -o -m 1 'istio.io/rev=\S*' "${LT_NAMESPACE}")"
   REV="$(echo "${LABEL}" | cut -f 2 -d =)"
