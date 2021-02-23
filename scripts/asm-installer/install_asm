@@ -469,6 +469,10 @@ fatal_with_usage() {
   exit 2
 }
 
+starline() {
+  echo "*****************************"
+}
+
 is_managed() {
   if [[ "${MANAGED}" -ne 1 ]]; then false; fi
 }
@@ -1158,10 +1162,17 @@ set_up_local_workspace() {
   if [[ -z "${OUTPUT_DIR}" ]]; then
     info "Creating temp directory..."
     OUTPUT_DIR="$(mktemp -d)"
-    info "Created ${OUTPUT_DIR}"
     if [[ -z "${OUTPUT_DIR}" ]]; then
       fatal "Encountered error when running mktemp -d!"
     fi
+    info ""
+    info "$(starline)"
+    info "No output folder was specified with --output_dir|-D, so configuration and"
+    info "binaries will be stored in the following directory."
+    info "${OUTPUT_DIR}"
+    info "$(starline)"
+    info ""
+    sleep 2
   else
     OUTPUT_DIR="$(apath -f "${OUTPUT_DIR}")"
   fi
@@ -2360,7 +2371,7 @@ install_managed_components() {
 
 outro() {
   info ""
-  info "*****************************"
+  info "$(starline)"
   info "The ASM control plane installation is now complete."
   info "To enable automatic sidecar injection on a namespace, you can use the following command:"
   info "kubectl label namespace <NAMESPACE> istio-injection- istio.io/rev=${REVISION_LABEL} --overwrite"
@@ -2389,7 +2400,7 @@ outro() {
     info "${OUTPUT_DIR}/${EXPANDED_YAML}"
   fi
 
-  info "*****************************"
+  info "$(starline)"
 }
 
 main "${@}"
