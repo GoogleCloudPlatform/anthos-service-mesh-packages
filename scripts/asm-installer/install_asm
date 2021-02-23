@@ -1420,7 +1420,8 @@ validate_node_pool() {
       jq '.[] |
         (if .autoscaling.enabled then .autoscaling.maxNodeCount else .initialNodeCount end)
         *
-        (.config.machineType / "-" | .[-1] | tonumber)
+        (.config.machineType / "-" | .[-1] | try tonumber catch 1)
+        * (.locations | length)
       ' 2>/dev/null)" || true
 
   local MAX_CPU; MAX_CPU=0;

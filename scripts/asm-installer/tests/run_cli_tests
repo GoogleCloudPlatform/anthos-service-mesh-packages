@@ -77,6 +77,17 @@ fatal() {
   fi
 }
 
+WARNED=0
+warn_pause() {
+  echo "[WARNING(fake)]: ${1}" >&2
+  WARNED=1
+}
+
+NODE_POOL=""
+list_valid_pools() {
+  echo "${NODE_POOL}"
+}
+
 sleep() {
   echo "sleeping ${*}" >&2
 }
@@ -519,6 +530,50 @@ EOF
     ((++FAILURES))
   else
     echo "local_iam_user detects not logged in state: PASS"
+  fi
+  echo "***"
+
+  #################
+  # node pool validation should handle zonal, regional pools with mixed types
+  #################
+
+  WARNED=0
+  NODE_POOL='[
+{
+  "autoscaling": {
+    "enabled": false
+  },
+  "config": {
+    "machineType": "e2-standard-4"
+  },
+  "initialNodeCount": 1,
+  "locations": [
+    "us-central1-x",
+    "us-central1-y",
+    "us-central1-z"
+  ]
+},
+{
+  "autoscaling": {
+    "enabled": false
+  },
+  "config": {
+    "machineType": "e2-medium"
+  },
+  "initialNodeCount": 1,
+  "locations": [
+    "us-central1-z"
+  ]
+}
+]'
+
+  validate_node_pool
+
+  if [[ "${WARNED}" -eq 1 ]]; then
+    echo "validate_node_pool handles multiple pool location/types: FAIL"
+    ((++FAILURES))
+  else
+    echo "validate_node_pool handles multiple pool location/types: PASS"
   fi
   echo "***"
 
