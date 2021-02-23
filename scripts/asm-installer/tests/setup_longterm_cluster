@@ -11,7 +11,7 @@ cd "${SDIR}"
 
 setup_cluster() {
   local cluster; cluster="$1"
-  
+
   RESULT="$(gcloud container clusters list \
     --project="${LT_PROJECT_ID}" \
     --filter="name = ${cluster} and location = ${LT_CLUSTER_LOCATION}" \
@@ -41,7 +41,6 @@ setup_cluster() {
       \
       --zone "${LT_CLUSTER_LOCATION}" \
       --no-enable-basic-auth \
-      --cluster-version "1.17.14-gke.1600" \
       --release-channel "regular" \
       --machine-type "e2-standard-4" \
       --image-type "COS" \
