@@ -1588,9 +1588,9 @@ expose_istiod() {
 
   ASM_REVISIONS="$(strip_last_char "${ASM_REVISIONS}")"
   for rev in $(echo "${ASM_REVISIONS}" | tr ',' '\n'); do
-    kpt cfg set asm anthos.servicemesh.istiodHost "istiod-${rev}.istio-system.svc.cluster.local"
+    kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod-${rev}.istio-system.svc.cluster.local"
+    kpt cfg set asm anthos.servicemesh.istiodHost "istiod-${rev}.istio-system.svc"
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${rev}"
-    kpt cfg set asm anthos.servicemesh.istiod-dr-name "istiod-dr-${rev}"
   done
 
   retry 3 kubectl apply -f "${EXPOSE_ISTIOD_SERVICE}"
