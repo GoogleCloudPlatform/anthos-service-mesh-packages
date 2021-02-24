@@ -654,6 +654,11 @@ run_basic_test() {
   label_with_revision "${LT_NAMESPACE}" "${LABEL}"
   roll "${LT_NAMESPACE}"
 
+  # MCP doesn't install Ingress
+  if [[ "${EXTRA_FLAGS}" = *--managed* ]]; then
+    return
+  fi
+
   local SUCCESS; SUCCESS=0;
   echo "Getting istio ingress IP..."
   GATEWAY="$(istio_ingress)"
