@@ -263,6 +263,7 @@ main() {
   fi
 
   configure_package
+  handle_multi_yaml_bug
 
   if [[ "${PRINT_CONFIG}" -eq 1 ]]; then
     print_config >&3
@@ -1214,8 +1215,7 @@ EOF
   done <<EOF
 ${OPTIONAL_OVERLAY}
 EOF
-  handle_multi_yaml_bug
-unset OPTIONAL_OVERLAY; readonly CUSTOM_OVERLAY
+  unset OPTIONAL_OVERLAY
 }
 
 # This is a workaround for https://github.com/istio/istio/issues/30632
