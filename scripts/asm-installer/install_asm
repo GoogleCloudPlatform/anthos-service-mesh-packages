@@ -2162,9 +2162,9 @@ configure_package() {
   fi
 
   if [[ "${USE_VM}" -eq 1 ]] && [[ "${_CI_NO_REVISION}" -eq 0 ]]; then
-    kpt cfg set asm anthos.servicemesh.istiodHost "istiod-${REVISION_LABEL}.istio-system.svc.cluster.local"
+    kpt cfg set asm anthos.servicemesh.istiodHost "istiod-${REVISION_LABEL}.istio-system.svc"
+    kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod-${REVISION_LABEL}.istio-system.svc.cluster.local"
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${REVISION_LABEL}"
-    kpt cfg set asm anthos.servicemesh.istiod-dr-name "istiod-dr-${REVISION_LABEL}"
   fi
 
   if [[ "${CA}" == "mesh_ca" && -n "${_CI_TRUSTED_GCP_PROJECTS}" ]]; then
@@ -2288,9 +2288,9 @@ EOF
 
     # The default istiod service is exposed so that any fallback on the VM side
     # to use the default Istiod service can still connect to the control plane.
-    kpt cfg set asm anthos.servicemesh.istiodHost "istiod.istio-system.svc.cluster.local"
+    kpt cfg set asm anthos.servicemesh.istiodHost "istiod.istio-system.svc"
+    kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod.istio-system.svc.cluster.local"
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs"
-    kpt cfg set asm anthos.servicemesh.istiod-dr-name "istiod-dr"
     expose_istiod
   fi
 
