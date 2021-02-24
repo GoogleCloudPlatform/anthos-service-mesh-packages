@@ -13,11 +13,12 @@
 # limitations under the License.
 
 # [START docs]
+---
 apiVersion: install.istio.io/v1alpha1
 kind: IstioOperator
 spec:
   components:
     egressGateways:
-    - name: istio-egressgateway
-      enabled: true
+      - name: istio-egressgateway
+        enabled: true
 # [END docs]

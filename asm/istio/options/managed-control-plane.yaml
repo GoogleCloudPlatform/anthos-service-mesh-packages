@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+---
 apiVersion: install.istio.io/v1alpha1
 kind: IstioOperator
 spec:
@@ -29,11 +30,11 @@ spec:
     istiodRemote:
       enabled: false
     ingressGateways:
-    - enabled: true
-      name: istio-ingressgateway
-      label:
-        app: istio-ingressgateway
-        istio: ingressgateway
+      - enabled: true
+        name: istio-ingressgateway
+        label:
+          app: istio-ingressgateway
+          istio: ingressgateway
   meshConfig:
     trustDomain: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
     defaultConfig:

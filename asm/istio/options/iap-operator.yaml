@@ -14,32 +14,34 @@
 
 # This overlay adds compatibility for upgrades to clusters using GCLB
 # for certain versions of istioctl
+
+---
 apiVersion: install.istio.io/v1alpha1
 kind: IstioOperator
 spec:
   components:
     ingressGateways:
-    - enabled: true
-      name: istio-ingressgateway
-      k8s:
-        service:
-          type: NodePort
-          ports:
-            - name: status-port
-              nodePort: 31223 # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.ingress.statusPort"}
-              port: 15021
-              protocol: TCP
-              targetPort: 15021
-            - nodePort: 31224 # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.ingress.httpPort"}
-              port: 80
-              targetPort: 8080
-              name: http2
-            - port: 443
-              targetPort: 8443
-              name: https
-            - port: 15012
-              targetPort: 15012
-              name: tcp-istiod
-            - port: 15443
-              targetPort: 15443
-              name: tls
+      - enabled: true
+        name: istio-ingressgateway
+        k8s:
+          service:
+            type: NodePort
+            ports:
+              - name: status-port
+                nodePort: 31223 # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.ingress.statusPort"}
+                port: 15021
+                protocol: TCP
+                targetPort: 15021
+              - nodePort: 31224 # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.ingress.httpPort"}
+                port: 80
+                targetPort: 8080
+                name: http2
+              - port: 443
+                targetPort: 8443
+                name: https
+              - port: 15012
+                targetPort: 15012
+                name: tcp-istiod
+              - port: 15443
+                targetPort: 15443
+                name: tls

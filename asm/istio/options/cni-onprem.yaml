@@ -13,6 +13,7 @@
 # limitations under the License.
 
 # [START docs]
+---
 apiVersion: install.istio.io/v1alpha1
 kind: IstioOperator
 spec:
@@ -24,7 +25,7 @@ spec:
     cni:
       cniBinDir: /opt/cni/bin
       excludeNamespaces:
-      - istio-system
-      - kube-system
-      - gke-system
+        - istio-system
+        - kube-system
+        - gke-system
 # [END docs]

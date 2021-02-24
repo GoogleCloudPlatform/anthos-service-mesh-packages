@@ -13,6 +13,7 @@
 # limitations under the License.
 
 # [START docs]
+---
 apiVersion: install.istio.io/v1alpha1
 kind: IstioOperator
 spec:
