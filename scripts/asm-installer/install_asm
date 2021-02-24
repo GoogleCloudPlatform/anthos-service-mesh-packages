@@ -32,7 +32,7 @@ _CI_ENVIRON_PROJECT_NUMBER="${_CI_ENVIRON_PROJECT_NUMBER:=}"
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=9}"; readonly MINOR;
 POINT="${POINT:=0}"; readonly POINT;
-REV="${REV:=1}"; readonly REV;
+REV="${REV:=2}"; readonly REV;
 K8S_MINOR=0
 
 ### File related constants ###
