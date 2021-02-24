@@ -2350,7 +2350,6 @@ install_managed_components() {
   info "Configuring base installation for managed control plane..."
 
   kubectl apply -f "${BASE_REL_PATH}"
-  kubectl replace -f "${MANAGED_WEBHOOKS}"
 
   info "Configuring ASM managed control plane components..."
   print_config >| managed_control_plane_gateway.yaml
@@ -2394,6 +2393,10 @@ outro() {
     info "${OUTPUT_DIR}/${RAW_YAML}"
     info "The full, expanded set of kubernetes resources can be found at:"
     info "${OUTPUT_DIR}/${EXPANDED_YAML}"
+  else
+    info "You can find the validatingwebhook and gateway configuration files at:"
+    info "${OUTPUT_DIR}/${MANAGED_WEBHOOKS}"
+    info "${OUTPUT_DIR}/managed_control_plane_gateway.yaml"
   fi
 
   info "$(starline)"
