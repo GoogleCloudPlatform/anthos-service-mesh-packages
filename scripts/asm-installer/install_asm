@@ -2370,7 +2370,10 @@ install_managed_components() {
 }
 
 outro() {
+
   info ""
+  info "$(starline)"
+  istioctl version
   info "$(starline)"
   info "The ASM control plane installation is now complete."
   info "To enable automatic sidecar injection on a namespace, you can use the following command:"
