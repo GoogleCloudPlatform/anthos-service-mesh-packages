@@ -862,10 +862,9 @@ delete_service_mesh_feature() {
   echo "Removing the service mesh feature from the project ${PROJECT_ID}..."
 
   local TOKEN
-  TOKEN="$(retry 2 gcloud \
-    --project="${PROJECT_ID}" auth print-access-token)"
+  TOKEN="$(gcloud --project="${PROJECT_ID}" auth print-access-token)"
 
-  run curl -s -H "X-Goog-User-Project: ${PROJECT_ID}"  \
+  curl -s -H "X-Goog-User-Project: ${PROJECT_ID}"  \
     -X DELETE \
     "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features/servicemesh" \
     -H @- <<EOF
@@ -875,11 +874,10 @@ EOF
 
 is_service_mesh_feature_enabled() {
   local TOKEN
-  TOKEN="$(retry 2 gcloud \
-    --project="${PROJECT_ID}" auth print-access-token)"
-  
+  TOKEN="$(gcloud --project="${PROJECT_ID}" auth print-access-token)"
+
   local RESPONSE
-  RESPONSE="$(run curl -s -H "X-Goog-User-Project: ${PROJECT_ID}"  \
+  RESPONSE="$(curl -s -H "X-Goog-User-Project: ${PROJECT_ID}"  \
     "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features/servicemesh" \
     -H @- <<EOF
 Authorization: Bearer ${TOKEN}
