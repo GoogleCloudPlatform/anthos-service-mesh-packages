@@ -67,6 +67,7 @@ REVISION_LABEL=""
 RELEASE_LINE=""
 PREVIOUS_RELEASE_LINE=""
 KPT_BRANCH=""
+NAMESPACE_EXISTS=0
 
 ### Option variables ###
 PROJECT_ID="${PROJECT_ID:=}"
@@ -2078,11 +2079,20 @@ EOF
   fi
 }
 
-ensure_istio_namespace_exists(){
+ensure_istio_namespace_exists() {
   info "Checking for istio-system namespace..."
-  if [ "$(retry 2 kubectl get ns | grep -c istio-system || true)" -eq 0 ]; then
+  if ! istio_namespace_exists; then
     info "Creating istio-system namespace..."
     retry 2 kubectl create ns istio-system
+  fi
+}
+
+istio_namespace_exists() {
+  if [[ "${NAMESPACE_EXISTS}" -eq 1 ]]; then return; fi
+  if [[ "$(retry 2 kubectl get ns | grep -c istio-system || true)" -eq 0 ]]; then
+    false
+  else
+    NAMESPACE_EXISTS=1
   fi
 }
 
@@ -2347,9 +2357,11 @@ scrape_managed_urls() {
 }
 
 install_managed_components() {
-  info "Configuring base installation for managed control plane..."
 
-  kubectl apply -f "${BASE_REL_PATH}"
+  if ! istio_namespace_exists; then
+    info "Configuring base installation for managed control plane..."
+    kubectl apply -f "${BASE_REL_PATH}"
+  fi
 
   info "Configuring ASM managed control plane components..."
   print_config >| managed_control_plane_gateway.yaml
