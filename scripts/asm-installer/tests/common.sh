@@ -618,8 +618,6 @@ run_basic_test() {
   # Test starts here
   echo "Installing ASM with MeshCA..."
   echo "_CI_REVISION_PREFIX=${LT_NAMESPACE} \
-  _CI_CLOUDRUN_IMAGE_HUB="gcr.io/wlhe-cr/asm/cloudrun" \
-  _CI_CLOUDRUN_IMAGE_TAG="1.9.0-asm.1" \
   ../install_asm ${KEY_FILE} ${SERVICE_ACCOUNT} \
     -l ${LT_CLUSTER_LOCATION} \
     -n ${LT_CLUSTER_NAME} \
@@ -630,8 +628,6 @@ run_basic_test() {
     ${EXTRA_FLAGS}"
   # shellcheck disable=SC2086
   _CI_REVISION_PREFIX="${LT_NAMESPACE}" \
-  _CI_CLOUDRUN_IMAGE_HUB="gcr.io/wlhe-cr/asm/cloudrun" \
-  _CI_CLOUDRUN_IMAGE_TAG="1.9.0-asm.1" \
     ../install_asm ${KEY_FILE} ${SERVICE_ACCOUNT} \
     -l "${LT_CLUSTER_LOCATION}" \
     -n "${LT_CLUSTER_NAME}" \

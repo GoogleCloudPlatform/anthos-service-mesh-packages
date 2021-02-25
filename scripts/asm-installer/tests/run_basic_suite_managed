@@ -15,9 +15,7 @@ main() {
   # CLI setup
   parse_args "$@"
 
-  sed -i 's/meshconfig\.googleapis\.com/staging-meshconfig.sandbox.googleapis.com/g' ../install_asm
   run_basic_test "install" "mesh_ca" "--managed"; RETVAL=$?;
-  sed -i 's/staging-meshconfig.sandbox.googleapis.com/meshconfig\.googleapis\.com/g' ../install_asm
   cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"
 
   exit "${RETVAL}"
