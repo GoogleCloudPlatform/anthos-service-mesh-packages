@@ -2,35 +2,14 @@ steps:
   ########
   # SETUP
   ########
-- name: 'gcr.io/cloud-builders/gcloud'
-  dir: 'scripts/asm-installer'
-  id: 'fetch-secrets'
-  entrypoint: '/bin/bash'
-  args:
-  - '-c'
-  - |
-    date
-    gcloud secrets versions access latest \
-    --secret="${_SECRET_NAME}" \
-    --format='get(payload.data)' \
-    --project="${PROJECT_ID}" \
-    | tr '_-' '/+' \
-    | base64 -d > "${_KEY_FILE}"
-
-- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
-  dir: 'scripts/asm-installer'
-  id: 'setup-long-term-cluster'
-  entrypoint: '/bin/bash'
-  args:
-  - '-c'
-  - >
-    ./tests/setup_longterm_cluster
-  env:
-  - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
-  - 'KEY_FILE=${_KEY_FILE}'
-  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
-  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
-  - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
+  - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
+    dir: 'scripts/asm-installer'
+    id: 'no-existing-flaky-test'
+    entrypoint: '/bin/bash'
+    args:
+      - '-c'
+      - |
+        echo "No existing flaky test. Configure this job to add flaky tests."
 
   #############
   # FAST TESTS
@@ -39,45 +18,6 @@ steps:
   #############
   # SLOW TESTS
   #############
-
-
-- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
-  dir: 'scripts/asm-installer'
-  id: 'run-basic-suite-vm'
-  entrypoint: '/bin/bash'
-  args:
-  - '-c'
-  - >
-    ./tests/run_basic_suite_vm
-    --PROJECT_ID "${PROJECT_ID}"
-    --BUILD_ID "${BUILD_ID}"
-  env:
-  - '_LT_CLUSTER_NAME=long-term-test-cluster-environ'
-  - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
-  - 'KEY_FILE=${_KEY_FILE}'
-  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
-  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
-  - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
-  timeout: 600s
-
-- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
-  dir: 'scripts/asm-installer'
-  id: 'run_basic_instance_template_creation'
-  entrypoint: '/bin/bash'
-  args:
-  - '-c'
-  - >
-    ./tests/run_basic_instance_template_creation
-    --PROJECT_ID "${PROJECT_ID}"
-    --BUILD_ID "${BUILD_ID}"
-  env:
-  - '_LT_CLUSTER_NAME=long-term-test-cluster-environ'
-  - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
-  - 'KEY_FILE=${_KEY_FILE}'
-  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
-  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
-  - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
-  timeout: 600s
 
 substitutions:
   _BUCKET_NAME: my-gcs-bucket
