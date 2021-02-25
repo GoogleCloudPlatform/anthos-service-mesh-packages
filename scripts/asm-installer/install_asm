@@ -2352,15 +2352,7 @@ install_managed_components() {
   kubectl apply -f "${BASE_REL_PATH}"
   kubectl replace -f "${MANAGED_WEBHOOKS}"
 
-  PARAMS="-f ${MANAGED_MANIFEST}"
-  PARAMS="${PARAMS} -c ${KUBECONFIG}"
-  PARAMS="${PARAMS} --skip-confirmation"
-  PARAMS="${PARAMS} --set revision=${REVISION_LABEL}"
-
-  info "Installing ASM managed control plane components..."
-  # shellcheck disable=SC2086
-  retry 5 istioctl install $PARAMS
-
+  info "Configuring ASM managed control plane components..."
   print_config >| managed_control_plane_gateway.yaml
 
 
