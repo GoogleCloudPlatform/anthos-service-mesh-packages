@@ -1176,14 +1176,17 @@ set_up_local_workspace() {
     sleep 2
   else
     OUTPUT_DIR="$(apath -f "${OUTPUT_DIR}")"
+    if [[ ! -a "${OUTPUT_DIR}" ]]; then
+      if ! mkdir -p "${OUTPUT_DIR}"; then
+        fatal "Failed to create directory ${OUTPUT_DIR}"
+      fi
+    elif [[ ! -d "${OUTPUT_DIR}" ]]; then
+      fatal "${OUTPUT_DIR} exists and is not a directory, please specify another directory."
+    fi
   fi
   pushd "$OUTPUT_DIR" > /dev/null
 
-  info "Generating a new kubeconfig..."
-  KUBECONFIG="$(mktemp)"
-  if [[ -z "${KUBECONFIG}" ]]; then
-    fatal "Encountered error when running mktemp!"
-  fi
+  KUBECONFIG="asm_kubeconfig"
   export KUBECONFIG
 }
 

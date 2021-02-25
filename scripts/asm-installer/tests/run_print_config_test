@@ -38,6 +38,7 @@ EOF
     -n long-term-test-cluster \
     -p asm-scriptaro-oss \
     --print-config \
+    -d test_output_dir \
     --option egressgateways \
     --custom_overlay ${CUSTOM_OVERLAY} \
     -m install"
@@ -46,10 +47,23 @@ EOF
     -l us-central1-c \
     -n long-term-test-cluster \
     -p asm-scriptaro-oss \
+    -d test_output_dir \
     --print-config \
     --option egressgateways \
     --custom_overlay ${CUSTOM_OVERLAY} \
     -m install)"
+
+  if [[ ! -d test_output_dir ]]; then
+    echo "Didn't properly create output directory!"
+    RETVAL=1
+  fi
+
+  if [[ ! -f test_output_dir/asm_kubeconfig ]]; then
+    echo "Didn't properly create kubeconfig file!"
+    RETVAL=1
+  fi
+
+  rm -r test_output_dir
 
   if ! echo "${CONFIG}" | grep egressGateways: -A 1 | tail -n 1 | grep 'enabled: true' -q; then
     echo "Print config doesn't pick up --option files!"
