@@ -171,10 +171,10 @@ main() {
   # is a bit different
   if is_managed; then
     if can_modify_gcp_components; then
-      enable_gke_workload_identity
+      enable_workload_identity
       enable_stackdriver_kubernetes
     else
-      exit_if_no_gke_workload_identity
+      exit_if_no_workload_identity
       exit_if_stackdriver_not_enabled
     fi
     if can_modify_gcp_iam_roles; then
@@ -206,8 +206,8 @@ main() {
 
   if ! is_managed; then
     if can_modify_gcp_components; then
-      if should_enable_gke_workload_identity; then
-        enable_gke_workload_identity
+      if should_enable_workload_identity; then
+        enable_workload_identity
       fi
       init_meshconfig
       if [[ "${CA}" = "gcp_cas" ]]; then
@@ -221,8 +221,8 @@ main() {
         enable_service_mesh_feature
       fi
     elif should_validate; then
-      if should_enable_gke_workload_identity; then
-        exit_if_no_gke_workload_identity
+      if should_enable_workload_identity; then
+        exit_if_no_workload_identity
       fi
       exit_if_stackdriver_not_enabled
       if should_enable_service_mesh_feature; then
@@ -1950,7 +1950,7 @@ EOF
   fi
 }
 
-is_gke_workload_identity_enabled() {
+is_workload_identity_enabled() {
   local ENABLED
   ENABLED="$(gcloud container clusters describe \
     --project="${PROJECT_ID}" \
@@ -1988,7 +1988,7 @@ EOF
   fi
 }
 
-should_enable_gke_workload_identity() {
+should_enable_workload_identity() {
   # Enable workload identity is not needed for using Hub Workload Identity Pool
   # as the cluster needs to be registered with Hub Workload Identity Pool
   if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
@@ -1996,8 +1996,8 @@ should_enable_gke_workload_identity() {
   fi
 }
 
-enable_gke_workload_identity(){
-  if is_gke_workload_identity_enabled; then return; fi
+enable_workload_identity(){
+  if is_workload_identity_enabled; then return; fi
   info "Enabling Workload Identity on ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
   info "(This could take awhile, up to 10 minutes)"
   retry 2 gcloud container clusters update "${CLUSTER_NAME}" \
@@ -2006,8 +2006,8 @@ enable_gke_workload_identity(){
     --workload-pool="${WORKLOAD_POOL}"
 }
 
-exit_if_no_gke_workload_identity() {
-  if ! is_gke_workload_identity_enabled; then
+exit_if_no_workload_identity() {
+  if ! is_workload_identity_enabled; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Workload identity is not enabled on ${CLUSTER_NAME}. Please enable it and
 retry, or run the script with the '--enable_gcp_components' flag to allow
