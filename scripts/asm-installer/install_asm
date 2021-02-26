@@ -1998,7 +1998,7 @@ should_enable_gke_workload_identity() {
 
 enable_gke_workload_identity(){
   if is_gke_workload_identity_enabled; then return; fi
-  info "Enabling GKE Workload Identity on ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
+  info "Enabling Workload Identity on ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
   info "(This could take awhile, up to 10 minutes)"
   retry 2 gcloud container clusters update "${CLUSTER_NAME}" \
     --project="${PROJECT_ID}" \
@@ -2009,7 +2009,7 @@ enable_gke_workload_identity(){
 exit_if_no_gke_workload_identity() {
   if ! is_gke_workload_identity_enabled; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-GKE workload identity is not enabled on ${CLUSTER_NAME}. Please enable it and
+Workload identity is not enabled on ${CLUSTER_NAME}. Please enable it and
 retry, or run the script with the '--enable_gcp_components' flag to allow
 the script to enable it on your behalf.
 $(enable_common_message)
