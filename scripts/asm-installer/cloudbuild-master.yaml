@@ -24,6 +24,15 @@ steps:
 
   - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
     dir: 'scripts/asm-installer'
+    id: 'script-version-check'
+    entrypoint: '/bin/bash'
+    args:
+      - '-c'
+      - >
+        ./tests/script_version_check.sh
+
+  - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
+    dir: 'scripts/asm-installer'
     id: 'lint-with-yamllint'
     entrypoint: 'yamllint'
     args:
