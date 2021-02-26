@@ -2,12 +2,12 @@
 set -eu
 
 while read -r KEYWORD; do
-  INSTALL_ASM_LINE="$(grep "^${KEYWORD}=" ../install_asm)"
+  INSTALL_ASM_LINE="$(grep "^${KEYWORD}=" "${INSTALL_ASM_SCRIPT}")"
   if [[ -z "${INSTALL_ASM_LINE}" ]]; then
     echo "Cannot find line starting with ${KEYWORD}= in install_asm"
     exit 1
   fi
-  ASM_VM_LINE="$(grep "^${KEYWORD}=" ../asm_vm)"
+  ASM_VM_LINE="$(grep "^${KEYWORD}=" "${ASM_VM_SCRIPT}")"
   if [[ -z "${ASM_VM_LINE}" ]]; then
     echo "Cannot find line starting with ${KEYWORD}= in asm_vm"
     exit 1
