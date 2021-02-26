@@ -1,6 +1,9 @@
 #!/bin/bash
 set -eu
 
+INSTALL_ASM_SCRIPT="install_asm"; readonly INSTALL_ASM_SCRIPT;
+ASM_VM_SCRIPT="install_asm"; readonly ASM_VM_SCRIPT;
+
 while read -r KEYWORD; do
   INSTALL_ASM_LINE="$(grep "^${KEYWORD}=" "${INSTALL_ASM_SCRIPT}")"
   if [[ -z "${INSTALL_ASM_LINE}" ]]; then
@@ -22,3 +25,5 @@ MINOR
 POINT
 REV
 EOF
+
+echo "Success: versions in the scripts are verified."
