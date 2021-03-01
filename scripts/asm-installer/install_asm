@@ -1599,6 +1599,10 @@ validate_ca_consistency() {
 
   info "CA already in use: ${CURRENT_CA}"
 
+  if [[ -z "${CA}" ]]; then
+    CA="${CURRENT_CA}"
+  fi
+
   if [[ "${CA}" != "${CURRENT_CA}" ]]; then
     fatal "CA cannot be switched while performing upgrade. Please use ${CURRENT_CA} as the CA."
   fi
