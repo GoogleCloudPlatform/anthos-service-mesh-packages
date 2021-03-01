@@ -426,8 +426,9 @@ configure_kubectl(){
     --project="${PROJECT_ID}" \
     --zone="${CLUSTER_LOCATION}"
 
-  if ! hash nc; then
-     warn "nc command not found, not verifying connection to Kube API server."
+  if ! hash nc 2>/dev/null; then
+     warn "nc not found, skipping k8s connection verification"
+     warn "(Installation will continue normally.)"
      return
   fi
 
