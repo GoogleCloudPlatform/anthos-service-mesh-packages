@@ -67,6 +67,7 @@ main() {
       -p ${PROJECT_ID} \
       -m migrate \
       -c mesh_ca \
+      -D mesh_migration \
       -s ${SERVICE_ACCOUNT} \
       -k ${KEY_FILE} -v -e"
     ../install_asm \
@@ -75,6 +76,7 @@ main() {
       -p "${PROJECT_ID}" \
       -m migrate \
       -c mesh_ca \
+      -D mesh_migration \
       -s "${SERVICE_ACCOUNT}" \
       -k "${KEY_FILE}" -v -e \
       2>&1 | tee "${CLUSTER_NAME}" &
@@ -84,12 +86,14 @@ main() {
       -n ${CLUSTER_NAME} \
       -p ${PROJECT_ID} \
       -m migrate \
+      -D mesh_migration \
       -c mesh_ca -v -e"
     ../install_asm \
       -l "${CLUSTER_LOCATION}" \
       -n "${CLUSTER_NAME}" \
       -p "${PROJECT_ID}" \
       -m migrate \
+      -D mesh_migration \
       -c mesh_ca -v -e \
       2>&1 | tee "${CLUSTER_NAME}" &
   fi
@@ -98,7 +102,7 @@ main() {
 
   LABEL="$(grep -o -m 1 'istio.io/rev=\S*' "${CLUSTER_NAME}")"
   rm "${CLUSTER_NAME}"
-  echo "Relabelling namsepace with ${LABEL}..."
+  echo "Relabelling namespace with ${LABEL}..."
   label_with_revision "${NAMESPACE}" "${LABEL}"
   echo "Performing a rolling restart of the demo app..."
   roll "${NAMESPACE}"
@@ -121,6 +125,13 @@ main() {
     set +e
     verify_demo_app "${GATEWAY}" || SUCCESS=1
     set -e
+  fi
+
+  echo "Checking for validation service yaml..."
+
+  if [[ ! -f mesh_migration/istiod-service.yaml ]]; then
+    echo "Couldn't find validation service at mesh_migration/istiod-service.yaml!"
+    SUCCESS=1
   fi
 
   # Cluster teardown
