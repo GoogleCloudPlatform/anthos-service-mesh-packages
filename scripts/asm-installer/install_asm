@@ -1323,6 +1323,8 @@ Authorization: Bearer ${TOKEN}
 EOF
   fi
 
+  ln -s "${ISTIOCTL_REL_PATH}" .
+
   info "Downloading ASM kpt package..."
   retry 3 kpt pkg get --auto-set=false "${KPT_URL}" asm
 }
@@ -2417,14 +2419,17 @@ outro() {
   info "${OUTPUT_DIR}/asm"
   info "The version of istioctl that matches the installation can be found at:"
   info "${OUTPUT_DIR}/${ISTIOCTL_REL_PATH}"
+  info "A symlink to the istioctl binary can be found at:"
+  info "${OUTPUT_DIR}/istioctl"
   if ! is_managed; then
     info "The combined configuration generated for installation can be found at:"
     info "${OUTPUT_DIR}/${RAW_YAML}"
     info "The full, expanded set of kubernetes resources can be found at:"
     info "${OUTPUT_DIR}/${EXPANDED_YAML}"
   else
-    info "You can find the validatingwebhook and gateway configuration files at:"
+    info "You can find the validatingwebhook config to apply with kubectl here:"
     info "${OUTPUT_DIR}/${MANAGED_WEBHOOKS}"
+    info "You can find the gateway config to install with istioctl here:"
     info "${OUTPUT_DIR}/managed_control_plane_gateway.yaml"
   fi
 
