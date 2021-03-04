@@ -69,6 +69,7 @@ NETWORK=""
 MEMBERSHIP_UID=""
 GKE_URL=""
 ENVIRON_PROJECT_ID=""
+CLUSTER_ID=""
 
 ### Workload variables ###
 WORKLOAD_LABELS=""
@@ -654,6 +655,7 @@ validate_dependencies() {
   if [[ "${CREATE_GCE_INSTANCE_TEMPLATE}" -eq 1 ]]; then
     validate_workloadgroup
     validate_gce_instance_template
+    retrieve_cluster_id
   fi
 }
 
@@ -1177,6 +1179,17 @@ retrieve_cluster_root_cert() {
     | awk 'NF {sub(/\r/, ""); printf "%s\n",$0;}')"
   if [[ -z "${ROOT_CERT}" ]]; then
     fatal "Error retrieving the cluster's root certificate from Istiod pod ${ISTIOD}. Please try again."
+  fi
+}
+
+retrieve_cluster_id() {
+  info "Retrieving the Istio cluster ID..."
+
+  CLUSTER_ID=$(retry 2 kubectl -n istio-system get cm -l istio.io/rev="${WORKLOAD_ASM_REVISION}" -ojson \
+    | jq -r '.items[] | select(.metadata.name | startswith("istio-sidecar-injector")) | .data.values' \
+    | jq -r '.global.multiCluster.clusterName')
+  if [[ -z "${CLUSTER_ID}" ]]; then
+    fatal "Error retrieving the Istio cluster ID. Please try again."
   fi
 }
 
