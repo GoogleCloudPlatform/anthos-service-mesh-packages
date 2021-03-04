@@ -16,7 +16,7 @@ fi
 BUCKET_URL="https://storage.googleapis.com"
 BUCKET_PATH="csm-artifacts/asm"; readonly BUCKET_PATH
 
-CURRENT_RELEASE="release-1.8-asm"; readonly CURRENT_RELEASE
+CURRENT_RELEASE="release-1.9-asm"; readonly CURRENT_RELEASE
 prod_releases() {
   cat << EOF
 release 1.9
