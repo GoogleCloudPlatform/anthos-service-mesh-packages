@@ -15,8 +15,6 @@
 ---
 apiVersion: install.istio.io/v1alpha1
 kind: IstioOperator
-metadata:
-  name: eastwest
 spec:
   components:
     ingressGateways:
