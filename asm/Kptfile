@@ -14,31 +14,13 @@ openAPI:
       x-k8s-cli:
         setter:
           name: gcloud.compute.network
-          value: default
-    io.k8s.cli.setters.gcloud.compute.subnetwork:
-      type: string
-      x-k8s-cli:
-        setter:
-          name: gcloud.compute.subnetwork
-          value: default
+          value: "NETWORK_ID"
     io.k8s.cli.setters.gcloud.container.cluster.clusterSecondaryRange:
       type: string
       x-k8s-cli:
         setter:
           name: gcloud.container.cluster.clusterSecondaryRange
           value: ""
-    io.k8s.cli.setters.gcloud.container.cluster.servicesSecondaryRange:
-      type: string
-      x-k8s-cli:
-        setter:
-          name: gcloud.container.cluster.servicesSecondaryRange
-          value: ""
-    io.k8s.cli.setters.gcloud.container.cluster.releaseChannel:
-      type: string
-      x-k8s-cli:
-        setter:
-          name: gcloud.container.cluster.releaseChannel
-          value: REGULAR
     io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases:
       items:
         pattern: '[a-z0-9\-].(svc|hub).id.goog'
@@ -69,11 +51,6 @@ openAPI:
         setter:
           name: gcloud.container.cluster
           value: asm-cluster
-    io.k8s.cli.setters.gcloud.container.nodepool.max-nodes:
-      x-k8s-cli:
-        setter:
-          name: gcloud.container.nodepool.max-nodes
-          value: "4"
     io.k8s.cli.setters.gcloud.core.project:
       type: string
       x-k8s-cli:
@@ -162,15 +139,6 @@ openAPI:
         setter:
           name: anthos.servicemesh.managed-controlplane.cloudrun-addr
           value: CLOUDRUN_ADDR
-    io.k8s.cli.substitutions.network:
-      type: string
-      x-k8s-cli:
-        substitution:
-          name: network
-          pattern: "NETWORK_ID"
-          values:
-          - marker: NETWORK_ID
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.network'
     io.k8s.cli.substitutions.mesh-id:
       type: string
       x-k8s-cli:
@@ -180,15 +148,6 @@ openAPI:
           values:
           - marker: PROJECT_NUMBER
             ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectNumber'
-    io.k8s.cli.substitutions.network-id:
-      type: string
-      x-k8s-cli:
-        substitution:
-          name: network-id
-          pattern: "NETWORK_ID"
-          values:
-          - marker: NETWORK_ID
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.network'
     io.k8s.cli.substitutions.gke-metadata:
       type: string
       x-k8s-cli:
