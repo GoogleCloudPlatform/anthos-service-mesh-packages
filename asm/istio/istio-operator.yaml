@@ -111,4 +111,4 @@ spec:
         # Provided to ensure a human readable name rather than a UUID.
         clusterName: "cn-PROJECTID-us-central1-c-asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
       meshID: "proj-PROJECT_NUMBER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh-id"}
-      network: "NETWORK_ID" # {"$ref":"#/definitions/io.k8s.cli.substitutions.network"}
+      network: "NETWORK_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.compute.network"}
