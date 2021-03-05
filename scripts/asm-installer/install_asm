@@ -1102,7 +1102,7 @@ EOF
 validate_revision_label() {
   # Matches DNS label formats of RFC 1123
   local DNS1123LabelMaxLength; DNS1123LabelMaxLength=63
-  local DNS1123LabelFmt; DNS1123LabelFmt="[a-zA-Z0-9]([-a-z-A-Z0-9]*[a-zA-Z0-9])?"
+  local DNS1123LabelFmt; DNS1123LabelFmt="[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?"
   
   if [[ ${#REVISION_LABEL} -gt $DNS1123LabelMaxLength ]]; then
     fatal "Custom revision label cannot be longer than $DNS1123LabelMaxLength."
