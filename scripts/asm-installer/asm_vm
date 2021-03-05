@@ -1259,7 +1259,7 @@ gen_gce_service_proxy() {
     --arg asm_revision "${ASM_META_REVISION}"\
     --arg credential_identity_provider "${CREDENTIAL_IDENTITY_PROVIDER}" \
     --arg network "${NETWORK}" \
-    --arg clusterID "${CLUSTER_NAME}" \
+    --arg clusterID "${CLUSTER_ID}" \
     --arg asm_meta_version "${ASM_META_VERSION}" '{
   "mode": "ON",
   "proxy-spec": {
