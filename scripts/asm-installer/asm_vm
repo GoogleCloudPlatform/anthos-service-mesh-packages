@@ -69,6 +69,7 @@ NETWORK=""
 MEMBERSHIP_UID=""
 GKE_URL=""
 ENVIRON_PROJECT_ID=""
+CLUSTER_ID=""
 
 ### Workload variables ###
 WORKLOAD_LABELS=""
@@ -654,6 +655,7 @@ validate_dependencies() {
   if [[ "${CREATE_GCE_INSTANCE_TEMPLATE}" -eq 1 ]]; then
     validate_workloadgroup
     validate_gce_instance_template
+    retrieve_cluster_id
   fi
 }
 
@@ -1180,6 +1182,17 @@ retrieve_cluster_root_cert() {
   fi
 }
 
+retrieve_cluster_id() {
+  info "Retrieving the Istio cluster ID..."
+
+  CLUSTER_ID=$(retry 2 kubectl -n istio-system get cm -l istio.io/rev="${WORKLOAD_ASM_REVISION}" -ojson \
+    | jq -r '.items[] | select(.metadata.name | startswith("istio-sidecar-injector")) | .data.values' \
+    | jq -r '.global.multiCluster.clusterName')
+  if [[ -z "${CLUSTER_ID}" ]]; then
+    fatal "Error retrieving the Istio cluster ID. Please try again."
+  fi
+}
+
 retrieve_expansiongateway() {
   info "Retrieving the cluster's ${EXPANSION_GATEWAY_NAME} IP..."
 
@@ -1246,6 +1259,7 @@ gen_gce_service_proxy() {
     --arg asm_revision "${ASM_META_REVISION}"\
     --arg credential_identity_provider "${CREDENTIAL_IDENTITY_PROVIDER}" \
     --arg network "${NETWORK}" \
+    --arg clusterID "${CLUSTER_NAME}" \
     --arg asm_meta_version "${ASM_META_VERSION}" '{
   "mode": "ON",
   "proxy-spec": {
@@ -1263,6 +1277,7 @@ gen_gce_service_proxy() {
   "asm-env": {
     "ISTIO_META_WORKLOAD_NAME": $workload_name,
     "ISTIO_META_MESH_ID": ("proj-"+$project_number),
+    "ISTIO_META_CLUSTER_ID": $clusterID,
     "ISTIO_META_NETWORK": $network,
     "ISTIO_META_ISTIO_VERSION": $asm_meta_version,
     "POD_NAMESPACE": $workload_namespace,
