@@ -97,6 +97,7 @@ WORKLOAD_NAMESPACE="${WORKLOAD_NAMESPACE:=}"
 
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT:=}"
 KEY_FILE="${KEY_FILE:=}"
+IMAGE_FAMILY="${IMAGE_FAMILY:=}"
 
 DRY_RUN="${DRY_RUN:=0}"
 ONLY_VALIDATE="${ONLY_VALIDATE:=0}"
@@ -341,6 +342,15 @@ OPTIONS:
                                                       Required if
                                                       --service_account is
                                                       passed.
+  -m|--image_family           <IMAGE_FAMILY>          (optional) The image family
+                                                      for the operating system
+                                                      Only valid when the
+                                                      --source_instance_template
+                                                      is not specified. Default
+                                                      to the "debian-10" if not
+                                                      specified. Available os
+                                                      image-families are:
+                                                      [debian-10|debian-9|centos-7|centos-8]
 
 FLAGS:
 
@@ -501,6 +511,11 @@ parse_args_create_gce_instance_template() {
         KEY_FILE="${2}"
         shift 2
         ;;
+      -m | --image_family | --image-family)
+        arg_required "${@}"
+        IMAGE_FAMILY="${2}"
+        shift 2
+        ;;
       --dry_run | --dry-run)
         DRY_RUN=1
         shift 1
@@ -630,6 +645,10 @@ EOF
     readonly KEY_FILE
   elif [[ -n "${KEY_FILE}" ]]; then
     fatal "Couldn't find key file ${KEY_FILE}."
+  fi
+
+  if [[ ! -z "${SOURCE_INSTANCE_TEMPLATE}" ]] && [[ ! -z "${IMAGE_FAMILY}" ]]; then
+      warn "source instance template has been specified and the image family parameter will not be used"
   fi
 }
 
@@ -1384,11 +1403,22 @@ gen_gce_instance_labels() {
 
 # Generate a default instance template.
 gen_default_instance_template() {
+  local source_image="projects/debian-cloud/global/images/family/debian-10"
+  if [[ ! -z "${IMAGE_FAMILY}" ]]; then
+    if [[ "${IMAGE_FAMILY}" == "debian-10" ]] || [[ "${IMAGE_FAMILY}" == "debian-9" ]]; then
+      source_image="projects/debian-cloud/global/images/family/${IMAGE_FAMILY}"
+    elif [[ "${IMAGE_FAMILY}" == "centos-7" ]] || [[ "${IMAGE_FAMILY}" == "centos-8" ]]; then
+      source_image="projects/centos-cloud/global/images/family/${IMAGE_FAMILY}"
+    else
+      fatal "${IMAGE_FAMILY} is not supported."
+    fi
+  fi
   jq -n \
   --arg project_id "${PROJECT_ID}" \
   --arg project_number "${PROJECT_NUMBER}" \
   --arg service_account "${WORKLOAD_SERVICE_ACCOUNT}" \
-  --arg instance_template "${NEW_INSTANCE_TEMPLATE}" '{
+  --arg instance_template "${NEW_INSTANCE_TEMPLATE}" \
+  --arg source_image "${source_image}" '{
   "name": $instance_template,
   "properties": {
     "machineType": "n1-standard-1",
@@ -1407,7 +1437,7 @@ gen_default_instance_template() {
         "autoDelete": true,
         "deviceName": $instance_template,
         "initializeParams": {
-          "sourceImage": "projects/debian-cloud/global/images/family/debian-10",
+          "sourceImage": $source_image,
           "diskType": "pd-standard",
           "diskSizeGb": "10"
         }
