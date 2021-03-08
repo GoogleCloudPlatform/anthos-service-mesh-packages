@@ -798,7 +798,7 @@ validate_asm_installation() {
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 VM auto-registration is not enabled in any of your ASM ${ASM_RELEASE}
 installations in the cluster. Please install ASM and make sure none of the
-values set in your custom overlay overrides the default values.
+values set in your custom overlay override the default values.
 EOF
   fi
 
