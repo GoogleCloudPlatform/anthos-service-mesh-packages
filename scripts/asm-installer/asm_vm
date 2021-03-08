@@ -27,10 +27,8 @@ POINT="${POINT:=1}"; readonly POINT;
 REV="${REV:=1}"; readonly REV;
 ASM_RELEASE="${MAJOR}.${MINOR}"
 ASM_META_VERSION="${ASM_RELEASE}.0"
-ASM_REVISION_PREFIX="${ASM_REVISION_PREFIX:=asm-${MAJOR}${MINOR}}"
 readonly ASM_RELEASE
 readonly ASM_META_VERSION
-readonly ASM_REVISION_PREFIX
 RELEASE=""
 
 SERVICE_PROXY_AGENT_BUCKET="${SERVICE_PROXY_AGENT_BUCKET:=gs://gce-service-proxy/service-proxy-agent/releases/service-proxy-agent-asm-${MAJOR}.${MINOR}.${POINT}-stable.tgz}"
@@ -798,16 +796,16 @@ validate_asm_installation() {
 
   if [[ "${AUTOREGISTRATION_ENABLED}" -eq 0 ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-VM auto-registration is not enabled in any of your ASM installations in the
-cluster. Please install ASM and make sure none of the values set in your custom
-overlay overrides the default values.
+VM auto-registration is not enabled in any of your ASM ${ASM_RELEASE}
+installations in the cluster. Please install ASM and make sure none of the
+values set in your custom overlay overrides the default values.
 EOF
   fi
 
   if [[ "${ENVIRON_WORKLOAD_IDENTITY_USED}" -eq 0 ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-The environ workload identity is not used in any of your ASM installation in the
-cluster. Please install ASM with VM support.
+The environ workload identity is not used in any of your ASM ${ASM_RELEASE}
+installation in the cluster. Please install ASM with VM support.
 EOF
   fi
 
@@ -1021,14 +1019,6 @@ EOF
 validate_workload_asm_revision() {
   info "Verifying the ASM revision for the WorkloadGroup..."
 
-  if ! [[ "${WORKLOAD_ASM_REVISION}" =~ ^${ASM_REVISION_PREFIX} ]]; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-Adding VM workloads to ASM ${WORKLOAD_ASM_REVISION} revision is not supported.
-Please make sure to label your WorkloadGroup with an ASM revision starting with
-${ASM_REVISION_PREFIX} and try again.
-EOF
-  fi
-
   local WORKLOAD_REVISION_FOUND=0
   ASM_REVISIONS="$(strip_last_char "${ASM_REVISIONS}")"
   for rev in $(echo "${ASM_REVISIONS}" | tr ',' '\n'); do
@@ -1040,17 +1030,16 @@ EOF
 
   if [[ "${WORKLOAD_REVISION_FOUND}" -eq 0 ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-ASM revision ${WORKLOAD_ASM_REVISION} for the workload is not found in the
-cluster. Please verify the value of ${ASM_REVISION_LABEL_KEY} label on namespace
-${WORKLOAD_NAMESPACE} and try again.
+ASM revision ${WORKLOAD_ASM_REVISION} for the workload is not found in any ASM
+${ASM_RELEASE} installation in the cluster. Please verify the value of
+${ASM_REVISION_LABEL_KEY} label on namespace ${WORKLOAD_NAMESPACE} and try again.
 EOF
   fi
 
   if ! uses_environ_workload_identity "${WORKLOAD_ASM_REVISION}"; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 ASM revision ${WORKLOAD_ASM_REVISION} for the workload is not using Environ
-workload identity. Please make sure "--option hub-meshca" is included when you
-use the install_asm script.
+workload identity. Please install ASM with VM support.
 EOF
   fi
 }
