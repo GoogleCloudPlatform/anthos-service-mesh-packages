@@ -1409,7 +1409,7 @@ gen_default_instance_template() {
         "initializeParams": {
           "sourceImage": "projects/debian-cloud/global/images/family/debian-10",
           "diskType": "pd-standard",
-          "diskSizeGb": "10"
+          "diskSizeGb": "20"
         }
       }
     ],
