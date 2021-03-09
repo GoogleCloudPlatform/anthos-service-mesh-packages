@@ -14,8 +14,9 @@ cd "${SDIR}"
 main() {
   # CLI setup
   parse_args "$@"
+  local REVISION_LABEL; REVISION_LABEL="$(uniq_name "${SCRIPT_NAME}" "${BUILD_ID}")"
 
-  run_basic_test "install" "mesh_ca"; RETVAL=$?;
+  run_basic_test "install" "mesh_ca" "--revision_name ${REVISION_LABEL}"; RETVAL=$?;
   cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"
 
   exit "${RETVAL}"
