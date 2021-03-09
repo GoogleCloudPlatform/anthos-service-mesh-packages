@@ -971,7 +971,11 @@ validate_args() {
     fi
 
     if [[ "${CUSTOM_REVISION}" -eq 1 ]]; then
-      fatal "Specifying a revision label with managed control plane is not supported"
+      fatal "Specifying a revision label with managed control plane is not supported."
+    fi
+
+    if [[ -n "${CUSTOM_OVERLAY}" ]]; then
+      fatal "Specifying a custom overlay file with managed control plane is not supported."
     fi
   fi
 
