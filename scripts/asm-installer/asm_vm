@@ -346,10 +346,13 @@ OPTIONS:
                                                       for the operating system
                                                       Only valid when the
                                                       --source_instance_template
-                                                      is not specified. Default
-                                                      to the "debian-10" if not
-                                                      specified. Available os
-                                                      image-families are:
+                                                      is not specified, otherwise
+                                                      the vm os will use
+                                                      the distro type from the
+                                                      source_instance_template.
+                                                      Default to the "debian-10"
+                                                      if not specified. Available
+                                                      os image-families are:
                                                       [debian-10|debian-9|centos-7|centos-8]
 
 FLAGS:
@@ -1404,11 +1407,13 @@ gen_gce_instance_labels() {
 # Generate a default instance template.
 gen_default_instance_template() {
   local source_image="projects/debian-cloud/global/images/family/debian-10"
+  local default_disk_size=10
   if [[ ! -z "${IMAGE_FAMILY}" ]]; then
     if [[ "${IMAGE_FAMILY}" == "debian-10" ]] || [[ "${IMAGE_FAMILY}" == "debian-9" ]]; then
       source_image="projects/debian-cloud/global/images/family/${IMAGE_FAMILY}"
     elif [[ "${IMAGE_FAMILY}" == "centos-7" ]] || [[ "${IMAGE_FAMILY}" == "centos-8" ]]; then
       source_image="projects/centos-cloud/global/images/family/${IMAGE_FAMILY}"
+      default_disk_size=20
     else
       fatal "${IMAGE_FAMILY} is not supported."
     fi
@@ -1418,7 +1423,8 @@ gen_default_instance_template() {
   --arg project_number "${PROJECT_NUMBER}" \
   --arg service_account "${WORKLOAD_SERVICE_ACCOUNT}" \
   --arg instance_template "${NEW_INSTANCE_TEMPLATE}" \
-  --arg source_image "${source_image}" '{
+  --arg source_image "${source_image}" \
+  --arg default_disk_size ${default_disk_size} '{
   "name": $instance_template,
   "properties": {
     "machineType": "n1-standard-1",
@@ -1439,7 +1445,7 @@ gen_default_instance_template() {
         "initializeParams": {
           "sourceImage": $source_image,
           "diskType": "pd-standard",
-          "diskSizeGb": "10"
+          "diskSizeGb": $default_disk_size
         }
       }
     ],
