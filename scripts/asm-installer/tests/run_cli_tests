@@ -312,6 +312,31 @@ test_main() {
   echo "***"
 
   #################
+  # Should fail if custom overlay is passed with --managed
+  #################
+
+  CMD="-l this_should_pass"
+  CMD="${CMD} -n this_should_pass"
+  CMD="${CMD} -p this_should_pass"
+  CMD="${CMD} -m install"
+  CMD="${CMD} --managed"
+  CMD="${CMD} --custom-overlay foo.yaml"
+  CMD="${CMD} -c mesh_ca"
+  CMD="${CMD} --only_validate"
+
+  RETVAL=0
+  clear_variables
+  _="$(main ${CMD})" || RETVAL="${?}"
+
+  if [[ "${RETVAL}" -ne 0 ]]; then
+    echo "Fails when passing --custom_overlay with --managed: PASS"
+  else
+    echo "Fails when passing --custom_overlay with --managed: FAIL"
+    ((++FAILURES))
+  fi
+  echo "***"
+
+  #################
   # Below we're testing that what permissions we use match the flags
   #################
 

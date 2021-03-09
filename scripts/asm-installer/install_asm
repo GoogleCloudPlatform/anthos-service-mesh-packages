@@ -953,6 +953,10 @@ validate_args() {
     if [[ "${USE_VM}" -eq 1 ]]; then
       fatal "Adding VM workloads with managed control plane is not supported."
     fi
+
+    if [[ -n "${CUSTOM_OVERLAY}" ]]; then
+      fatal "Specifying a custom overlay file with managed control plane is not supported."
+    fi
   fi
 
   local MISSING_ARGS=0
