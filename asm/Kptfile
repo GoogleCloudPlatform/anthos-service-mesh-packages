@@ -112,13 +112,31 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.tag
-          value: 1.7.3-asm.6
+          value: 1.9.0-asm.3
           isSet: true
     io.k8s.cli.setters.anthos.servicemesh.rev:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.rev
           value: asm-173-6
+          isSet: true
+    io.k8s.cli.setters.anthos.servicemesh.istiodHost:
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.istiodHost
+          value: istiod.istio-system.svc
+          isSet: true
+    io.k8s.cli.setters.anthos.servicemesh.istiodHostFQDN:
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.istiodHostFQDN
+          value: istiod.istio-system.svc.cluster.local
+          isSet: true
+    io.k8s.cli.setters.anthos.servicemesh.istiod-vs-name:
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.istiod-vs-name
+          value: istiod-vs
           isSet: true
     io.k8s.cli.setters.anthos.servicemesh.canonicalServiceHub:
       x-k8s-cli:
