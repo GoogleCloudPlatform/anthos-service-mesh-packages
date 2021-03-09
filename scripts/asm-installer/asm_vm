@@ -650,11 +650,11 @@ EOF
     fatal "Couldn't find key file ${KEY_FILE}."
   fi
 
-  if [[ ! -n "${SOURCE_INSTANCE_TEMPLATE}" ]] && [[ ! -n "${IMAGE_FAMILY}" ]]; then
+  if [[ -n "${SOURCE_INSTANCE_TEMPLATE}" ]] && [[ -n "${IMAGE_FAMILY}" ]]; then
       fatal "At most one of these parameters may be specified: --image_family and --source_instance_template"
   fi
 
-  if [[ ! -n "${IMAGE_FAMILY}" ]] && [[ "${IMAGE_FAMILY}" != "debian-10" && "${IMAGE_FAMILY}" \
+  if [[ -n "${IMAGE_FAMILY}" ]] && [[ "${IMAGE_FAMILY}" != "debian-10" && "${IMAGE_FAMILY}" \
       != "debian-9" && "${IMAGE_FAMILY}" != "centos-8" && "${IMAGE_FAMILY}" != "centos-7" ]]; then
       fatal "${IMAGE_FAMILY} os distro is not supported."
   fi
