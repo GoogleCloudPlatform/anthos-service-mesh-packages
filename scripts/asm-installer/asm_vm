@@ -650,8 +650,13 @@ EOF
     fatal "Couldn't find key file ${KEY_FILE}."
   fi
 
-  if [[ ! -z "${SOURCE_INSTANCE_TEMPLATE}" ]] && [[ ! -z "${IMAGE_FAMILY}" ]]; then
-      warn "source instance template has been specified and the image family parameter will not be used"
+  if [[ ! -n "${SOURCE_INSTANCE_TEMPLATE}" ]] && [[ ! -n "${IMAGE_FAMILY}" ]]; then
+      fatal "At most one of these parameters may be specified: --image_family and --source_instance_template"
+  fi
+
+  if [[ ! -n "${IMAGE_FAMILY}" ]] && [[ "${IMAGE_FAMILY}" != "debian-10" && "${IMAGE_FAMILY}" \
+      != "debian-9" && "${IMAGE_FAMILY}" != "centos-8" && "${IMAGE_FAMILY}" != "centos-7" ]]; then
+      fatal "${IMAGE_FAMILY} os distro is not supported."
   fi
 }
 
@@ -1414,8 +1419,6 @@ gen_default_instance_template() {
     elif [[ "${IMAGE_FAMILY}" == "centos-7" ]] || [[ "${IMAGE_FAMILY}" == "centos-8" ]]; then
       source_image="projects/centos-cloud/global/images/family/${IMAGE_FAMILY}"
       default_disk_size=20
-    else
-      fatal "${IMAGE_FAMILY} is not supported."
     fi
   fi
   jq -n \
