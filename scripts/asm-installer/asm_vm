@@ -19,6 +19,7 @@ fi
 _CI_ASM_IMAGE_TAG="${_CI_ASM_IMAGE_TAG:=}"
 _CI_ASM_PKG_LOCATION="${_CI_ASM_PKG_LOCATION:=}"
 _CI_ISTIOCTL_REL_PATH="${_CI_ISTIOCTL_REL_PATH:=}"
+_CI_NO_REVISION="${_CI_NO_REVISION:=0}"
 
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
@@ -987,13 +988,17 @@ retrieve_workload_asm_revision() {
   WORKLOAD_ASM_REVISION="$(retry 2 kubectl get namespace "${WORKLOAD_NAMESPACE}" -ojson \
     | jq -r '.metadata.labels["'${ASM_REVISION_LABEL_KEY}'"]')"
   if [[ -z "${WORKLOAD_ASM_REVISION}" ]]; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+      WORKLOAD_ASM_REVISION=default
+    if [[ "${_CI_NO_REVISION}" -eq 1]]; then
+    else
+      { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Unable to find an ASM revision for the namespace of the WorkloadGroup. To apply
 a revision label on the namespace, replace <REVISION> with an available revision
 name and run:
   kubectl label namespace ${WORKLOAD_NAMESPACE} istio-injection- \
   istio.io/rev=<REVISION> --overwrite
 EOF
+    fi
   fi
 }
 
