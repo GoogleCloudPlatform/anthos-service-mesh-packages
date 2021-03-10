@@ -254,3 +254,35 @@ openAPI:
           values:
           - marker: ENVIRON_PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectID'
+    io.k8s.cli.substitutions.istio-ingressgateway-deploy-name:
+      x-k8s-cli:
+        substitution:
+          name: istio-ingressgateway-deploy-name
+          pattern: istio-ingressgateway-ASM_REV
+          values:
+          - marker: ASM_REV
+            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.rev'
+    io.k8s.cli.setters.anthos.servicemesh.custom-ingressgateway-name:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.custom-ingressgateway-name
+          value: "INGRESSGATEWAY_NAME"
+          isSet: true
+    io.k8s.cli.setters.anthos.servicemesh.custom-ingressgateway-namespace:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.custom-ingressgateway-namespace
+          value: "istio-system"
+          isSet: true
+    io.k8s.cli.substitutions.custom-ingressgateway-deploy-name:
+      x-k8s-cli:
+        substitution:
+          name: custom-ingressgateway-deploy-name
+          pattern: INGRESSGATEWAY_NAME-ASM_REV
+          values:
+          - marker: ASM_REV
+            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.rev'
+          - marker: INGRESSGATEWAY_NAME
+            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.custom-ingressgateway-name'
