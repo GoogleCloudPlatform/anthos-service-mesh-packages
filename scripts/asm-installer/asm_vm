@@ -1120,8 +1120,7 @@ EOF
 
     # check whether it is a  public gcp image
     if [[ "$source_image_path" == *projects* && "$source_image_path" == *global/images/* ]]; then
-      if [[ "$source_image_path" != *centos-7* ]] && [[ "$source_image_path" != *centos-8* ]] \
-        && [[ "$source_image_path" != *debian-9* ]] && [[ "$source_image_path" != *debian-10* ]]; then
+      if [[ "$source_image_path" != *debian-9* ]] && [[ "$source_image_path" != *debian-10* ]]; then
         fatal "found not support image, the image path is $source_image_path"
       fi
     else
