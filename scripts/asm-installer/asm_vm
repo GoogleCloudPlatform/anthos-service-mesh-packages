@@ -1477,6 +1477,11 @@ create_gce_instance_template() {
 
     EXISTING_METADATA="$(echo "${INSTANCE_TEMPLATE_REQ}" \
       | jq '.properties.metadata.items')"
+
+    echo "lllllll"
+    echo $EXISTING_METADATA
+    echo "ggggggggg"
+    echo $INSTANCE_TEMPLATE_REQ
   fi
 
   local METADATA; METADATA="$(gen_instance_template_metadata "${EXISTING_METADATA}")";
