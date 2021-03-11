@@ -1110,6 +1110,23 @@ this project, run:
   --project="${PROJECT_ID}"
 EOF
     fi
+
+    local INSTANCE_TEMPLATE_REQ=$(retry 2 run gcloud compute instance-templates \
+      describe "${SOURCE_INSTANCE_TEMPLATE}" \
+      --format=json \
+      --project="${PROJECT_ID}")
+    local source_image_path="$(echo "${INSTANCE_TEMPLATE_REQ}" \
+    | jq '.properties.disks[].initializeParams.sourceImage')"
+
+    # check whether it is a  public gcp image
+    if [[ "$source_image_path" == *projects* && "$source_image_path" == *global/images/* ]]; then
+      if [[ "$source_image_path" != *centos-7* ]] && [[ "$source_image_path" != *centos-8* ]] \
+        && [[ "$source_image_path" != *debian-9* ]] && [[ "$source_image_path" != *debian-10* ]]; then
+        fatal "found not support image, the image path is $source_image_path"
+      fi
+    else
+      info "custom image found, skip checking"
+    fi
   fi
 }
 
@@ -1477,11 +1494,6 @@ create_gce_instance_template() {
 
     EXISTING_METADATA="$(echo "${INSTANCE_TEMPLATE_REQ}" \
       | jq '.properties.metadata.items')"
-
-    echo "lllllll"
-    echo $EXISTING_METADATA
-    echo "ggggggggg"
-    echo $INSTANCE_TEMPLATE_REQ
   fi
 
   local METADATA; METADATA="$(gen_instance_template_metadata "${EXISTING_METADATA}")";
