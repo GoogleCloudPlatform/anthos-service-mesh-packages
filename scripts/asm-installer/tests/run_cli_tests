@@ -83,6 +83,11 @@ warn_pause() {
   WARNED=1
 }
 
+warn() {
+  echo "[WARNING(fake)]: ${1}" >&2
+  WARNED=1
+}
+
 NODE_POOL=""
 list_valid_pools() {
   echo "${NODE_POOL}"
@@ -557,6 +562,7 @@ EOF
     echo "local_iam_user detects not logged in state: PASS"
   fi
   echo "***"
+  FATAL_EXITS=1
 
   #################
   # node pool validation should handle zonal, regional pools with mixed types
@@ -602,6 +608,25 @@ EOF
   fi
   echo "***"
 
+  #################
+  # CLI dependency validation should fail when compatibility variables are unset
+  #################
+
+  WARNED=0
+  FATAL_EXITS=0
+  AKPT=""
+  AGCLOUD="gcloud"
+  AKUBECTL="kubectl"
+  validate_cli_dependencies
+  FATAL_EXITS=1
+
+  if [[ "${WARNED}" -eq 0 ]]; then
+    echo "validate_cli_dependencies handles compatibility variables: FAIL"
+    ((++FAILURES))
+  else
+    echo "validate_cli_dependencies handles compatibility variables: PASS"
+  fi
+  echo "***"
 
   #################
   echo "There were ${FAILURES} failures."

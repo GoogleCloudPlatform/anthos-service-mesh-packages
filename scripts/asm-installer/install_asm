@@ -413,12 +413,13 @@ EOF
 ${NEEDLES}
 EOF
 
-  if [[ -n "${NOTFOUND}" ]]; then NOTFOUND="$(strip_last_char "${NOTFOUND}")"; fi
+  if [[ -n "${NOTFOUND}" ]]; then NOTFOUND="$(strip_trailing_commas "${NOTFOUND}")"; fi
   echo "${NOTFOUND}"
 }
 
-strip_last_char() {
-  echo "${1:0:$((${#1} - 1))}"
+strip_trailing_commas() {
+  # shellcheck disable=SC2001
+  echo "${1}" | sed 's/,*$//g'
 }
 
 configure_kubectl(){
@@ -1273,12 +1274,22 @@ awk
 $AGCLOUD
 grep
 jq
-kpt
 $AKUBECTL
+$AKPT
 sed
 tr
 head
 csplit
+EOF
+
+  while read -r FLAG; do
+    if [[ -z "${!FLAG}" ]]; then
+      NOTFOUND="${FLAG},${NOTFOUND}"
+    fi
+  done <<EOF
+AKUBECTL
+AGCLOUD
+AKPT
 EOF
 
   if [[ "${CUSTOM_CA}" -eq 1 ]]; then
@@ -1289,8 +1300,8 @@ EOF
     fi
   fi
 
-  if [[ -n "${NOTFOUND}" ]]; then
-    NOTFOUND="$(strip_last_char "${NOTFOUND}")"
+  if [[ "${#NOTFOUND}" -gt 1 ]]; then
+    NOTFOUND="$(strip_trailing_commas "${NOTFOUND}")"
     for dep in $(echo "${NOTFOUND}" | tr ' ' '\n'); do
       warn "Dependency not found: ${dep}"
     done
