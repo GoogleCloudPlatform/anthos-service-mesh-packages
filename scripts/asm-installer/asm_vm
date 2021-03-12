@@ -1401,7 +1401,6 @@ gen_gce_instance_labels() {
 
 # Generate a default instance template.
 gen_default_instance_template() {
-  local source_image="projects/debian-cloud/global/images/family/debian-10"
   jq -n \
   --arg project_id "${PROJECT_ID}" \
   --arg project_number "${PROJECT_NUMBER}" \
