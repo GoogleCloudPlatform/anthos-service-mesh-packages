@@ -1119,8 +1119,7 @@ EOF
     | jq '.properties.disks[].initializeParams.sourceImage')"
 
     # check whether it is a public gcp image
-    echo $SOURCE_IMAGE_PATH
-    if [[ "$SOURCE_IMAGE_PATH" == *projects* && "$SOURCE_IMAGE_PATH" == *global/images/* ]]; then
+    if [[ "$SOURCE_IMAGE_PATH" == *projects/*-cloud/global/images*  ]]; then
       if [[ "$SOURCE_IMAGE_PATH" != *debian-9* ]] && [[ "$SOURCE_IMAGE_PATH" != *debian-10* ]]; then
         fatal "Image not supported. Supported images are: debian9, debian10"
       fi
