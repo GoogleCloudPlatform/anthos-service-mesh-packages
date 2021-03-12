@@ -97,7 +97,6 @@ WORKLOAD_NAMESPACE="${WORKLOAD_NAMESPACE:=}"
 
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT:=}"
 KEY_FILE="${KEY_FILE:=}"
-IMAGE_FAMILY="${IMAGE_FAMILY:=}"
 
 DRY_RUN="${DRY_RUN:=0}"
 ONLY_VALIDATE="${ONLY_VALIDATE:=0}"
@@ -1428,7 +1427,7 @@ gen_default_instance_template() {
         "initializeParams": {
           "sourceImage": "projects/debian-cloud/global/images/family/debian-10",
           "diskType": "pd-standard",
-          "diskSizeGb": 10
+          "diskSizeGb": "10"
         }
       }
     ],
