@@ -1116,7 +1116,7 @@ EOF
       describe "${SOURCE_INSTANCE_TEMPLATE}" \
       --format=json \
       --project="${PROJECT_ID}")" \
-    | jq '.properties.disks[].initializeParams.sourceImage')"
+    | jq '.properties.disks[] | select(.initializeParams.sourceImage != null) | .initializeParams.sourceImage')"
 
     # check whether it is a public gcp image
     if [[ "$SOURCE_IMAGE_PATH" == *projects/*-cloud/global/images*  ]]; then
