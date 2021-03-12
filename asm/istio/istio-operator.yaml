@@ -19,6 +19,22 @@ spec:
   hub: gcr.io/gke-release/asm # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}
   tag: 1.9.0-asm.3 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
   components:
+    base:
+      enabled: true
+    egressGateways:
+    - enabled: false
+      name: istio-egressgateway
+      k8s:
+        hpaSpec:
+          maxReplicas: 5
+          minReplicas: 2
+    ingressGateways:
+    - enabled: true
+      name: istio-ingressgateway
+      k8s:
+        hpaSpec:
+          maxReplicas: 5
+          minReplicas: 2   
     pilot:
       k8s:
         env:
@@ -37,10 +53,22 @@ spec:
             cpu: 50m
             memory: 150Mi
   meshConfig:
+    trustDomainAliases: # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases"}
+      - PROJECT_ID.svc.id.goog # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
+    trustDomain: PROJECT_ID.svc.id.goog # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
     defaultConfig:
       proxyMetadata:
+        GKE_CLUSTER_URL: "https://container.googleapis.com/v1/projects/PROJECT_ID/locations/us-central1-c/clusters/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cluster-url"}
+        GCP_METADATA: "PROJECT_ID|PROJECT_NUMBER|asm-cluster|us-central1-c" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-metadata"}
+        CA_PROVIDER: "GoogleCA"
+        PLUGINS: "GoogleTokenExchange"
+        USE_TOKEN_FOR_CSR: "true"
         GCE_METADATA_HOST: "metadata.google.internal"
-        TRUST_DOMAIN: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
+    # Protocol detection timeout is not supported
+    protocolDetectionTimeout: 0s
+    # Locality load balancing is not supported
+    localityLbSetting:
+      enabled: false
   values:
     global:
       trustDomain: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
