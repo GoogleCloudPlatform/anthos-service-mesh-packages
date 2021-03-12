@@ -1462,7 +1462,7 @@ create_gce_instance_template() {
       --format=json \
       --project="${PROJECT_ID}" \
       | jq --arg name "${NEW_INSTANCE_TEMPLATE}" \
-      '.name=$name | .properties.disks[].deviceName=$name' || true)"
+      '.name=$name | .properties.disks[0].deviceName=$name' || true)"
 
     EXISTING_METADATA="$(echo "${INSTANCE_TEMPLATE_REQ}" \
       | jq '.properties.metadata.items')"
