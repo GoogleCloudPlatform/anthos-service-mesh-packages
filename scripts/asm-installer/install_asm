@@ -27,12 +27,14 @@ _CI_NO_REVISION="${_CI_NO_REVISION:=0}"
 _CI_ISTIOCTL_REL_PATH="${_CI_ISTIOCTL_REL_PATH:=}"
 _CI_TRUSTED_GCP_PROJECTS="${_CI_TRUSTED_GCP_PROJECTS:=}"
 _CI_ENVIRON_PROJECT_NUMBER="${_CI_ENVIRON_PROJECT_NUMBER:=}"
+_CI_CRC_VERSION="${_CI_CRC_VERSION:=0}"
 
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=9}"; readonly MINOR;
 POINT="${POINT:=1}"; readonly POINT;
 REV="${REV:=1}"; readonly REV;
+CONFIG_VER="${CONFIG_VER:="1-unstable"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
 ### File related constants ###
@@ -107,6 +109,7 @@ ONLY_VALIDATE="${ONLY_VALIDATE:=0}"
 ONLY_ENABLE="${ONLY_ENABLE:=0}"
 VERBOSE="${VERBOSE:=0}"
 PRINT_HELP=0
+PRINT_VERSION=0
 MANAGED="${MANAGED:=0}"
 MANAGED_SERVICE_ACCOUNT=""
 
@@ -577,9 +580,18 @@ enable_common_message() {
   echo "Alternatively, use --enable_all|-e to allow this tool to handle all dependencies."
 }
 
+version_message() {
+  local VER; VER="${MAJOR}.${MINOR}.${POINT}-asm.${REV}+config${CONFIG_VER}";
+  if [[ "${_CI_CRC_VERSION}" -eq 1 ]]; then
+    VER="${VER}-$(crc32 "$0")"
+  fi
+  echo "${VER}"
+}
+
 ### CLI/initial setup functions ###
 usage_short() {
   cat << EOF
+${SCRIPT_NAME} $(version_message)
 usage: ${SCRIPT_NAME} [OPTION]...
 
 Set up, validate, and install ASM in a Google Cloud environment.
@@ -622,11 +634,13 @@ FLAGS:
      --only_validate
      --only_enable
   -h|--help
+  --version
 EOF
 }
 
 usage() {
   cat << EOF
+${SCRIPT_NAME} $(version_message)
 usage: ${SCRIPT_NAME} [OPTION]...
 
 Set up, validate, and install ASM in a Google Cloud environment.
@@ -736,6 +750,7 @@ FLAGS:
                                       current user/cluster but don't install
                                       anything.
   -h|--help                           Show this message and exit.
+  --version                           Print the version of this tool and exit.
 
 EXAMPLE:
 The following invocation will install ASM to a cluster named "my_cluster" in
@@ -913,13 +928,19 @@ parse_args() {
         PRINT_HELP=1
         shift 1
         ;;
+      --version)
+        PRINT_VERSION=1
+        shift 1
+        ;;
       *)
         fatal_with_usage "Unknown option ${1}"
         ;;
     esac
   done
-  if [[ "${PRINT_HELP}" -eq 1 ]]; then
-    if [[ "${VERBOSE}" -eq 1 ]]; then
+  if [[ "${PRINT_HELP}" -eq 1 || "${PRINT_VERSION}" -eq 1 ]]; then
+    if [[ "${PRINT_VERSION}" -eq 1 ]]; then
+      version_message
+    elif [[ "${VERBOSE}" -eq 1 ]]; then
       usage
     else
       usage_short
