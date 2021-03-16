@@ -211,9 +211,7 @@ main() {
 
   if ! is_managed; then
     if can_modify_gcp_components; then
-      if should_enable_workload_identity; then
-        enable_workload_identity
-      fi
+      enable_workload_identity
       init_meshconfig
       if [[ "${CA}" = "gcp_cas" ]]; then
         # This sets up IAM privileges for the project to be able to access GCP CAS.
@@ -226,9 +224,7 @@ main() {
         enable_service_mesh_feature
       fi
     elif should_validate; then
-      if should_enable_workload_identity; then
-        exit_if_no_workload_identity
-      fi
+      exit_if_no_workload_identity
       exit_if_stackdriver_not_enabled
       if should_enable_service_mesh_feature; then
         exit_if_service_mesh_feature_not_enabled
@@ -2066,14 +2062,6 @@ populate_environ_info() {
     read -r ENVIRON_PROJECT_ID HUB_MEMBERSHIP_ID <<EOF
 ${IDENTITY}
 EOF
-  fi
-}
-
-should_enable_workload_identity() {
-  # Enable workload identity is not needed for using Hub Workload Identity Pool
-  # as the cluster needs to be registered with Hub Workload Identity Pool
-  if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
-    false
   fi
 }
 
