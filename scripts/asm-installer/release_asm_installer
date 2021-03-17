@@ -17,6 +17,18 @@ BUCKET_URL="https://storage.googleapis.com"
 BUCKET_PATH="csm-artifacts/asm"; readonly BUCKET_PATH
 
 CURRENT_RELEASE="release-1.9-asm"; readonly CURRENT_RELEASE
+
+main() {
+  setup
+
+  while read -r branch version; do
+    publish_script "${branch}" "${version}" install_asm
+    publish_script "${branch}" "${version}" asm_vm
+  done <<EOF
+$(all_releases)
+EOF
+}
+
 prod_releases() {
   cat << EOF
 release 1.9
@@ -61,15 +73,37 @@ $(other_releases)
 EOF
 }
 
-main() {
-  setup
+changes_necessary() {
+  local URI; URI="${1}";
+  local NAME; NAME="${2}";
 
-  while read -r branch version; do
-    publish_script "${branch}" "${version}" install_asm
-    publish_script "${branch}" "${version}" asm_vm
-  done <<EOF
-$(all_releases)
-EOF
+  if curl -O "${URI}.sha256"; then
+    if sha256sum -c --ignore-missing "${NAME}.sha256" >/dev/null 2>/dev/null; then
+      echo "No changes in ${NAME}, skipping"
+      rm "${NAME}.sha256"
+      false
+      return
+    fi
+    rm "${NAME}.sha256"
+  else
+    echo "New file {FILE_NAME}"
+  fi
+}
+
+upload() {
+  local SCRIPT_NAME; SCRIPT_NAME="${1}";
+  local FILE_NAME; FILE_NAME="${2}";
+  local FILE_PATH; FILE_PATH="${3}";
+  local FILE_URI; FILE_URI="${4}";
+
+  gsutil cp "${FILE_NAME}" gs://"${FILE_PATH}"
+  gsutil cp "${SCRIPT_NAME}.sha256" gs://"${FILE_PATH}.sha256"
+  gsutil acl ch -u AllUsers:R gs://"${FILE_PATH}" gs://"${FILE_PATH}.sha256"
+
+  curl -O "${FILE_URI}"
+  curl -O "${FILE_URI}.sha256"
+
+  sha256sum -c --ignore-missing "${FILE_NAME}.sha256" || echo "Failed to verify ${FILE_NAME}!" >&2
 }
 
 publish_script() {
@@ -82,40 +116,18 @@ publish_script() {
 
   git checkout "${BRANCH_NAME}"
 
-  if [[ ! -f "${SCRIPT_NAME}" ]]; then return; fi
+  if [[ ! -f "${SCRIPT_NAME}" ]]; then echo "${SCRIPT_NAME} not found" >&2; return; fi
 
-  if curl -O "${FILE_URI}.sha256"; then
-    if sha256sum -c --ignore-missing "${FILE_NAME}.sha256" >/dev/null 2>/dev/null; then
-      echo "No changes in ${FILE_NAME}, skipping"
-      rm "${FILE_NAME}.sha256"
-      return
-    fi
-    rm "${FILE_NAME}.sha256"
-  else
-      echo "New file {FILE_NAME}"
-  fi
+  if ! changes_necessary "${FILE_URI}" "${FILE_NAME}"; then return; fi
 
   sha256sum "${SCRIPT_NAME}" >| "${SCRIPT_NAME}.sha256"
-  mv "${SCRIPT_NAME}" "${FILE_NAME}"
+  cp "${SCRIPT_NAME}" "${FILE_NAME}"
   sha256sum "${FILE_NAME}" >> "${SCRIPT_NAME}.sha256"
-  gsutil cp "${FILE_NAME}" gs://"${FILE_PATH}"
-  gsutil cp "${SCRIPT_NAME}.sha256" gs://"${FILE_PATH}.sha256"
-  gsutil acl ch -u AllUsers:R gs://"${FILE_PATH}" gs://"${FILE_PATH}.sha256"
 
-  curl -O "${FILE_URI}"
-  curl -O "${FILE_URI}.sha256"
-
-  sha256sum -c --ignore-missing "${FILE_NAME}.sha256" || echo "Failed to verify ${FILE_NAME}!" >&2
+  upload "${SCRIPT_NAME}" "${FILE_NAME}" "${FILE_PATH}" "${FILE_URI}"
 
   if [[ "${BRANCH_NAME}" == "${CURRENT_RELEASE}" ]]; then
-    gsutil cp "${FILE_NAME}" gs://"${BUCKET_PATH}/${SCRIPT_NAME}"
-    gsutil cp "${SCRIPT_NAME}.sha256" gs://"${BUCKET_PATH}/${SCRIPT_NAME}.sha256"
-    gsutil acl ch -u AllUsers:R gs://"${BUCKET_PATH}/${SCRIPT_NAME}" gs://"${BUCKET_PATH}/${SCRIPT_NAME}.sha256"
-
-    curl -O "${BUCKET_URL}/${BUCKET_PATH}/${SCRIPT_NAME}"
-    curl -O "${BUCKET_URL}/${BUCKET_PATH}/${SCRIPT_NAME}.sha256"
-
-    sha256sum -c --ignore-missing "${SCRIPT_NAME}.sha256" || echo "Failed to verify ${SCRIPT_NAME}!" >&2
+    upload "${SCRIPT_NAME}" "${FILE_NAME}" "${BUCKET_PATH}/${SCRIPT_NAME}" "${BUCKET_URL}/${BUCKET_PATH}/${SCRIPT_NAME}"
   fi
 
   git restore "${SCRIPT_NAME}"
