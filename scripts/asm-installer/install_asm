@@ -97,31 +97,28 @@ SERVICE_ACCOUNT="${SERVICE_ACCOUNT:=}"
 KEY_FILE="${KEY_FILE:=}"
 OUTPUT_DIR="${OUTPUT_DIR:=}"
 
-CUSTOM_CA=0
 CA_CERT="${CA_CERT:=}"
 CA_KEY="${CA_KEY:=}"
 CA_ROOT="${CA_ROOT:=}"
 CA_CHAIN="${CA_CHAIN:=}"
 CA_NAME="${CA_NAME:=}"
 
-
 DRY_RUN="${DRY_RUN:=0}"
 ONLY_VALIDATE="${ONLY_VALIDATE:=0}"
 ONLY_ENABLE="${ONLY_ENABLE:=0}"
 VERBOSE="${VERBOSE:=0}"
-PRINT_HELP=0
-PRINT_VERSION=0
 MANAGED="${MANAGED:=0}"
 MANAGED_SERVICE_ACCOUNT=""
 
-# Environment variables used by Hub Workload Identity Pool
+PRINT_HELP=0
+PRINT_VERSION=0
+CUSTOM_CA=0
 USE_HUB_WIP=0
+USE_VM=0
 ENVIRON_PROJECT_ID=""
 HUB_MEMBERSHIP_ID=""
-
-# Environment variable used by VM
-USE_VM=0
 CUSTOM_REVISION=0
+WI_ENABLED=0
 
 main() {
   init
@@ -2028,6 +2025,12 @@ generate_membership_name() {
 register_cluster() {
   if is_cluster_registered; then return; fi
 
+  if can_modify_gcp_components; then
+    enable_workload_identity
+  else
+    exit_if_no_workload_identity
+  fi
+
   populate_cluster_values
   local MEMBERSHIP_NAME
   MEMBERSHIP_NAME="$(generate_membership_name)"
@@ -2049,6 +2052,8 @@ EOF
 }
 
 is_workload_identity_enabled() {
+  if [[ "${WI_ENABLED}" -eq 1 ]]; then return; fi
+
   local ENABLED
   ENABLED="$(gcloud container clusters describe \
     --project="${PROJECT_ID}" \
@@ -2057,7 +2062,7 @@ is_workload_identity_enabled() {
     --format=json | \
     jq .workloadIdentityConfig)"
 
-  if [[ "${ENABLED}" = 'null' ]]; then false; fi
+  if [[ "${ENABLED}" = 'null' ]]; then false; else WI_ENABLED=1; fi
 }
 
 is_membership_crd_installed() {
