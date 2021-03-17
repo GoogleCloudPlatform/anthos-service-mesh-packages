@@ -1327,7 +1327,7 @@ gen_gce_service_proxy() {
 
   # Append each workload label pair into asm_labels field of GCE_SERVICE_PROXY
   # as a valid JSON object.
-  for label in $(a "${WORKLOAD_LABELS}" | jq -r '. as $k|keys[]|[., $k[.]]|map(tostring+"=")|add'); do
+  for label in $(echo "${WORKLOAD_LABELS}" | jq -r '. as $k|keys[]|[., $k[.]]|map(tostring+"=")|add'); do
     IFS='=' read -r -a pair <<< "${label}"
     PROXY=$(jq --arg key "${pair[0]}" \
     --arg value "${pair[1]}" \
