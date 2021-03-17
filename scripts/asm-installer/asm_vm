@@ -102,6 +102,11 @@ DRY_RUN="${DRY_RUN:=0}"
 ONLY_VALIDATE="${ONLY_VALIDATE:=0}"
 VERBOSE="${VERBOSE:=0}"
 
+IF_VM_DISTRO_SUPPORTED=0
+
+## declare an array of supported vm linux distro
+declare -a SUPPORTED_VM_DISTROS=("debian-9" "debian-10")
+
 init() {
   # BSD-style readlink apparently doesn't have the same -f toggle on readlink
   case "$(uname)" in
@@ -1111,23 +1116,33 @@ this project, run:
 EOF
     fi
 
-    info "Verifying GCE image..."
+    info "Verifying the GCE image..."
     local SOURCE_IMAGE_PATH="$(echo "$(retry 2 run gcloud compute instance-templates \
       describe "${SOURCE_INSTANCE_TEMPLATE}" \
-      --format=json \
-      --project="${PROJECT_ID}")" \
-    | jq '.properties.disks[] | select(.initializeParams.sourceImage != null) | .initializeParams.sourceImage')"
+    --format=json \
+    --project="${PROJECT_ID}")" \
+    | jq '.properties.disks[0] | .initializeParams.sourceImage')"
 
-
-    if [[ "$SOURCE_IMAGE_PATH" == *projects/*-cloud/global/images*  ]]; then
+    if [[ "${SOURCE_IMAGE_PATH}" == *projects/*-cloud/global/images* ]]; then
     # check whether the public image is supported
-      if [[ "$SOURCE_IMAGE_PATH" != *debian-9* ]] && [[ "$SOURCE_IMAGE_PATH" != *debian-10* ]]; then
-        fatal "Image not supported. Supported images are: debian9, debian10"
+      check_supported_vm_linux_distro "${SOURCE_IMAGE_PATH}"
+      if [[ "${IF_VM_DISTRO_SUPPORTED}" -eq 0 ]]; then
+        fatal "Image not supported. Supported images are: debian-9, debian-10"
       fi
     else
       info "custom image found, skip checking"
     fi
   fi
+}
+
+check_supported_vm_linux_distro() {
+  local source_image_path=$1
+  for distro in "${SUPPORTED_VM_DISTROS[@]}"
+  do
+    if [[ "${source_image_path}" = *"${distro}"* ]]; then
+      IF_VM_DISTRO_SUPPORTED=1
+    fi
+  done
 }
 
 extract_canonical_service_label() {
@@ -1312,7 +1327,7 @@ gen_gce_service_proxy() {
 
   # Append each workload label pair into asm_labels field of GCE_SERVICE_PROXY
   # as a valid JSON object.
-  for label in $(echo "${WORKLOAD_LABELS}" | jq -r '. as $k|keys[]|[., $k[.]]|map(tostring+"=")|add'); do
+  for label in $(a "${WORKLOAD_LABELS}" | jq -r '. as $k|keys[]|[., $k[.]]|map(tostring+"=")|add'); do
     IFS='=' read -r -a pair <<< "${label}"
     PROXY=$(jq --arg key "${pair[0]}" \
     --arg value "${pair[1]}" \
