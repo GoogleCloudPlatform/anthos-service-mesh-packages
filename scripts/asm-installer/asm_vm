@@ -102,8 +102,7 @@ DRY_RUN="${DRY_RUN:=0}"
 ONLY_VALIDATE="${ONLY_VALIDATE:=0}"
 VERBOSE="${VERBOSE:=0}"
 
-IF_VM_DISTRO_SUPPORTED=0
-
+SOURCE_IMAGE_PATH=""
 SUPPORTED_VM_DISTROS=("debian-9" "debian-10")
 
 init() {
@@ -1116,16 +1115,16 @@ EOF
     fi
 
     info "Verifying the GCE image..."
-    local SOURCE_IMAGE_PATH="$(retry 2 run gcloud compute instance-templates \
+    SOURCE_IMAGE_PATH="$(retry 2 run gcloud compute instance-templates \
       describe "${SOURCE_INSTANCE_TEMPLATE}" \
     --format=json \
     --project="${PROJECT_ID}" \
-    | jq '.properties.disks[0] | .initializeParams.sourceImage')"
+    | jq '.properties.disks[0].initializeParams.sourceImage')"
 
     if [[ "${SOURCE_IMAGE_PATH}" == *projects/*-cloud/global/images* ]]; then
     # check whether the public image is supported
-      check_supported_vm_linux_distro "${SOURCE_IMAGE_PATH}"
-      if [[ "${IF_VM_DISTRO_SUPPORTED}" -eq 0 ]]; then
+
+      if check_not_supported_vm_linux_distro ; then
         fatal "Image not supported. Supported image OS list are: ${SUPPORTED_VM_DISTROS[*]}"
       fi
     else
@@ -1134,12 +1133,12 @@ EOF
   fi
 }
 
-check_supported_vm_linux_distro() {
-  local IMAGE_PATH=$1
+check_not_supported_vm_linux_distro() {
   for distro in "${SUPPORTED_VM_DISTROS[@]}"
   do
-    if [[ "${IMAGE_PATH}" = *"${distro}"* ]]; then
-      IF_VM_DISTRO_SUPPORTED=1
+    if [[ "${SOURCE_IMAGE_PATH}" = *"${distro}"* ]]; then
+      false
+      return
     fi
   done
 }
