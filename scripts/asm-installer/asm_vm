@@ -1099,6 +1099,29 @@ this project, run:
   --project="${PROJECT_ID}"
 EOF
     fi
+
+    local INSTANCE_TEMPLATE_SERVICE_ACCOUNT
+    INSTANCE_TEMPLATE_SERVICE_ACCOUNT="$(gcloud compute instance-templates \
+      describe "${SOURCE_INSTANCE_TEMPLATE}" \
+      --format="value(properties.serviceAccounts[0].email)" \
+      --project="${PROJECT_ID}" || true)"
+    if [[ -z "${INSTANCE_TEMPLATE_SERVICE_ACCOUNT}" ]]; then
+      { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+The GCE instance template ${SOURCE_INSTANCE_TEMPLATE} does not use a service
+account. Please create an instance template with a service account and try again.
+EOF
+    else
+      if [[ "${INSTANCE_TEMPLATE_SERVICE_ACCOUNT}" == "default" ]]; then
+        INSTANCE_TEMPLATE_SERVICE_ACCOUNT="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+      fi
+      if [[ "${INSTANCE_TEMPLATE_SERVICE_ACCOUNT}" != "${WORKLOAD_SERVICE_ACCOUNT}" ]]; then
+        { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+The service account used in the instance template ${SOURCE_INSTANCE_TEMPLATE}
+does not match the service account used in the WorkloadGroup. Please make sure
+they match and try again.
+EOF
+      fi
+    fi
   fi
 }
 
