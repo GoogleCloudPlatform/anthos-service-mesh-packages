@@ -90,6 +90,29 @@ changes_necessary() {
   fi
 }
 
+check_tags() {
+  local BRANCH_NAME; BRANCH_NAME="${1}";
+  local SCRIPT_NAME; SCRIPT_NAME="${2}";
+
+  local TAG; TAG="$(git tag --points-at HEAD)";
+  local VER; VER="$(./"${SCRIPT_NAME}" --version || true)";
+
+  if [[ "${_DEBUG}" -eq 1 ]]; then
+    echo "DEBUG: Tag: ${TAG} Version: ${VER}"
+    return
+  fi
+
+  if [[ "${BRANCH_NAME}" = release* && "${TAG}" == "" ]]; then
+    echo "Release branches must be tagged before releasing. Aborting."
+    exit 1
+  fi
+
+  if [[ "${TAG}" != "" && "${VER}" != "${TAG}" ]]; then
+    echo "${SCRIPT_NAME} version and git tag don't match. Aborting."
+    exit 1
+  fi
+}
+
 upload() {
   local SCRIPT_NAME; SCRIPT_NAME="${1}";
   local FILE_NAME; FILE_NAME="${2}";
@@ -119,6 +142,8 @@ publish_script() {
   if [[ ! -f "${SCRIPT_NAME}" ]]; then echo "${SCRIPT_NAME} not found" >&2; return; fi
 
   if ! changes_necessary "${FILE_URI}" "${FILE_NAME}"; then return; fi
+
+  check_tags "${BRANCH_NAME}" "${SCRIPT_NAME}"
 
   sha256sum "${SCRIPT_NAME}" >| "${SCRIPT_NAME}.sha256"
   cp "${SCRIPT_NAME}" "${FILE_NAME}"
