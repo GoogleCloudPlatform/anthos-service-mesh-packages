@@ -761,7 +761,8 @@ create_source_instance_template() {
   gcloud compute instance-templates create "${SOURCE_INSTANCE_TEMPLATE_NAME}" \
     --project "${PROJECT_ID}" \
     --metadata="testKey=testValue" \
-    --labels="testlabel=testvalue"
+    --labels="testlabel=testvalue" \
+    --service-account="${WORKLOAD_SERVICE_ACCOUNT}"
 }
 
 verify_instance_template() {
