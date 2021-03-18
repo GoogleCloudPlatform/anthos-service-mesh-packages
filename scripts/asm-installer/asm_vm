@@ -25,6 +25,7 @@ MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=9}"; readonly MINOR;
 POINT="${POINT:=1}"; readonly POINT;
 REV="${REV:=1}"; readonly REV;
+CONFIG_VER="${CONFIG_VER:="1-unstable"}"; readonly CONFIG_VER;
 ASM_RELEASE="${MAJOR}.${MINOR}"
 ASM_META_VERSION="${ASM_RELEASE}.0"
 readonly ASM_RELEASE
@@ -283,6 +284,11 @@ fatal_with_usage() {
   exit 2
 }
 
+version_message() {
+  local VER; VER="${MAJOR}.${MINOR}.${POINT}-asm.${REV}+config${CONFIG_VER}";
+  echo "${VER}"
+}
+
 usage_asm_vm() {
   cat << EOF
 usage: ${SCRIPT_NAME} <COMMAND>
@@ -297,6 +303,7 @@ COMMANDS:
 
 OPTIONS:
   -h|--help                      Show this message and exit.
+  --version                      Print the version of this tool and exit.
 
 Use "${SCRIPT_NAME} <COMMAND> --help" for more information about a command.
 EOF
@@ -438,6 +445,10 @@ parse_args() {
       ;;
     -h | --help)
       usage_asm_vm
+      exit
+      ;;
+    --version)
+      version_message
       exit
       ;;
     *)
