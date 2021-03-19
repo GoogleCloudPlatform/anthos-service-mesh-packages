@@ -790,8 +790,6 @@ create_custom_source_instance_template() {
     --image-project="${PROJECT_ID}" \
     --image="${CUSTOM_IMAGE_NAME}"
 
-  gcloud compute images delete "${CUSTOM_IMAGE_NAME}" \
-   --project "${PROJECT_ID}" --quiet
   gcloud compute instances delete "${CUSTOM_IMAGE_NAME}" --zone "${CUSTOM_IMAGE_LOCATION}" \
    --project "${PROJECT_ID}" --quiet
 }
