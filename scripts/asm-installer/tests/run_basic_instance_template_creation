@@ -51,44 +51,27 @@ main() {
 
   create_workload_service_account
 
+  echo "Applying WorkloadGroup ${WORKLOAD_NAME} in namespace ${LT_NAMESPACE}..."
+  kubectl apply -f - <<EOF
+apiVersion: networking.istio.io/v1alpha3
+kind: WorkloadGroup
+metadata:
+  name: ${WORKLOAD_NAME}
+  namespace: ${LT_NAMESPACE}
+spec:
+  metadata:
+    annotations:
+      security.cloud.google.com/IdentityProvider: google
+    labels:
+      app: ${WORKLOAD_NAME}
+      version: v1
+  template:
+    serviceAccount: ${WORKLOAD_SERVICE_ACCOUNT}
+EOF
+
   verify_default_template_instance
   verify_template_instance_with_source_image
-  
-#  echo "Applying WorkloadGroup ${WORKLOAD_NAME} in namespace ${LT_NAMESPACE}..."
-#  kubectl apply -f - <<EOF
-#apiVersion: networking.istio.io/v1alpha3
-#kind: WorkloadGroup
-#metadata:
-#  name: ${WORKLOAD_NAME}
-#  namespace: ${LT_NAMESPACE}
-#spec:
-#  metadata:
-#    annotations:
-#      security.cloud.google.com/IdentityProvider: google
-#    labels:
-#      app: ${WORKLOAD_NAME}
-#      version: v1
-#  template:
-#    serviceAccount: ${WORKLOAD_SERVICE_ACCOUNT}
-#EOF
-#
-#  create_new_instance_template; RETVAL=$?;
-#  trap 'cleanup_workload_service_account' ERR
-#
-#  verify_instance_template
-#
-#  delete_instance_template "${INSTANCE_TEMPLATE_NAME}"
-#
-#  create_source_instance_template
-#
-#  CREATE_FROM_SOURCE=1
-#  create_new_instance_template; RETVAL=$?;
-#  trap 'delete_instance_template "${SOURCE_INSTANCE_TEMPLATE_NAME}"' ERR
-#
-#  verify_instance_template_with_source
-#
-#  delete_instance_template "${INSTANCE_TEMPLATE_NAME}"
-#  delete_instance_template "${SOURCE_INSTANCE_TEMPLATE_NAME}"
+
   cleanup_workload_service_account
   cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"
   delete_service_mesh_feature
