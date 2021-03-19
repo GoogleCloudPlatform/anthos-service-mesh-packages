@@ -745,7 +745,7 @@ create_new_instance_template() {
         --project_id ${PROJECT_ID} \
         --workload_name ${WORKLOAD_NAME} \
         --workload_namespace ${LT_NAMESPACE} \
-        --source_instance_template "${SOURCE_INSTANCE_TEMPLATE}"
+        --source_instance_template ${SOURCE_INSTANCE_TEMPLATE_NAME}"
     
     ASM_REVISION_PREFIX="${LT_NAMESPACE}" \
     ../asm_vm create_gce_instance_template "${INSTANCE_TEMPLATE_NAME}" \
@@ -759,25 +759,25 @@ create_new_instance_template() {
   fi
 }
 
-create_source_instance_template() {
-  echo "Creating source instance template ${SOURCE_INSTANCE_TEMPLATE_NAME}..."
-
-  # Create an instance template with a metadata entry and a label entry
-  gcloud compute instance-templates create "${SOURCE_INSTANCE_TEMPLATE_NAME}" \
-    --project "${PROJECT_ID}" \
-    --metadata="testKey=testValue" \
-    --labels="testlabel=testvalue"
-}
-
-create_not_supported_public_image_source_instance_template() {
-  echo "Creating source instance template ${NOT_SUPPORTED_PUBLIC_SOURCE_INSTANCE_TEMPLATE_NAME}..."
-
-  # Create an instance template with a metadata entry and a label entry
-  gcloud compute instance-templates create "${NOT_SUPPORTED_PUBLIC_SOURCE_INSTANCE_TEMPLATE_NAME}" \
-    --project "${PROJECT_ID}" \
-    --metadata="testKey=testValue" \
-    --labels="testlabel=testvalue"
-}
+#create_source_instance_template() {
+#  echo "Creating source instance template ${SOURCE_INSTANCE_TEMPLATE_NAME}..."
+#
+#  # Create an instance template with a metadata entry and a label entry
+#  gcloud compute instance-templates create "${SOURCE_INSTANCE_TEMPLATE_NAME}" \
+#    --project "${PROJECT_ID}" \
+#    --metadata="testKey=testValue" \
+#    --labels="testlabel=testvalue"
+#}
+#
+#create_not_supported_public_image_source_instance_template() {
+#  echo "Creating source instance template ${NOT_SUPPORTED_PUBLIC_SOURCE_INSTANCE_TEMPLATE_NAME}..."
+#
+#  # Create an instance template with a metadata entry and a label entry
+#  gcloud compute instance-templates create "${NOT_SUPPORTED_PUBLIC_SOURCE_INSTANCE_TEMPLATE_NAME}" \
+#    --project "${PROJECT_ID}" \
+#    --metadata="testKey=testValue" \
+#    --labels="testlabel=testvalue"
+#}
 
 create_custom_source_instance_template() {
   echo "Creating source instance template ${CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME}..."
