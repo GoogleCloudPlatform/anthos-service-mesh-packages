@@ -773,7 +773,7 @@ create_custom_source_instance_template() {
 
   gcloud compute instances create "${CUSTOM_IMAGE_NAME}" \
   --project "${PROJECT_ID}" \
-  --zone "${CUSTOM_IMAGE_LOCATION}" \
+  --zone "${CUSTOM_IMAGE_LOCATION}"
   gcloud compute instances stop "${CUSTOM_IMAGE_NAME}" \
   --project "${PROJECT_ID}" \
   --zone "${CUSTOM_IMAGE_LOCATION}"
