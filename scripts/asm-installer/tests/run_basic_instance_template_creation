@@ -69,9 +69,9 @@ spec:
     serviceAccount: ${WORKLOAD_SERVICE_ACCOUNT}
 EOF
 
-  verify_default_template_instance
-  verify_template_instance_with_source_image
-#  verify_template_instance_with_custom_image
+#  verify_default_template_instance
+#  verify_template_instance_with_source_image
+  verify_template_instance_with_custom_image
 
   cleanup_workload_service_account
   cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"
