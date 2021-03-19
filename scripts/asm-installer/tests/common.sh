@@ -797,6 +797,7 @@ create_custom_source_instance_template() {
     --image="${CUSTOM_IMAGE_NAME}"
 
   gcloud compute images delete "${CUSTOM_IMAGE_NAME}"
+  gcloud compute instances delete "${CUSTOM_IMAGE_NAME}" --zone "${CUSTOM_IMAGE_LOCATION}"
 }
 
 verify_instance_template() {
