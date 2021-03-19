@@ -786,7 +786,7 @@ create_custom_source_instance_template() {
   gcloud compute instances stop "${CUSTOM_IMAGE_NAME}" --zone "${CUSTOM_IMAGE_LOCATION}"
   gcloud compute images create "${CUSTOM_IMAGE_NAME}" \
   --source-disk="${CUSTOM_IMAGE_NAME}" \
-  --source-disk-zone=asia-east1-a "${CUSTOM_IMAGE_LOCATION}"
+  --source-disk-zone="${CUSTOM_IMAGE_LOCATION}" --quiet
 
   # Create an instance template with a metadata entry, a label entry AND A CUO
   gcloud compute instance-templates create "${CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME}" \
