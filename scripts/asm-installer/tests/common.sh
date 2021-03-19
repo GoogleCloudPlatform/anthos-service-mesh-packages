@@ -782,11 +782,16 @@ create_not_supported_public_image_source_instance_template() {
 create_custom_source_instance_template() {
   echo "Creating custom source instance template ${CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME}..."
 
-  gcloud compute instances create "${CUSTOM_IMAGE_NAME}" --zone "${CUSTOM_IMAGE_LOCATION}"
-  gcloud compute instances stop "${CUSTOM_IMAGE_NAME}" --zone "${CUSTOM_IMAGE_LOCATION}"
+  gcloud compute instances create "${CUSTOM_IMAGE_NAME}" \
+  --project "${PROJECT_ID}" \
+  --zone "${CUSTOM_IMAGE_LOCATION}" \
+  gcloud compute instances stop "${CUSTOM_IMAGE_NAME}"
+  --project "${PROJECT_ID}" \
+  --zone "${CUSTOM_IMAGE_LOCATION}"
   gcloud compute images create "${CUSTOM_IMAGE_NAME}" \
+  --project "${PROJECT_ID}" \
   --source-disk="${CUSTOM_IMAGE_NAME}" \
-  --source-disk-zone="${CUSTOM_IMAGE_LOCATION}" --quiet
+  --source-disk-zone="${CUSTOM_IMAGE_LOCATION}"
 
   # Create an instance template with a metadata entry, a label entry AND A CUO
   gcloud compute instance-templates create "${CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME}" \
@@ -796,8 +801,10 @@ create_custom_source_instance_template() {
     --image-project="${PROJECT_ID}" \
     --image="${CUSTOM_IMAGE_NAME}"
 
-  gcloud compute images delete "${CUSTOM_IMAGE_NAME}"
-  gcloud compute instances delete "${CUSTOM_IMAGE_NAME}" --zone "${CUSTOM_IMAGE_LOCATION}"
+  gcloud compute images delete "${CUSTOM_IMAGE_NAME}" \
+   --project "${PROJECT_ID}" --quiet
+  gcloud compute instances delete "${CUSTOM_IMAGE_NAME}" --zone "${CUSTOM_IMAGE_LOCATION}" \
+   --project "${PROJECT_ID}" --quiet
 }
 
 verify_instance_template() {
