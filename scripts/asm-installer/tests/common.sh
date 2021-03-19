@@ -10,7 +10,6 @@ WORKLOAD_NAME="vm"
 WORKLOAD_SERVICE_ACCOUNT=""
 INSTANCE_TEMPLATE_NAME=""
 SOURCE_INSTANCE_TEMPLATE_NAME="vm-source"
-NOT_SUPPORTED_PUBLIC_SOURCE_INSTANCE_TEMPLATE_NAME="not_supported_public_vm_source"
 CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME="custom_public_vm_source"
 CUSTOM_IMAGE_LOCATION="us-central1-c"
 CUSTOM_IMAGE_NAME="testcustomimage"
@@ -764,16 +763,6 @@ create_source_instance_template() {
 
   # Create an instance template with a metadata entry and a label entry
   gcloud compute instance-templates create "${SOURCE_INSTANCE_TEMPLATE_NAME}" \
-    --project "${PROJECT_ID}" \
-    --metadata="testKey=testValue" \
-    --labels="testlabel=testvalue"
-}
-
-create_not_supported_public_image_source_instance_template() {
-  echo "Creating source instance template ${NOT_SUPPORTED_PUBLIC_SOURCE_INSTANCE_TEMPLATE_NAME}..."
-
-  # Create an instance template with a metadata entry and a label entry
-  gcloud compute instance-templates create "${NOT_SUPPORTED_PUBLIC_SOURCE_INSTANCE_TEMPLATE_NAME}" \
     --project "${PROJECT_ID}" \
     --metadata="testKey=testValue" \
     --labels="testlabel=testvalue"
