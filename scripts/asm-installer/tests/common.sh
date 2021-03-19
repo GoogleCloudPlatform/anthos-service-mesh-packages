@@ -780,7 +780,7 @@ create_not_supported_public_image_source_instance_template() {
 }
 
 create_custom_source_instance_template() {
-  echo "Creating source instance template ${CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME}..."
+  echo "Creating custom source instance template ${CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME}..."
 
   gcloud compute instances create "${CUSTOM_IMAGE_NAME}" --zone "${CUSTOM_IMAGE_LOCATION}"
   gcloud compute instances stop "${CUSTOM_IMAGE_NAME}" --zone "${CUSTOM_IMAGE_LOCATION}"
