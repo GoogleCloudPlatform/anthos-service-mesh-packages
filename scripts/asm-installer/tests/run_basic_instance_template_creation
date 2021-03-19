@@ -30,10 +30,11 @@ verify_template_instance_with_custom_image() {
   create_new_instance_template "${CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME}"; RETVAL=$?;
   trap 'delete_instance_template "${CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME}"' ERR
 
+  INSTANCE_TEMPLATE_NAME=${CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME}
   verify_instance_template_with_source
 
   delete_instance_template "${INSTANCE_TEMPLATE_NAME}"
-  delete_instance_template "${SOURCE_INSTANCE_TEMPLATE_NAME}"
+  delete_instance_template "${CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME}"
   gcloud compute images delete "${CUSTOM_IMAGE_NAME}" \
   --project "${PROJECT_ID}" --quiet
 }
