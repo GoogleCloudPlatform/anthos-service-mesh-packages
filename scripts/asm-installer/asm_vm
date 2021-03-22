@@ -1123,7 +1123,6 @@ EOF
 
     if [[ "${SOURCE_IMAGE_PATH}" == *projects/*-cloud/global/images* ]]; then
     # check whether the public image is supported
-
       if check_not_supported_vm_linux_distro ; then
         fatal "Image not supported. Supported image OS list are: ${SUPPORTED_VM_DISTROS[*]}"
       fi
