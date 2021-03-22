@@ -1129,7 +1129,7 @@ EOF
       fi
     else
       info "custom image found, skip checking"
-
+    fi
     local INSTANCE_TEMPLATE_SERVICE_ACCOUNT
     INSTANCE_TEMPLATE_SERVICE_ACCOUNT="$(gcloud compute instance-templates \
       describe "${SOURCE_INSTANCE_TEMPLATE}" \
