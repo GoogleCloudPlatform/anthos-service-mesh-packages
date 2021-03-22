@@ -27,16 +27,19 @@ _CI_NO_REVISION="${_CI_NO_REVISION:=0}"
 _CI_ISTIOCTL_REL_PATH="${_CI_ISTIOCTL_REL_PATH:=}"
 _CI_TRUSTED_GCP_PROJECTS="${_CI_TRUSTED_GCP_PROJECTS:=}"
 _CI_ENVIRON_PROJECT_NUMBER="${_CI_ENVIRON_PROJECT_NUMBER:=}"
+_CI_CRC_VERSION="${_CI_CRC_VERSION:=0}"
 
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=9}"; readonly MINOR;
 POINT="${POINT:=1}"; readonly POINT;
 REV="${REV:=1}"; readonly REV;
+CONFIG_VER="${CONFIG_VER:="1-unstable"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
 ### File related constants ###
 VALIDATION_FIX_FILE_NAME="istiod-service.yaml"
+ASM_VERSION_FILE=".asm_version"
 ISTIO_FOLDER_NAME=""
 ISTIOCTL_REL_PATH=""
 BASE_REL_PATH=""
@@ -94,29 +97,28 @@ SERVICE_ACCOUNT="${SERVICE_ACCOUNT:=}"
 KEY_FILE="${KEY_FILE:=}"
 OUTPUT_DIR="${OUTPUT_DIR:=}"
 
-CUSTOM_CA=0
 CA_CERT="${CA_CERT:=}"
 CA_KEY="${CA_KEY:=}"
 CA_ROOT="${CA_ROOT:=}"
 CA_CHAIN="${CA_CHAIN:=}"
 CA_NAME="${CA_NAME:=}"
 
-
 DRY_RUN="${DRY_RUN:=0}"
 ONLY_VALIDATE="${ONLY_VALIDATE:=0}"
 ONLY_ENABLE="${ONLY_ENABLE:=0}"
 VERBOSE="${VERBOSE:=0}"
-PRINT_HELP=0
 MANAGED="${MANAGED:=0}"
 MANAGED_SERVICE_ACCOUNT=""
 
-# Environment variables used by Hub Workload Identity Pool
+PRINT_HELP=0
+PRINT_VERSION=0
+CUSTOM_CA=0
 USE_HUB_WIP=0
+USE_VM=0
 ENVIRON_PROJECT_ID=""
 HUB_MEMBERSHIP_ID=""
-
-# Environment variable used by VM
-USE_VM=0
+CUSTOM_REVISION=0
+WI_ENABLED=0
 
 main() {
   init
@@ -207,9 +209,7 @@ main() {
 
   if ! is_managed; then
     if can_modify_gcp_components; then
-      if should_enable_workload_identity; then
-        enable_workload_identity
-      fi
+      enable_workload_identity
       init_meshconfig
       if [[ "${CA}" = "gcp_cas" ]]; then
         # This sets up IAM privileges for the project to be able to access GCP CAS.
@@ -222,9 +222,7 @@ main() {
         enable_service_mesh_feature
       fi
     elif should_validate; then
-      if should_enable_workload_identity; then
-        exit_if_no_workload_identity
-      fi
+      exit_if_no_workload_identity
       exit_if_stackdriver_not_enabled
       if should_enable_service_mesh_feature; then
         exit_if_service_mesh_feature_not_enabled
@@ -413,12 +411,13 @@ EOF
 ${NEEDLES}
 EOF
 
-  if [[ -n "${NOTFOUND}" ]]; then NOTFOUND="$(strip_last_char "${NOTFOUND}")"; fi
+  if [[ -n "${NOTFOUND}" ]]; then NOTFOUND="$(strip_trailing_commas "${NOTFOUND}")"; fi
   echo "${NOTFOUND}"
 }
 
-strip_last_char() {
-  echo "${1:0:$((${#1} - 1))}"
+strip_trailing_commas() {
+  # shellcheck disable=SC2001
+  echo "${1}" | sed 's/,*$//g'
 }
 
 configure_kubectl(){
@@ -576,9 +575,18 @@ enable_common_message() {
   echo "Alternatively, use --enable_all|-e to allow this tool to handle all dependencies."
 }
 
+version_message() {
+  local VER; VER="${MAJOR}.${MINOR}.${POINT}-asm.${REV}+config${CONFIG_VER}";
+  if [[ "${_CI_CRC_VERSION}" -eq 1 ]]; then
+    VER="${VER}-$(crc32 "$0")"
+  fi
+  echo "${VER}"
+}
+
 ### CLI/initial setup functions ###
 usage_short() {
   cat << EOF
+${SCRIPT_NAME} $(version_message)
 usage: ${SCRIPT_NAME} [OPTION]...
 
 Set up, validate, and install ASM in a Google Cloud environment.
@@ -602,6 +610,7 @@ OPTIONS:
   --root_cert            <FILE PATH>
   --cert_chain           <FILE PATH>
   --ca_name              <CA NAME>
+  -r|--revision_name     <REVISION NAME>
 
 FLAGS:
   -e|--enable_all
@@ -621,11 +630,13 @@ FLAGS:
      --only_validate
      --only_enable
   -h|--help
+  --version
 EOF
 }
 
 usage() {
   cat << EOF
+${SCRIPT_NAME} $(version_message)
 usage: ${SCRIPT_NAME} [OPTION]...
 
 Set up, validate, and install ASM in a Google Cloud environment.
@@ -682,7 +693,11 @@ OPTIONS:
                                       Name of the ca in the GCP CAS service used to
                                       sign certificates in the format
                                       'projects/project_name/locations/ \
-                                       ca_region/certificateAuthorities/ca_name'
+                                      ca_region/certificateAuthorities/ca_name'.
+  -r|--revision_name <REVISION NAME>  Custom revision label. Label needs to follow DNS
+                                      label formats (re: RFC 1123). Not supported if
+                                      control plane is managed. Prefixing the revision
+                                      name with 'asm' is recommended.
   The following four options must be passed together and are only necessary
   for using a custom certificate for Citadel. Users that aren't sure whether
   they need this probably don't.
@@ -735,6 +750,7 @@ FLAGS:
                                       current user/cluster but don't install
                                       anything.
   -h|--help                           Show this message and exit.
+  --version                           Print the version of this tool and exit.
 
 EXAMPLE:
 The following invocation will install ASM to a cluster named "my_cluster" in
@@ -904,6 +920,12 @@ parse_args() {
         CUSTOM_CA=1
         shift 2
         ;;
+      -r | --revision_name | --revision-name)
+        arg_required "${@}"
+        CUSTOM_REVISION=1
+        REVISION_LABEL="${2}"
+        shift 2
+        ;;
       -v | --verbose)
         VERBOSE=1
         shift 1
@@ -912,13 +934,19 @@ parse_args() {
         PRINT_HELP=1
         shift 1
         ;;
+      --version)
+        PRINT_VERSION=1
+        shift 1
+        ;;
       *)
         fatal_with_usage "Unknown option ${1}"
         ;;
     esac
   done
-  if [[ "${PRINT_HELP}" -eq 1 ]]; then
-    if [[ "${VERBOSE}" -eq 1 ]]; then
+  if [[ "${PRINT_HELP}" -eq 1 || "${PRINT_VERSION}" -eq 1 ]]; then
+    if [[ "${PRINT_VERSION}" -eq 1 ]]; then
+      version_message
+    elif [[ "${VERBOSE}" -eq 1 ]]; then
       usage
     else
       usage_short
@@ -931,6 +959,10 @@ parse_args() {
 validate_args() {
   if [[ "${MODE}" == "install" && -z "${CA}" ]]; then
     CA="mesh_ca"
+  fi
+
+  if [[ "${CUSTOM_REVISION}" -eq 1 ]]; then
+    validate_revision_label
   fi
 
   if is_managed; then
@@ -952,6 +984,14 @@ validate_args() {
 
     if [[ "${USE_VM}" -eq 1 ]]; then
       fatal "Adding VM workloads with managed control plane is not supported."
+    fi
+
+    if [[ "${CUSTOM_REVISION}" -eq 1 ]]; then
+      fatal "Specifying a revision label with managed control plane is not supported."
+    fi
+
+    if [[ -n "${CUSTOM_OVERLAY}" ]]; then
+      fatal "Specifying a custom overlay file with managed control plane is not supported."
     fi
   fi
 
@@ -1077,6 +1117,23 @@ EOF
 
   set_kpt_package_url
   WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"
+}
+
+validate_revision_label() {
+  # Matches DNS label formats of RFC 1123
+  local DNS_1123_LABEL_MAX_LEN; DNS_1123_LABEL_MAX_LEN=63;
+  readonly DNS_1123_LABEL_MAX_LEN
+
+  local DNS_1123_LABEL_FMT; DNS_1123_LABEL_FMT="^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?$";
+  readonly DNS_1123_LABEL_FMT
+
+  if [[ ${#REVISION_LABEL} -gt ${DNS_1123_LABEL_MAX_LEN} ]]; then
+    fatal "Revision label cannot be longer than $DNS_1123_LABEL_MAX_LEN."
+  fi
+
+  if ! [[ "${REVISION_LABEL}" =~ ${DNS_1123_LABEL_FMT} ]]; then
+    fatal "Revision label does not follow RFC 1123 formatting convention."
+  fi
 }
 
 validate_gcp_cas_args() {
@@ -1269,12 +1326,22 @@ awk
 $AGCLOUD
 grep
 jq
-kpt
 $AKUBECTL
+$AKPT
 sed
 tr
 head
 csplit
+EOF
+
+  while read -r FLAG; do
+    if [[ -z "${!FLAG}" ]]; then
+      NOTFOUND="${FLAG},${NOTFOUND}"
+    fi
+  done <<EOF
+AKUBECTL
+AGCLOUD
+AKPT
 EOF
 
   if [[ "${CUSTOM_CA}" -eq 1 ]]; then
@@ -1285,8 +1352,8 @@ EOF
     fi
   fi
 
-  if [[ -n "${NOTFOUND}" ]]; then
-    NOTFOUND="$(strip_last_char "${NOTFOUND}")"
+  if [[ "${#NOTFOUND}" -gt 1 ]]; then
+    NOTFOUND="$(strip_trailing_commas "${NOTFOUND}")"
     for dep in $(echo "${NOTFOUND}" | tr ' ' '\n'); do
       warn "Dependency not found: ${dep}"
     done
@@ -1328,13 +1395,33 @@ EOF
 
   info "Downloading ASM kpt package..."
   retry 3 kpt pkg get --auto-set=false "${KPT_URL}" asm
+  version_message > "${ASM_VERSION_FILE}"
 }
 
 necessary_files_exist() {
   if [[ ! -f "${OUTPUT_DIR}/${ISTIOCTL_REL_PATH}" ]]; then
     false
+    return
   elif [[ ! -f "${OUTPUT_DIR}/${OPERATOR_MANIFEST}" ]]; then
     false
+    return
+  fi
+
+  # Refuse to overwrite configuration downloaded from a different version
+  if [[ ! -f "${OUTPUT_DIR}/${ASM_VERSION_FILE}" ]]; then
+    warn "Re-using existing configuration in ${OUTPUT_DIR}."
+    warn_pause "If this was unintentional, please re-run with a different output directory."
+    return
+  fi
+
+  local EXISTING_VER; EXISTING_VER="$(cat "${ASM_VERSION_FILE}")";
+  if [[ "${EXISTING_VER}" != "$(version_message)" ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+The existing configuration in ${OUTPUT_DIR} is from a different version.
+Existing: ${EXISTING_VER}
+Current: $(version_message)
+Please try again and specify a different output directory.
+EOF
   fi
 }
 
@@ -1938,6 +2025,12 @@ generate_membership_name() {
 register_cluster() {
   if is_cluster_registered; then return; fi
 
+  if can_modify_gcp_components; then
+    enable_workload_identity
+  else
+    exit_if_no_workload_identity
+  fi
+
   populate_cluster_values
   local MEMBERSHIP_NAME
   MEMBERSHIP_NAME="$(generate_membership_name)"
@@ -1959,6 +2052,8 @@ EOF
 }
 
 is_workload_identity_enabled() {
+  if [[ "${WI_ENABLED}" -eq 1 ]]; then return; fi
+
   local ENABLED
   ENABLED="$(gcloud container clusters describe \
     --project="${PROJECT_ID}" \
@@ -1967,7 +2062,7 @@ is_workload_identity_enabled() {
     --format=json | \
     jq .workloadIdentityConfig)"
 
-  if [[ "${ENABLED}" = 'null' ]]; then false; fi
+  if [[ "${ENABLED}" = 'null' ]]; then false; else WI_ENABLED=1; fi
 }
 
 is_membership_crd_installed() {
@@ -1993,14 +2088,6 @@ populate_environ_info() {
     read -r ENVIRON_PROJECT_ID HUB_MEMBERSHIP_ID <<EOF
 ${IDENTITY}
 EOF
-  fi
-}
-
-should_enable_workload_identity() {
-  # Enable workload identity is not needed for using Hub Workload Identity Pool
-  # as the cluster needs to be registered with Hub Workload Identity Pool
-  if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
-    false
   fi
 }
 

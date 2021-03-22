@@ -25,12 +25,11 @@ MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=9}"; readonly MINOR;
 POINT="${POINT:=1}"; readonly POINT;
 REV="${REV:=1}"; readonly REV;
+CONFIG_VER="${CONFIG_VER:="1-unstable"}"; readonly CONFIG_VER;
 ASM_RELEASE="${MAJOR}.${MINOR}"
 ASM_META_VERSION="${ASM_RELEASE}.0"
-ASM_REVISION_PREFIX="${ASM_REVISION_PREFIX:=asm-${MAJOR}${MINOR}}"
 readonly ASM_RELEASE
 readonly ASM_META_VERSION
-readonly ASM_REVISION_PREFIX
 RELEASE=""
 
 SERVICE_PROXY_AGENT_BUCKET="${SERVICE_PROXY_AGENT_BUCKET:=gs://gce-service-proxy/service-proxy-agent/releases/service-proxy-agent-asm-${MAJOR}.${MINOR}.${POINT}-stable.tgz}"
@@ -288,6 +287,11 @@ fatal_with_usage() {
   exit 2
 }
 
+version_message() {
+  local VER; VER="${MAJOR}.${MINOR}.${POINT}-asm.${REV}+config${CONFIG_VER}";
+  echo "${VER}"
+}
+
 usage_asm_vm() {
   cat << EOF
 usage: ${SCRIPT_NAME} <COMMAND>
@@ -302,6 +306,7 @@ COMMANDS:
 
 OPTIONS:
   -h|--help                      Show this message and exit.
+  --version                      Print the version of this tool and exit.
 
 Use "${SCRIPT_NAME} <COMMAND> --help" for more information about a command.
 EOF
@@ -443,6 +448,10 @@ parse_args() {
       ;;
     -h | --help)
       usage_asm_vm
+      exit
+      ;;
+    --version)
+      version_message
       exit
       ;;
     *)
@@ -801,16 +810,16 @@ validate_asm_installation() {
 
   if [[ "${AUTOREGISTRATION_ENABLED}" -eq 0 ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-VM auto-registration is not enabled in any of your ASM installations in the
-cluster. Please install ASM and make sure none of the values set in your custom
-overlay overrides the default values.
+VM auto-registration is not enabled in any of your ASM ${ASM_RELEASE}
+installations in the cluster. Please install ASM and make sure none of the
+values set in your custom overlay override the default values.
 EOF
   fi
 
   if [[ "${ENVIRON_WORKLOAD_IDENTITY_USED}" -eq 0 ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-The environ workload identity is not used in any of your ASM installation in the
-cluster. Please install ASM with VM support.
+The environ workload identity is not used in any of your ASM ${ASM_RELEASE}
+installation in the cluster. Please install ASM with VM support.
 EOF
   fi
 
@@ -1024,14 +1033,6 @@ EOF
 validate_workload_asm_revision() {
   info "Verifying the ASM revision for the WorkloadGroup..."
 
-  if ! [[ "${WORKLOAD_ASM_REVISION}" =~ ^${ASM_REVISION_PREFIX} ]]; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-Adding VM workloads to ASM ${WORKLOAD_ASM_REVISION} revision is not supported.
-Please make sure to label your WorkloadGroup with an ASM revision starting with
-${ASM_REVISION_PREFIX} and try again.
-EOF
-  fi
-
   local WORKLOAD_REVISION_FOUND=0
   ASM_REVISIONS="$(strip_last_char "${ASM_REVISIONS}")"
   for rev in $(echo "${ASM_REVISIONS}" | tr ',' '\n'); do
@@ -1043,17 +1044,16 @@ EOF
 
   if [[ "${WORKLOAD_REVISION_FOUND}" -eq 0 ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-ASM revision ${WORKLOAD_ASM_REVISION} for the workload is not found in the
-cluster. Please verify the value of ${ASM_REVISION_LABEL_KEY} label on namespace
-${WORKLOAD_NAMESPACE} and try again.
+ASM revision ${WORKLOAD_ASM_REVISION} for the workload is not found in any ASM
+${ASM_RELEASE} installation in the cluster. Please verify the value of
+${ASM_REVISION_LABEL_KEY} label on namespace ${WORKLOAD_NAMESPACE} and try again.
 EOF
   fi
 
   if ! uses_environ_workload_identity "${WORKLOAD_ASM_REVISION}"; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 ASM revision ${WORKLOAD_ASM_REVISION} for the workload is not using Environ
-workload identity. Please make sure "--option hub-meshca" is included when you
-use the install_asm script.
+workload identity. Please install ASM with VM support.
 EOF
   fi
 }
@@ -1129,6 +1129,28 @@ EOF
       fi
     else
       info "custom image found, skip checking"
+
+    local INSTANCE_TEMPLATE_SERVICE_ACCOUNT
+    INSTANCE_TEMPLATE_SERVICE_ACCOUNT="$(gcloud compute instance-templates \
+      describe "${SOURCE_INSTANCE_TEMPLATE}" \
+      --format="value(properties.serviceAccounts[0].email)" \
+      --project="${PROJECT_ID}" || true)"
+    if [[ -z "${INSTANCE_TEMPLATE_SERVICE_ACCOUNT}" ]]; then
+      { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+The GCE instance template ${SOURCE_INSTANCE_TEMPLATE} does not use a service
+account. Please create an instance template with a service account and try again.
+EOF
+    else
+      if [[ "${INSTANCE_TEMPLATE_SERVICE_ACCOUNT}" == "default" ]]; then
+        INSTANCE_TEMPLATE_SERVICE_ACCOUNT="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+      fi
+      if [[ "${INSTANCE_TEMPLATE_SERVICE_ACCOUNT}" != "${WORKLOAD_SERVICE_ACCOUNT}" ]]; then
+        { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+The service account used in the instance template ${SOURCE_INSTANCE_TEMPLATE}
+does not match the service account used in the WorkloadGroup. Please make sure
+they match and try again.
+EOF
+      fi
     fi
   fi
 }
@@ -1503,7 +1525,7 @@ create_gce_instance_template() {
       --format=json \
       --project="${PROJECT_ID}" \
       | jq --arg name "${NEW_INSTANCE_TEMPLATE}" \
-      '.name=$name | .properties.disks[].deviceName=$name' || true)"
+      '.name=$name | .properties.disks[0].deviceName=$name' || true)"
 
     EXISTING_METADATA="$(echo "${INSTANCE_TEMPLATE_REQ}" \
       | jq '.properties.metadata.items')"
