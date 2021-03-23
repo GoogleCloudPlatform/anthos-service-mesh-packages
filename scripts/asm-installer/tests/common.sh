@@ -10,9 +10,9 @@ WORKLOAD_NAME="vm"
 WORKLOAD_SERVICE_ACCOUNT=""
 INSTANCE_TEMPLATE_NAME=""
 SOURCE_INSTANCE_TEMPLATE_NAME="vm-source"
-CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME="custompublicvmsource"
+CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME="custompublicsourcetemplate"
 CUSTOM_IMAGE_LOCATION="us-central1-c"
-CUSTOM_IMAGE_NAME="customsourceimage"
+CUSTOM_IMAGE_NAME="custompublicsourceimage"
 CREATE_FROM_SOURCE=0
 
 _EXTRA_FLAGS="${_EXTRA_FLAGS:=}"; export _EXTRA_FLAGS;
@@ -790,7 +790,8 @@ create_custom_source_instance_template() {
     --metadata="testKey=testValue" \
     --labels="testlabel=testvalue" \
     --image-project="${PROJECT_ID}" \
-    --image="${CUSTOM_IMAGE_NAME}"
+    --image="${CUSTOM_IMAGE_NAME}" \
+    --service-account="${WORKLOAD_SERVICE_ACCOUNT}"
 
   gcloud compute instances delete "${CUSTOM_IMAGE_NAME}" --zone "${CUSTOM_IMAGE_LOCATION}" \
    --project "${PROJECT_ID}" --quiet
