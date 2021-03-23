@@ -1791,6 +1791,7 @@ required_iam_roles_mcp_sa() {
 roles/serviceusage.serviceUsageConsumer
 roles/container.admin
 roles/monitoring.metricWriter
+roles/logging.logWriter
 EOF
 }
 
