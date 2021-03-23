@@ -24,6 +24,7 @@ setup_cluster() {
     -p "${LT_PROJECT_ID}" \
     -m install \
     --print-config \
+    -v \
     -D "${OUTPUT_DIR}" > /dev/null
 
   if [[ -n "${RESULT}" ]]; then
