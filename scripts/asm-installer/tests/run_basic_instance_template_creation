@@ -34,6 +34,7 @@ verify_template_instance_with_custom_image() {
   verify_instance_template_with_source
 
   delete_instance_template "${CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME}"
+  delete_instance_template "${CUSTOM_INSTANCE_TEMPLATE_NAME}"
   gcloud compute images delete "${CUSTOM_IMAGE_NAME}" \
   --project "${PROJECT_ID}" --quiet
 }
