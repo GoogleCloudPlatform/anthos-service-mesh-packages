@@ -15,6 +15,7 @@ verify_template_instance_with_source_image() {
   create_source_instance_template
 
   CREATE_FROM_SOURCE=1
+  INSTANCE_TEMPLATE_NAME="vm-${LT_NAMESPACE}"
   create_new_instance_template "${SOURCE_INSTANCE_TEMPLATE_NAME}" "${INSTANCE_TEMPLATE_NAME}"; RETVAL=$?;
   trap 'delete_instance_template "${SOURCE_INSTANCE_TEMPLATE_NAME}"' ERR
 
@@ -41,6 +42,7 @@ verify_template_instance_with_custom_image() {
 }
 
 verify_default_template_instance() {
+  INSTANCE_TEMPLATE_NAME="vm-${LT_NAMESPACE}"
   create_new_instance_template "${SOURCE_INSTANCE_TEMPLATE_NAME}" "${INSTANCE_TEMPLATE_NAME}"; RETVAL=$?;
   trap 'cleanup_workload_service_account' ERR
   verify_instance_template
