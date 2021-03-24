@@ -715,12 +715,12 @@ create_workload_service_account() {
 
 create_new_instance_template() {
   local SOURCE_INSTANCE_TEMPLATE="$1"
-  INSTANCE_TEMPLATE_NAME="$2"
+  local TEMPLATE_NAME="$2"
   
   echo "Creating instance template ${INSTANCE_TEMPLATE_NAME}..."
   if [[ "${CREATE_FROM_SOURCE}" -eq 0 ]]; then
     echo "ASM_REVISION_PREFIX=${LT_NAMESPACE} \
-        ../asm_vm create_gce_instance_template ${INSTANCE_TEMPLATE_NAME} \
+        ../asm_vm create_gce_instance_template ${TEMPLATE_NAME} \
         ${KEY_FILE} ${SERVICE_ACCOUNT} \
         --cluster_location ${LT_CLUSTER_LOCATION} \
         --cluster_name ${LT_CLUSTER_NAME} \
@@ -729,7 +729,7 @@ create_new_instance_template() {
         --workload_namespace ${LT_NAMESPACE}"
     
     ASM_REVISION_PREFIX="${LT_NAMESPACE}" \
-    ../asm_vm create_gce_instance_template "${INSTANCE_TEMPLATE_NAME}" \
+    ../asm_vm create_gce_instance_template "${TEMPLATE_NAME}" \
       ${KEY_FILE} ${SERVICE_ACCOUNT} \
       --cluster_location "${LT_CLUSTER_LOCATION}" \
       --cluster_name "${LT_CLUSTER_NAME}" \
@@ -738,7 +738,7 @@ create_new_instance_template() {
       --workload_namespace "${LT_NAMESPACE}"
   else
     echo "ASM_REVISION_PREFIX=${LT_NAMESPACE} \
-        ../asm_vm create_gce_instance_template ${INSTANCE_TEMPLATE_NAME} \
+        ../asm_vm create_gce_instance_template ${TEMPLATE_NAME} \
         ${KEY_FILE} ${SERVICE_ACCOUNT} \
         --cluster_location ${LT_CLUSTER_LOCATION} \
         --cluster_name ${LT_CLUSTER_NAME} \
@@ -748,7 +748,7 @@ create_new_instance_template() {
         --source_instance_template ${SOURCE_INSTANCE_TEMPLATE}"
     
     ASM_REVISION_PREFIX="${LT_NAMESPACE}" \
-    ../asm_vm create_gce_instance_template "${INSTANCE_TEMPLATE_NAME}" \
+    ../asm_vm create_gce_instance_template "${TEMPLATE_NAME}" \
       ${KEY_FILE} ${SERVICE_ACCOUNT} \
       --cluster_location "${LT_CLUSTER_LOCATION}" \
       --cluster_name "${LT_CLUSTER_NAME}" \
