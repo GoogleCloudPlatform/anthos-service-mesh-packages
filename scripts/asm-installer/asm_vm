@@ -1117,17 +1117,17 @@ EOF
     info "Verifying the GCE image..."
     SOURCE_IMAGE_PATH="$(retry 2 run gcloud compute instance-templates \
       describe "${SOURCE_INSTANCE_TEMPLATE}" \
-    --format=json \
-    --project="${PROJECT_ID}" \
-    | jq '.properties.disks[0].initializeParams.sourceImage')"
+      --format=json \
+      --project="${PROJECT_ID}" \
+      | jq '.properties.disks[0].initializeParams.sourceImage')"
 
     if [[ "${SOURCE_IMAGE_PATH}" == *projects/*-cloud/global/images* ]]; then
     # check whether the public image is supported
       if check_not_supported_vm_linux_distro ; then
-        fatal "Image not supported. Supported image OS list are: ${SUPPORTED_VM_DISTROS[*]}"
+        fatal "Image not supported. Supported image OS distros are: ${SUPPORTED_VM_DISTROS[*]}"
       fi
     else
-      info "custom image found, skip checking"
+      info "A custom image found, skip checking"
     fi
     local INSTANCE_TEMPLATE_SERVICE_ACCOUNT
     INSTANCE_TEMPLATE_SERVICE_ACCOUNT="$(gcloud compute instance-templates \

@@ -15,7 +15,7 @@ verify_template_instance_with_source_image() {
   create_source_instance_template
 
   CREATE_FROM_SOURCE=1
-  create_new_instance_template; RETVAL=$?;
+  create_new_instance_template "${SOURCE_INSTANCE_TEMPLATE_NAME}" "${INSTANCE_TEMPLATE_NAME}"; RETVAL=$?;
   trap 'delete_instance_template "${SOURCE_INSTANCE_TEMPLATE_NAME}"' ERR
 
   verify_instance_template_with_source
@@ -23,6 +23,7 @@ verify_template_instance_with_source_image() {
   delete_instance_template "${INSTANCE_TEMPLATE_NAME}"
   delete_instance_template "${SOURCE_INSTANCE_TEMPLATE_NAME}"
 }
+
 verify_template_instance_with_custom_image() {
   create_custom_source_instance_template
 
@@ -38,8 +39,9 @@ verify_template_instance_with_custom_image() {
   gcloud compute images delete "${CUSTOM_IMAGE_NAME}" \
   --project "${PROJECT_ID}" --quiet
 }
+
 verify_default_template_instance() {
-  create_new_instance_template; RETVAL=$?;
+  create_new_instance_template "${SOURCE_INSTANCE_TEMPLATE_NAME}" "${INSTANCE_TEMPLATE_NAME}"; RETVAL=$?;
   trap 'cleanup_workload_service_account' ERR
   verify_instance_template
   delete_instance_template "${INSTANCE_TEMPLATE_NAME}"
