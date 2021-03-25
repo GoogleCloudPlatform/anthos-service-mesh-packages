@@ -28,12 +28,13 @@ REV="${REV:=1}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1-unstable"}"; readonly CONFIG_VER;
 ASM_RELEASE="${MAJOR}.${MINOR}"
 ASM_META_VERSION="${ASM_RELEASE}.0"
+ASM_FULL_VERSION="${MAJOR}.${MINOR}.${POINT}"
 readonly ASM_RELEASE
 readonly ASM_META_VERSION
+readonly ASM_FULL_VERSION
 RELEASE=""
 
-SERVICE_PROXY_AGENT_BUCKET="${SERVICE_PROXY_AGENT_BUCKET:=gs://gce-service-proxy/service-proxy-agent/releases/service-proxy-agent-asm-${MAJOR}.${MINOR}.${POINT}-stable.tgz}"
-readonly SERVICE_PROXY_AGENT_BUCKET
+SERVICE_PROXY_AGENT_BUCKET="${SERVICE_PROXY_AGENT_BUCKET:=}"
 ASM_REVISION_LABEL_KEY="istio.io/rev"
 readonly ASM_REVISION_LABEL_KEY
 EXPANSION_GATEWAY_NAME="istio-eastwestgateway"
@@ -63,12 +64,12 @@ PROJECT_NUMBER=""
 ### Cluster variables ###
 ROOT_CERT=""
 INGRESS_IP=""
-ASM_REVISIONS=""
 NETWORK=""
 MEMBERSHIP_UID=""
 GKE_URL=""
 ENVIRON_PROJECT_ID=""
 CLUSTER_ID=""
+declare -A ASM_REVISIONS
 
 ### Workload variables ###
 WORKLOAD_LABELS=""
@@ -779,7 +780,12 @@ validate_asm_installation() {
         CURR_REVISION="$(retry 2 kubectl get deployment "${deploy}" \
           -n istio-system -ojson | jq -r \
           '.metadata.labels["'"${ASM_REVISION_LABEL_KEY}"'"]')"
-        ASM_REVISIONS="${CURR_REVISION},${ASM_REVISIONS}"
+        local CURR_VERSION
+        CURR_VERSION="$(echo "${IMAGE_NAME}" | sed -n 's/.*:\([0-9]\+.[0-9]\+.[0-9]\+\)-asm.[0-9]/\1/p')"
+        if [[ -z "${CURR_VERSION}" ]]; then
+          CURR_VERSION="${ASM_FULL_VERSION}"
+        fi
+        ASM_REVISIONS["${CURR_REVISION}"]="${CURR_VERSION}"
         SUPPORTED_VERSION_INSTALLED=1
 
         # verify the auto-registration feature is enabled.
@@ -1030,16 +1036,7 @@ EOF
 validate_workload_asm_revision() {
   info "Verifying the ASM revision for the WorkloadGroup..."
 
-  local WORKLOAD_REVISION_FOUND=0
-  ASM_REVISIONS="$(strip_last_char "${ASM_REVISIONS}")"
-  for rev in $(echo "${ASM_REVISIONS}" | tr ',' '\n'); do
-    if [[ "${WORKLOAD_ASM_REVISION}" == "${rev}" ]]; then
-      WORKLOAD_REVISION_FOUND=1
-      break
-    fi
-  done
-
-  if [[ "${WORKLOAD_REVISION_FOUND}" -eq 0 ]]; then
+  if [[ -z "${ASM_REVISIONS["${WORKLOAD_ASM_REVISION}"]}" ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 ASM revision ${WORKLOAD_ASM_REVISION} for the workload is not found in any ASM
 ${ASM_RELEASE} installation in the cluster. Please verify the value of
@@ -1134,6 +1131,14 @@ EOF
       fi
     fi
   fi
+}
+
+set_service_proxy_url() {
+  if [[ -n "${SERVICE_PROXY_AGENT_BUCKET}" ]]; then
+    return
+  fi
+
+  SERVICE_PROXY_AGENT_BUCKET="gs://gce-service-proxy/service-proxy-agent/releases/service-proxy-agent-asm-${ASM_REVISIONS["${WORKLOAD_ASM_REVISION}"]}-stable.tgz"
 }
 
 extract_canonical_service_label() {
@@ -1624,14 +1629,13 @@ expose_istiod() {
   info "Exposing the control plane for VM workloads..."
   retry 3 kubectl apply -f "${EXPOSE_ISTIOD_SERVICE}"
 
-  ASM_REVISIONS="$(strip_last_char "${ASM_REVISIONS}")"
-  for rev in $(echo "${ASM_REVISIONS}" | tr ',' '\n'); do
+  for rev in "${!ASM_REVISIONS[*]}"; do
     kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod-${rev}.istio-system.svc.cluster.local"
     kpt cfg set asm anthos.servicemesh.istiodHost "istiod-${rev}.istio-system.svc"
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${rev}"
-  done
 
-  retry 3 kubectl apply -f "${EXPOSE_ISTIOD_SERVICE}"
+    retry 3 kubectl apply -f "${EXPOSE_ISTIOD_SERVICE}"
+  done
 }
 
 install_google_identity_provider() {
@@ -1710,6 +1714,7 @@ main() {
   fi
 
   if [[ "${CREATE_GCE_INSTANCE_TEMPLATE}" -eq 1 ]]; then
+    set_service_proxy_url
     extract_canonical_service_label
     extract_canonical_service_revision
     retrieve_cluster_root_cert
