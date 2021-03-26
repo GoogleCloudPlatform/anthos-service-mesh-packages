@@ -10,6 +10,9 @@ WORKLOAD_NAME="vm"
 WORKLOAD_SERVICE_ACCOUNT=""
 INSTANCE_TEMPLATE_NAME=""
 SOURCE_INSTANCE_TEMPLATE_NAME="vm-source"
+CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME="customsourcetemplate"
+CUSTOM_IMAGE_LOCATION="us-central1-c"
+CUSTOM_IMAGE_NAME="customsourcetemplateimage"
 CREATE_FROM_SOURCE=0
 
 _EXTRA_FLAGS="${_EXTRA_FLAGS:=}"; export _EXTRA_FLAGS;
@@ -18,6 +21,7 @@ BUILD_ID="${BUILD_ID:=}"; export BUILD_ID;
 PROJECT_ID="${PROJECT_ID:=}"; export PROJECT_ID;
 CLUSTER_LOCATION="${CLUSTER_LOCATION:=us-central1-c}"; export CLUSTER_LOCATION;
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT:=}"; export SERVICE_ACCOUNT;
+CUSTOM_INSTANCE_TEMPLATE_NAME="${CUSTOM_INSTANCE_TEMPLATE_NAME:=custominstancetemplate}"; export CUSTOM_INSTANCE_TEMPLATE_NAME;
 KEY_FILE="${KEY_FILE:=}"; export KEY_FILE;
 OSS_VERSION="${OSS_VERSION:=1.9.0}"; export OSS_VERSION;
 OLD_OSS_VERSION="${OLD_OSS_VERSION:=1.8.2}"; export OLD_OSS_VERSION;
@@ -710,12 +714,13 @@ create_workload_service_account() {
 }
 
 create_new_instance_template() {
-  INSTANCE_TEMPLATE_NAME="vm-${LT_NAMESPACE}"
+  local SOURCE_INSTANCE_TEMPLATE="$1"
+  local TEMPLATE_NAME="$2"
   
   echo "Creating instance template ${INSTANCE_TEMPLATE_NAME}..."
   if [[ "${CREATE_FROM_SOURCE}" -eq 0 ]]; then
     echo "ASM_REVISION_PREFIX=${LT_NAMESPACE} \
-        ../asm_vm create_gce_instance_template ${INSTANCE_TEMPLATE_NAME} \
+        ../asm_vm create_gce_instance_template ${TEMPLATE_NAME} \
         ${KEY_FILE} ${SERVICE_ACCOUNT} \
         --cluster_location ${LT_CLUSTER_LOCATION} \
         --cluster_name ${LT_CLUSTER_NAME} \
@@ -724,7 +729,7 @@ create_new_instance_template() {
         --workload_namespace ${LT_NAMESPACE}"
     
     ASM_REVISION_PREFIX="${LT_NAMESPACE}" \
-    ../asm_vm create_gce_instance_template "${INSTANCE_TEMPLATE_NAME}" \
+    ../asm_vm create_gce_instance_template "${TEMPLATE_NAME}" \
       ${KEY_FILE} ${SERVICE_ACCOUNT} \
       --cluster_location "${LT_CLUSTER_LOCATION}" \
       --cluster_name "${LT_CLUSTER_NAME}" \
@@ -733,24 +738,24 @@ create_new_instance_template() {
       --workload_namespace "${LT_NAMESPACE}"
   else
     echo "ASM_REVISION_PREFIX=${LT_NAMESPACE} \
-        ../asm_vm create_gce_instance_template ${INSTANCE_TEMPLATE_NAME} \
+        ../asm_vm create_gce_instance_template ${TEMPLATE_NAME} \
         ${KEY_FILE} ${SERVICE_ACCOUNT} \
         --cluster_location ${LT_CLUSTER_LOCATION} \
         --cluster_name ${LT_CLUSTER_NAME} \
         --project_id ${PROJECT_ID} \
         --workload_name ${WORKLOAD_NAME} \
         --workload_namespace ${LT_NAMESPACE} \
-        --source_instance_template ${SOURCE_INSTANCE_TEMPLATE_NAME}"
+        --source_instance_template ${SOURCE_INSTANCE_TEMPLATE}"
     
     ASM_REVISION_PREFIX="${LT_NAMESPACE}" \
-    ../asm_vm create_gce_instance_template "${INSTANCE_TEMPLATE_NAME}" \
+    ../asm_vm create_gce_instance_template "${TEMPLATE_NAME}" \
       ${KEY_FILE} ${SERVICE_ACCOUNT} \
       --cluster_location "${LT_CLUSTER_LOCATION}" \
       --cluster_name "${LT_CLUSTER_NAME}" \
       --project_id "${PROJECT_ID}" \
       --workload_name "${WORKLOAD_NAME}" \
       --workload_namespace "${LT_NAMESPACE}" \
-      --source_instance_template "${SOURCE_INSTANCE_TEMPLATE_NAME}"
+      --source_instance_template "${SOURCE_INSTANCE_TEMPLATE}"
   fi
 }
 
@@ -763,6 +768,33 @@ create_source_instance_template() {
     --metadata="testKey=testValue" \
     --labels="testlabel=testvalue" \
     --service-account="${WORKLOAD_SERVICE_ACCOUNT}"
+}
+
+create_custom_source_instance_template() {
+  echo "Creating custom source instance template ${CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME}..."
+
+  gcloud compute instances create "${CUSTOM_IMAGE_NAME}" \
+    --project "${PROJECT_ID}" \
+    --zone "${CUSTOM_IMAGE_LOCATION}"
+  gcloud compute instances stop "${CUSTOM_IMAGE_NAME}" \
+    --project "${PROJECT_ID}" \
+    --zone "${CUSTOM_IMAGE_LOCATION}"
+  gcloud compute images create "${CUSTOM_IMAGE_NAME}" \
+    --project "${PROJECT_ID}" \
+    --source-disk="${CUSTOM_IMAGE_NAME}" \
+    --source-disk-zone="${CUSTOM_IMAGE_LOCATION}"
+
+  # Create an instance template with a metadata entry, a label entry AND A CUO
+  gcloud compute instance-templates create "${CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME}" \
+    --project "${PROJECT_ID}" \
+    --metadata="testKey=testValue" \
+    --labels="testlabel=testvalue" \
+    --image-project="${PROJECT_ID}" \
+    --image="${CUSTOM_IMAGE_NAME}" \
+    --service-account="${WORKLOAD_SERVICE_ACCOUNT}"
+
+  gcloud compute instances delete "${CUSTOM_IMAGE_NAME}" --zone "${CUSTOM_IMAGE_LOCATION}" \
+    --project "${PROJECT_ID}" --quiet
 }
 
 verify_instance_template() {
