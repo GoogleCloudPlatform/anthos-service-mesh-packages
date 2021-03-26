@@ -1757,6 +1757,7 @@ roles/monitoring.metricWriter
 EOF
 }
 
+# [START required_iam_roles]
 required_iam_roles() {
   # meshconfig.admin - required for init, stackdriver, UI elements, etc.
   # servicemanagement.admin/serviceusage.serviceUsageAdmin - enables APIs
@@ -1773,6 +1774,7 @@ roles/gkehub.admin
 roles/privateca.admin
 EOF
 }
+# [END required_iam_roles]
 
 # [START required_apis]
 required_apis() {
