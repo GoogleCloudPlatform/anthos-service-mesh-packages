@@ -102,6 +102,9 @@ DRY_RUN="${DRY_RUN:=0}"
 ONLY_VALIDATE="${ONLY_VALIDATE:=0}"
 VERBOSE="${VERBOSE:=0}"
 
+SOURCE_IMAGE_PATH=""
+SUPPORTED_VM_DISTROS=("debian-9" "debian-10")
+
 init() {
   # BSD-style readlink apparently doesn't have the same -f toggle on readlink
   case "$(uname)" in
@@ -1107,6 +1110,21 @@ this project, run:
 EOF
     fi
 
+    info "Verifying the GCE image..."
+    SOURCE_IMAGE_PATH="$(retry 2 run gcloud compute instance-templates \
+      describe "${SOURCE_INSTANCE_TEMPLATE}" \
+      --format=json \
+      --project="${PROJECT_ID}" \
+      | jq '.properties.disks[0].initializeParams.sourceImage')"
+
+    if [[ "${SOURCE_IMAGE_PATH}" == *projects/*-cloud/global/images* ]]; then
+    # check whether the public image is supported
+      if check_not_supported_vm_linux_distro ; then
+        fatal "Image not supported. Supported image OS distros are: ${SUPPORTED_VM_DISTROS[*]}"
+      fi
+    else
+      info "A custom image found, skip checking"
+    fi
     local INSTANCE_TEMPLATE_SERVICE_ACCOUNT
     INSTANCE_TEMPLATE_SERVICE_ACCOUNT="$(gcloud compute instance-templates \
       describe "${SOURCE_INSTANCE_TEMPLATE}" \
@@ -1130,6 +1148,16 @@ EOF
       fi
     fi
   fi
+}
+
+check_not_supported_vm_linux_distro() {
+  for distro in "${SUPPORTED_VM_DISTROS[@]}"
+  do
+    if [[ "${SOURCE_IMAGE_PATH}" = *"${distro}"* ]]; then
+      false
+      return
+    fi
+  done
 }
 
 set_service_proxy_url() {
