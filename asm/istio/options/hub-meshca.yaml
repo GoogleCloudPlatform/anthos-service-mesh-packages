@@ -32,8 +32,6 @@ spec:
             value: "istio-ca,ENVIRON_PROJECT_ID.hub.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.token-audiences-hub"}
           - name: PILOT_ENABLE_WORKLOAD_ENTRY_AUTOREGISTRATION
             value: "true"
-          - name: PILOT_ENABLE_CROSS_CLUSTER_WORKLOAD_ENTRY
-            value: "true"
   meshConfig:
     trustDomain: "ENVIRON_PROJECT_ID.hub.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain-hub"}
     defaultConfig:
