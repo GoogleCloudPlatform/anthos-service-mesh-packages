@@ -34,7 +34,7 @@ MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=9}"; readonly MINOR;
 POINT="${POINT:=1}"; readonly POINT;
 REV="${REV:=1}"; readonly REV;
-CONFIG_VER="${CONFIG_VER:="2"}"; readonly CONFIG_VER;
+CONFIG_VER="${CONFIG_VER:="3"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
 ### File related constants ###
@@ -1757,6 +1757,7 @@ roles/monitoring.metricWriter
 EOF
 }
 
+# [START required_iam_roles]
 required_iam_roles() {
   # meshconfig.admin - required for init, stackdriver, UI elements, etc.
   # servicemanagement.admin/serviceusage.serviceUsageAdmin - enables APIs
@@ -1773,6 +1774,7 @@ roles/gkehub.admin
 roles/privateca.admin
 EOF
 }
+# [END required_iam_roles]
 
 # [START required_apis]
 required_apis() {
