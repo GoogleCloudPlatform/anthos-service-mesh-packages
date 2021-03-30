@@ -32,7 +32,7 @@ _CI_CRC_VERSION="${_CI_CRC_VERSION:=0}"
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=9}"; readonly MINOR;
-POINT="${POINT:=1}"; readonly POINT;
+POINT="${POINT:=2}"; readonly POINT;
 REV="${REV:=1}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1-staging"}"; readonly CONFIG_VER;
 K8S_MINOR=0
