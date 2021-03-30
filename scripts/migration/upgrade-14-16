@@ -1,0 +1,281 @@
+#!/bin/bash
+
+set -o errexit
+set -o pipefail
+set -o nounset
+set -o noclobber
+
+ISTIO_NAMESPACE="istio-system"
+TMP_DIR="/tmp/upgrade-14-16"
+
+# Maintain work done so far in case tool exits or errors out.
+STATE_FILE="${TMP_DIR}/state"
+STATE_START="START"
+STATE_CRS_CHECKED="STATE_CRS_CHECKED"
+STATE_AFTER_RESTART="AFTER_RESTART"
+STATE_COMPLETE="COMPLETE"
+STATE="${STATE_START}"
+
+EXPECTED_PODS=(istio-citadel istio-galley istio-ingressgateway istio-pilot istio-policy \
+istio-sidecar-injector istio-telemetry prometheus promsd istiod-istio-16)
+
+SKIP_CONFIRM=""
+RESTART_WORKLOADS=""
+ISTIO_REV=""
+
+usage() {
+    echo "Usage:"
+    echo "  ./upgrade-14-16 [OPTIONS]"
+    echo
+    echo "  --reset               reset the upgrade tool to start from the beginning."
+    echo "  --skip-confirm, -y    select 'yes' for any prompts."
+    echo
+}
+
+die() {
+    echo "$*" >&2 ; exit 1;
+}
+
+prompt() {
+  read -r -p "${1} [y/N] " response
+  case "$response" in
+      [yY][eE][sS]|[yY])
+          return
+          ;;
+  esac
+  false
+}
+
+get_state() {
+  STATE=$(cat "${STATE_FILE}")
+}
+
+set_state() {
+  echo "${1}" >| "${STATE_FILE}"
+  STATE="${1}"
+}
+
+init_state() {
+  if [[ ! -f "${STATE_FILE}" ]]; then
+      set_state "${STATE_START}"
+  fi
+  get_state
+}
+
+print_intro() {
+  if [[ -z "${SKIP_CONFIRM}" ]]; then
+    echo
+    echo "This tool automatically upgrades the Istio addon in the current cluster from 1.4 to 1.6."
+    echo "The cluster is selected by the current kubectl configuration."
+    echo
+    prompt "Do you want to proceed?" || exit 0
+    echo
+  fi
+}
+
+check_prerequisites() {
+  echo "Checking prerequisites:"
+  command -v kubectl >| /dev/null 2>&1 || die "kubectl must be installed, aborting."
+  echo "OK"
+}
+
+get_istio_rev_label () {
+  echo "Checking the installed revision of istiod:"
+  istiod_line="$(kubectl -n istio-system get pods -lapp=istiod --show-labels --no-headers)"
+  regex="rev=istio-([0-9]+)"
+  if [[ $istiod_line =~ $regex ]]; then
+      ISTIO_REV="istio-${BASH_REMATCH[1]}"
+  else
+      die "Could not find the expected istiod instance."
+  fi
+  echo "OK - ${ISTIO_REV} is installed."
+}
+
+get_cluster_info() {
+  echo "Gathering info about the cluster:"
+  PODS="$(kubectl -n ${ISTIO_NAMESPACE} get pods --no-headers)"
+  PODS_ARR=()
+  while read -r line; do
+    PODS_ARR+=("$line")
+  done <<< "$PODS"
+  echo "OK"
+}
+
+check_pod_exists() {
+  local pod_name="${1}"
+  for line in "${PODS_ARR[@]}"; do
+    if [[ ${line} == *"${pod_name}"* ]]; then
+        return
+    fi
+  done
+
+  die "${pod_name} pod is missing from the cluster."
+}
+
+check_pod_ready() {
+  local pod_name="${1}"
+  for line in "${PODS_ARR[@]}"; do
+    if [[ ${line} == *"${pod_name}"* && ${line} == *"Running"* ]]; then
+        return
+    fi
+  done
+
+  die "${pod_name} pod must be in a Running state."
+}
+
+check_istio_pods() {
+  echo "Checking that expected Istio pods are present and running:"
+  for pod in "${EXPECTED_PODS[@]}"; do
+    check_pod_exists "${pod}"
+    check_pod_ready "${pod}"
+  done
+  echo "OK"
+}
+
+disable_galley_webhook() {
+  echo "Disabling the Istio validating webhook:"
+  kubectl patch clusterrole -n istio-system istio-galley-istio-system --type='json' -p='[{"op": "replace", "path": "/rules/2/verbs/0", "value": "get"}]'
+  kubectl delete ValidatingWebhookConfiguration istio-galley
+  echo "OK"
+}
+
+enable_galley_webhook() {
+  echo "Enabling the Istio validating webhook:"
+  echo ":"
+  kubectl patch clusterrole -n istio-system istio-galley-istio-system --type='json' -p='[{"op": "replace", "path": "/rules/2/verbs/0", "value": '\''*'\''}]'
+  echo "OK"
+}
+
+download_and_install_migration_tool () {
+  if [[ -f "${TMP_DIR}/convert" ]]; then
+    echo "Authentication CR migration tool is already installed."
+  else
+    echo "Installing the authentication CR migration tool:"
+    pushd "${TMP_DIR}"
+    curl -L -s https://github.com/istio-ecosystem/security-policy-migrate/releases/latest/download/convert.tar.gz --output convert.tar.gz
+    tar -xvf convert.tar.gz
+    chmod +x convert
+    echo "OK"
+  fi
+}
+
+generate_auth_migration_crs() {
+  echo "Converting authentication CRs:"
+  pushd "${TMP_DIR}"
+  ./convert >| beta-policy.yaml
+  kubectl apply --dry-run -f beta-policy.yaml
+  popd
+  echo "OK"
+}
+
+prompt_check_auth_crs () {
+  echo
+  echo "Please inspect ${TMP_DIR}/beta-policy.yaml and ensure that the translated CRs look correct."
+  echo "When ready, re-run this tool to continue the migration."
+  echo "The tool will automatically resume from this point."
+  echo
+}
+
+migrate_auth_crs () {
+  echo "Migrating authentication CRs:"
+  kubectl apply -f "${TMP_DIR}"/beta-policy.yaml
+  echo "OK"
+}
+
+print_restart_instructions() {
+  echo
+  echo "The first part of the migration completed successfully. Now, please perform the following steps:"
+  echo
+  echo "1. Label any namespaces with auto injection using the following command:"
+  echo
+  echo "     kubectl label namespace <NAMESPACE> istio-injection- istio.io/rev=${ISTIO_REV} --overwrite"
+  echo
+  echo "2. Restart all workloads in these namespaces to update the sidecar proxies to the new version."
+  echo
+  echo "Any manually injected proxies must also be re-injected manually at this point."
+  echo
+  echo "When ready, re-run this tool to continue the migration."
+  echo "The tool will automatically resume from this point."
+}
+
+move_gateway_to_new_istio() {
+  echo "Updating ingress gateway to use the new control plane:"
+  operator_cr_name=$(kubectl get istiooperators -n istio-system --no-headers | awk '{print $1}')
+  kubectl patch istiooperator -n istio-system "${operator_cr_name}" --type='json' -p='[{"op": "replace", "path": "/spec/components/ingressGateways/0/enabled", "value": true}]'
+  echo "OK"
+}
+
+turn_down_old_istio() {
+  echo "Turning down old control plane:"
+  kubectl scale deploy -n istio-system --replicas=0 \
+    istio-citadel istio-galley istio-pilot istio-policy istio-sidecar-injector istio-telemetry prometheus promsd
+  echo "OK"
+}
+
+mkdir -p "${TMP_DIR}" || die "Failed to create temp directory ${TMP_DIR} under /tmp."
+
+init_state
+
+while (( "$#" )); do
+    PARAM=$(echo "${1}" | awk -F= '{print $1}')
+    eval VALUE="$(echo "${1}" | awk -F= '{print $2}')"
+    case "${PARAM}" in
+        -h | --help)
+            usage
+            exit
+            ;;
+        --reset)
+            set_state "${STATE_START}"
+            exit 0
+            ;;
+        -y | --skip-confirm)
+            SKIP_CONFIRM=true
+            ;;
+        *)
+            echo "ERROR: unknown parameter \"$PARAM\""
+            usage
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+# TODO: may need to handle multiple clusters case better.
+if [[ "${STATE}" == "${STATE_COMPLETE}" ]]; then
+  echo "It appears that this tool already completed successfully."
+  echo "To upgrade another cluster:"
+  echo "  1. Configure kubectl to the new cluster"
+  echo "  2. Run './upgrade-14-16.sh --reset'. This will reset the tool."
+  echo "  3. Run './upgrade-14-16.sh'. This will repeat the migration for the new cluster."
+  exit 0
+fi
+
+get_istio_rev_label
+
+if [[ "${STATE}" == "${STATE_CRS_CHECKED}" ]]; then
+  migrate_auth_crs
+  set_state "${STATE_AFTER_RESTART}"
+  print_restart_instructions
+  exit 0
+fi
+
+if [[ "${STATE}" == "${STATE_AFTER_RESTART}" ]]; then
+  move_gateway_to_new_istio
+  turn_down_old_istio
+  set_state "${STATE_COMPLETE}"
+  echo "Upgrade successfully completed."
+  exit 0
+fi
+
+check_prerequisites
+print_intro
+get_cluster_info
+check_istio_pods
+download_and_install_migration_tool
+generate_auth_migration_crs
+disable_galley_webhook
+prompt_check_auth_crs
+set_state "${STATE_CRS_CHECKED}"
+
+
+
