@@ -24,6 +24,7 @@ PREVIOUS_RELEASE_LINE="${MAJOR}.$(( MINOR - 1 ))."
 REVISION_LABEL="asm-${MAJOR}${MINOR}${POINT}-${REV}"
 KPT_BRANCH="release-${MAJOR}.${MINOR}-asm"
 readonly RELEASE; readonly RELEASE_LINE; readonly REVISION_LABEL; readonly KPT_BRANCH;
+CONFIG_VER="${CONFIG_VER:="4"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
 ### These are hooks for Cloud Build to be able to use debug/staging images
@@ -31,6 +32,7 @@ K8S_MINOR=0
 ### in CI/CD.
 _CI_ASM_IMAGE_LOCATION="${_CI_ASM_IMAGE_LOCATION:=}"
 _CI_ASM_PKG_LOCATION="${_CI_ASM_PKG_LOCATION:=}"
+_CI_CRC_VERSION="${_CI_CRC_VERSION:=0}"
 
 ### File related constants ###
 ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
@@ -76,6 +78,7 @@ DRY_RUN="${DRY_RUN:=0}"
 ONLY_VALIDATE="${ONLY_VALIDATE:=0}"
 VERBOSE="${VERBOSE:=0}"
 PRINT_HELP=0
+PRINT_VERSION=0
 
 main() {
   init
@@ -226,9 +229,18 @@ needs_asm() {
   if [[ "${PRINT_CONFIG}" -eq 0 ]] && ! can_modify && ! should_validate; then false; fi
 }
 
+version_message() {
+  local VER; VER="${MAJOR}.${MINOR}.${POINT}-asm.${REV}+config${CONFIG_VER}";
+  if [[ "${_CI_CRC_VERSION}" -eq 1 ]]; then
+    VER="${VER}-$(crc32 "$0")"
+  fi
+  echo "${VER}"
+}
+
 ### CLI/initial setup functions ###
 usage_short() {
   cat << EOF
+${SCRIPT_NAME} $(version_message)
 usage: ${SCRIPT_NAME} [OPTION]...
 
 Set up, validate, and install ASM in a Google Cloud environment.
@@ -260,11 +272,13 @@ FLAGS:
      --dry_run
      --only_validate
   -h|--help
+  --version
 EOF
 }
 
 usage() {
   cat << EOF
+${SCRIPT_NAME} $(version_message)
 usage: ${SCRIPT_NAME} [OPTION]...
 
 Set up, validate, and install ASM in a Google Cloud environment.
@@ -343,6 +357,7 @@ FLAGS:
      --dry_run                        Print commands, but don't execute them.
      --only_validate                  Run validation, but don't install.
   -h|--help                           Show this message and exit.
+  --version                           Print the version of this tool and exit.
 
 EXAMPLE:
 The following invocation will install ASM to a cluster named "my_cluster" in
@@ -476,13 +491,19 @@ parse_args() {
         PRINT_HELP=1
         shift 1
         ;;
+      --version)
+        PRINT_VERSION=1
+        shift 1
+        ;;
       *)
         fatal_with_usage "Unknown option ${1}"
         ;;
     esac
   done
-  if [[ "${PRINT_HELP}" -eq 1 ]]; then
-    if [[ "${VERBOSE}" -eq 1 ]]; then
+  if [[ "${PRINT_HELP}" -eq 1 || "${PRINT_VERSION}" -eq 1 ]]; then
+    if [[ "${PRINT_VERSION}" -eq 1 ]]; then
+      version_message
+    elif [[ "${VERBOSE}" -eq 1 ]]; then
       usage
     else
       usage_short
