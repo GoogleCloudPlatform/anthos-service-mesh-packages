@@ -113,6 +113,17 @@ check_tags() {
   fi
 }
 
+get_tags() {
+  local TAG; TAG="$(git tag --points-at HEAD)";
+  IFS="+" read -r VERSION CONFIG <<EOF
+${TAG}
+EOF
+
+  cat << EOF
+${VERSION}-${CONFIG}
+EOF
+}
+
 upload() {
   local SCRIPT_NAME; SCRIPT_NAME="${1}";
   local FILE_NAME; FILE_NAME="${2}";
@@ -133,29 +144,38 @@ publish_script() {
   local BRANCH_NAME; BRANCH_NAME="${1}"
   local VERSION; VERSION="${2}"
   local SCRIPT_NAME; SCRIPT_NAME="${3}"
+  local TAG;
+
+  git checkout "${BRANCH_NAME}"
+  TAG="$(get_tags)"
+
+  if [[ ! -f "${SCRIPT_NAME}" ]]; then echo "${SCRIPT_NAME} not found" >&2; return; fi
+
+  check_tags "${BRANCH_NAME}" "${SCRIPT_NAME}"
+
+  write_and_upload ${SCRIPT_NAME} ${VERSION};
+  write_and_upload ${SCRIPT_NAME} ${TAG}
+}
+
+write_and_upload() {
+  local SCRIPT_NAME; SCRIPT_NAME="${1}"
+  local VERSION; VERSION="${2}"
   local FILE_NAME; FILE_NAME="${SCRIPT_NAME}_${VERSION}"
   local FILE_PATH; FILE_PATH="${BUCKET_PATH}/${FILE_NAME}"
   local FILE_URI; FILE_URI="${BUCKET_URL}/${FILE_PATH}"
 
-  git checkout "${BRANCH_NAME}"
-
-  if [[ ! -f "${SCRIPT_NAME}" ]]; then echo "${SCRIPT_NAME} not found" >&2; return; fi
-
   if ! changes_necessary "${FILE_URI}" "${FILE_NAME}"; then return; fi
-
-  check_tags "${BRANCH_NAME}" "${SCRIPT_NAME}"
 
   sha256sum "${SCRIPT_NAME}" >| "${SCRIPT_NAME}.sha256"
   cp "${SCRIPT_NAME}" "${FILE_NAME}"
   sha256sum "${FILE_NAME}" >> "${SCRIPT_NAME}.sha256"
 
-  upload "${SCRIPT_NAME}" "${FILE_NAME}" "${FILE_PATH}" "${FILE_URI}"
+  # upload "${SCRIPT_NAME}" "${FILE_NAME}" "${FILE_PATH}" "${FILE_URI}"
 
-  if [[ "${BRANCH_NAME}" == "${CURRENT_RELEASE}" ]]; then
-    upload "${SCRIPT_NAME}" "${FILE_NAME}" "${BUCKET_PATH}/${SCRIPT_NAME}" "${BUCKET_URL}/${BUCKET_PATH}/${SCRIPT_NAME}"
-  fi
-
-  git restore "${SCRIPT_NAME}"
+  # if [[ "${BRANCH_NAME}" == "${CURRENT_RELEASE}" ]]; then
+  #   upload "${SCRIPT_NAME}" "${FILE_NAME}" "${BUCKET_PATH}/${SCRIPT_NAME}" "${BUCKET_URL}/${BUCKET_PATH}/${SCRIPT_NAME}"
+  # fi
+  # git restore "${SCRIPT_NAME}"
   echo "Published ${FILE_NAME} successfully."
 }
 
