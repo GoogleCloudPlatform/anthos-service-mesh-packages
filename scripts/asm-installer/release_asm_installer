@@ -147,13 +147,13 @@ publish_script() {
   local TAG;
 
   git checkout "${BRANCH_NAME}"
-  TAG="$(get_tags)"
 
   if [[ ! -f "${SCRIPT_NAME}" ]]; then echo "${SCRIPT_NAME} not found" >&2; return; fi
 
   check_tags "${BRANCH_NAME}" "${SCRIPT_NAME}"
 
-  write_and_upload ${SCRIPT_NAME} ${VERSION};
+  TAG="$(get_tags)"
+  write_and_upload ${SCRIPT_NAME} ${VERSION}
   write_and_upload ${SCRIPT_NAME} ${TAG}
 }
 
