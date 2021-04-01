@@ -103,7 +103,7 @@ ONLY_VALIDATE="${ONLY_VALIDATE:=0}"
 VERBOSE="${VERBOSE:=0}"
 
 SOURCE_IMAGE_PATH=""
-SUPPORTED_VM_DISTROS=("debian-9" "debian-10")
+SUPPORTED_VM_DISTROS=("debian-9" "debian-10" "centos-8")
 
 init() {
   # BSD-style readlink apparently doesn't have the same -f toggle on readlink
