@@ -34,7 +34,6 @@ prod_releases() {
 release 1.9
 release 1.8
 release 1.7
-release 1.6
 EOF
 }
 
@@ -114,9 +113,9 @@ check_tags() {
 }
 
 get_tags() {
-  local TAG; TAG="$(git tag --points-at HEAD)";
+  local VER; VER="$(./"${SCRIPT_NAME}" --version || true)"
   IFS="+" read -r VERSION CONFIG <<EOF
-${TAG}
+${VER}
 EOF
 
   cat << EOF
