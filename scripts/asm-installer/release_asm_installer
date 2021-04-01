@@ -115,7 +115,7 @@ check_tags() {
 get_stable_version() {
   local VER; VER="$(./"${SCRIPT_NAME}" --version || true)"
 
-  echo ${VER//+/-}
+  echo "${VER//+/-}"
 }
 
 upload() {
@@ -147,8 +147,8 @@ publish_script() {
   check_tags "${BRANCH_NAME}" "${SCRIPT_NAME}"
 
   STABLE_VERSION="$(get_stable_version)"
-  write_and_upload ${SCRIPT_NAME} ${VERSION}
-  write_and_upload ${SCRIPT_NAME} ${STABLE_VERSION}
+  write_and_upload "${SCRIPT_NAME}" "${VERSION}"
+  write_and_upload "${SCRIPT_NAME}" "${STABLE_VERSION}"
 }
 
 write_and_upload() {
