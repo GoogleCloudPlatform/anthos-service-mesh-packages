@@ -1838,28 +1838,36 @@ required_iam_roles() {
 # [START required_apis]
 required_apis() {
     cat << EOF
-container.googleapis.com
-compute.googleapis.com
 monitoring.googleapis.com
 logging.googleapis.com
 cloudtrace.googleapis.com
 meshtelemetry.googleapis.com
-meshconfig.googleapis.com
-iamcredentials.googleapis.com
-gkeconnect.googleapis.com
-gkehub.googleapis.com
-cloudresourcemanager.googleapis.com
 stackdriver.googleapis.com
 EOF
-  case "${CA}" in
-   mesh_ca)
-     echo meshca.googleapis.com
-     ;;
-   gcp_cas)
-     echo privateca.googleapis.com
-     ;;
-    *);;
-  esac
+  if can_modify_gcp_components || \
+     can_modify_cluster_labels || \
+     can_modify_cluster_roles; then
+    echo container.googleapis.com
+  fi
+  if can_modify_gcp_components; then
+    echo meshconfig.googleapis.com
+  fi
+  if can_modify_gcp_iam_roles; then
+    echo cloudresourcemanager.googleapis.com
+    echo iamcredentials.googleapis.com
+  fi
+  if can_register_cluster; then
+    echo gkeconnect.googleapis.com
+    echo gkehub.googleapis.com
+  fi
+  if [[ "${CA}" = "gcp_cas" ]]; then
+    echo privateca.googleapis.com
+  elif [[ "${CA}" = "mesh_ca" ]]; then
+    echo meshca.googleapis.com
+  fi
+  if [[ "${_CI_I_AM_A_TEST_ROBOT}" -eq 1 ]]; then
+    echo compute.googleapis.com
+  fi
 }
 # [END required_apis]
 
