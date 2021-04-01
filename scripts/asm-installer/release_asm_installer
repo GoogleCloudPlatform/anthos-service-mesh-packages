@@ -112,15 +112,10 @@ check_tags() {
   fi
 }
 
-get_tags() {
+get_stable_version() {
   local VER; VER="$(./"${SCRIPT_NAME}" --version || true)"
-  IFS="+" read -r VERSION CONFIG <<EOF
-${VER}
-EOF
 
-  cat << EOF
-${VERSION}-${CONFIG}
-EOF
+  echo ${VER//+/-}
 }
 
 upload() {
@@ -143,7 +138,7 @@ publish_script() {
   local BRANCH_NAME; BRANCH_NAME="${1}"
   local VERSION; VERSION="${2}"
   local SCRIPT_NAME; SCRIPT_NAME="${3}"
-  local TAG;
+  local STABLE_VERSION;
 
   git checkout "${BRANCH_NAME}"
 
@@ -151,9 +146,9 @@ publish_script() {
 
   check_tags "${BRANCH_NAME}" "${SCRIPT_NAME}"
 
-  TAG="$(get_tags)"
+  STABLE_VERSION="$(get_stable_version)"
   write_and_upload ${SCRIPT_NAME} ${VERSION}
-  write_and_upload ${SCRIPT_NAME} ${TAG}
+  write_and_upload ${SCRIPT_NAME} ${STABLE_VERSION}
 }
 
 write_and_upload() {
@@ -174,6 +169,7 @@ write_and_upload() {
   if [[ "${BRANCH_NAME}" == "${CURRENT_RELEASE}" ]]; then
     upload "${SCRIPT_NAME}" "${FILE_NAME}" "${BUCKET_PATH}/${SCRIPT_NAME}" "${BUCKET_URL}/${BUCKET_PATH}/${SCRIPT_NAME}"
   fi
+
   git restore "${SCRIPT_NAME}"
   echo "Published ${FILE_NAME} successfully."
 }
