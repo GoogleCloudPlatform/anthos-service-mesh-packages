@@ -169,12 +169,12 @@ write_and_upload() {
   cp "${SCRIPT_NAME}" "${FILE_NAME}"
   sha256sum "${FILE_NAME}" >> "${SCRIPT_NAME}.sha256"
 
-  # upload "${SCRIPT_NAME}" "${FILE_NAME}" "${FILE_PATH}" "${FILE_URI}"
+  upload "${SCRIPT_NAME}" "${FILE_NAME}" "${FILE_PATH}" "${FILE_URI}"
 
-  # if [[ "${BRANCH_NAME}" == "${CURRENT_RELEASE}" ]]; then
-  #   upload "${SCRIPT_NAME}" "${FILE_NAME}" "${BUCKET_PATH}/${SCRIPT_NAME}" "${BUCKET_URL}/${BUCKET_PATH}/${SCRIPT_NAME}"
-  # fi
-  # git restore "${SCRIPT_NAME}"
+  if [[ "${BRANCH_NAME}" == "${CURRENT_RELEASE}" ]]; then
+    upload "${SCRIPT_NAME}" "${FILE_NAME}" "${BUCKET_PATH}/${SCRIPT_NAME}" "${BUCKET_URL}/${BUCKET_PATH}/${SCRIPT_NAME}"
+  fi
+  git restore "${SCRIPT_NAME}"
   echo "Published ${FILE_NAME} successfully."
 }
 
