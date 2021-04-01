@@ -32,7 +32,7 @@ _CI_CRC_VERSION="${_CI_CRC_VERSION:=0}"
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=9}"; readonly MINOR;
-POINT="${POINT:=1}"; readonly POINT;
+POINT="${POINT:=2}"; readonly POINT;
 REV="${REV:=1}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="3"}"; readonly CONFIG_VER;
 K8S_MINOR=0
@@ -2045,15 +2045,8 @@ is_membership_crd_installed() {
 populate_environ_info() {
   if [[ -n "${ENVIRON_PROJECT_ID}" && -n "${HUB_MEMBERSHIP_ID}" ]]; then return; fi
   if ! is_membership_crd_installed; then return; fi
-  local IDENTITY_PROVIDER
-  local IDENTITY
-  IDENTITY_PROVIDER="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.identity_provider)"
-  IDENTITY="$(echo "${IDENTITY_PROVIDER}" | sed 's/^\"https:\/\/gkehub.googleapis.com\/projects\/\(.*\)\/locations\/global\/memberships\/\(.*\)\"$/\1 \2/g')"
-  if [[ -n "${IDENTITY}" ]]; then
-    read -r ENVIRON_PROJECT_ID HUB_MEMBERSHIP_ID <<EOF
-${IDENTITY}
-EOF
-  fi
+  HUB_MEMBERSHIP_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.owner.id | sed 's/^\"\/\/gkehub.googleapis.com\/projects\/\(.*\)\/locations\/global\/memberships\/\(.*\)\"$/\2/g')"
+  ENVIRON_PROJECT_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.workload_identity_pool | sed 's/^\"\(.*\).\(svc\|hub\).id.goog\"$/\1/g')"
 }
 
 enable_workload_identity(){
