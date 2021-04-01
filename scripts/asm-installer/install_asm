@@ -1839,7 +1839,6 @@ required_iam_roles() {
 required_apis() {
     cat << EOF
 container.googleapis.com
-compute.googleapis.com
 monitoring.googleapis.com
 logging.googleapis.com
 cloudtrace.googleapis.com
@@ -1860,6 +1859,10 @@ EOF
      ;;
     *);;
   esac
+
+  if [[ "${_CI_I_AM_A_TEST_ROBOT}" -eq 1 ]]; then
+    echo compute.googleapis.com
+  fi
 }
 # [END required_apis]
 
