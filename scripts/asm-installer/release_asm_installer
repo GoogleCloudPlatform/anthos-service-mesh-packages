@@ -34,7 +34,6 @@ prod_releases() {
 release 1.9
 release 1.8
 release 1.7
-release 1.6
 EOF
 }
 
@@ -113,6 +112,12 @@ check_tags() {
   fi
 }
 
+get_stable_version() {
+  local VER; VER="$(./"${SCRIPT_NAME}" --version || true)"
+
+  echo "${VER//+/-}"
+}
+
 upload() {
   local SCRIPT_NAME; SCRIPT_NAME="${1}";
   local FILE_NAME; FILE_NAME="${2}";
@@ -133,17 +138,27 @@ publish_script() {
   local BRANCH_NAME; BRANCH_NAME="${1}"
   local VERSION; VERSION="${2}"
   local SCRIPT_NAME; SCRIPT_NAME="${3}"
-  local FILE_NAME; FILE_NAME="${SCRIPT_NAME}_${VERSION}"
-  local FILE_PATH; FILE_PATH="${BUCKET_PATH}/${FILE_NAME}"
-  local FILE_URI; FILE_URI="${BUCKET_URL}/${FILE_PATH}"
+  local STABLE_VERSION;
 
   git checkout "${BRANCH_NAME}"
 
   if [[ ! -f "${SCRIPT_NAME}" ]]; then echo "${SCRIPT_NAME} not found" >&2; return; fi
 
-  if ! changes_necessary "${FILE_URI}" "${FILE_NAME}"; then return; fi
-
   check_tags "${BRANCH_NAME}" "${SCRIPT_NAME}"
+
+  STABLE_VERSION="$(get_stable_version)"
+  write_and_upload "${SCRIPT_NAME}" "${VERSION}"
+  write_and_upload "${SCRIPT_NAME}" "${STABLE_VERSION}"
+}
+
+write_and_upload() {
+  local SCRIPT_NAME; SCRIPT_NAME="${1}"
+  local VERSION; VERSION="${2}"
+  local FILE_NAME; FILE_NAME="${SCRIPT_NAME}_${VERSION}"
+  local FILE_PATH; FILE_PATH="${BUCKET_PATH}/${FILE_NAME}"
+  local FILE_URI; FILE_URI="${BUCKET_URL}/${FILE_PATH}"
+
+  if ! changes_necessary "${FILE_URI}" "${FILE_NAME}"; then return; fi
 
   sha256sum "${SCRIPT_NAME}" >| "${SCRIPT_NAME}.sha256"
   cp "${SCRIPT_NAME}" "${FILE_NAME}"
