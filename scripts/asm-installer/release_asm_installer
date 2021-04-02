@@ -18,7 +18,11 @@ BUCKET_PATH="csm-artifacts/asm"; readonly BUCKET_PATH
 
 CURRENT_RELEASE="release-1.9-asm"; readonly CURRENT_RELEASE
 
+ALWAYS_PUBLISH_VERSION="${ALWAYS_PUBLISH_VERSION:=0}"
+STABLE_VERSION_NAME="STABLE_VERSIONS"; readonly STABLE_VERSION_NAME
+
 main() {
+  parse_args "${@}"
   setup
 
   while read -r branch version; do
@@ -27,6 +31,9 @@ main() {
   done <<EOF
 $(all_releases)
 EOF
+
+  # upload STABLE_VERSION_NAME
+  upload_version_file
 }
 
 prod_releases() {
@@ -118,6 +125,15 @@ get_stable_version() {
   echo "${VER//+/-}"
 }
 
+upload_version_file() {
+  local FILE_PATH; FILE_PATH="${BUCKET_PATH}/${STABLE_VERSION_NAME}"
+
+  sort -r ${STABLE_VERSION_NAME} | uniq > "tmpfile" && mv "tmpfile" ${STABLE_VERSION_NAME}
+
+  # gsutil cp "${FILE_NAME}" gs://"${FILE_PATH}"
+  # gsutil acl ch -u AllUsers:R gs://"${FILE_PATH}"
+}
+
 upload() {
   local SCRIPT_NAME; SCRIPT_NAME="${1}";
   local FILE_NAME; FILE_NAME="${2}";
@@ -158,20 +174,31 @@ write_and_upload() {
   local FILE_PATH; FILE_PATH="${BUCKET_PATH}/${FILE_NAME}"
   local FILE_URI; FILE_URI="${BUCKET_URL}/${FILE_PATH}"
 
-  if ! changes_necessary "${FILE_URI}" "${FILE_NAME}"; then return; fi
+  if changes_necessary "${FILE_URI}" "${FILE_NAME}"; then
+    sha256sum "${SCRIPT_NAME}" >| "${SCRIPT_NAME}.sha256"
+    cp "${SCRIPT_NAME}" "${FILE_NAME}"
+    sha256sum "${FILE_NAME}" >> "${SCRIPT_NAME}.sha256"
 
-  sha256sum "${SCRIPT_NAME}" >| "${SCRIPT_NAME}.sha256"
-  cp "${SCRIPT_NAME}" "${FILE_NAME}"
-  sha256sum "${FILE_NAME}" >> "${SCRIPT_NAME}.sha256"
+    # upload "${SCRIPT_NAME}" "${FILE_NAME}" "${FILE_PATH}" "${FILE_URI}"
 
-  upload "${SCRIPT_NAME}" "${FILE_NAME}" "${FILE_PATH}" "${FILE_URI}"
+    # if [[ "${BRANCH_NAME}" == "${CURRENT_RELEASE}" ]]; then
+    #   upload "${SCRIPT_NAME}" "${FILE_NAME}" "${BUCKET_PATH}/${SCRIPT_NAME}" "${BUCKET_URL}/${BUCKET_PATH}/${SCRIPT_NAME}"
+    # fi
 
-  if [[ "${BRANCH_NAME}" == "${CURRENT_RELEASE}" ]]; then
-    upload "${SCRIPT_NAME}" "${FILE_NAME}" "${BUCKET_PATH}/${SCRIPT_NAME}" "${BUCKET_URL}/${BUCKET_PATH}/${SCRIPT_NAME}"
+    # git restore "${SCRIPT_NAME}"
+
+    append_version "$(./"${SCRIPT_NAME}" --version)" "${FILE_NAME}"
+
+    echo "Published ${FILE_NAME} successfully."
+  elif [[ ${ALWAYS_PUBLISH_VERSION} -eq 1 ]]; then
+    append_version "$(./"${SCRIPT_NAME}" --version)" "${FILE_NAME}"
   fi
+}
 
-  git restore "${SCRIPT_NAME}"
-  echo "Published ${FILE_NAME} successfully."
+append_version() {
+  local VERSION; VERSION="${1}"
+  local FILE_NAME; FILE_NAME="${2}"
+  echo "${VERSION}:${FILE_NAME}" >> "${STABLE_VERSION_NAME}"
 }
 
 setup() {
@@ -183,6 +210,26 @@ setup() {
   else
     touch install_asm
   fi
+
+  if [[ ! $(curl -O "${BUCKET_URL}/${BUCKET_PATH}/${STABLE_VERSION_NAME}") ]]; then
+    echo "Create New Version File ${STABLE_VERSION_NAME}"
+    true >| ${STABLE_VERSION_NAME}
+  fi
 }
 
-main
+parse_args() {
+  # shellcheck disable=SC2064
+  trap "$(shopt -p nocasematch)" RETURN
+  shopt -s nocasematch
+
+  while [[ $# != 0 ]]; do
+    case "${1}" in
+      -a | --always_publish_version)
+        ALWAYS_PUBLISH_VERSION=1
+        shift 1
+        ;;
+    esac
+  done
+}
+
+main "${@}"
