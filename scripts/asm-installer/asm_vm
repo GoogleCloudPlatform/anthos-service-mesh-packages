@@ -1037,7 +1037,7 @@ EOF
 validate_workload_asm_revision() {
   info "Verifying the ASM revision for the WorkloadGroup..."
 
-  if [[ -z "${ASM_REVISIONS["${WORKLOAD_ASM_REVISION}"]}" ]]; then
+  if [[ -z "${ASM_REVISIONS["${WORKLOAD_ASM_REVISION}"]-}" ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 ASM revision ${WORKLOAD_ASM_REVISION} for the workload is not found in any ASM
 ${ASM_RELEASE} installation in the cluster. Please verify the value of
