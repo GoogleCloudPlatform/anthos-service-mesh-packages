@@ -1,0 +1,35 @@
+#!/bin/bash
+set -CeEu
+set -o pipefail
+
+SPATH="$(readlink -f "$0")"
+SDIR="$(dirname "${SPATH}")"; export SDIR;
+SCRIPT_NAME="${0##*/}"
+
+# shellcheck source=common.sh
+. "${SDIR}/common.sh"
+
+cd "${SDIR}"
+
+main() {
+  # CLI setup
+  parse_args "$@"
+  local REVISION_LABEL; REVISION_LABEL="$(uniq_name "${SCRIPT_NAME}" "${BUILD_ID}")"
+  local EXPECTED_ROLES; EXPECTED_ROLES="$(expected_roles)"
+
+  run_required_role "install" "mesh_ca" "${EXPECTED_ROLES}" "--revision_name ${REVISION_LABEL}" "--enable_gcp_iam_roles" "--enable_cluster_roles"; RETVAL=$?;
+  cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}"
+
+  exit "${RETVAL}"
+}
+
+expected_roles() {
+  cat <<EOF
+projects/asm-scriptaro-oss/roles/PermTest
+roles/container.admin
+roles/iam.serviceAccountAdmin
+roles/resourcemanager.projectIamAdmin
+EOF
+}
+
+main "$@"
