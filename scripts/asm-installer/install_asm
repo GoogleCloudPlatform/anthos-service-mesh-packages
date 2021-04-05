@@ -28,6 +28,7 @@ _CI_ISTIOCTL_REL_PATH="${_CI_ISTIOCTL_REL_PATH:=}"
 _CI_TRUSTED_GCP_PROJECTS="${_CI_TRUSTED_GCP_PROJECTS:=}"
 _CI_ENVIRON_PROJECT_NUMBER="${_CI_ENVIRON_PROJECT_NUMBER:=}"
 _CI_CRC_VERSION="${_CI_CRC_VERSION:=0}"
+_CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"
 
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
@@ -1805,18 +1806,34 @@ EOF
 required_iam_roles() {
   # meshconfig.admin - required for init, stackdriver, UI elements, etc.
   # servicemanagement.admin/serviceusage.serviceUsageAdmin - enables APIs
-  cat <<EOF
-roles/servicemanagement.admin
-roles/serviceusage.serviceUsageAdmin
-roles/meshconfig.admin
-roles/compute.admin
-roles/container.admin
-roles/resourcemanager.projectIamAdmin
-roles/iam.serviceAccountAdmin
-roles/iam.serviceAccountKeyAdmin
-roles/gkehub.admin
-roles/privateca.admin
-EOF
+  if can_modify_gcp_components || \
+     can_modify_cluster_labels || \
+     can_modify_cluster_roles; then
+    echo roles/container.admin
+  fi
+  if can_modify_gcp_components; then
+    echo roles/meshconfig.admin
+  fi
+  if can_modify_gcp_apis; then
+    echo roles/servicemanagement.admin
+    echo roles/serviceusage.serviceUsageAdmin
+  fi
+  if can_modify_gcp_iam_roles; then
+    echo roles/resourcemanager.projectIamAdmin
+  fi
+  if is_sa; then
+    echo roles/iam.serviceAccountAdmin
+  fi
+  if can_register_cluster; then
+    echo roles/gkehub.admin
+  fi
+  if [[ "${CA}" = "gcp_cas" ]]; then
+    echo roles/privateca.admin
+  fi
+  if [[ "${_CI_I_AM_A_TEST_ROBOT}" -eq 1 ]]; then
+    echo roles/compute.admin
+    echo roles/iam.serviceAccountKeyAdmin
+  fi
 }
 # [END required_iam_roles]
 
@@ -1824,7 +1841,6 @@ EOF
 required_apis() {
     cat << EOF
 container.googleapis.com
-compute.googleapis.com
 monitoring.googleapis.com
 logging.googleapis.com
 cloudtrace.googleapis.com
@@ -1845,6 +1861,10 @@ EOF
      ;;
     *);;
   esac
+
+  if [[ "${_CI_I_AM_A_TEST_ROBOT}" -eq 1 ]]; then
+    echo compute.googleapis.com
+  fi
 }
 # [END required_apis]
 
