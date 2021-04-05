@@ -992,7 +992,6 @@ EOF
   fi
 }
 
-# From install_asm
 find_missing_strings() {
   local NEEDLES; NEEDLES="${1}";
   local HAYSTACK; HAYSTACK="${2}";
