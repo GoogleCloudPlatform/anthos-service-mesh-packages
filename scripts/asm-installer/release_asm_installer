@@ -19,7 +19,10 @@ BUCKET_PATH="csm-artifacts/asm"; readonly BUCKET_PATH
 CURRENT_RELEASE="release-1.9-asm"; readonly CURRENT_RELEASE
 
 ALWAYS_PUBLISH_VERSION="${ALWAYS_PUBLISH_VERSION:=0}"
-STABLE_VERSION_NAME="STABLE_VERSIONS"; readonly STABLE_VERSION_NAME
+STABLE_VERSION_FILE="STABLE_VERSIONS"; readonly STABLE_VERSION_FILE
+VERSION_FILE_PATH="${BUCKET_PATH}/${STABLE_VERSION_FILE}"
+HOLD_TYPE="temp"
+trap 'gsutil retention "${HOLD_TYPE}" release gs://"${VERSION_FILE_PATH}"' ERR  # make sure the hold is cleared
 
 main() {
   parse_args "${@}"
@@ -32,8 +35,7 @@ main() {
 $(all_releases)
 EOF
 
-  # upload STABLE_VERSION_NAME
-  upload_version_file
+  upload_version_file_and_unlock
 }
 
 prod_releases() {
@@ -125,13 +127,26 @@ get_stable_version() {
   echo "${VER//+/-}"
 }
 
-upload_version_file() {
-  local FILE_PATH; FILE_PATH="${BUCKET_PATH}/${STABLE_VERSION_NAME}"
+get_version_file_and_lock() {
+  local FILE_PATH; FILE_PATH=${BUCKET_PATH}/${STABLE_VERSION_FILE}
 
-  sort -r ${STABLE_VERSION_NAME} | uniq > "tmpfile" && mv "tmpfile" ${STABLE_VERSION_NAME}
+  if [[ ! $(curl -O "${BUCKET_URL}/${FILE_PATH}") ]]; then
+    echo "Create New Version File ${STABLE_VERSION_FILE}"
+    true >| ${STABLE_VERSION_FILE}
+    gsutil cp "${STABLE_VERSION_FILE}" gs://"${FILE_PATH}"
+  fi
 
-  # gsutil cp "${FILE_NAME}" gs://"${FILE_PATH}"
-  # gsutil acl ch -u AllUsers:R gs://"${FILE_PATH}"
+  gsutil retention ${HOLD_TYPE} set "gs://${FILE_PATH}"
+}
+
+upload_version_file_and_unlock() {
+  local FILE_PATH; FILE_PATH=${BUCKET_PATH}/${STABLE_VERSION_FILE}
+
+  sort -r ${STABLE_VERSION_FILE} | uniq > "tmpfile" && mv "tmpfile" ${STABLE_VERSION_FILE}
+
+  gsutil retention ${HOLD_TYPE} release gs://"${FILE_PATH}"
+  gsutil cp "${STABLE_VERSION_FILE}" gs://"${FILE_PATH}"
+  gsutil acl ch -u AllUsers:R gs://"${FILE_PATH}"
 }
 
 upload() {
@@ -179,13 +194,13 @@ write_and_upload() {
     cp "${SCRIPT_NAME}" "${FILE_NAME}"
     sha256sum "${FILE_NAME}" >> "${SCRIPT_NAME}.sha256"
 
-    # upload "${SCRIPT_NAME}" "${FILE_NAME}" "${FILE_PATH}" "${FILE_URI}"
+    upload "${SCRIPT_NAME}" "${FILE_NAME}" "${FILE_PATH}" "${FILE_URI}"
 
-    # if [[ "${BRANCH_NAME}" == "${CURRENT_RELEASE}" ]]; then
-    #   upload "${SCRIPT_NAME}" "${FILE_NAME}" "${BUCKET_PATH}/${SCRIPT_NAME}" "${BUCKET_URL}/${BUCKET_PATH}/${SCRIPT_NAME}"
-    # fi
+    if [[ "${BRANCH_NAME}" == "${CURRENT_RELEASE}" ]]; then
+      upload "${SCRIPT_NAME}" "${FILE_NAME}" "${BUCKET_PATH}/${SCRIPT_NAME}" "${BUCKET_URL}/${BUCKET_PATH}/${SCRIPT_NAME}"
+    fi
 
-    # git restore "${SCRIPT_NAME}"
+    git restore "${SCRIPT_NAME}"
 
     append_version "$(./"${SCRIPT_NAME}" --version)" "${FILE_NAME}"
 
@@ -198,7 +213,7 @@ write_and_upload() {
 append_version() {
   local VERSION; VERSION="${1}"
   local FILE_NAME; FILE_NAME="${2}"
-  echo "${VERSION}:${FILE_NAME}" >> "${STABLE_VERSION_NAME}"
+  echo "${VERSION}:${FILE_NAME}" >> "${STABLE_VERSION_FILE}"
 }
 
 setup() {
@@ -211,10 +226,7 @@ setup() {
     touch install_asm
   fi
 
-  if [[ ! $(curl -O "${BUCKET_URL}/${BUCKET_PATH}/${STABLE_VERSION_NAME}") ]]; then
-    echo "Create New Version File ${STABLE_VERSION_NAME}"
-    true >| ${STABLE_VERSION_NAME}
-  fi
+  get_version_file_and_lock
 }
 
 parse_args() {
