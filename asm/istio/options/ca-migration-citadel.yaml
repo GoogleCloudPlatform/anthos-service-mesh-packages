@@ -23,7 +23,7 @@ spec:
   meshConfig:
     defaultConfig:
       proxyMetadata:
-        PROXY_CONFIG_XDS_AGENT: true
+        PROXY_CONFIG_XDS_AGENT: "true"
     caCertificates:
       - pem: |
           -----BEGIN CERTIFICATE-----

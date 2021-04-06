@@ -24,6 +24,6 @@ spec:
   meshConfig:
     defaultConfig:
       proxyMetadata:
-        PROXY_CONFIG_XDS_AGENT: true
+        PROXY_CONFIG_XDS_AGENT: "true"
     trustDomainAliases:
       - cluster.local
