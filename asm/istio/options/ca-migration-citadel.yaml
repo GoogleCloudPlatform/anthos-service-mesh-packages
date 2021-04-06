@@ -16,7 +16,14 @@
 apiVersion: install.istio.io/v1alpha1
 kind: IstioOperator
 spec:
+  values:
+    pilot:
+      env:
+        ISTIO_MULTIROOT_MESH: true
   meshConfig:
+    defaultConfig:
+      proxyMetadata:
+        PROXY_CONFIG_XDS_AGENT: true
     caCertificates:
       - pem: |
           -----BEGIN CERTIFICATE-----
