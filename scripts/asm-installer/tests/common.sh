@@ -585,6 +585,75 @@ EOF
   echo "Done."
 }
 
+run_required_role() {
+  local MODE; MODE="${1}";
+  local CA; CA="${2}";
+  local EXPECTED_ROLES; EXPECTED_ROLES="${3}"
+  shift 3 # increment this if more arguments are added
+  local EXTRA_FLAGS; EXTRA_FLAGS="${*}"
+
+  date +"%T"
+
+  if [[ -n "${SERVICE_ACCOUNT}" ]]; then
+    echo "Authorizing service acount..."
+    auth_service_account
+  fi
+
+  OUTPUT_DIR="$(mktemp -d)"
+
+  configure_kubectl "${LT_CLUSTER_NAME}" "${PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
+
+  if [[ -n "${KEY_FILE}" && -n "${SERVICE_ACCOUNT}" ]]; then
+    KEY_FILE="-k ${KEY_FILE}"
+    SERVICE_ACCOUNT="-s ${SERVICE_ACCOUNT}"
+  fi
+
+  # Test starts here
+  echo "Installing ASM with MeshCA..."
+  echo "_CI_REVISION_PREFIX=${LT_NAMESPACE} \
+  ../install_asm ${KEY_FILE} ${SERVICE_ACCOUNT} \
+    -l ${LT_CLUSTER_LOCATION} \
+    -n ${LT_CLUSTER_NAME} \
+    -p ${PROJECT_ID} \
+    -m ${MODE} \
+    -c ${CA} -v \
+    --output-dir ${OUTPUT_DIR} \
+    ${EXTRA_FLAGS}"
+  # shellcheck disable=SC2086
+  _CI_REVISION_PREFIX="${LT_NAMESPACE}" \
+    ../install_asm ${KEY_FILE} ${SERVICE_ACCOUNT} \
+    -l "${LT_CLUSTER_LOCATION}" \
+    -n "${LT_CLUSTER_NAME}" \
+    -p "${PROJECT_ID}" \
+    -m "${MODE}" \
+    -c "${CA}" -v \
+    --output-dir "${OUTPUT_DIR}" \
+    ${EXTRA_FLAGS} ${_EXTRA_FLAGS} 2>&1
+
+
+  local SUCCESS; SUCCESS=0;
+
+  local MEMBER_ROLES
+  MEMBER_ROLES="$(gcloud projects \
+    get-iam-policy "${PROJECT_ID}" \
+    --flatten='bindings[].members' \
+    --filter="bindings.members:serviceAccount:${SERVICE_ACCOUNT}" \
+    --format='value(bindings.role)')"
+
+  # Should not bind any addiontal roles othen than the expected ones
+  local NOTFOUND; NOTFOUND="$(find_missing_strings "${MEMBER_ROLES}" "${EXPECTED_ROLES}")"
+
+  if [[ -n "${NOTFOUND}" ]]; then
+    for role in $(echo "${NOTFOUND}" | tr ',' '\n'); do
+      warn "IAM roles should not be enabled - ${role}"
+    done
+    SUCCESS=1
+  else
+    echo "Success! Only required IAM roles are enabled."
+  fi
+  return "$SUCCESS"
+}
+
 run_basic_test() {
   local MODE; MODE="${1}";
   local CA; CA="${2}";
@@ -921,4 +990,25 @@ EOF
   if [[ "$(echo "${RESPONSE}" | jq -r '.featureState.lifecycleState')" != "ENABLED" ]]; then
     false
   fi
+}
+
+find_missing_strings() {
+  local NEEDLES; NEEDLES="${1}";
+  local HAYSTACK; HAYSTACK="${2}";
+  local NOTFOUND; NOTFOUND="";
+
+  while read -r needle; do
+    EXITCODE=0
+    grep -q "${needle}" <<EOF || EXITCODE=$?
+${HAYSTACK}
+EOF
+    if [[ "${EXITCODE}" -ne 0 ]]; then
+      NOTFOUND="${needle},${NOTFOUND}"
+    fi
+  done <<EOF
+${NEEDLES}
+EOF
+
+  if [[ -n "${NOTFOUND}" ]]; then NOTFOUND="$(strip_trailing_commas "${NOTFOUND}")"; fi
+  echo "${NOTFOUND}"
 }

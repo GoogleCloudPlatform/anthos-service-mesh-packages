@@ -69,6 +69,7 @@ setup_cluster() {
 
   echo "Performing necessary cluster setup on ${cluster}"
 
+  _CI_I_AM_A_TEST_ROBOT=1 \
   ../install_asm \
     -l "${LT_CLUSTER_LOCATION}" \
     -n "${cluster}" \
