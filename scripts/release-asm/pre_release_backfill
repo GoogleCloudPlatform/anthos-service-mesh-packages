@@ -1,0 +1,31 @@
+#!/bin/bash
+set -eEuC
+set -o pipefail
+
+SPATH="$(readlink -f "$0")"
+SDIR="$(dirname "${SPATH}")"; export SDIR;
+
+# shellcheck source=common.sh
+. "${SDIR}/common.sh"
+
+# Override so that legacy scripts won't fail with `--version`
+check_tags() {
+  echo "NOTE: would have run 'check_tags ${*}' but skipping to cope with legacy scripts"
+}
+
+main() {
+  setup
+
+  get_version_file_and_lock
+
+  while read -r tag version; do
+    publish_script "${tag}" "${version}" install_asm
+    publish_script "${tag}" "${version}" asm_vm
+  done <<EOF
+$(all_release_tags)
+EOF
+
+  upload_version_file_and_unlock
+}
+
+main

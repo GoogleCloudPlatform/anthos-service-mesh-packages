@@ -1,7 +1,3 @@
-#!/bin/bash
-set -eEuC
-set -o pipefail
-
 _DEBUG="${_DEBUG:=}"
 if [[ "${_DEBUG}" -eq 1 ]]; then
   gsutil() {
@@ -21,20 +17,7 @@ CURRENT_RELEASE="release-1.9-asm"; readonly CURRENT_RELEASE
 STABLE_VERSION_FILE="STABLE_VERSIONS"; readonly STABLE_VERSION_FILE
 STABLE_VERSION_FILE_PATH="${BUCKET_PATH}/${STABLE_VERSION_FILE}"; readonly STABLE_VERSION_FILE_PATH
 HOLD_TYPE="temp"; readonly HOLD_TYPE
-trap 'gsutil retention "${HOLD_TYPE}" release gs://"${VERSION_FILE_PATH}"' ERR  # make sure the hold is cleared
-
-main() {
-  setup
-
-  while read -r branch version; do
-    publish_script "${branch}" "${version}" install_asm
-    publish_script "${branch}" "${version}" asm_vm
-  done <<EOF
-$(all_releases)
-EOF
-
-  upload_version_file_and_unlock
-}
+trap 'gsutil retention "${HOLD_TYPE}" release gs://"${STABLE_VERSION_FILE_PATH}"' ERR # make sure the hold is cleared
 
 prod_releases() {
   cat << EOF
@@ -76,6 +59,25 @@ EOF
     echo "${type}" "${version}"
   done <<EOF
 $(other_releases)
+EOF
+}
+
+is_proper_tag() {
+  local TAG; TAG="${1}"
+  if [[ "${TAG}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-asm\.[0-9]+\+config[0-9]+$ ]]; then
+    true
+  else
+    false
+  fi
+}
+
+all_release_tags() {
+  while read -r TAG; do
+    if is_proper_tag "${TAG}"; then
+      echo "${TAG}" "${TAG%.*-*}"   # the latter prints {MAJOR}.{MINOR}
+    fi
+  done <<EOF
+$(git tag)
 EOF
 }
 
@@ -122,16 +124,21 @@ check_tags() {
 get_stable_version() {
   local VER; VER="$(./"${SCRIPT_NAME}" --version || true)"
 
-  echo "${VER//+/-}"
+  if [[ "${VER}" == "" ]]; then
+    VER="$(git tag --points-at HEAD)"
+  fi
+
+  echo "${VER}"
 }
 
 get_version_file_and_lock() {
   if ! gsutil -q stat "gs://${STABLE_VERSION_FILE_PATH}"; then
     echo "[ERROR]: file does not exist: ${STABLE_VERSION_FILE_PATH}." >&2
-    exit 2
+    exit 1
   fi
 
   gsutil retention "${HOLD_TYPE}" set "gs://${STABLE_VERSION_FILE_PATH}"
+  gsutil cp "gs://${STABLE_VERSION_FILE_PATH}" .
 }
 
 upload_version_file_and_unlock() {
@@ -179,7 +186,7 @@ publish_script() {
 write_and_upload() {
   local SCRIPT_NAME; SCRIPT_NAME="${1}"
   local VERSION; VERSION="${2}"
-  local FILE_NAME; FILE_NAME="${SCRIPT_NAME}_${VERSION}"
+  local FILE_NAME; FILE_NAME="${SCRIPT_NAME}_${VERSION//+/-}"
   local FILE_PATH; FILE_PATH="${BUCKET_PATH}/${FILE_NAME}"
   local FILE_URI; FILE_URI="${BUCKET_URL}/${FILE_PATH}"
 
@@ -196,7 +203,9 @@ write_and_upload() {
   fi
 
   if [[ "${BRANCH_NAME}" =~ "release" ]]; then
-    append_version "$(./"${SCRIPT_NAME}" --version)" "${FILE_NAME}"
+    append_version "${VERSION}" "${FILE_NAME}"
+  elif is_proper_tag "${VERSION}"; then
+    append_version "${VERSION}" "${FILE_NAME}"
   fi
 
   git restore "${SCRIPT_NAME}"
@@ -219,8 +228,4 @@ setup() {
   else
     touch install_asm
   fi
-
-  get_version_file_and_lock
 }
-
-main

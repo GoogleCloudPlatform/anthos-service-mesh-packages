@@ -1,0 +1,26 @@
+#!/bin/bash
+set -eEuC
+set -o pipefail
+
+SPATH="$(readlink -f "$0")"
+SDIR="$(dirname "${SPATH}")"; export SDIR;
+
+# shellcheck source=common.sh
+. "${SDIR}/common.sh"
+
+main() {
+  setup
+
+  get_version_file_and_lock
+
+  while read -r branch version; do
+    publish_script "${branch}" "${version}" install_asm
+    publish_script "${branch}" "${version}" asm_vm
+  done <<EOF
+$(all_releases)
+EOF
+
+  upload_version_file_and_unlock
+}
+
+main
