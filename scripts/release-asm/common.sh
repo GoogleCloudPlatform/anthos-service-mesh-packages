@@ -71,6 +71,11 @@ is_proper_tag() {
   fi
 }
 
+is_not_under_hold() {
+  local HOLD_STATUS; HOLD_STATUS="$(gsutil stat gs://${STABLE_VERSION_FILE_PATH} | grep -i ${HOLD_TYPE})"
+  if [[ "${HOLD_STATUS}" =~ "Enabled" ]]; then false; fi
+}
+
 all_release_tags() {
   while read -r TAG; do
     if is_proper_tag "${TAG}"; then
@@ -137,6 +142,10 @@ get_version_file_and_lock() {
     exit 1
   fi
 
+  if ! is_not_under_hold; then
+    echo "[ERROR]: file already on hold: ${STABLE_VERSION_FILE_PATH}." >&2
+    exit 1
+  fi
   gsutil retention "${HOLD_TYPE}" set "gs://${STABLE_VERSION_FILE_PATH}"
   gsutil cp "gs://${STABLE_VERSION_FILE_PATH}" .
 }
