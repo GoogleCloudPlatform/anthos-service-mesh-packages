@@ -17,7 +17,7 @@ CURRENT_RELEASE="release-1.9-asm"; readonly CURRENT_RELEASE
 STABLE_VERSION_FILE="STABLE_VERSIONS"; readonly STABLE_VERSION_FILE
 STABLE_VERSION_FILE_PATH="${BUCKET_PATH}/${STABLE_VERSION_FILE}"; readonly STABLE_VERSION_FILE_PATH
 HOLD_TYPE="temp"; readonly HOLD_TYPE
-trap 'gsutil retention "${HOLD_TYPE}" release gs://"${STABLE_VERSION_FILE_PATH}"' ERR # make sure the hold is cleared
+trap 'gsutil retention "${HOLD_TYPE}" release gs://"${STABLE_VERSION_FILE_PATH}"' ERR # hope that the hold is cleared
 
 prod_releases() {
   cat << EOF
@@ -64,16 +64,12 @@ EOF
 
 is_proper_tag() {
   local TAG; TAG="${1}"
-  if [[ "${TAG}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-asm\.[0-9]+\+config[0-9]+$ ]]; then
-    true
-  else
-    false
-  fi
+  if [[ ! "${TAG}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-asm\.[0-9]+\+config[0-9]+$ ]]; then false; fi
 }
 
-is_not_under_hold() {
+is_on_hold() {
   local HOLD_STATUS; HOLD_STATUS="$(gsutil stat gs://${STABLE_VERSION_FILE_PATH} | grep -i ${HOLD_TYPE})"
-  if [[ "${HOLD_STATUS}" =~ "Enabled" ]]; then false; fi
+  if [[ ! "${HOLD_STATUS}" =~ "Enabled" ]]; then false; fi
 }
 
 all_release_tags() {
@@ -142,7 +138,7 @@ get_version_file_and_lock() {
     exit 1
   fi
 
-  if ! is_not_under_hold; then
+  if is_on_hold; then
     echo "[ERROR]: file already on hold: ${STABLE_VERSION_FILE_PATH}." >&2
     exit 1
   fi
@@ -211,9 +207,7 @@ write_and_upload() {
     upload "${SCRIPT_NAME}" "${FILE_NAME}" "${BUCKET_PATH}/${SCRIPT_NAME}" "${BUCKET_URL}/${BUCKET_PATH}/${SCRIPT_NAME}"
   fi
 
-  if [[ "${BRANCH_NAME}" =~ "release" ]]; then
-    append_version "${VERSION}" "${FILE_NAME}"
-  elif is_proper_tag "${VERSION}"; then
+  if [[ "${BRANCH_NAME}" =~ "release" ]] || is_proper_tag "${VERSION}"; then
     append_version "${VERSION}" "${FILE_NAME}"
   fi
 
