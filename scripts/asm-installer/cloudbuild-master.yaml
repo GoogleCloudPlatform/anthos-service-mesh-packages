@@ -78,7 +78,7 @@ steps:
     args:
       - '-c'
       - >
-        ./../release-asm/release_asm_installer
+        ../release-asm/release_asm_installer
     env:
       - '_DEBUG=1'
     timeout: 10s
