@@ -1,7 +1,3 @@
-#!/bin/bash
-set -eEuC
-set -o pipefail
-
 _DEBUG="${_DEBUG:=}"
 if [[ "${_DEBUG}" -eq 1 ]]; then
   gsutil() {
@@ -18,16 +14,10 @@ BUCKET_PATH="csm-artifacts/asm"; readonly BUCKET_PATH
 
 CURRENT_RELEASE="release-1.9-asm"; readonly CURRENT_RELEASE
 
-main() {
-  setup
-
-  while read -r branch version; do
-    publish_script "${branch}" "${version}" install_asm
-    publish_script "${branch}" "${version}" asm_vm
-  done <<EOF
-$(all_releases)
-EOF
-}
+STABLE_VERSION_FILE="STABLE_VERSIONS"; readonly STABLE_VERSION_FILE
+STABLE_VERSION_FILE_PATH="${BUCKET_PATH}/${STABLE_VERSION_FILE}"; readonly STABLE_VERSION_FILE_PATH
+HOLD_TYPE="temp"; readonly HOLD_TYPE
+trap 'gsutil retention "${HOLD_TYPE}" release gs://"${STABLE_VERSION_FILE_PATH}"' ERR # hope that the hold is cleared
 
 prod_releases() {
   cat << EOF
@@ -69,6 +59,26 @@ EOF
     echo "${type}" "${version}"
   done <<EOF
 $(other_releases)
+EOF
+}
+
+is_proper_tag() {
+  local TAG; TAG="${1}"
+  if [[ ! "${TAG}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-asm\.[0-9]+\+config[0-9]+$ ]]; then false; fi
+}
+
+is_on_hold() {
+  local HOLD_STATUS; HOLD_STATUS="$(gsutil stat gs://${STABLE_VERSION_FILE_PATH} | grep -i ${HOLD_TYPE})"
+  if [[ ! "${HOLD_STATUS}" =~ "Enabled" ]]; then false; fi
+}
+
+all_release_tags() {
+  while read -r TAG; do
+    if is_proper_tag "${TAG}"; then
+      echo "${TAG}" "${TAG%.*-*}"   # the latter prints {MAJOR}.{MINOR}
+    fi
+  done <<EOF
+$(git tag)
 EOF
 }
 
@@ -115,7 +125,34 @@ check_tags() {
 get_stable_version() {
   local VER; VER="$(./"${SCRIPT_NAME}" --version || true)"
 
-  echo "${VER//+/-}"
+  if [[ "${VER}" == "" ]]; then
+    VER="$(git tag --points-at HEAD)"
+  fi
+
+  echo "${VER}"
+}
+
+get_version_file_and_lock() {
+  if ! gsutil -q stat "gs://${STABLE_VERSION_FILE_PATH}"; then
+    echo "[ERROR]: file does not exist: ${STABLE_VERSION_FILE_PATH}." >&2
+    exit 1
+  fi
+
+  if is_on_hold; then
+    echo "[ERROR]: file already on hold: ${STABLE_VERSION_FILE_PATH}." >&2
+    exit 1
+  fi
+  gsutil retention "${HOLD_TYPE}" set "gs://${STABLE_VERSION_FILE_PATH}"
+  gsutil cp "gs://${STABLE_VERSION_FILE_PATH}" .
+}
+
+upload_version_file_and_unlock() {
+  TMPFILE="$(mktemp)"
+  sort -r "${STABLE_VERSION_FILE}" | uniq >> "${TMPFILE}" && mv "${TMPFILE}" "${STABLE_VERSION_FILE}"
+
+  gsutil retention "${HOLD_TYPE}" release gs://"${STABLE_VERSION_FILE_PATH}"
+  gsutil cp "${STABLE_VERSION_FILE}" gs://"${STABLE_VERSION_FILE_PATH}"
+  gsutil acl ch -u AllUsers:R gs://"${STABLE_VERSION_FILE_PATH}"
 }
 
 upload() {
@@ -154,7 +191,7 @@ publish_script() {
 write_and_upload() {
   local SCRIPT_NAME; SCRIPT_NAME="${1}"
   local VERSION; VERSION="${2}"
-  local FILE_NAME; FILE_NAME="${SCRIPT_NAME}_${VERSION}"
+  local FILE_NAME; FILE_NAME="${SCRIPT_NAME}_${VERSION//+/-}"
   local FILE_PATH; FILE_PATH="${BUCKET_PATH}/${FILE_NAME}"
   local FILE_URI; FILE_URI="${BUCKET_URL}/${FILE_PATH}"
 
@@ -170,8 +207,19 @@ write_and_upload() {
     upload "${SCRIPT_NAME}" "${FILE_NAME}" "${BUCKET_PATH}/${SCRIPT_NAME}" "${BUCKET_URL}/${BUCKET_PATH}/${SCRIPT_NAME}"
   fi
 
+  if [[ "${BRANCH_NAME}" =~ "release" ]] || is_proper_tag "${VERSION}"; then
+    append_version "${VERSION}" "${FILE_NAME}"
+  fi
+
   git restore "${SCRIPT_NAME}"
+
   echo "Published ${FILE_NAME} successfully."
+}
+
+append_version() {
+  local VERSION; VERSION="${1}"
+  local FILE_NAME; FILE_NAME="${2}"
+  echo "${VERSION}:${FILE_NAME}" >> "${STABLE_VERSION_FILE}"
 }
 
 setup() {
@@ -184,5 +232,3 @@ setup() {
     touch install_asm
   fi
 }
-
-main
