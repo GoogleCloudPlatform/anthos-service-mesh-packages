@@ -1804,25 +1804,26 @@ EOF
 required_iam_roles() {
   # meshconfig.admin - required for init, stackdriver, UI elements, etc.
   # servicemanagement.admin/serviceusage.serviceUsageAdmin - enables APIs
-  if can_modify_gcp_components || \
+  if should_validate || \
+     can_modify_gcp_components || \
      can_modify_cluster_labels || \
      can_modify_cluster_roles; then
     echo roles/container.admin
   fi
-  if can_modify_gcp_components; then
+  if should_validate || can_modify_gcp_components; then
     echo roles/meshconfig.admin
   fi
-  if can_modify_gcp_apis; then
+  if should_validate || can_modify_gcp_apis; then
     echo roles/servicemanagement.admin
     echo roles/serviceusage.serviceUsageAdmin
   fi
-  if can_modify_gcp_iam_roles; then
+  if should_validate || can_modify_gcp_iam_roles; then
     echo roles/resourcemanager.projectIamAdmin
   fi
   if is_sa; then
     echo roles/iam.serviceAccountAdmin
   fi
-  if can_register_cluster; then
+  if should_validate || can_register_cluster; then
     echo roles/gkehub.admin
   fi
   if [[ "${CA}" = "gcp_cas" ]]; then
