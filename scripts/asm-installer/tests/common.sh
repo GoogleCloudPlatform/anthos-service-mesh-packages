@@ -301,7 +301,9 @@ cleanup_lt_cluster() {
 
   set +e
   "${DIR}"/istio*/bin/istioctl x uninstall --purge -y
-  remove_ns "${NAMESPACE} istio-system asm-system" || true
+  remove_ns "${NAMESPACE}" || true
+  remove_ns istio-system || true
+  remove_ns asm-system || true
   # Remove managed control plane webhooks
   kubectl delete mutatingwebhookconfigurations istiod-asm-managed istiod-asmca istiod-ossmanaged || true
   kubectl delete validatingwebhookconfigurations istiod-istio-system || true
