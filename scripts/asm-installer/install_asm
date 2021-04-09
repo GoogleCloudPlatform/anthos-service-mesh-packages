@@ -238,10 +238,12 @@ main() {
     exit_if_not_cluster_admin
   fi
 
-  if can_create_namespace; then
-    create_istio_namespace
-  elif should_validate; then
-    exit_if_istio_namespace_not_exists
+  if ! is_managed; then
+    if can_create_namespace; then
+      create_istio_namespace
+    elif should_validate; then
+      exit_if_istio_namespace_not_exists
+    fi
   fi
 
   if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
