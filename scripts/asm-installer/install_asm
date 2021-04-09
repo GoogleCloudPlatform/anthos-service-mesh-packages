@@ -2228,6 +2228,9 @@ EOF
 
 create_istio_namespace() {
   info "Creating istio-system namespace..."
+
+  if istio_namespace_exists; then return; fi
+  
   retry 2 kubectl create ns istio-system
 }
 
