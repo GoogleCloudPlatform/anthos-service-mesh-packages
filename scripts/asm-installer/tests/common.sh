@@ -526,6 +526,12 @@ does_istiod_exist(){
   return "${RETVAL}"
 }
 
+istio_namespace_exists() {
+  if [[ "$(kubectl get ns | grep -c istio-system || true)" -eq 0 ]]; then
+    false
+  fi
+}
+
 is_cluster_registered() {
   local IDENTITY_PROVIDER
   IDENTITY_PROVIDER="$(kubectl get memberships.hub.gke.io \
@@ -694,7 +700,9 @@ run_basic_test() {
 
   mkfifo "${LT_NAMESPACE}"
 
-  if [[ ! "${EXTRA_FLAGS}" =~ "managed" ]]; then
+  if [[ "${EXTRA_FLAGS}" =~ "managed" ]] && istio_namespace_exists; then
+    remove_ns "${ISTIO_NAMESPACE}"
+  else
     create_ns "${ISTIO_NAMESPACE}"
   fi
 
