@@ -564,6 +564,10 @@ can_register_cluster() {
   fi
 }
 
+can_create_namespace() {
+  if ! can_modify_at_all; then false; return; fi
+}
+
 needs_asm() {
   if only_enable; then false; return; fi
 
@@ -2217,11 +2221,23 @@ EOF
   fi
 }
 
-ensure_istio_namespace_exists() {
+create_istio_namespace() {
+  info "Creating istio-system namespace..."
+
+  if istio_namespace_exists; then return; fi
+
+  retry 2 kubectl create ns istio-system
+}
+
+exit_if_istio_namespace_not_exists() {
   info "Checking for istio-system namespace..."
   if ! istio_namespace_exists; then
-    info "Creating istio-system namespace..."
-    retry 2 kubectl create ns istio-system
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+The istio-system namespace doesn't exist.
+Please create the "istio-namespace" and retry, or run the script with the
+'--enable_namespace_creation' flag to allow the script to enable it on your behalf.
+$(enable_common_message)
+EOF
   fi
 }
 
