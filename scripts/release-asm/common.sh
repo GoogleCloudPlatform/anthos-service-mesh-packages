@@ -75,7 +75,7 @@ is_on_hold() {
 all_release_tags() {
   while read -r TAG; do
     if is_proper_tag "${TAG}"; then
-      echo "${TAG}" "${TAG%.*-*}"   # the latter prints {MAJOR}.{MINOR}
+      echo "${TAG}"
     fi
   done <<EOF
 $(git tag)
@@ -104,7 +104,7 @@ check_tags() {
   local SCRIPT_NAME; SCRIPT_NAME="${2}";
 
   local TAG; TAG="$(git tag --points-at HEAD)";
-  local VER; VER="$(./"${SCRIPT_NAME}" --version || true)";
+  local VER; VER="$(./"${SCRIPT_NAME}" --version 2>/dev/null || true)";
 
   if [[ "${_DEBUG}" -eq 1 ]]; then
     echo "DEBUG: Tag: ${TAG} Version: ${VER}"
@@ -123,7 +123,7 @@ check_tags() {
 }
 
 get_stable_version() {
-  local VER; VER="$(./"${SCRIPT_NAME}" --version || true)"
+  local VER; VER="$(./"${SCRIPT_NAME}" --version 2>/dev/null || true)"
 
   if [[ "${VER}" == "" ]]; then
     VER="$(git tag --points-at HEAD)"

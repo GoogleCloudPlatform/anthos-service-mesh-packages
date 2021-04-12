@@ -8,9 +8,17 @@ SDIR="$(dirname "${SPATH}")"; export SDIR;
 # shellcheck source=common.sh
 . "${SDIR}/common.sh"
 
-# Override so that legacy scripts won't fail with `--version`
-check_tags() {
-  echo "NOTE: would have run 'check_tags ${*}' but skipping to cope with legacy scripts"
+publish_script() {
+  local BRANCH_NAME; BRANCH_NAME="${1}"
+  local SCRIPT_NAME; SCRIPT_NAME="${2}"
+  local STABLE_VERSION;
+
+  git checkout "${BRANCH_NAME}"
+
+  if [[ ! -f "${SCRIPT_NAME}" ]]; then echo "${SCRIPT_NAME} not found" >&2; return; fi
+
+  STABLE_VERSION="$(get_stable_version)"
+  write_and_upload "${SCRIPT_NAME}" "${STABLE_VERSION}"
 }
 
 main() {
@@ -18,9 +26,9 @@ main() {
 
   get_version_file_and_lock
 
-  while read -r tag version; do
-    publish_script "${tag}" "${version}" install_asm
-    publish_script "${tag}" "${version}" asm_vm
+  while read -r tag; do
+    publish_script "${tag}" install_asm
+    publish_script "${tag}" asm_vm
   done <<EOF
 $(all_release_tags)
 EOF
