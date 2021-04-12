@@ -25,6 +25,7 @@ CUSTOM_INSTANCE_TEMPLATE_NAME="${CUSTOM_INSTANCE_TEMPLATE_NAME:=custominstancete
 KEY_FILE="${KEY_FILE:=}"; export KEY_FILE;
 OSS_VERSION="${OSS_VERSION:=1.9.0}"; export OSS_VERSION;
 OLD_OSS_VERSION="${OLD_OSS_VERSION:=1.8.2}"; export OLD_OSS_VERSION;
+ISTIO_NAMESPACE="istio-system"; readonly ISTIO_NAMESPACE
 
 KUBECONFIG=""
 
@@ -527,6 +528,12 @@ does_istiod_exist(){
   return "${RETVAL}"
 }
 
+istio_namespace_exists() {
+  if [[ "$(kubectl get ns | grep -c istio-system || true)" -eq 0 ]]; then
+    false
+  fi
+}
+
 is_cluster_registered() {
   local IDENTITY_PROVIDER
   IDENTITY_PROVIDER="$(kubectl get memberships.hub.gke.io \
@@ -538,16 +545,19 @@ is_cluster_registered() {
 }
 
 remove_ns() {
-  kubectl delete ns ${1} || true
+  kubectl delete ns "${1}" || true
 }
+
+create_ns() {
+  kubectl create ns "${1}" || true
+}
+
 #
 ### functions for interacting with OSS Istio
 install_oss_istio() {
   local NAMESPACE; NAMESPACE="$1"
   local CLUSTER_NAME; CLUSTER_NAME="$2"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$3"
-  local ISTIO_NAMESPACE; ISTIO_NAMESPACE="istio-system"
-  readonly ISTIO_NAMESPACE
 
   echo "Downloading istioctl..."
   TMPDIR="$(mktemp -d)"
@@ -559,7 +569,7 @@ ${OSS_VERSION}/istio-${OSS_VERSION}-linux-amd64.tar.gz" | tar xz
   popd
   rm -r "${TMPDIR}"
 
-  kubectl create ns "${ISTIO_NAMESPACE}"
+  create_ns "${ISTIO_NAMESPACE}"
   kubectl label ns "${ISTIO_NAMESPACE}" scriptaro-test=true
 
   kubectl apply -f - <<EOF
@@ -609,6 +619,8 @@ run_required_role() {
     KEY_FILE="-k ${KEY_FILE}"
     SERVICE_ACCOUNT="-s ${SERVICE_ACCOUNT}"
   fi
+
+  create_ns "${ISTIO_NAMESPACE}"
 
   # Test starts here
   echo "Installing ASM with MeshCA..."
@@ -689,6 +701,13 @@ run_basic_test() {
   fi
 
   mkfifo "${LT_NAMESPACE}"
+
+  # Create the "istio-syste" NS only when it's not managed
+  if [[ ! "${EXTRA_FLAGS}" =~ "managed" ]]; then
+    create_ns "${ISTIO_NAMESPACE}"
+  elif istio_namespace_exists; then
+    remove_ns "${ISTIO_NAMESPACE}"
+  fi
 
   # Test starts here
   echo "Installing ASM with MeshCA..."

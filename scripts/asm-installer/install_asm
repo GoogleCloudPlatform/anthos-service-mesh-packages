@@ -91,6 +91,7 @@ ENABLE_GCP_APIS="${ENABLE_GCP_APIS:=0}"
 ENABLE_GCP_IAM_ROLES="${ENABLE_GCP_IAM_ROLES:=0}"
 ENABLE_GCP_COMPONENTS="${ENABLE_GCP_COMPONENTS:=0}"
 ENABLE_REGISTRATION="${ENABLE_REGISTRATION:=0}"
+ENABLE_NAMESPACE_CREATION="${ENABLE_NAMESPACE_CREATION:=0}"
 
 DISABLE_CANONICAL_SERVICE="${DISABLE_CANONICAL_SERVICE:=0}"
 PRINT_CONFIG="${PRINT_CONFIG:=0}"
@@ -237,8 +238,12 @@ main() {
     exit_if_not_cluster_admin
   fi
 
-  if should_validate && ! is_managed; then
-    ensure_istio_namespace_exists
+  if ! is_managed; then
+    if can_create_namespace; then
+      create_istio_namespace
+    elif should_validate; then
+      exit_if_istio_namespace_not_exists
+    fi
   fi
 
   if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
@@ -566,6 +571,16 @@ can_register_cluster() {
   fi
 }
 
+can_create_namespace() {
+  if ! can_modify_at_all; then false; return; fi
+
+  if [[ "${ENABLE_ALL}" -eq 1 || "${ENABLE_NAMESPACE_CREATION}" -eq 1 ]]; then
+    true
+  else
+    false
+  fi
+}
+
 needs_asm() {
   if only_enable; then false; return; fi
 
@@ -625,6 +640,7 @@ FLAGS:
      --enable_gcp_iam_roles
      --enable_gcp_components
      --enable_registration
+     --enable_namespace_creation
 
      --managed
 
@@ -736,6 +752,8 @@ FLAGS:
                                       managed services and components
      --enable_registration            Allow the script to register the cluster
                                       to an environ
+     --enable_namespace_creation      Allow the script to create the istio-system
+                                      namespace for the user
 
      --managed                        Provision a remote, managed control plane
                                       instead of installing one in-cluster.
@@ -859,6 +877,10 @@ parse_args() {
         ;;
       --enable_registration | --enable-registration)
         ENABLE_REGISTRATION=1
+        shift 1
+        ;;
+      --enable_namespace_creation | --enable-namespace-creation)
+        ENABLE_NAMESPACE_CREATION=1
         shift 1
         ;;
       --managed)
@@ -1083,7 +1105,7 @@ EOF
   if [[ "${ENABLE_ALL}" -eq 1 || "${ENABLE_CLUSTER_ROLES}" -eq 1 || \
     "${ENABLE_CLUSTER_LABELS}" -eq 1 || "${ENABLE_GCP_APIS}" -eq 1 || \
     "${ENABLE_GCP_IAM_ROLES}" -eq 1 || "${ENABLE_GCP_COMPONENTS}" -eq 1 || \
-    "${ENABLE_REGISTRATION}" -eq 1 ]]; then
+    "${ENABLE_REGISTRATION}" -eq 1  || "${ENABLE_NAMESPACE_CREATION}" -eq 1 ]]; then
     if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
       fatal "The only_validate flag cannot be used with any --enable* flag"
     fi
@@ -2206,11 +2228,23 @@ EOF
   fi
 }
 
-ensure_istio_namespace_exists() {
+create_istio_namespace() {
+  info "Creating istio-system namespace..."
+
+  if istio_namespace_exists; then return; fi
+  
+  retry 2 kubectl create ns istio-system
+}
+
+exit_if_istio_namespace_not_exists() {
   info "Checking for istio-system namespace..."
   if ! istio_namespace_exists; then
-    info "Creating istio-system namespace..."
-    retry 2 kubectl create ns istio-system
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+The istio-system namespace doesn't exist.
+Please create the "istio-namespace" and retry, or run the script with the
+'--enable_namespace_creation' flag to allow the script to enable it on your behalf.
+$(enable_common_message)
+EOF
   fi
 }
 
