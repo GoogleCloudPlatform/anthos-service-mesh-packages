@@ -843,7 +843,12 @@ create_source_instance_template() {
 
 create_custom_source_instance_template() {
   echo "Creating custom source instance template ${CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME}..."
-
+  exist_instance=$(gcloud compute instances list --filter="name=${CUSTOM_IMAGE_NAME}")
+  if [[ "${exist_instance}" == "" ]]
+  then
+    gcloud compute instances delete "${CUSTOM_IMAGE_NAME}" --zone "${CUSTOM_IMAGE_LOCATION}" \
+    --project "${PROJECT_ID}" --quiet
+  fi
   gcloud compute instances create "${CUSTOM_IMAGE_NAME}" \
     --project "${PROJECT_ID}" \
     --zone "${CUSTOM_IMAGE_LOCATION}"
