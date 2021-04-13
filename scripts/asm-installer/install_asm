@@ -2586,8 +2586,6 @@ outro() {
     info "The full, expanded set of kubernetes resources can be found at:"
     info "${OUTPUT_DIR}/${EXPANDED_YAML}"
   else
-    info "You can find the validatingwebhook config to apply with kubectl here:"
-    info "${OUTPUT_DIR}/${MANAGED_WEBHOOKS}"
     info "You can find the gateway config to install with istioctl here:"
     info "${OUTPUT_DIR}/managed_control_plane_gateway.yaml"
   fi
