@@ -2535,6 +2535,9 @@ install_managed_components() {
     kubectl apply -f "${BASE_REL_PATH}"
   fi
 
+  info "Configuring ASM managed control plane validating webhook config..."
+  kubectl apply -f "${MANAGED_WEBHOOKS}"
+
   info "Configuring ASM managed control plane components..."
   print_config >| managed_control_plane_gateway.yaml
 
