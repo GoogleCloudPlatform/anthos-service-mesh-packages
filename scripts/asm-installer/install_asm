@@ -2192,21 +2192,23 @@ EOF
 
 is_user_cluster_admin() {
   local GCLOUD_USER; GCLOUD_USER="$(gcloud config get-value core/account)"
-  local IAM_USER; IAM_USER="$(iam_user)"
+  local IAM_USER; IAM_USER="$(local_iam_user)"
   local ROLES
-  ROLES=$(cat <<EOF
-$(kubectl get clusterrolebinding \
-  --all-namespaces \
-  -o jsonpath='{range .items[?(@.subjects[0].name=="'"${GCLOUD_USER}"'")]}[{.roleRef.name}]{end}'\
-  2>/dev/null)
-$(gcloud projects \
+  ROLES="$(\
+    kubectl get clusterrolebinding \
+    --all-namespaces \
+    -o jsonpath='{range .items[?(@.subjects[0].name=="'"${GCLOUD_USER}"'")]}[{.roleRef.name}]{end}'\
+    2>/dev/null)"
+  if echo "${ROLES}" | grep -q cluster-admin; then return; fi
+
+  ROLES="$(gcloud projects \
     get-iam-policy "${PROJECT_ID}" \
     --flatten='bindings[].members' \
     --filter="bindings.members:${IAM_USER}" \
-    --format='value(bindings.role)' 2>/dev/null)
-EOF
-)
-  if ! (echo "${ROLES}" | grep -q roles/container.admin) && (echo "${ROLES}" | grep -q cluster-admin); then false; fi
+    --format='value(bindings.role)' 2>/dev/null)"
+  if echo "${ROLES}" | grep -q roles/container.admin; then return; fi
+
+  false
 }
 
 bind_user_to_cluster_admin(){
