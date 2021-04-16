@@ -237,10 +237,3 @@ validation and stop before taking any actions with side effects.
 Use the `--dry-run` flag for the script to display commands with side effects
 instead of executing them, or use the `--verbose` flag to display _and_ execute
 the commands. Combine the --verbose flag with --help to see extended help.
-
-## Release
-
-The release_asm_installer script is used to upload various versions of the
-script into the associated GCS buckets.
-
-This is intended for Google internal use, but is included here for transparency.
