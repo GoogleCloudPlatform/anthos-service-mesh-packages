@@ -13,9 +13,9 @@ cd "${SDIR}"
 
 verify_template_instance_with_source_image() {
   local image_project="${1:-debian-cloud}"
-  local image="${2:-debian-10}"
+  local image_family="${2:-debian-10}"
 
-  create_source_instance_template "${image_project}" "${image}"
+  create_source_instance_template "${image_project}" "${image_family}"
 
   CREATE_FROM_SOURCE=1
   create_new_instance_template "${SOURCE_INSTANCE_TEMPLATE_NAME}" "vm-${LT_NAMESPACE}"; RETVAL=$?;
