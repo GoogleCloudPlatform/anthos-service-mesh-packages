@@ -31,8 +31,6 @@ spec:
         PLUGINS: "GoogleTokenExchange"
         USE_TOKEN_FOR_CSR: "true"
         GCE_METADATA_HOST: "metadata.google.internal"
-    # Protocol detection timeout is not supported
-    protocolDetectionTimeout: 0s
     # Locality load balancing is not supported
     localityLbSetting:
       enabled: false
@@ -78,10 +76,6 @@ spec:
           - name: PILOT_ENABLE_WORKLOAD_ENTRY_AUTOREGISTRATION
             value: "true"
   values:
-    # Protocol sniffing is not supported
-    pilot:
-      enableProtocolSniffingForOutbound: false
-      enableProtocolSniffingForInbound: false
     # Enable telemetry v2 backend by Stackdriver.
     # Prometheus is also supported with --set values.telemetry.v2.prometheus.enabled=true --set prometheus.enabled=true
     telemetry:
