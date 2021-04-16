@@ -13,7 +13,7 @@ cd "${SDIR}"
 
 verify_template_instance_with_source_image() {
   local image_project="${1:-debian-cloud}"
-  local image="${2:debian-10}"
+  local image="${2:-debian-10}"
 
   create_source_instance_template "${image_project}" "${image}"
 
