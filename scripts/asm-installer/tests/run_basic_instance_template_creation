@@ -12,7 +12,10 @@ SCRIPT_NAME="${0##*/}"
 cd "${SDIR}"
 
 verify_template_instance_with_source_image() {
-  create_source_instance_template
+  local image_project="${1:-debian-cloud}"
+  local image_family="${2:-debian-10}"
+
+  create_source_instance_template "${image_project}" "${image_family}"
 
   CREATE_FROM_SOURCE=1
   create_new_instance_template "${SOURCE_INSTANCE_TEMPLATE_NAME}" "vm-${LT_NAMESPACE}"; RETVAL=$?;
@@ -78,6 +81,8 @@ EOF
 
   verify_default_template_instance
   verify_template_instance_with_source_image
+  verify_template_instance_with_source_image "centos-cloud" "centos-8"
+  verify_template_instance_with_source_image "centos-cloud" "centos-7"
   verify_template_instance_with_custom_image
 
   cleanup_workload_service_account
