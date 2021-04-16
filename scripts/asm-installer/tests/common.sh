@@ -861,7 +861,7 @@ create_source_instance_template() {
     --labels="testlabel=testvalue" \
     --service-account="${WORKLOAD_SERVICE_ACCOUNT}" \
     --image-project="${image_project}" \
-    --image_family="${image_family}"
+    --image-family="${image_family}"
 }
 
 create_custom_source_instance_template() {
