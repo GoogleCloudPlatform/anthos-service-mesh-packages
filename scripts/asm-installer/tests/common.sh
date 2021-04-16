@@ -10,9 +10,9 @@ WORKLOAD_NAME="vm"
 WORKLOAD_SERVICE_ACCOUNT=""
 INSTANCE_TEMPLATE_NAME=""
 SOURCE_INSTANCE_TEMPLATE_NAME="vm-source"
-CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME="customsourcetemplate"
+CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME="vm-customsourcetemplate"
 CUSTOM_IMAGE_LOCATION="us-central1-c"
-CUSTOM_IMAGE_NAME="customsourcetemplateimage"
+CUSTOM_IMAGE_NAME="vm-customsourcetemplateimage"
 CREATE_FROM_SOURCE=0
 
 _EXTRA_FLAGS="${_EXTRA_FLAGS:=}"; export _EXTRA_FLAGS;
@@ -979,6 +979,28 @@ cleanup_old_instance_templates() {
     fi
   done <<EOF
 $(gcloud compute instance-templates list --filter="name~^vm-" --format="value(name)" --project "${LT_PROJECT_ID}")
+EOF
+}
+
+cleanup_old_instances() {
+  echo "Cleaning up all instance for VM workload..."
+  while read -r it; do
+    if [[ -n "${it}" ]]; then
+      gcloud compute instances delete "${it}" --quiet --project "${LT_PROJECT_ID}"
+    fi
+  done <<EOF
+$(gcloud compute instances list --filter="name~^vm-" --format="value(name)" --project "${LT_PROJECT_ID}")
+EOF
+}
+
+cleanup_old_images() {
+  echo "Cleaning up all images for VM workload..."
+  while read -r it; do
+    if [[ -n "${it}" ]]; then
+      gcloud compute images delete "${it}" --quiet --project "${LT_PROJECT_ID}"
+    fi
+  done <<EOF
+$(gcloud compute images list --filter="name~^vm-" --format="value(name)" --project "${LT_PROJECT_ID}")
 EOF
 }
 
