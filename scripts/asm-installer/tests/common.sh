@@ -851,13 +851,17 @@ create_new_instance_template() {
 
 create_source_instance_template() {
   echo "Creating source instance template ${SOURCE_INSTANCE_TEMPLATE_NAME}..."
+  local image_project="${1:-debian-cloud}"
+  local image="${2:-debian-10}"
 
   # Create an instance template with a metadata entry and a label entry
   gcloud compute instance-templates create "${SOURCE_INSTANCE_TEMPLATE_NAME}" \
     --project "${PROJECT_ID}" \
     --metadata="testKey=testValue" \
     --labels="testlabel=testvalue" \
-    --service-account="${WORKLOAD_SERVICE_ACCOUNT}"
+    --service-account="${WORKLOAD_SERVICE_ACCOUNT}" \
+    --image-project="${image_project}" \
+    --image="${image}"
 }
 
 create_custom_source_instance_template() {
