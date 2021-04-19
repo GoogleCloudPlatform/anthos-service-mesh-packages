@@ -728,6 +728,7 @@ bind_user_to_iam_policy(){
   while read -r role; do
   retry 3 run gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
     --member "${ACCOUNT_TYPE}":"${GCLOUD_MEMBER}" \
+    --condition=None \
     --role=roles/"${role}" >/dev/null
   done <<EOF
 editor
