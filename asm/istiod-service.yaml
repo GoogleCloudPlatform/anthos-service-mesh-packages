@@ -21,7 +21,7 @@ metadata:
   name: istiod
   namespace: istio-system
   labels:
-    istio.io/rev: asm-1614-1 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.rev"}
+    istio.io/rev: asm-1614-2 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.rev"}
     app: istiod
     istio: pilot
     release: istio
@@ -42,4 +42,4 @@ spec:
     protocol: TCP
   selector:
     app: istiod
-    istio.io/rev: asm-1614-1 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.rev"}
+    istio.io/rev: asm-1614-2 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.rev"}
