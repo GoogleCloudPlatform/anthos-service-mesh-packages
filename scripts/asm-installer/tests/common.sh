@@ -702,12 +702,7 @@ run_basic_test() {
 
   mkfifo "${LT_NAMESPACE}"
 
-  # Create the "istio-syste" NS only when it's not managed
-  if [[ ! "${EXTRA_FLAGS}" =~ "managed" ]]; then
-    create_ns "${ISTIO_NAMESPACE}"
-  elif istio_namespace_exists; then
-    remove_ns "${ISTIO_NAMESPACE}"
-  fi
+  create_ns "${ISTIO_NAMESPACE}"
 
   # Test starts here
   echo "Installing ASM with MeshCA..."
