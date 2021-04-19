@@ -236,8 +236,10 @@ main() {
     exit_if_not_cluster_admin
   fi
 
-  if should_validate && ! is_managed; then
-    ensure_istio_namespace_exists
+  if can_create_namespace; then
+    create_istio_namespace
+  elif should_validate; then
+    exit_if_istio_namespace_not_exists
   fi
 
   if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
@@ -2446,14 +2448,6 @@ EOF
     -K <(auth_header "$(get_auth_token)")
 }
 
-server-side_apply() {
-  local FILE; FILE="${1}";
-  kubectl apply -f "${FILE}" \
-    --record=false \
-    --overwrite=false \
-    --server-side
-}
-
 scrape_managed_urls() {
   local URL
   URL="$(kubectl get mutatingwebhookconfiguration istiod-asm-managed -ojson | jq .webhooks[0].clientConfig.url -r)"
@@ -2466,11 +2460,8 @@ scrape_managed_urls() {
 }
 
 install_managed_components() {
-
-  if ! istio_namespace_exists; then
-    info "Configuring base installation for managed control plane..."
-    kubectl apply -f "${BASE_REL_PATH}"
-  fi
+  info "Configuring base installation for managed control plane..."
+  kubectl apply --overwrite=true -f "${BASE_REL_PATH}"
 
   info "Configuring ASM managed control plane components..."
   print_config >| managed_control_plane_gateway.yaml
@@ -2479,7 +2470,6 @@ install_managed_components() {
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
     install_canonical_controller
   fi
-
 }
 
 outro() {

@@ -619,6 +619,8 @@ run_basic_test() {
 
   mkfifo "${LT_NAMESPACE}"
 
+  create_ns "${ISTIO_NAMESPACE}"
+
   # Test starts here
   echo "Installing ASM with MeshCA..."
   echo "_CI_REVISION_PREFIX=${LT_NAMESPACE} \
