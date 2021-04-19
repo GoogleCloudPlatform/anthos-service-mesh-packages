@@ -1759,6 +1759,11 @@ exit_if_out_of_iam_policy() {
     --flatten='bindings[].members' \
     --filter="bindings.members:$(iam_user)" \
     --format='value(bindings.role)')"
+
+  if [[ "${MEMBER_ROLES}" = *"roles/owner"* ]]; then
+    return
+  fi
+
   local REQUIRED; REQUIRED="$(required_iam_roles)";
 
   local NOTFOUND; NOTFOUND="$(find_missing_strings "${REQUIRED}" "${MEMBER_ROLES}")"
