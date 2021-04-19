@@ -19,11 +19,20 @@ while read -r KEYWORD; do
     echo "${KEYWORD} version line does not match in install_asm and asm_vm. Please make the change."
     exit 1
   fi
+  eval ${INSTALL_ASM_LINE}
 done <<EOF
 MAJOR
 MINOR
 POINT
 REV
 EOF
+
+V_STRING="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
+KPT_TAG="$(grep -A 1 'name: anthos.servicemesh.tag' ../../asm/Kptfile | tail -n 1 | sed 's/.*value: \(.*\)$/\1/g')"
+
+if [[ "${V_STRING}" != "${KPT_TAG}" ]]; then
+  echo "The version tag in the Kptfile doesn't match installation tools, please make the change."
+  exit 1
+fi
 
 echo "Success: versions in the scripts are verified."
