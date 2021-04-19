@@ -112,7 +112,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.tag
-          value: 1.7.6-asm.1
+          value: 1.7.8-asm.1
           isSet: true
     io.k8s.cli.setters.anthos.servicemesh.rev:
       x-k8s-cli:
@@ -124,7 +124,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.canonicalServiceHub
-          value: gcr.io/gke-release/asm/canonical-service-controller:1.7.6-asm.1
+          value: gcr.io/gke-release/asm/canonical-service-controller:1.7.8-asm.1
           isSet: true
     io.k8s.cli.setters.anthos.servicemesh.hubMembershipID:
       type: string
