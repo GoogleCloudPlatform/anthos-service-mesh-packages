@@ -1427,11 +1427,11 @@ gen_instance_template_metadata() {
 gen_gce_instance_labels() {
   jq -n \
   --arg canonical_service "${CANONICAL_SERVICE}" \
-  --arg project_id "${PROJECT_ID}" \
+  --arg workload_namespace "${WORKLOAD_NAMESPACE}" \
   --arg project_number "${PROJECT_NUMBER}" '{
 "gce-service-proxy": "asm-istiod",
 "asm_service_name": $canonical_service,
-"asm_service_namespace": $project_id,
+"asm_service_namespace": $workload_namespace,
 "mesh_id": ("proj-"+$project_number)
 }'
 }
