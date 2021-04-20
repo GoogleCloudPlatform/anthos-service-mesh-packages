@@ -32,7 +32,7 @@ _CI_CRC_VERSION="${_CI_CRC_VERSION:=0}"
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=8}"; readonly MINOR;
-POINT="${POINT:=3}"; readonly POINT;
+POINT="${POINT:=5}"; readonly POINT;
 REV="${REV:=2}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="3"}"; readonly CONFIG_VER;
 K8S_MINOR=0
@@ -1563,6 +1563,11 @@ exit_if_out_of_iam_policy() {
     --flatten='bindings[].members' \
     --filter="bindings.members:$(iam_user)" \
     --format='value(bindings.role)')"
+
+  if [[ "${MEMBER_ROLES}" = *"roles/owner"* ]]; then
+    return
+  fi
+
   local REQUIRED; REQUIRED="$(required_iam_roles)";
 
   local NOTFOUND; NOTFOUND="$(find_missing_strings "${REQUIRED}" "${MEMBER_ROLES}")"

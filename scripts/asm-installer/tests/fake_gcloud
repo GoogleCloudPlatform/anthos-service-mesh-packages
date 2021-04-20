@@ -41,6 +41,11 @@ if [[ "${*}" == *"this_should_fail"* ]]; then
   exit 1
 fi
 
+if [[ "${*}" == *"get-iam-policy"*"owner_this_should_pass"* ]]; then
+  echo roles/owner
+  exit 0
+fi
+
 if [[ "${*}" == *"get-iam-policy"*"this_should_pass"* ]]; then
   cat <<EOF
 roles/servicemanagement.admin
