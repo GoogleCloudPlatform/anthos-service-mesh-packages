@@ -7,4 +7,6 @@ with [Anthos Service Mesh] features enabled.
 
 Package Descriptions:
 
-* `asm`: Creates an ASM ready cluster and installs ASM
+* `asm`: Contains various manifests to help configure and install ASM
+* `docs`: Contains useful reading material around design, development and release
+* `scripts`: Contains the executables to install or modify ASM
