@@ -28,13 +28,14 @@ _CI_ISTIOCTL_REL_PATH="${_CI_ISTIOCTL_REL_PATH:=}"
 _CI_TRUSTED_GCP_PROJECTS="${_CI_TRUSTED_GCP_PROJECTS:=}"
 _CI_ENVIRON_PROJECT_NUMBER="${_CI_ENVIRON_PROJECT_NUMBER:=}"
 _CI_CRC_VERSION="${_CI_CRC_VERSION:=0}"
+_CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"
 
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=9}"; readonly MINOR;
-POINT="${POINT:=2}"; readonly POINT;
-REV="${REV:=1}"; readonly REV;
-CONFIG_VER="${CONFIG_VER:="4"}"; readonly CONFIG_VER;
+POINT="${POINT:=3}"; readonly POINT;
+REV="${REV:=2}"; readonly REV;
+CONFIG_VER="${CONFIG_VER:="1"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
 ### File related constants ###
@@ -118,6 +119,7 @@ USE_VM=0
 ENVIRON_PROJECT_ID=""
 HUB_MEMBERSHIP_ID=""
 WI_ENABLED=0
+CUSTOM_REVISION=0
 
 main() {
   init
@@ -235,8 +237,10 @@ main() {
     exit_if_not_cluster_admin
   fi
 
-  if should_validate && ! is_managed; then
-    ensure_istio_namespace_exists
+  if can_create_namespace; then
+    create_istio_namespace
+  elif should_validate; then
+    exit_if_istio_namespace_not_exists
   fi
 
   if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
@@ -560,6 +564,10 @@ can_register_cluster() {
   fi
 }
 
+can_create_namespace() {
+  if ! can_modify_at_all; then false; return; fi
+}
+
 needs_asm() {
   if only_enable; then false; return; fi
 
@@ -609,6 +617,7 @@ OPTIONS:
   --root_cert            <FILE PATH>
   --cert_chain           <FILE PATH>
   --ca_name              <CA NAME>
+  -r|--revision_name     <REVISION NAME>
 
 FLAGS:
   -e|--enable_all
@@ -691,7 +700,11 @@ OPTIONS:
                                       Name of the ca in the GCP CAS service used to
                                       sign certificates in the format
                                       'projects/project_name/locations/ \
-                                       ca_region/certificateAuthorities/ca_name'
+                                      ca_region/certificateAuthorities/ca_name'.
+  -r|--revision_name <REVISION NAME>  Custom revision label. Label needs to follow DNS
+                                      label formats (re: RFC 1123). Not supported if
+                                      control plane is managed. Prefixing the revision
+                                      name with 'asm' is recommended.
   The following four options must be passed together and are only necessary
   for using a custom certificate for Citadel. Users that aren't sure whether
   they need this probably don't.
@@ -914,6 +927,12 @@ parse_args() {
         CUSTOM_CA=1
         shift 2
         ;;
+      -r | --revision_name | --revision-name)
+        arg_required "${@}"
+        CUSTOM_REVISION=1
+        REVISION_LABEL="${2}"
+        shift 2
+        ;;
       -v | --verbose)
         VERBOSE=1
         shift 1
@@ -949,6 +968,10 @@ validate_args() {
     CA="mesh_ca"
   fi
 
+  if [[ "${CUSTOM_REVISION}" -eq 1 ]]; then
+    validate_revision_label
+  fi
+
   if is_managed; then
     if [[ "${MODE}" != "install" ]]; then
       fatal "Migrate and upgrade are incompatible with managed control plane."
@@ -972,6 +995,10 @@ validate_args() {
 
     if [[ -n "${CUSTOM_OVERLAY}" ]]; then
       fatal "Specifying a custom overlay file with managed control plane is not supported."
+    fi
+
+    if [[ "${CUSTOM_REVISION}" -eq 1 ]]; then
+      fatal "Specifying a revision label with managed control plane is not supported"
     fi
   fi
 
@@ -1097,6 +1124,23 @@ EOF
 
   set_kpt_package_url
   WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"
+}
+
+validate_revision_label() {
+  # Matches DNS label formats of RFC 1123
+  local DNS_1123_LABEL_MAX_LEN; DNS_1123_LABEL_MAX_LEN=63;
+  readonly DNS_1123_LABEL_MAX_LEN
+
+  local DNS_1123_LABEL_FMT; DNS_1123_LABEL_FMT="^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?$";
+  readonly DNS_1123_LABEL_FMT
+
+  if [[ ${#REVISION_LABEL} -gt ${DNS_1123_LABEL_MAX_LEN} ]]; then
+    fatal "Revision label cannot be longer than $DNS_1123_LABEL_MAX_LEN."
+  fi
+
+  if ! [[ "${REVISION_LABEL}" =~ ${DNS_1123_LABEL_FMT} ]]; then
+    fatal "Revision label does not follow RFC 1123 formatting convention."
+  fi
 }
 
 validate_gcp_cas_args() {
@@ -1695,6 +1739,11 @@ exit_if_out_of_iam_policy() {
     --flatten='bindings[].members' \
     --filter="bindings.members:$(iam_user)" \
     --format='value(bindings.role)')"
+
+  if [[ "${MEMBER_ROLES}" = *"roles/owner"* ]]; then
+    return
+  fi
+
   local REQUIRED; REQUIRED="$(required_iam_roles)";
 
   local NOTFOUND; NOTFOUND="$(find_missing_strings "${REQUIRED}" "${MEMBER_ROLES}")"
@@ -1761,18 +1810,34 @@ EOF
 required_iam_roles() {
   # meshconfig.admin - required for init, stackdriver, UI elements, etc.
   # servicemanagement.admin/serviceusage.serviceUsageAdmin - enables APIs
-  cat <<EOF
-roles/servicemanagement.admin
-roles/serviceusage.serviceUsageAdmin
-roles/meshconfig.admin
-roles/compute.admin
-roles/container.admin
-roles/resourcemanager.projectIamAdmin
-roles/iam.serviceAccountAdmin
-roles/iam.serviceAccountKeyAdmin
-roles/gkehub.admin
-roles/privateca.admin
-EOF
+  if can_modify_gcp_components || \
+     can_modify_cluster_labels || \
+     can_modify_cluster_roles; then
+    echo roles/container.admin
+  fi
+  if can_modify_gcp_components; then
+    echo roles/meshconfig.admin
+  fi
+  if can_modify_gcp_apis; then
+    echo roles/servicemanagement.admin
+    echo roles/serviceusage.serviceUsageAdmin
+  fi
+  if can_modify_gcp_iam_roles; then
+    echo roles/resourcemanager.projectIamAdmin
+  fi
+  if is_sa; then
+    echo roles/iam.serviceAccountAdmin
+  fi
+  if can_register_cluster; then
+    echo roles/gkehub.admin
+  fi
+  if [[ "${CA}" = "gcp_cas" ]]; then
+    echo roles/privateca.admin
+  fi
+  if [[ "${_CI_I_AM_A_TEST_ROBOT}" -eq 1 ]]; then
+    echo roles/compute.admin
+    echo roles/iam.serviceAccountKeyAdmin
+  fi
 }
 # [END required_iam_roles]
 
@@ -1780,7 +1845,6 @@ EOF
 required_apis() {
     cat << EOF
 container.googleapis.com
-compute.googleapis.com
 monitoring.googleapis.com
 logging.googleapis.com
 cloudtrace.googleapis.com
@@ -1801,6 +1865,10 @@ EOF
      ;;
     *);;
   esac
+
+  if [[ "${_CI_I_AM_A_TEST_ROBOT}" -eq 1 ]]; then
+    echo compute.googleapis.com
+  fi
 }
 # [END required_apis]
 
@@ -2108,14 +2176,23 @@ EOF
 
 is_user_cluster_admin() {
   local GCLOUD_USER; GCLOUD_USER="$(gcloud config get-value core/account)"
+  local IAM_USER; IAM_USER="$(local_iam_user)"
   local ROLES
   ROLES="$(\
     kubectl get clusterrolebinding \
     --all-namespaces \
     -o jsonpath='{range .items[?(@.subjects[0].name=="'"${GCLOUD_USER}"'")]}[{.roleRef.name}]{end}'\
     2>/dev/null)"
+  if echo "${ROLES}" | grep -q cluster-admin; then return; fi
 
-  if ! echo "${ROLES}" | grep -q cluster-admin; then false; fi
+  ROLES="$(gcloud projects \
+    get-iam-policy "${PROJECT_ID}" \
+    --flatten='bindings[].members' \
+    --filter="bindings.members:${IAM_USER}" \
+    --format='value(bindings.role)' 2>/dev/null)"
+  if echo "${ROLES}" | grep -q roles/container.admin; then return; fi
+
+  false
 }
 
 bind_user_to_cluster_admin(){
@@ -2144,11 +2221,23 @@ EOF
   fi
 }
 
-ensure_istio_namespace_exists() {
+create_istio_namespace() {
+  info "Creating istio-system namespace..."
+
+  if istio_namespace_exists; then return; fi
+
+  retry 2 kubectl create ns istio-system
+}
+
+exit_if_istio_namespace_not_exists() {
   info "Checking for istio-system namespace..."
   if ! istio_namespace_exists; then
-    info "Creating istio-system namespace..."
-    retry 2 kubectl create ns istio-system
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+The istio-system namespace doesn't exist.
+Please create the "istio-namespace" and retry, or run the script with the
+'--enable_namespace_creation' flag to allow the script to enable it on your behalf.
+$(enable_common_message)
+EOF
   fi
 }
 
@@ -2404,14 +2493,6 @@ EOF
     -K <(auth_header "$(get_auth_token)")
 }
 
-server-side_apply() {
-  local FILE; FILE="${1}";
-  kubectl apply -f "${FILE}" \
-    --record=false \
-    --overwrite=false \
-    --server-side
-}
-
 scrape_managed_urls() {
   local URL
   URL="$(kubectl get mutatingwebhookconfiguration istiod-asm-managed -ojson | jq .webhooks[0].clientConfig.url -r)"
@@ -2424,11 +2505,11 @@ scrape_managed_urls() {
 }
 
 install_managed_components() {
+  info "Configuring base installation for managed control plane..."
+  kubectl apply --overwrite=true -f "${BASE_REL_PATH}"
 
-  if ! istio_namespace_exists; then
-    info "Configuring base installation for managed control plane..."
-    kubectl apply -f "${BASE_REL_PATH}"
-  fi
+  info "Configuring ASM managed control plane validating webhook config..."
+  kubectl apply -f "${MANAGED_WEBHOOKS}"
 
   info "Configuring ASM managed control plane components..."
   print_config >| managed_control_plane_gateway.yaml
@@ -2437,7 +2518,6 @@ install_managed_components() {
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
     install_canonical_controller
   fi
-
 }
 
 outro() {
@@ -2478,8 +2558,6 @@ outro() {
     info "The full, expanded set of kubernetes resources can be found at:"
     info "${OUTPUT_DIR}/${EXPANDED_YAML}"
   else
-    info "You can find the validatingwebhook config to apply with kubectl here:"
-    info "${OUTPUT_DIR}/${MANAGED_WEBHOOKS}"
     info "You can find the gateway config to install with istioctl here:"
     info "${OUTPUT_DIR}/managed_control_plane_gateway.yaml"
   fi

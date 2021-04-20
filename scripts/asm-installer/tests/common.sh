@@ -10,6 +10,9 @@ WORKLOAD_NAME="vm"
 WORKLOAD_SERVICE_ACCOUNT=""
 INSTANCE_TEMPLATE_NAME=""
 SOURCE_INSTANCE_TEMPLATE_NAME="vm-source"
+CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME="customsourcetemplate"
+CUSTOM_IMAGE_LOCATION="us-central1-c"
+CUSTOM_IMAGE_NAME="customsourcetemplateimage"
 CREATE_FROM_SOURCE=0
 
 _EXTRA_FLAGS="${_EXTRA_FLAGS:=}"; export _EXTRA_FLAGS;
@@ -18,9 +21,11 @@ BUILD_ID="${BUILD_ID:=}"; export BUILD_ID;
 PROJECT_ID="${PROJECT_ID:=}"; export PROJECT_ID;
 CLUSTER_LOCATION="${CLUSTER_LOCATION:=us-central1-c}"; export CLUSTER_LOCATION;
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT:=}"; export SERVICE_ACCOUNT;
+CUSTOM_INSTANCE_TEMPLATE_NAME="${CUSTOM_INSTANCE_TEMPLATE_NAME:=custominstancetemplate}"; export CUSTOM_INSTANCE_TEMPLATE_NAME;
 KEY_FILE="${KEY_FILE:=}"; export KEY_FILE;
 OSS_VERSION="${OSS_VERSION:=1.9.0}"; export OSS_VERSION;
 OLD_OSS_VERSION="${OLD_OSS_VERSION:=1.8.2}"; export OLD_OSS_VERSION;
+ISTIO_NAMESPACE="istio-system"; readonly ISTIO_NAMESPACE
 
 KUBECONFIG=""
 
@@ -521,6 +526,12 @@ does_istiod_exist(){
   return "${RETVAL}"
 }
 
+istio_namespace_exists() {
+  if [[ "$(kubectl get ns | grep -c istio-system || true)" -eq 0 ]]; then
+    false
+  fi
+}
+
 is_cluster_registered() {
   local IDENTITY_PROVIDER
   IDENTITY_PROVIDER="$(kubectl get memberships.hub.gke.io \
@@ -532,16 +543,19 @@ is_cluster_registered() {
 }
 
 remove_ns() {
-  kubectl delete ns ${1} || true
+  kubectl delete ns "${1}" || true
 }
+
+create_ns() {
+  kubectl create ns "${1}" || true
+}
+
 #
 ### functions for interacting with OSS Istio
 install_oss_istio() {
   local NAMESPACE; NAMESPACE="$1"
   local CLUSTER_NAME; CLUSTER_NAME="$2"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$3"
-  local ISTIO_NAMESPACE; ISTIO_NAMESPACE="istio-system"
-  readonly ISTIO_NAMESPACE
 
   echo "Downloading istioctl..."
   TMPDIR="$(mktemp -d)"
@@ -553,7 +567,7 @@ ${OSS_VERSION}/istio-${OSS_VERSION}-linux-amd64.tar.gz" | tar xz
   popd
   rm -r "${TMPDIR}"
 
-  kubectl create ns "${ISTIO_NAMESPACE}"
+  create_ns "${ISTIO_NAMESPACE}"
   kubectl label ns "${ISTIO_NAMESPACE}" scriptaro-test=true
 
   kubectl apply -f - <<EOF
@@ -579,6 +593,77 @@ EOF
     fatal "Timed out waiting for Istio to finish installing."
   fi
   echo "Done."
+}
+
+run_required_role() {
+  local MODE; MODE="${1}";
+  local CA; CA="${2}";
+  local EXPECTED_ROLES; EXPECTED_ROLES="${3}"
+  shift 3 # increment this if more arguments are added
+  local EXTRA_FLAGS; EXTRA_FLAGS="${*}"
+
+  date +"%T"
+
+  if [[ -n "${SERVICE_ACCOUNT}" ]]; then
+    echo "Authorizing service acount..."
+    auth_service_account
+  fi
+
+  OUTPUT_DIR="$(mktemp -d)"
+
+  configure_kubectl "${LT_CLUSTER_NAME}" "${PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
+
+  if [[ -n "${KEY_FILE}" && -n "${SERVICE_ACCOUNT}" ]]; then
+    KEY_FILE="-k ${KEY_FILE}"
+    SERVICE_ACCOUNT="-s ${SERVICE_ACCOUNT}"
+  fi
+
+  create_ns "${ISTIO_NAMESPACE}"
+
+  # Test starts here
+  echo "Installing ASM with MeshCA..."
+  echo "_CI_REVISION_PREFIX=${LT_NAMESPACE} \
+  ../install_asm ${KEY_FILE} ${SERVICE_ACCOUNT} \
+    -l ${LT_CLUSTER_LOCATION} \
+    -n ${LT_CLUSTER_NAME} \
+    -p ${PROJECT_ID} \
+    -m ${MODE} \
+    -c ${CA} -v \
+    --output-dir ${OUTPUT_DIR} \
+    ${EXTRA_FLAGS}"
+  # shellcheck disable=SC2086
+  _CI_REVISION_PREFIX="${LT_NAMESPACE}" \
+    ../install_asm ${KEY_FILE} ${SERVICE_ACCOUNT} \
+    -l "${LT_CLUSTER_LOCATION}" \
+    -n "${LT_CLUSTER_NAME}" \
+    -p "${PROJECT_ID}" \
+    -m "${MODE}" \
+    -c "${CA}" -v \
+    --output-dir "${OUTPUT_DIR}" \
+    ${EXTRA_FLAGS} ${_EXTRA_FLAGS} 2>&1
+
+
+  local SUCCESS; SUCCESS=0;
+
+  local MEMBER_ROLES
+  MEMBER_ROLES="$(gcloud projects \
+    get-iam-policy "${PROJECT_ID}" \
+    --flatten='bindings[].members' \
+    --filter="bindings.members:serviceAccount:${SERVICE_ACCOUNT}" \
+    --format='value(bindings.role)')"
+
+  # Should not bind any addiontal roles othen than the expected ones
+  local NOTFOUND; NOTFOUND="$(find_missing_strings "${MEMBER_ROLES}" "${EXPECTED_ROLES}")"
+
+  if [[ -n "${NOTFOUND}" ]]; then
+    for role in $(echo "${NOTFOUND}" | tr ',' '\n'); do
+      warn "IAM roles should not be enabled - ${role}"
+    done
+    SUCCESS=1
+  else
+    echo "Success! Only required IAM roles are enabled."
+  fi
+  return "$SUCCESS"
 }
 
 run_basic_test() {
@@ -614,6 +699,8 @@ run_basic_test() {
   fi
 
   mkfifo "${LT_NAMESPACE}"
+
+  create_ns "${ISTIO_NAMESPACE}"
 
   # Test starts here
   echo "Installing ASM with MeshCA..."
@@ -710,12 +797,13 @@ create_workload_service_account() {
 }
 
 create_new_instance_template() {
-  INSTANCE_TEMPLATE_NAME="vm-${LT_NAMESPACE}"
+  local SOURCE_INSTANCE_TEMPLATE="$1"
+  local TEMPLATE_NAME="$2"
   
   echo "Creating instance template ${INSTANCE_TEMPLATE_NAME}..."
   if [[ "${CREATE_FROM_SOURCE}" -eq 0 ]]; then
     echo "ASM_REVISION_PREFIX=${LT_NAMESPACE} \
-        ../asm_vm create_gce_instance_template ${INSTANCE_TEMPLATE_NAME} \
+        ../asm_vm create_gce_instance_template ${TEMPLATE_NAME} \
         ${KEY_FILE} ${SERVICE_ACCOUNT} \
         --cluster_location ${LT_CLUSTER_LOCATION} \
         --cluster_name ${LT_CLUSTER_NAME} \
@@ -724,7 +812,7 @@ create_new_instance_template() {
         --workload_namespace ${LT_NAMESPACE}"
     
     ASM_REVISION_PREFIX="${LT_NAMESPACE}" \
-    ../asm_vm create_gce_instance_template "${INSTANCE_TEMPLATE_NAME}" \
+    ../asm_vm create_gce_instance_template "${TEMPLATE_NAME}" \
       ${KEY_FILE} ${SERVICE_ACCOUNT} \
       --cluster_location "${LT_CLUSTER_LOCATION}" \
       --cluster_name "${LT_CLUSTER_NAME}" \
@@ -733,24 +821,24 @@ create_new_instance_template() {
       --workload_namespace "${LT_NAMESPACE}"
   else
     echo "ASM_REVISION_PREFIX=${LT_NAMESPACE} \
-        ../asm_vm create_gce_instance_template ${INSTANCE_TEMPLATE_NAME} \
+        ../asm_vm create_gce_instance_template ${TEMPLATE_NAME} \
         ${KEY_FILE} ${SERVICE_ACCOUNT} \
         --cluster_location ${LT_CLUSTER_LOCATION} \
         --cluster_name ${LT_CLUSTER_NAME} \
         --project_id ${PROJECT_ID} \
         --workload_name ${WORKLOAD_NAME} \
         --workload_namespace ${LT_NAMESPACE} \
-        --source_instance_template ${SOURCE_INSTANCE_TEMPLATE_NAME}"
+        --source_instance_template ${SOURCE_INSTANCE_TEMPLATE}"
     
     ASM_REVISION_PREFIX="${LT_NAMESPACE}" \
-    ../asm_vm create_gce_instance_template "${INSTANCE_TEMPLATE_NAME}" \
+    ../asm_vm create_gce_instance_template "${TEMPLATE_NAME}" \
       ${KEY_FILE} ${SERVICE_ACCOUNT} \
       --cluster_location "${LT_CLUSTER_LOCATION}" \
       --cluster_name "${LT_CLUSTER_NAME}" \
       --project_id "${PROJECT_ID}" \
       --workload_name "${WORKLOAD_NAME}" \
       --workload_namespace "${LT_NAMESPACE}" \
-      --source_instance_template "${SOURCE_INSTANCE_TEMPLATE_NAME}"
+      --source_instance_template "${SOURCE_INSTANCE_TEMPLATE}"
   fi
 }
 
@@ -763,6 +851,33 @@ create_source_instance_template() {
     --metadata="testKey=testValue" \
     --labels="testlabel=testvalue" \
     --service-account="${WORKLOAD_SERVICE_ACCOUNT}"
+}
+
+create_custom_source_instance_template() {
+  echo "Creating custom source instance template ${CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME}..."
+
+  gcloud compute instances create "${CUSTOM_IMAGE_NAME}" \
+    --project "${PROJECT_ID}" \
+    --zone "${CUSTOM_IMAGE_LOCATION}"
+  gcloud compute instances stop "${CUSTOM_IMAGE_NAME}" \
+    --project "${PROJECT_ID}" \
+    --zone "${CUSTOM_IMAGE_LOCATION}"
+  gcloud compute images create "${CUSTOM_IMAGE_NAME}" \
+    --project "${PROJECT_ID}" \
+    --source-disk="${CUSTOM_IMAGE_NAME}" \
+    --source-disk-zone="${CUSTOM_IMAGE_LOCATION}"
+
+  # Create an instance template with a metadata entry, a label entry AND A CUO
+  gcloud compute instance-templates create "${CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME}" \
+    --project "${PROJECT_ID}" \
+    --metadata="testKey=testValue" \
+    --labels="testlabel=testvalue" \
+    --image-project="${PROJECT_ID}" \
+    --image="${CUSTOM_IMAGE_NAME}" \
+    --service-account="${WORKLOAD_SERVICE_ACCOUNT}"
+
+  gcloud compute instances delete "${CUSTOM_IMAGE_NAME}" --zone "${CUSTOM_IMAGE_LOCATION}" \
+    --project "${PROJECT_ID}" --quiet
 }
 
 verify_instance_template() {
@@ -889,4 +1004,25 @@ EOF
   if [[ "$(echo "${RESPONSE}" | jq -r '.featureState.lifecycleState')" != "ENABLED" ]]; then
     false
   fi
+}
+
+find_missing_strings() {
+  local NEEDLES; NEEDLES="${1}";
+  local HAYSTACK; HAYSTACK="${2}";
+  local NOTFOUND; NOTFOUND="";
+
+  while read -r needle; do
+    EXITCODE=0
+    grep -q "${needle}" <<EOF || EXITCODE=$?
+${HAYSTACK}
+EOF
+    if [[ "${EXITCODE}" -ne 0 ]]; then
+      NOTFOUND="${needle},${NOTFOUND}"
+    fi
+  done <<EOF
+${NEEDLES}
+EOF
+
+  if [[ -n "${NOTFOUND}" ]]; then NOTFOUND="$(strip_trailing_commas "${NOTFOUND}")"; fi
+  echo "${NOTFOUND}"
 }
