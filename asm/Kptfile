@@ -89,7 +89,7 @@ openAPI:
     io.k8s.cli.setters.gcloud.project.environProjectNumber:
       type:
       - string
-      - null
+      - 'null'
       x-k8s-cli:
         setter:
           name: gcloud.project.environProjectNumber
@@ -97,7 +97,7 @@ openAPI:
     io.k8s.cli.setters.gcloud.project.environProjectID:
       type:
       - string
-      - null
+      - 'null'
       x-k8s-cli:
         setter:
           name: gcloud.project.environProjectID
