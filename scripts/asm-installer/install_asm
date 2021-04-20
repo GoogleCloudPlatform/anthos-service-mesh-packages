@@ -1158,7 +1158,7 @@ bind_user_to_iam_policy(){
   MEMBER_ROLES="$(gcloud projects \
     get-iam-policy "${PROJECT_ID}" \
     --flatten='bindings[].members' \
-    --filter="bindings.members:$(iam_user)" \
+    --filter="bindings.members:${ACCOUNT_TYPE}:${GCLOUD_MEMBER}") \
     --format='value(bindings.role)')"
 
   if [[ "${MEMBER_ROLES}" = *"roles/owner"* ]]; then
