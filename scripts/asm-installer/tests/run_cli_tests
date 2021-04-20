@@ -90,6 +90,29 @@ test_main() {
   fi
 
   #################
+  # The owner role by itself should also pass
+  #################
+
+  CMD="-l this_should_pass"
+  CMD="${CMD} -n this_should_pass"
+  CMD="${CMD} -p owner_this_should_pass"
+  CMD="${CMD} -m install"
+  CMD="${CMD} -c mesh_ca"
+  CMD="${CMD} --only_validate"
+
+  RETVAL=0
+  clear_variables
+  _="$(_CI_I_AM_A_TEST_ROBOT=1 main ${CMD})" || RETVAL="${?}"
+
+  if [[ "${RETVAL}" -eq 0 ]]; then
+    echo "Passes with owner: PASS"
+  else
+    echo "Passes with owner: FAIL"
+    ((++FAILURES))
+  fi
+  echo "***"
+
+  #################
   # Should fail on non-existing project
   #################
 
