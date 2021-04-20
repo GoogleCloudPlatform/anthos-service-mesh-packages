@@ -87,13 +87,17 @@ openAPI:
           name: gcloud.project.projectNumber
           value: PROJECT_NUMBER
     io.k8s.cli.setters.gcloud.project.environProjectNumber:
-      type: string
+      type:
+      - string
+      - null
       x-k8s-cli:
         setter:
           name: gcloud.project.environProjectNumber
           value: PROJECT_NUMBER
     io.k8s.cli.setters.gcloud.project.environProjectID:
-      type: string
+      type:
+      - string
+      - null
       x-k8s-cli:
         setter:
           name: gcloud.project.environProjectID
