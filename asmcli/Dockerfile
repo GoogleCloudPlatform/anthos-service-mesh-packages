@@ -11,7 +11,7 @@ RUN apt-get install google-cloud-sdk-kpt jq kubectl -y
 # install test dependencies
 RUN apt-get install shellcheck posh bc procps openssl yamllint -y
 # copy source files into WORKDIR
-COPY install_asm ./
+COPY asmcli ./
 COPY tests ./tests/
 COPY Dockerfile ./
 ENTRYPOINT [ "bash" ]
