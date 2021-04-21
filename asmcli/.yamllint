@@ -6,8 +6,8 @@ yaml-files:
   - '.yamllint'
 
 ignore: |
-  ../../asm/canonical-service/
-  ../../asm/third-party/
+  ../asm/canonical-service/
+  ../asm/third-party/
 
 rules:
   braces: enable
