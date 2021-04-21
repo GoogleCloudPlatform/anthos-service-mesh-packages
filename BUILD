@@ -6,7 +6,7 @@ merge(
     out = "asmcli",
     chunks = glob(
         ["asmcli/**/*.sh", "asmcli/asmcli"],
-        exclude = ["**/test*/**"],  # exclude any directory that starts with test and release
+        exclude = ["**/test*/**"],  # exclude any directory that starts with test
     ),
     merge_tool = "//:merge_script"
 )

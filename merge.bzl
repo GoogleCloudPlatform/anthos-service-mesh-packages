@@ -1,7 +1,7 @@
 def _impl(ctx):
     # The list of arguments we pass to the script.
     args = [ctx.outputs.out.path] + [f.path for f in ctx.files.chunks]
-    
+
     # Action to call the script.
     ctx.actions.run(
         inputs = ctx.files.chunks,

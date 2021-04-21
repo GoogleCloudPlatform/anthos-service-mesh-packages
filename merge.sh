@@ -7,8 +7,8 @@ out="${1}"
 shift
 touch "${out}"
 
-{ 
-  printf "%s\n" "#!/usr/bin/env bash" "set -CeE" "set -o pipefail"; 
-  cat "$@"; 
-  printf "\nmain \"\${@}\"\n"; 
+{
+  printf "%s\n" "#!/usr/bin/env bash" "set -CeE" "set -o pipefail";
+  cat "$@";
+  printf "\nmain \"\${@}\"\n";
 } >> "${out}"
