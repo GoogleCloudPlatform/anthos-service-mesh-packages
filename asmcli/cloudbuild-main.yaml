@@ -4,16 +4,16 @@ steps:
   # SETUP
   ########
   - name: 'gcr.io/cloud-builders/docker'
-    dir: 'scripts/asm-installer'
+    dir: 'asmcli'
     id: 'build-tester-image'
     args: ['build', '-t', 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}', '.']
   - name: 'gcr.io/cloud-builders/docker'
-    dir: 'scripts/asm-installer'
+    dir: 'asmcli'
     id: 'publish-tester-image'
     args: ['push', 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}']
 
   - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
-    dir: 'scripts/asm-installer'
+    dir: 'asmcli'
     id: 'lint-with-shellcheck'
     entrypoint: 'shellcheck'
     args:
@@ -23,7 +23,7 @@ steps:
       - '${_ASM_VM_SCRIPT_NAME}'
 
   - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
-    dir: 'scripts/asm-installer'
+    dir: 'asmcli'
     id: 'script-version-check'
     entrypoint: '/bin/bash'
     args:
@@ -32,14 +32,14 @@ steps:
         ./tests/script_version_check.sh
 
   - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
-    dir: 'scripts/asm-installer'
+    dir: 'asmcli'
     id: 'lint-with-yamllint'
     entrypoint: 'yamllint'
     args:
-      - '../../asm'
+      - '../asm'
 
   - name: 'gcr.io/cloud-builders/gcloud'
-    dir: 'scripts/asm-installer'
+    dir: 'asmcli'
     id: 'fetch-secrets'
     entrypoint: '/bin/bash'
     args:
@@ -54,7 +54,7 @@ steps:
         | base64 -d > "${_KEY_FILE}"
 
   - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
-    dir: 'scripts/asm-installer'
+    dir: 'asmcli'
     id: 'setup-long-term-cluster'
     entrypoint: '/bin/bash'
     args:
@@ -72,19 +72,19 @@ steps:
   # FAST TESTS
   #############
   - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
-    dir: 'scripts/asm-installer'
+    dir: 'asmcli'
     id: 'run-release-debug'
     entrypoint: '/bin/bash'
     args:
       - '-c'
       - >
-        ../release-asm/release_asm_installer
+        ../scripts/release-asm/release_asm_installer
     env:
       - '_DEBUG=1'
     timeout: 10s
 
   - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
-    dir: 'scripts/asm-installer'
+    dir: 'asmcli'
     id: 'run-cli-tests'
     entrypoint: '/bin/bash'
     args:
@@ -100,7 +100,7 @@ steps:
     timeout: 120s
 
   - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
-    dir: 'scripts/asm-installer'
+    dir: 'asmcli'
     id: 'run-print-config-test'
     entrypoint: '/bin/bash'
     args:
@@ -122,7 +122,7 @@ steps:
     # SLOW TESTS
     #############
   - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
-    dir: 'scripts/asm-installer'
+    dir: 'asmcli'
     id: 'run-basic-suite'
     entrypoint: '/bin/bash'
     args:
@@ -140,7 +140,7 @@ steps:
     timeout: 600s
 
   - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
-    dir: 'scripts/asm-installer'
+    dir: 'asmcli'
     id: 'run-basic-suite-managed'
     entrypoint: '/bin/bash'
     args:
@@ -158,7 +158,7 @@ steps:
     timeout: 600s
 
   - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
-    dir: 'scripts/asm-installer'
+    dir: 'asmcli'
     id: 'run-basic-suite-vm'
     entrypoint: '/bin/bash'
     args:
@@ -177,7 +177,7 @@ steps:
     timeout: 600s
 
   - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
-    dir: 'scripts/asm-installer'
+    dir: 'asmcli'
     id: 'run_basic_instance_template_creation'
     entrypoint: '/bin/bash'
     args:
@@ -199,7 +199,7 @@ substitutions:
   _BUCKET_NAME: my-gcs-bucket
   _CLUSTER_LOCATION: us-central1-c
   _IMAGE_NAME: gcloud-with-kpt
-  _SCRIPT_NAME: install_asm
+  _SCRIPT_NAME: asmcli
   _ASM_VM_SCRIPT_NAME: asm_vm
   _ASM_PKG_BRANCH: ""
   _SERVICE_ACCOUNT: asm-installer

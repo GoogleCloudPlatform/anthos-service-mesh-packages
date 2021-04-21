@@ -18,7 +18,7 @@ setup_cluster() {
     --format="value(name)" || true)"
 
   OUTPUT_DIR=$(mktemp -d)
-  ../install_asm \
+  ../asmcli \
     -l "${LT_CLUSTER_LOCATION}" \
     -n "${LT_CLUSTER_NAME}" \
     -p "${LT_PROJECT_ID}" \
@@ -73,7 +73,7 @@ setup_cluster() {
   echo "Performing necessary cluster setup on ${cluster}"
 
   _CI_I_AM_A_TEST_ROBOT=1 \
-  ../install_asm \
+  ../asmcli \
     -l "${LT_CLUSTER_LOCATION}" \
     -n "${cluster}" \
     -p "${LT_PROJECT_ID}" \

@@ -1,7 +1,7 @@
 # this is using debian, with a "minimal footprint" install for gcloud
 FROM gcr.io/google.com/cloudsdktool/cloud-sdk:slim
 # cloudbuild will mount a volume in this path
-WORKDIR /workspace/
+WORKDIR /workspace/asmcli
 # cloudbuild will override this variable:
 ENV SERVICE_ACCOUNT my_sa_email_goes_here
 # cloudbuild will override this variable:
@@ -11,7 +11,7 @@ RUN apt-get install google-cloud-sdk-kpt jq kubectl -y
 # install test dependencies
 RUN apt-get install shellcheck posh bc procps openssl yamllint -y
 # copy source files into WORKDIR
-COPY install_asm ./
+COPY asmcli ./
 COPY tests ./tests/
 COPY Dockerfile ./
 ENTRYPOINT [ "bash" ]

@@ -227,8 +227,8 @@ setup() {
   pushd "${tmpdir}"
   git clone git@github.com:GoogleCloudPlatform/anthos-service-mesh-packages.git
   if [[ "${_DEBUG}" -ne 1 ]]; then
-    cd anthos-service-mesh-packages/scripts/asm-installer
+    cd anthos-service-mesh-packages/asmcli
   else
-    touch install_asm
+    touch asmcli
   fi
 }

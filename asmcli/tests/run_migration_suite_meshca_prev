@@ -20,7 +20,7 @@ main() {
     auth_service_account
   fi
 
-  local CLUSTER_NAME; CLUSTER_NAME="ephem-migration-citadel-${BUILD_ID::8}";
+  local CLUSTER_NAME; CLUSTER_NAME="ephem-migration-meshca-old-${BUILD_ID::8}";
   local NAMESPACE; NAMESPACE="namespace-${BUILD_ID}"
   readonly CLUSTER_NAME
   readonly NAMESPACE
@@ -36,7 +36,8 @@ main() {
   local GATEWAY; GATEWAY="$(kube_ingress "${NAMESPACE}")";
   verify_demo_app "$GATEWAY"
 
-  echo "Installing OSS Istio and re-verifying demo app..."
+  echo "Installing old OSS Istio and re-verifying demo app..."
+  OSS_VERSION="${OLD_OSS_VERSION}"
   install_oss_istio "${NAMESPACE}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}"
 
   echo "Installing Istio manifests for demo app..."
@@ -56,59 +57,42 @@ main() {
 
   verify_demo_app "${GATEWAY}"
 
-  # Test starts here
-
-  # Send persistent traffic to demo app to test any downtime.
-  echo "Start sending traffic to demo app"
-  send_persistent_traffic "${GATEWAY}" &
-  local SEND_TRAFFIC_CMD_PID="${!}"
-  if ! ps -p "${SEND_TRAFFIC_CMD_PID}" > /dev/null; then
-    fatal "Failed to fork child process to send traffic."
-  fi
-
   mkfifo "${CLUSTER_NAME}"
 
-  echo "Installing ASM with Citadel..."
+  # Test starts here
+  echo "Installing ASM with MeshCA..."
   if [[ -n "${SERVICE_ACCOUNT}" ]]; then
-    echo "../install_asm \
+    echo "../asmcli \
       -l ${CLUSTER_LOCATION} \
       -n ${CLUSTER_NAME} \
       -p ${PROJECT_ID} \
       -m migrate \
-      -c citadel \
+      -c mesh_ca \
       -s ${SERVICE_ACCOUNT} \
       -k ${KEY_FILE} -v -e"
-    ../install_asm \
+    ../asmcli \
       -l "${CLUSTER_LOCATION}" \
       -n "${CLUSTER_NAME}" \
       -p "${PROJECT_ID}" \
       -m migrate \
-      -c citadel \
+      -c mesh_ca \
       -s "${SERVICE_ACCOUNT}" \
       -k "${KEY_FILE}" -v -e \
       2>&1 | tee "${CLUSTER_NAME}" &
   else
-    echo "../install_asm \
+    echo "../asmcli \
       -l ${CLUSTER_LOCATION} \
       -n ${CLUSTER_NAME} \
       -p ${PROJECT_ID} \
       -m migrate \
-      -c citadel -v -e"
-    ../install_asm \
+      -c mesh_ca -v -e"
+    ../asmcli \
       -l "${CLUSTER_LOCATION}" \
       -n "${CLUSTER_NAME}" \
       -p "${PROJECT_ID}" \
       -m migrate \
-      -c citadel -v -e \
+      -c mesh_ca -v -e \
       2>&1 | tee "${CLUSTER_NAME}" &
-  fi
-
-  if ps -p "${SEND_TRAFFIC_CMD_PID}" > /dev/null; then
-    kill "${SEND_TRAFFIC_CMD_PID}"
-  else
-    # gcloud update can cause down time.
-    # Failing the test upon receiving unexpected response can make the test very flaky.
-    warn "Downtime detected during migration"
   fi
 
   sleep 5

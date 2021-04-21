@@ -20,7 +20,7 @@ main() {
     auth_service_account
   fi
 
-  local CLUSTER_NAME; CLUSTER_NAME="ephem-migration-meshca-${BUILD_ID::8}";
+  local CLUSTER_NAME; CLUSTER_NAME="ephem-migration-citadel-${BUILD_ID::8}";
   local NAMESPACE; NAMESPACE="namespace-${BUILD_ID}"
   readonly CLUSTER_NAME
   readonly NAMESPACE
@@ -56,53 +56,66 @@ main() {
 
   verify_demo_app "${GATEWAY}"
 
+  # Test starts here
+
+  # Send persistent traffic to demo app to test any downtime.
+  echo "Start sending traffic to demo app"
+  send_persistent_traffic "${GATEWAY}" &
+  local SEND_TRAFFIC_CMD_PID="${!}"
+  if ! ps -p "${SEND_TRAFFIC_CMD_PID}" > /dev/null; then
+    fatal "Failed to fork child process to send traffic."
+  fi
+
   mkfifo "${CLUSTER_NAME}"
 
-  # Test starts here
-  echo "Installing ASM with MeshCA..."
+  echo "Installing ASM with Citadel..."
   if [[ -n "${SERVICE_ACCOUNT}" ]]; then
-    echo "../install_asm \
+    echo "../asmcli \
       -l ${CLUSTER_LOCATION} \
       -n ${CLUSTER_NAME} \
       -p ${PROJECT_ID} \
       -m migrate \
-      -c mesh_ca \
-      -D mesh_migration \
+      -c citadel \
       -s ${SERVICE_ACCOUNT} \
       -k ${KEY_FILE} -v -e"
-    ../install_asm \
+    ../asmcli \
       -l "${CLUSTER_LOCATION}" \
       -n "${CLUSTER_NAME}" \
       -p "${PROJECT_ID}" \
       -m migrate \
-      -c mesh_ca \
-      -D mesh_migration \
+      -c citadel \
       -s "${SERVICE_ACCOUNT}" \
       -k "${KEY_FILE}" -v -e \
       2>&1 | tee "${CLUSTER_NAME}" &
   else
-    echo "../install_asm \
+    echo "../asmcli \
       -l ${CLUSTER_LOCATION} \
       -n ${CLUSTER_NAME} \
       -p ${PROJECT_ID} \
       -m migrate \
-      -D mesh_migration \
-      -c mesh_ca -v -e"
-    ../install_asm \
+      -c citadel -v -e"
+    ../asmcli \
       -l "${CLUSTER_LOCATION}" \
       -n "${CLUSTER_NAME}" \
       -p "${PROJECT_ID}" \
       -m migrate \
-      -D mesh_migration \
-      -c mesh_ca -v -e \
+      -c citadel -v -e \
       2>&1 | tee "${CLUSTER_NAME}" &
+  fi
+
+  if ps -p "${SEND_TRAFFIC_CMD_PID}" > /dev/null; then
+    kill "${SEND_TRAFFIC_CMD_PID}"
+  else
+    # gcloud update can cause down time.
+    # Failing the test upon receiving unexpected response can make the test very flaky.
+    warn "Downtime detected during migration"
   fi
 
   sleep 5
 
   LABEL="$(grep -o -m 1 'istio.io/rev=\S*' "${CLUSTER_NAME}")"
   rm "${CLUSTER_NAME}"
-  echo "Relabelling namespace with ${LABEL}..."
+  echo "Relabelling namsepace with ${LABEL}..."
   label_with_revision "${NAMESPACE}" "${LABEL}"
   echo "Performing a rolling restart of the demo app..."
   roll "${NAMESPACE}"
@@ -125,13 +138,6 @@ main() {
     set +e
     verify_demo_app "${GATEWAY}" || SUCCESS=1
     set -e
-  fi
-
-  echo "Checking for validation service yaml..."
-
-  if [[ ! -f mesh_migration/istiod-service.yaml ]]; then
-    echo "Couldn't find validation service at mesh_migration/istiod-service.yaml!"
-    SUCCESS=1
   fi
 
   # Cluster teardown

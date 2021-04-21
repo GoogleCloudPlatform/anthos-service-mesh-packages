@@ -33,7 +33,7 @@ spec:
       enabled: true
 EOF
 
-  echo "../install_asm \
+  echo "../asmcli \
     -l us-central1-c \
     -n long-term-test-cluster \
     -p asm-scriptaro-oss \
@@ -43,7 +43,7 @@ EOF
     --custom_overlay ${CUSTOM_OVERLAY} \
     -m install"
 
-  CONFIG="$(../install_asm \
+  CONFIG="$(../asmcli \
     -l us-central1-c \
     -n long-term-test-cluster \
     -p asm-scriptaro-oss \

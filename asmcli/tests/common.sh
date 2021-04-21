@@ -625,7 +625,7 @@ run_required_role() {
   # Test starts here
   echo "Installing ASM with MeshCA..."
   echo "_CI_REVISION_PREFIX=${LT_NAMESPACE} \
-  ../install_asm ${KEY_FILE} ${SERVICE_ACCOUNT} \
+  ../asmcli ${KEY_FILE} ${SERVICE_ACCOUNT} \
     -l ${LT_CLUSTER_LOCATION} \
     -n ${LT_CLUSTER_NAME} \
     -p ${PROJECT_ID} \
@@ -635,7 +635,7 @@ run_required_role() {
     ${EXTRA_FLAGS}"
   # shellcheck disable=SC2086
   _CI_REVISION_PREFIX="${LT_NAMESPACE}" \
-    ../install_asm ${KEY_FILE} ${SERVICE_ACCOUNT} \
+    ../asmcli ${KEY_FILE} ${SERVICE_ACCOUNT} \
     -l "${LT_CLUSTER_LOCATION}" \
     -n "${LT_CLUSTER_NAME}" \
     -p "${PROJECT_ID}" \
@@ -707,7 +707,7 @@ run_basic_test() {
   # Test starts here
   echo "Installing ASM with MeshCA..."
   echo "_CI_REVISION_PREFIX=${LT_NAMESPACE} \
-  ../install_asm ${KEY_FILE} ${SERVICE_ACCOUNT} \
+  ../asmcli ${KEY_FILE} ${SERVICE_ACCOUNT} \
     -l ${LT_CLUSTER_LOCATION} \
     -n ${LT_CLUSTER_NAME} \
     -p ${PROJECT_ID} \
@@ -717,7 +717,7 @@ run_basic_test() {
     ${EXTRA_FLAGS}"
   # shellcheck disable=SC2086
   _CI_REVISION_PREFIX="${LT_NAMESPACE}" \
-    ../install_asm ${KEY_FILE} ${SERVICE_ACCOUNT} \
+    ../asmcli ${KEY_FILE} ${SERVICE_ACCOUNT} \
     -l "${LT_CLUSTER_LOCATION}" \
     -n "${LT_CLUSTER_NAME}" \
     -p "${PROJECT_ID}" \
