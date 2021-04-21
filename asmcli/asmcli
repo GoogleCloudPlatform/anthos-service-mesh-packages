@@ -1,6 +1,3 @@
-#!/usr/bin/env bash
-set -CeE
-set -o pipefail
 if [[ "${BASH_VERSINFO:-0}" -lt 4 ]]; then
   cat << EOF >&2
 WARNING: bash ${BASH_VERSION} does not support several modern safety features.
@@ -2583,5 +2580,3 @@ outro() {
 
   info "$(starline)"
 }
-
-main "${@}"
