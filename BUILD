@@ -5,7 +5,7 @@ merge(
     name = "merge",
     out = "asmcli",
     chunks = glob(
-        ["asmcli/**/*.sh", "asmcli/asmcli"],
+        ["asmcli/**/*.sh"],
         exclude = ["**/test*/**"],  # exclude any directory that starts with test
     ),
     merge_tool = "//:merge_script"
@@ -13,5 +13,5 @@ merge(
 
 sh_binary(
     name = "merge_script",
-    srcs = ["merge.sh"],
+    srcs = ["scripts/release-asm/merge"],
 )

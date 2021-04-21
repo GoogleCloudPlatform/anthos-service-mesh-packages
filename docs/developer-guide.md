@@ -27,6 +27,6 @@ bazel clean --expunge_async
 
 ## During Development
 * **Important**: make sure all global variables and functions are `readonly` to prevent unexpected overwriting.
-* Don't add `#!/usr/bin/env bash` or equivalanet lines to any modules/files. This line will be added during the compilation.
+* Don't add `#!/usr/bin/env bash` or equivalent lines to any modules/files. This line will be added during the compilation.
 * Put all code in functions. The merge logic will add the call to `main`. In other words, don't add any entry point to actually
 execute the script.
