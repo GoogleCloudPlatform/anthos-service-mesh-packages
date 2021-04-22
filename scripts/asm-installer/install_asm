@@ -477,7 +477,7 @@ error() {
 
 info() {
   if [[ "${VERBOSE}" -eq 1 && "${HAS_TS}" -eq 1 ]]; then
-    echo "${SCRIPT_NAME}: ${1}" | ts >&2
+    echo "${SCRIPT_NAME}: ${1}" | TZ=utc ts '%Y-%m-%dT%.T' >&2
   else
     echo "${SCRIPT_NAME}: ${1}" >&2
   fi
