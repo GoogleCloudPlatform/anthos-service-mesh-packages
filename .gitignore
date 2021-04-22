@@ -10,3 +10,6 @@
 
 # Ignore dist output directory
 dist/
+
+# Ignore Bazel outs
+bazel*
