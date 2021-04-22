@@ -122,6 +122,7 @@ ENVIRON_PROJECT_ID=""
 HUB_MEMBERSHIP_ID=""
 CUSTOM_REVISION=0
 WI_ENABLED=0
+HAS_TS=0
 
 main() {
   init
@@ -297,6 +298,10 @@ init() {
     *);;
   esac
 
+  if hash ts 2>/dev/null; then
+    HAS_TS=1
+  fi
+
   if [[ "${POINT}" == "alpha" ]]; then
     RELEASE="${MAJOR}.${MINOR}-alpha.${REV}"
     REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}"
@@ -348,6 +353,7 @@ run() {
     "${@}" 2>/dev/null
     return "$?"
   fi
+
   info "Running: '${*}'"
   info "-------------"
   local RETVAL
@@ -472,7 +478,11 @@ error() {
 }
 
 info() {
-  echo "${SCRIPT_NAME}: ${1}" >&2
+  if [[ "${VERBOSE}" -eq 1 && "${HAS_TS}" -eq 1 ]]; then
+    echo "${SCRIPT_NAME}: ${1}" | TZ=utc ts '%Y-%m-%dT%.T' >&2
+  else
+    echo "${SCRIPT_NAME}: ${1}" >&2
+  fi
 }
 
 fatal() {
