@@ -399,9 +399,20 @@ retry() {
     fi
     { "${@}" && return 0; } || true
     warn "Failed, retrying...($((i+1)) of ${MAX_TRIES})"
-    sleep 2
+    sleep $((2 * i + 2))
   done
   false
+}
+
+fail_if_empty() {
+  local VAL
+  VAL="$("${@}")"
+  if [[ -z "${VAL}" ]]; then
+    false
+    return
+  fi
+
+  echo "${VAL}"
 }
 
 find_missing_strings() {
@@ -2371,8 +2382,12 @@ EOF
   if [[ "${MANAGED}" -eq 1 ]]; then
     local VALIDATION_URL; local CLOUDRUN_ADDR;
     read -r VALIDATION_URL CLOUDRUN_ADDR <<EOF
-$(scrape_managed_urls)
+$(retry 5 fail_if_empty scrape_managed_urls)
 EOF
+
+    if [[ -z "${VALIDATION_URL}" ]] || [[ -z "${CLOUDRUN_ADDR}" ]]; then
+      fatal "Failed to read configuration to install components for managed control plane!"
+    fi
 
     kpt cfg set asm anthos.servicemesh.managed-controlplane.service-account "${MANAGED_SERVICE_ACCOUNT}"
     kpt cfg set asm anthos.servicemesh.controlplane.validation-url "${VALIDATION_URL}"
