@@ -133,6 +133,12 @@ openAPI:
         setter:
           name: anthos.servicemesh.managed-controlplane.cloudrun-addr
           value: CLOUDRUN_ADDR
+    io.k8s.cli.setters.anthos.servicemesh.managed-controlplane.service-account:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.managed-controlplane.service-account
+          value: MCP_ACCOUNT
     io.k8s.cli.substitutions.mesh-id:
       type: string
       x-k8s-cli:

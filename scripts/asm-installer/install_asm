@@ -51,6 +51,7 @@ OPERATOR_MANIFEST=""
 BETA_CRD_MANIFEST=""
 MANAGED_MANIFEST=""
 MANAGED_WEBHOOKS=""
+CONNECT_RBAC=""
 EXPOSE_ISTIOD_SERVICE=""
 CANONICAL_CONTROLLER_MANIFEST=""
 
@@ -323,6 +324,7 @@ init() {
   BETA_CRD_MANIFEST="${OPTIONS_DIRECTORY}/v1beta1-crds.yaml"; readonly BETA_CRD_MANIFEST;
   MANAGED_MANIFEST="${OPTIONS_DIRECTORY}/managed-control-plane.yaml"; readonly MANAGED_MANIFEST;
   MANAGED_WEBHOOKS="${OPTIONS_DIRECTORY}/managed-control-plane-webhooks.yaml"; readonly MANAGED_WEBHOOKS;
+  CONNECT_RBAC="asm/third-party/hub-connect-impersonate-rbac.yaml"; readonly CONNECT_RBAC;
   EXPOSE_ISTIOD_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_SERVICE;
   CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
 
@@ -1822,6 +1824,8 @@ roles/serviceusage.serviceUsageConsumer
 roles/container.admin
 roles/monitoring.metricWriter
 roles/logging.logWriter
+roles/gkehub.gatewayAdmin
+roles/gkehub.viewer
 EOF
 }
 
@@ -2370,6 +2374,7 @@ EOF
 $(scrape_managed_urls)
 EOF
 
+    kpt cfg set asm anthos.servicemesh.managed-controlplane.service-account "${MANAGED_SERVICE_ACCOUNT}"
     kpt cfg set asm anthos.servicemesh.controlplane.validation-url "${VALIDATION_URL}"
     kpt cfg set asm anthos.servicemesh.managed-controlplane.cloudrun-addr "${CLOUDRUN_ADDR}"
   fi
@@ -2529,6 +2534,9 @@ install_managed_components() {
 
   info "Configuring ASM managed control plane validating webhook config..."
   kubectl apply -f "${MANAGED_WEBHOOKS}"
+
+  info "Configuring service account for GKE Connect..."
+  kubectl apply -f "${CONNECT_RBAC}"
 
   info "Configuring ASM managed control plane components..."
   print_config >| managed_control_plane_gateway.yaml
