@@ -226,6 +226,11 @@ main() {
         enable_service_mesh_feature
       fi
     elif should_validate; then
+      warn "There is no way to validate that the meshconfig API has been initialized."
+      warn "This needs to happen once per GCP project. If the API has not been initialized"
+      warn "for ${PROJECT_ID}, please run ${SCRIPT_NAME} with the --enable_gcp_components"
+      warn "flag. Otherwise, installation will succeed but Anthos Service Mesh"
+      warn_pause "will not function correctly."
       exit_if_no_workload_identity
       exit_if_stackdriver_not_enabled
       if should_enable_service_mesh_feature; then
