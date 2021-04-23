@@ -1,9 +1,18 @@
 validate_in_cluster_control_plane() {
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+
   if should_validate; then
     validate_environment
   fi
   if can_modify_gcp_components; then
     init_meshconfig
+  elif [[ "${FLEET_ID}" == "${PROJECT_ID}" ]]; then
+    warn "There is no way to validate that the meshconfig API has been initialized."
+    warn "This needs to happen once per GCP project. If the API has not been initialized"
+    warn "for ${PROJECT_ID}, please re-run this tool with the --enable_gcp_components"
+    warn "flag. Otherwise, installation will succeed but Anthos Service Mesh"
+    warn_pause "will not function correctly."
   fi
   if can_modify_gcp_iam_roles; then
     bind_user_to_iam_policy "$(required_iam_roles)" "$(iam_user)"
