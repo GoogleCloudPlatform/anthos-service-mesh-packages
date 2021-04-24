@@ -112,6 +112,7 @@ ONLY_ENABLE="${ONLY_ENABLE:=0}"
 VERBOSE="${VERBOSE:=0}"
 MANAGED="${MANAGED:=0}"
 MANAGED_SERVICE_ACCOUNT=""
+FORCE_SAME_VERSION="${FORCE_SAME_VERSION:=0}"
 
 PRINT_HELP=0
 PRINT_VERSION=0
@@ -676,6 +677,7 @@ FLAGS:
      --dry_run
      --only_validate
      --only_enable
+  --force_same_version
   -h|--help
   --version
 EOF
@@ -798,6 +800,8 @@ FLAGS:
      --only_enable                    Perform the specified steps to set up the
                                       current user/cluster but don't install
                                       anything.
+  --force_same_version                Add features, such as the egress gateway, by
+                                      reinstalling the same version of the control plane.
   -h|--help                           Show this message and exit.
   --version                           Print the version of this tool and exit.
 
@@ -983,6 +987,10 @@ parse_args() {
         VERBOSE=1
         shift 1
         ;;
+      --force_same_version | --force-same-version)
+        FORCE_SAME_VERSION=1
+        shift 1
+        ;;
       -h | --help)
         PRINT_HELP=1
         shift 1
@@ -1126,6 +1134,7 @@ DISABLE_CANONICAL_SERVICE
 ONLY_VALIDATE
 ONLY_ENABLE
 VERBOSE
+FORCE_SAME_VERSION
 EOF
 
   if [[ "${ENABLE_ALL}" -eq 1 || "${ENABLE_CLUSTER_ROLES}" -eq 1 || \
@@ -1709,9 +1718,22 @@ EOF
 ${VERSION_REV}
 EOF
 )"
+
+  if [[ "${FORCE_SAME_VERSION}" -eq 1 ]];then
+    if check_equal_version;then
+      return 0
+    fi
+  fi
+
   if is_major_minor_invalid || is_minor_point_rev_invalid; then
     false
   fi
+
+}
+
+check_equal_version()
+{
+  [[ "$VERSION_MAJOR" -eq 1 && "$VERSION_MINOR" -eq "$MINOR" &&  "$VERSION_POINT" -eq "$POINT" && "$VERSION_REV" -eq "$REV" ]] && return 0
 }
 
 is_major_minor_invalid() {
