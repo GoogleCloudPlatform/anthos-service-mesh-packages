@@ -1835,7 +1835,7 @@ local_iam_user() {
 
   local ACCOUNT_TYPE
   ACCOUNT_TYPE="user"
-  if is_sa || [[ "${ACCOUNT_NAME}" = *.iam.gserviceaccount.com ]]; then
+  if is_sa || [[ "${ACCOUNT_NAME}" = *.gserviceaccount.com ]]; then
     ACCOUNT_TYPE="serviceAccount"
   fi
 
