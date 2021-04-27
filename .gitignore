@@ -13,3 +13,6 @@ dist/
 
 # Ignore Bazel outs
 bazel*
+
+# Ignore nodeJS packages
+node_modules/

@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+export PATH=$PATH:node_modules/bats/bin
+
+SOURCE_FILES=""
+TEST_FILES=""
+
+while [[ "$#" != 0 ]]; do
+    case "${1}" in
+      -s | --sources)
+        SOURCE_FILES="${2}"
+        shift 2
+        ;;
+      -t | --tests)
+        TEST_FILES="${2}"
+        shift 2
+        ;;
+      *)
+        echo "Unknown option ${1}" >&2
+        exit 2
+        ;;
+    esac
+  done
+
+# pass parameters as environment variables
+SOURCE_FILES="$SOURCE_FILES" bats "$TEST_FILES"

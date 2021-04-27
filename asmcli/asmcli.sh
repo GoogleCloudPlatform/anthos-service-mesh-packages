@@ -335,7 +335,7 @@ init() {
 # If DRY_RUN or VERBOSE is enabled, it will print the command, and if DRY_RUN is
 # not enabled it runs the command.
 #######
-run() {
+_run() {
   if [[ "${DRY_RUN}" -eq 1 ]]; then
     warn "Would have executed: ${*}"
     return
