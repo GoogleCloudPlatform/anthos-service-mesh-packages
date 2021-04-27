@@ -27,5 +27,5 @@ spec:
           service:
             type: ClusterIP
           serviceAnnotations:
-            cloud.google.com/backend-config: '{"default": "ingress-backendconfig"}'
+            cloud.google.com/backend-config: '{"default": "ingress-backendconfig"}' # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.container.cluster.ingress.backendConfig"}
             cloud.google.com/neg: '{"ingress": true}'
