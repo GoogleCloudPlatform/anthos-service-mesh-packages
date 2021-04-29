@@ -3,7 +3,7 @@ steps:
   ########
   # SETUP
   ########
-  - name: 'gcr.io/cloud-marketplace-containers/google/bazel'
+  - name: 'gcr.io/cloud-builders/bazel'
     entrypoint: 'bazel'
     args: ['build', 'merge']
   - name: 'bash'
