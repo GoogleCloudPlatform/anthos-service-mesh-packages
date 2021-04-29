@@ -32,13 +32,6 @@ openAPI:
           name: gcloud.container.cluster.ingress.statusPort
           value: "31223"
           isSet: true
-    io.k8s.cli.setters.gcloud.container.cluster.ingress.backendConfig:
-      type: string
-      x-k8s-cli:
-        setter:
-          name: gcloud.container.cluster.ingress.backendConfig
-          value: "{"default": "ingress-backendconfig"}"
-          isSet: true
     io.k8s.cli.setters.gcloud.container.cluster.ingress.httpPort:
       type: integer
       x-k8s-cli:
@@ -339,3 +332,10 @@ openAPI:
             ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.rev'
           - marker: INGRESSGATEWAY_NAME
             ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.custom-ingressgateway-name'
+    io.k8s.cli.setters.gcloud.container.cluster.ingress.backendConfig:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: gcloud.container.cluster.ingress.backendConfig
+          value: "{"default": "ingress-backendconfig"}"
+          isSet: true
