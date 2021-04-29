@@ -3,7 +3,7 @@ package(default_visibility = ["//visibility:public"])
 ASMCLI_MODULES = glob(["asmcli/**"])
 NODE_MODULES = glob(["node_modules/**"])
 ASMCLI_SOURCES = glob(["asmcli/**/*.sh"], exclude = ["**/test*/**"],)
-ALL_UNIT_TESTS = glob(["asmcli/tests/*.bats"])
+TESTS = glob(["asmcli/tests/*.bats"])
 MERGE_OUT = ["asmcli"]
 
 genrule(
@@ -26,12 +26,13 @@ sh_library(
 )
 
 sh_test(
-    name = "unit_test",
+    name = "test",
     size = "small",
-    srcs = ["scripts/tests/run_tests"],
+    srcs = ["node_modules/bats/bin/bats"],
     deps = [
             ":asmcli_modules",
             ":node_modules",
             ],
-    args = ["--sources"] + ASMCLI_SOURCES + ["--tests"] + ALL_UNIT_TESTS,
+    env = {"SOURCE_FILES": '\n'.join(ASMCLI_SOURCES)},
+    args = TESTS,
 )
