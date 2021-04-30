@@ -19,13 +19,13 @@ If you add a new file in `asm/istio/options/` folder, run:
 
 If you add or update a setter in the `asm/Kptfile`, run:
 ```
-# Make sure to successfully retrieve the associated package of your own branch:
+# Retrieve the associated package of your own branch:
 kpt pkg get https://github.com/YOUR-GH-ACCOUNT/anthos-service-mesh-packages.git/asm@THE-NAME-OF-YOUR-BRANCH .
 # Here you should see some "automatically set XX field(s)" in the output.
 
-# Make sure you could set a new value to your setter:
+# Set a new value to your setter:
 kpt cfg set YOUR-SETTER ITS-VALUE
 
-# Make sure the list of the setters is not showing an empty list:
+# List of the setters is not showing an empty list:
 kpt cfg list-setters asm
 ```
