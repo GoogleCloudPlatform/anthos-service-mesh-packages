@@ -10,12 +10,12 @@ teardown() {
   echo "Cleaned up"
 }
 
-@test "test main method --version" {
+@test "test main method with --version returns zero exit code" {
   run main --version
   assert_success
 }
 
-@test "test main method print usage" {
+@test "test main method with no arguments returns nonzero exit code" {
   run main
   assert_failure
 }
