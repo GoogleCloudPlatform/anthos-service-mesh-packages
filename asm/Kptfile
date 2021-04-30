@@ -337,5 +337,5 @@ openAPI:
       x-k8s-cli:
         setter:
           name: gcloud.container.cluster.ingress.backendConfig
-          value: "{"default": "ingress-backendconfig"}"
+          value: '{\"default\": \"ingress-backendconfig\"}'
           isSet: true
