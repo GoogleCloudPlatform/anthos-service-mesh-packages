@@ -2532,6 +2532,9 @@ expose_istiod() {
 }
 
 start_managed_control_plane() {
+  info "Configuring base installation for managed control plane..."
+  kubectl apply --overwrite=true -f "${BASE_REL_PATH}"
+
   local CR_IMAGE_JSON; CR_IMAGE_JSON="";
   if [[ -n "${_CI_CLOUDRUN_IMAGE_HUB}" ]]; then
     CR_IMAGE_JSON=$(cat <<EOF
@@ -2539,6 +2542,7 @@ start_managed_control_plane() {
 EOF
 )
   fi
+  info "Provisioning managed control plane..."
   retry 2 run curl --request POST \
     "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}:runIstiod" \
     --data "${CR_IMAGE_JSON}" \
@@ -2559,9 +2563,6 @@ scrape_managed_urls() {
 }
 
 install_managed_components() {
-  info "Configuring base installation for managed control plane..."
-  kubectl apply --overwrite=true -f "${BASE_REL_PATH}"
-
   info "Configuring ASM managed control plane validating webhook config..."
   kubectl apply -f "${MANAGED_WEBHOOKS}"
 
