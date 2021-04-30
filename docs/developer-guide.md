@@ -46,6 +46,11 @@ attach the relevant test files.
 
 
 ## Running Tests
+To install `bats`, simply run
+```shell
+npm install
+```
+in the pacakge root directory. You might need to install [`npm`](https://nodejs.org/en/knowledge/getting-started/npm/what-is-npm/) first.
 To run tests,
 ```shell
 bazel test $TEST_TARGET
