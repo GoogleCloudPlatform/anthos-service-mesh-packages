@@ -331,11 +331,11 @@ init() {
 ### Convenience functions ###
 
 #######
-# run takes a list of arguments that represents a command
+# run_command takes a list of arguments that represents a command
 # If DRY_RUN or VERBOSE is enabled, it will print the command, and if DRY_RUN is
 # not enabled it runs the command.
 #######
-run() {
+run_command() {
   if [[ "${DRY_RUN}" -eq 1 ]]; then
     warn "Would have executed: ${*}"
     return
@@ -355,19 +355,19 @@ apath() {
 }
 
 gcloud() {
-  run "${AGCLOUD}" "${@}"
+  run_command "${AGCLOUD}" "${@}"
 }
 
 kubectl() {
-  run "${AKUBECTL}" "${@}"
+  run_command "${AKUBECTL}" "${@}"
 }
 
 kpt() {
-  run "${AKPT}" "${@}"
+  run_command "${AKPT}" "${@}"
 }
 
 istioctl() {
-  run "$(istioctl_path)" "${@}"
+  run_command "$(istioctl_path)" "${@}"
 }
 
 istioctl_path() {
@@ -442,7 +442,7 @@ configure_kubectl(){
   ADDR="$(kubectl config view --minify=true -ojson | jq .clusters[0].cluster.server -r)"
 
   local RETVAL; RETVAL=0;
-  run nc -zvw 10 "${ADDR:8:${#ADDR}}" 443 || RETVAL=$?
+  run_command nc -zvw 10 "${ADDR:8:${#ADDR}}" 443 || RETVAL=$?
   if [[ "${RETVAL}" -ne 0 ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Couldn't connect to ${CLUSTER_NAME}.
@@ -1407,7 +1407,7 @@ download_asm() {
       | tar xz
   else
     local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
-    run curl -L "https://storage.googleapis.com/${_CI_ASM_PKG_LOCATION}/asm/${TARBALL}" \
+    run_command curl -L "https://storage.googleapis.com/${_CI_ASM_PKG_LOCATION}/asm/${TARBALL}" \
       --header @- <<EOF | tar xz
 Authorization: Bearer ${TOKEN}
 EOF
@@ -1935,13 +1935,13 @@ init_meshconfig() {
     fi
     # initialize replaces the existing Workload Identity Pools in the IAM binding, so we need to support both Hub and GKE Workload Identity Pools
     local POST_DATA; POST_DATA='{"workloadIdentityPools":["'${ENVIRON_PROJECT_ID}'.hub.id.goog","'${ENVIRON_PROJECT_ID}'.svc.id.goog"]}'
-    run curl --request POST --fail \
+    run_command curl --request POST --fail \
     --data "${POST_DATA}" -o /dev/null \
     "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
     --header "Content-Type: application/json" \
     -K <(auth_header "$(get_auth_token)")
   else
-    run curl --request POST --fail \
+    run_command curl --request POST --fail \
     --data '' -o /dev/null \
     "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
     -K <(auth_header "$(get_auth_token)")
@@ -1950,7 +1950,7 @@ init_meshconfig() {
 
 init_meshconfig_managed() {
   info "Initializing meshconfig managed API..."
-  run curl --request POST --fail \
+  run_command curl --request POST --fail \
     --data '{"prepare_istiod": true}' \
     "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
     --header "X-Server-Timeout: 600" \
@@ -2282,7 +2282,7 @@ enable_service_mesh_feature() {
   info "Enabling the service mesh feature..."
 
   # IAM permission: gkehub.features.create
-  retry 2 run curl -s -H "Content-Type: application/json" \
+  retry 2 run_command curl -s -H "Content-Type: application/json" \
     -XPOST "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features?feature_id=servicemesh"\
     -d '{servicemesh_feature_spec: {}}' \
     -K <(auth_header "$(get_auth_token)")
@@ -2302,7 +2302,7 @@ EOF
 is_service_mesh_feature_enabled() {
   local RESPONSE
   # IAM permission: gkehub.features.get
-  RESPONSE="$(run curl -s -H "X-Goog-User-Project: ${PROJECT_ID}"  \
+  RESPONSE="$(run_command curl -s -H "X-Goog-User-Project: ${PROJECT_ID}"  \
     "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features/servicemesh" \
     -K <(auth_header "$(get_auth_token)"))"
 
@@ -2358,7 +2358,7 @@ ${_CI_TRUSTED_GCP_PROJECTS}
 EOF
     # kpt treats words in quotes as a single param, while kpt need ${TRUST_DOMAIN_ALIASES} to be splitting params for a list. If we remove quotes, the lint will complain.
     # eval will translate the quoted TRUST_DOMAIN_ALIASES into params to workaround both.
-    run eval kpt cfg set asm anthos.servicemesh.trustDomainAliases "${TRUST_DOMAIN_ALIASES}"
+    run_command eval kpt cfg set asm anthos.servicemesh.trustDomainAliases "${TRUST_DOMAIN_ALIASES}"
   fi
 
   if [[ "${MANAGED}" -eq 1 ]]; then
@@ -2501,7 +2501,7 @@ start_managed_control_plane() {
 EOF
 )
   fi
-  retry 2 run curl --request POST \
+  retry 2 run_command curl --request POST \
     "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}:runIstiod" \
     --data "${CR_IMAGE_JSON}" \
     --header "X-Server-Timeout: 600" \
