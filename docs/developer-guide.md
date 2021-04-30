@@ -37,10 +37,10 @@ We integrated [`bats`](https://github.com/bats-core/bats-core) as our
 testing system. To add tests, read the
 [official documentation](https://bats-core.readthedocs.io/en/latest/)
 and update/add `*.bats` files to the `asmcli/tests` folder.
-If there are any set-ups that could be shared among tests, update
+If there's any set-up that could be shared among tests, update
 `unit_test_common.bash` in the test folder.
 
-The `//:test` target will by default run all the tests. If you want
+The `:test` target will by default run all the tests. If you want
 finer-grained test targets, add new `sh_test` targets to `BUILD` and
 attach the relevant test files.
 
