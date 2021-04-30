@@ -343,7 +343,7 @@ openAPI:
       x-k8s-cli:
         substitution:
           name: ingress-backend-config
-          pattern: '{"default": "BACKEND_CONFIG_NAME"}'
+          pattern: '{\"default\": \"BACKEND_CONFIG_NAME\"}'
           values:
           - marker: BACKEND_CONFIG_NAME
             ref: '#/definitions/io.k8s.cli.setters.gcloud.container.cluster.ingress.backendConfigName
