@@ -1555,12 +1555,9 @@ validate_cluster() {
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
     local CURRENT_CONTEXT; CURRENT_CONTEXT="$(kubectl config current-context)"
     info "Confirming cluster information for ${CURRENT_CONTEXT}"
-    IFS="_" read -r -a VALS  <<EOF
+    IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
 ${CURRENT_CONTEXT}
 EOF
-    PROJECT_ID=${VALS[1]}
-    CLUSTER_LOCATION=${VALS[2]}
-    CLUSTER_NAME=${VALS[3]}
   fi
 
   RESULT="$(gcloud container clusters list \
