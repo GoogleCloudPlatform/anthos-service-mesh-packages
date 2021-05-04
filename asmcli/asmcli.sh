@@ -1325,9 +1325,9 @@ set_up_local_workspace() {
   # If KUBECONFIG file is supplied, keep using that.
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
     KUBECONFIG="asm_kubeconfig"
-    export KUBECONFIG
   fi
 
+  export KUBECONFIG
   info "Using ${KUBECONFIG} as the kubeconfig..."
 }
 
@@ -1541,9 +1541,11 @@ EOF
 validate_cluster() {
   local RESULT; RESULT=""
 
-  local CURRENT_CONTEXT="$(kubectl config current-context)"
+  local CURRENT_CONTEXT; CURRENT_CONTEXT="$(kubectl config current-context)"
   info "Confirming cluster information for ${CURRENT_CONTEXT}"
-  IFS="_" read -r -a VALS  <<< "${CURRENT_CONTEXT}"
+  IFS="_" read -r -a VALS  <<EOF
+${CURRENT_CONTEXT}
+EOF
   PROJECT_ID=${VALS[1]}
   CLUSTER_LOCATION=${VALS[2]}
   CLUSTER_NAME=${VALS[3]}
