@@ -135,7 +135,9 @@ main() {
   validate_args
 
   set_up_local_workspace
-  configure_kubectl
+  if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
+    configure_kubectl
+  fi
 
   validate_cli_dependencies
 
@@ -1065,16 +1067,17 @@ CLUSTER_NAME
 PROJECT_ID
 EOF
 
+  if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 1 && "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
+    fatal_with_usage "Incompatible arguments. Kubeconfig cannot be used in conjuntion with [--cluster_location|--cluster_name|--project_id]."
+  fi
+
   if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 1 && "${CLUSTER_DETAIL_VALID}" -eq 0 ]]; then
-    fatal_with_usage "Missing one or more required options for [CLUSTER_LOCATION|CLUSTER_NAME|PROJECT_ID]"
+    MISSING_ARGS=1
+    warn "Missing one or more required options for [CLUSTER_LOCATION|CLUSTER_NAME|PROJECT_ID]"
   fi
 
   if [[ -n "${KUBECONFIG}" ]]; then
     KUBECONFIG_SUPPLIED=1
-  fi
-
-  if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 1 && "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
-    fatal_with_usage "Incompatible arguments. Kubeconfig cannot be used in conjuntion with [--cluster_location|--cluster_name|--project_id]."
   fi
 
   if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 0 && "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
