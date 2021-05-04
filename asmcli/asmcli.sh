@@ -70,6 +70,7 @@ RELEASE_LINE=""
 PREVIOUS_RELEASE_LINE=""
 KPT_BRANCH=""
 NAMESPACE_EXISTS=0
+KUBECONFIG_SUPPLIED=0
 
 ### Option variables ###
 PROJECT_ID="${PROJECT_ID:=}"
@@ -77,6 +78,8 @@ CLUSTER_NAME="${CLUSTER_NAME:=}"
 CLUSTER_LOCATION="${CLUSTER_LOCATION:=}"
 MODE="${MODE:=}"
 CA="${CA:=}"
+KUBECONFIG="${KUBECONFIG:=}"
+CONTEXT="${CONTEXT:=}"
 
 CUSTOM_OVERLAY=""
 OPTIONAL_OVERLAY=""
@@ -426,10 +429,12 @@ strip_trailing_commas() {
 }
 
 configure_kubectl(){
-  info "Fetching/writing GCP credentials to kubeconfig file..."
-  retry 2 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
-    --project="${PROJECT_ID}" \
-    --zone="${CLUSTER_LOCATION}"
+  if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
+    info "Fetching/writing GCP credentials to kubeconfig file..."
+    retry 2 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
+      --project="${PROJECT_ID}" \
+      --zone="${CLUSTER_LOCATION}"
+  fi
 
   if ! hash nc 2>/dev/null; then
      warn "nc not found, skipping k8s connection verification"
@@ -450,7 +455,8 @@ If this is a private cluster, verify that the correct firewall rules are applied
 https://cloud.google.com/service-mesh/docs/gke-install-overview#requirements
 EOF
   fi
-  info "kubeconfig set to ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
+  info "kubeconfig set to ${KUBECONFIG}"
+  info "context set to $(kubectl config current-context)"
 }
 
 warn() {
@@ -611,6 +617,8 @@ OPTIONS:
   -l|--cluster_location  <LOCATION>
   -n|--cluster_name      <NAME>
   -p|--project_id        <ID>
+  --kubeconfig           <KUBECONFIG>
+  --context              <CONTEXT>
   -m|--mode              <MODE>
   -c|--ca                <CA>
 
@@ -664,6 +672,11 @@ OPTIONS:
   -l|--cluster_location  <LOCATION>   The GCP location of the target cluster.
   -n|--cluster_name      <NAME>       The name of the target cluster.
   -p|--project_id        <ID>         The GCP project ID.
+  --kubeconfig           <KUBECONFIG> Path to the kubeconfig file to use for CLI requests.
+                                      Required if not supplying --cluster_location,
+                                      --cluster_name, --project_id in order to locate
+                                      and connect to the intended cluster.
+  --context              <CONTEXT>    The name of the kubeconfig context to use.
   -m|--mode              <MODE>       The type of installation to perform.
                                       Passing --mode install will attempt a
                                       new ASM installation. Passing --mode
@@ -808,6 +821,16 @@ parse_args() {
       -n | --cluster_name | --cluster-name)
         arg_required "${@}"
         CLUSTER_NAME="${2}"
+        shift 2
+        ;;
+      --kubeconfig)
+        arg_required "${@}"
+        KUBECONFIG="${2}"
+        shift 2
+        ;;
+      --context)
+        arg_required "${@}"
+        CONTEXT="${2}"
         shift 2
         ;;
       -p | --project_id | --project-id)
@@ -1025,11 +1048,38 @@ validate_args() {
     fi
     readonly "${REQUIRED_ARG}"
   done <<EOF
+MODE
+EOF
+
+  local CLUSTER_DETAIL_SUPPLIED=0
+  local CLUSTER_DETAIL_VALID=1
+  while read -r REQUIRED_ARG; do
+    if [[ -z "${!REQUIRED_ARG}" ]]; then
+      CLUSTER_DETAIL_VALID=0
+    else
+      CLUSTER_DETAIL_SUPPLIED=1
+    fi
+  done <<EOF
 CLUSTER_LOCATION
 CLUSTER_NAME
 PROJECT_ID
-MODE
 EOF
+
+  if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 1 && "${CLUSTER_DETAIL_VALID}" -eq 0 ]]; then
+    fatal_with_usage "Missing one or more required options for [CLUSTER_LOCATION|CLUSTER_NAME|PROJECT_ID]"
+  fi
+
+  if [[ -n "${KUBECONFIG}" ]]; then
+    KUBECONFIG_SUPPLIED=1
+  fi
+
+  if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 1 && "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
+    fatal_with_usage "Incompatible arguments. Kubeconfig cannot be used in conjuntion with [--cluster_location|--cluster_name|--project_id]."
+  fi
+
+  if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 0 && "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
+    fatal_with_usage "At least one of the following is required: 1) --kubeconfig or 2) --cluster_location, --cluster_name, project_id"
+  fi
 
   if [[ "${MODE}" != "upgrade" ]]; then
     case "${CA}" in
@@ -1272,8 +1322,13 @@ set_up_local_workspace() {
   fi
   pushd "$OUTPUT_DIR" > /dev/null
 
-  KUBECONFIG="asm_kubeconfig"
-  export KUBECONFIG
+  # If KUBECONFIG file is supplied, keep using that.
+  if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
+    KUBECONFIG="asm_kubeconfig"
+    export KUBECONFIG
+  fi
+
+  info "Using ${KUBECONFIG} as the kubeconfig..."
 }
 
 ### Environment validation functions ###
@@ -1486,7 +1541,10 @@ EOF
 validate_cluster() {
   local RESULT; RESULT=""
 
-  info "Confirming cluster information for ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
+  local CURRENT_CONTEXT="$(kubectl config current-context)"
+  info "Confirming cluster information for ${CURRENT_CONTEXT}"
+  IFS="_" read GKE_PREFIX PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<< "${CURRENT_CONTEXT}"
+
   RESULT="$(gcloud container clusters list \
     --project="${PROJECT_ID}" \
     --filter="name = ${CLUSTER_NAME} AND location = ${CLUSTER_LOCATION}" \
