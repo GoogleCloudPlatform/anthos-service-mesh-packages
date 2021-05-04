@@ -78,7 +78,7 @@ CLUSTER_NAME="${CLUSTER_NAME:=}"
 CLUSTER_LOCATION="${CLUSTER_LOCATION:=}"
 MODE="${MODE:=}"
 CA="${CA:=}"
-KUBECONFIG="${KUBECONFIG:=}"
+KUBECONFIG="${KUBECONFIG_FILE:=}"
 CONTEXT="${CONTEXT:=}"
 
 CUSTOM_OVERLAY=""
@@ -619,7 +619,7 @@ OPTIONS:
   -l|--cluster_location  <LOCATION>
   -n|--cluster_name      <NAME>
   -p|--project_id        <ID>
-  --kubeconfig           <KUBECONFIG>
+  --kubeconfig           <KUBECONFIG_FILE>
   --context              <CONTEXT>
   -m|--mode              <MODE>
   -c|--ca                <CA>
@@ -793,6 +793,13 @@ the certificate authority:
       -n my_cluster \\
       -p my_project \\
       -l us-central1-c \\
+      -m install
+
+  or
+
+  $> ${SCRIPT_NAME} \\
+      --kubeconfig kubeconfig_file \\
+      --context kube context \\
       -m install
 EOF
 }
