@@ -1081,7 +1081,8 @@ EOF
   fi
 
   if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 0 && "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
-    fatal_with_usage "At least one of the following is required: 1) --kubeconfig or 2) --cluster_location, --cluster_name, project_id"
+    MISSING_ARGS=1
+    warn "At least one of the following is required: 1) --kubeconfig or 2) --cluster_location, --cluster_name, --project_id"
   fi
 
   if [[ "${MODE}" != "upgrade" ]]; then
