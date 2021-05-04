@@ -674,11 +674,11 @@ OPTIONS:
   -l|--cluster_location  <LOCATION>   The GCP location of the target cluster.
   -n|--cluster_name      <NAME>       The name of the target cluster.
   -p|--project_id        <ID>         The GCP project ID.
-  --kubeconfig           <KUBECONFIG> Path to the kubeconfig file to use for CLI requests.
+  --kc|--kubeconfig      <KUBECONFIG> Path to the kubeconfig file to use for CLI requests.
                                       Required if not supplying --cluster_location,
                                       --cluster_name, --project_id in order to locate
                                       and connect to the intended cluster.
-  --context              <CONTEXT>    The name of the kubeconfig context to use.
+  --ctx|--context        <CONTEXT>    The name of the kubeconfig context to use.
   -m|--mode              <MODE>       The type of installation to perform.
                                       Passing --mode install will attempt a
                                       new ASM installation. Passing --mode
@@ -825,12 +825,12 @@ parse_args() {
         CLUSTER_NAME="${2}"
         shift 2
         ;;
-      --kubeconfig)
+      --kc | --kubeconfig)
         arg_required "${@}"
         KUBECONFIG="${2}"
         shift 2
         ;;
-      --context)
+      --ctx | --context)
         arg_required "${@}"
         CONTEXT="${2}"
         shift 2
