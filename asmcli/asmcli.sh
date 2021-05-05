@@ -1062,13 +1062,13 @@ validate_args() {
 MODE
 EOF
 
-  local CLUSTER_DETAIL_SUPPLIED=0 # gke cluster param usage intended
+  local CLUSTER_DETAIL_SUPPLIED=0
   local CLUSTER_DETAIL_VALID=1
   while read -r REQUIRED_ARG; do
     if [[ -z "${!REQUIRED_ARG}" ]]; then
       CLUSTER_DETAIL_VALID=0
     else
-      CLUSTER_DETAIL_SUPPLIED=1
+      CLUSTER_DETAIL_SUPPLIED=1 # gke cluster param usage intended
     fi
   done <<EOF
 CLUSTER_LOCATION
