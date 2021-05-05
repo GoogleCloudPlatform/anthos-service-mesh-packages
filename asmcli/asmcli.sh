@@ -1062,7 +1062,7 @@ validate_args() {
 MODE
 EOF
 
-  local CLUSTER_DETAIL_SUPPLIED=0 # old API intended
+  local CLUSTER_DETAIL_SUPPLIED=0 # gke cluster param usage intended
   local CLUSTER_DETAIL_VALID=1
   while read -r REQUIRED_ARG; do
     if [[ -z "${!REQUIRED_ARG}" ]]; then
@@ -1077,10 +1077,10 @@ PROJECT_ID
 EOF
 
   if [[ -n "${KUBECONFIG}" ]]; then
-    KUBECONFIG_SUPPLIED=1 # new API intended
+    KUBECONFIG_SUPPLIED=1 # kubeconfig usage intended
   fi
 
-  # Script will not infer the intent between old and new API in case both values are provided
+  # Script will not infer the intent between the 2 use cases in case both values are provided
   if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 1 && "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
     fatal_with_usage "Incompatible arguments. Kubeconfig cannot be used in conjuntion with [--cluster_location|--cluster_name|--project_id]."
   fi
