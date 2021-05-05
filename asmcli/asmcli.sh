@@ -1095,7 +1095,7 @@ EOF
     warn "At least one of the following is required: 1) --kubeconfig or 2) --cluster_location, --cluster_name, --project_id"
   fi
 
-  if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 && "${CONTEXT}" -eq 0 ]]; then
+  if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 && -z "${CONTEXT}" ]]; then
     # set CONTEXT to current-context in the KUBECONFIG
     # or fail-fast if current-context doesn't exist
     CONTEXT="$(kubectl --kubeconfig config config current-context)"
