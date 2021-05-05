@@ -20,9 +20,6 @@ metadata:
   labels:
     app: istio-cni
     release: istio
-    istio.io/rev: default
-    install.operator.istio.io/owning-resource: unknown
-    operator.istio.io/component: "Cni"
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -31,9 +28,6 @@ metadata:
   labels:
     app: istio-cni
     release: istio
-    istio.io/rev: default
-    install.operator.istio.io/owning-resource: unknown
-    operator.istio.io/component: "Cni"
 rules:
   - apiGroups: [""]
     resources:
@@ -64,9 +58,6 @@ metadata:
   labels:
     app: istio-cni
     release: istio
-    istio.io/rev: default
-    install.operator.istio.io/owning-resource: unknown
-    operator.istio.io/component: "Cni"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -99,9 +90,6 @@ metadata:
   labels:
     app: istio-cni
     release: istio
-    istio.io/rev: default
-    install.operator.istio.io/owning-resource: unknown
-    operator.istio.io/component: "Cni"
 data:
   # The CNI network configuration to add to the plugin chain on each node.  The special
   # values in this config will be automatically populated.
@@ -126,9 +114,6 @@ metadata:
   labels:
     k8s-app: istio-cni-node
     release: istio
-    istio.io/rev: default
-    install.operator.istio.io/owning-resource: unknown
-    operator.istio.io/component: "Cni"
 spec:
   selector:
     matchLabels:
