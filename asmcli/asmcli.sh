@@ -59,6 +59,7 @@ GCE_NETWORK_NAME=""
 GCLOUD_USER_OR_SA=""
 KPT_URL=""
 KUBECONFIG=""
+CONTEXT=""
 APATH=""
 AKUBECTL=""
 AKPT=""
@@ -787,7 +788,7 @@ parse_args() {
       --ctx | --context)
         arg_required "${@}"
         context_set-option "CONTEXT" "${2}"
-      shift 2
+        shift 2
         ;;
       -p | --project_id | --project-id)
         arg_required "${@}"
@@ -1067,7 +1068,7 @@ EOF
     if [[ -z "${!REQUIRED_ARG}" ]]; then
       CLUSTER_DETAIL_VALID=0
     else
-      CLUSTER_DETAIL_SUPPLIED=1
+      CLUSTER_DETAIL_SUPPLIED=1 # gke cluster param usage intended
     fi
   done <<EOF
 CLUSTER_LOCATION
@@ -1075,6 +1076,11 @@ CLUSTER_NAME
 PROJECT_ID
 EOF
 
+  if [[ -n "${KUBECONFIG}" ]]; then
+    KUBECONFIG_SUPPLIED=1 # kubeconfig usage intended
+  fi
+
+  # Script will not infer the intent between the 2 use cases in case both values are provided
   if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 1 && "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
     fatal_with_usage "Incompatible arguments. Kubeconfig cannot be used in conjuntion with [--cluster_location|--cluster_name|--project_id]."
   fi
@@ -1084,13 +1090,19 @@ EOF
     warn "Missing one or more required options for [CLUSTER_LOCATION|CLUSTER_NAME|PROJECT_ID]"
   fi
 
-  if [[ -n "${KUBECONFIG}" ]]; then
-    KUBECONFIG_SUPPLIED=1
-  fi
-
   if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 0 && "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
     MISSING_ARGS=1
     warn "At least one of the following is required: 1) --kubeconfig or 2) --cluster_location, --cluster_name, --project_id"
+  fi
+
+  if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 && -z "${CONTEXT}" ]]; then
+    # set CONTEXT to current-context in the KUBECONFIG
+    # or fail-fast if current-context doesn't exist
+    CONTEXT="$(kubectl --kubeconfig config config current-context)"
+    if [[ -z "${CONTEXT}" ]]; then
+      MISSING_ARGS=1
+      warn "Missing current-context in the KUBECONFIG. Please provide context with --context flag or set a current-context in the KUBECONFIG"
+    fi
   fi
 
   if [[ "${MODE}" != "upgrade" ]]; then
