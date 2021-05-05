@@ -72,66 +72,11 @@ KPT_BRANCH=""
 NAMESPACE_EXISTS=0
 KUBECONFIG_SUPPLIED=0
 
-### Option variables ###
-PROJECT_ID="${PROJECT_ID:=}"
-CLUSTER_NAME="${CLUSTER_NAME:=}"
-CLUSTER_LOCATION="${CLUSTER_LOCATION:=}"
-MODE="${MODE:=}"
-CA="${CA:=}"
-KUBECONFIG="${KUBECONFIG_FILE:=}"
-CONTEXT="${CONTEXT:=}"
-
-CUSTOM_OVERLAY=""
-OPTIONAL_OVERLAY=""
-
-ENABLE_ALL="${ENABLE_ALL:=0}"
-ENABLE_CLUSTER_ROLES="${ENABLE_CLUSTER_ROLES:=0}"
-ENABLE_CLUSTER_LABELS="${ENABLE_CLUSTER_LABELS:=0}"
-ENABLE_GCP_APIS="${ENABLE_GCP_APIS:=0}"
-ENABLE_GCP_IAM_ROLES="${ENABLE_GCP_IAM_ROLES:=0}"
-ENABLE_GCP_COMPONENTS="${ENABLE_GCP_COMPONENTS:=0}"
-ENABLE_REGISTRATION="${ENABLE_REGISTRATION:=0}"
-ENABLE_NAMESPACE_CREATION="${ENABLE_NAMESPACE_CREATION:=0}"
-
-DISABLE_CANONICAL_SERVICE="${DISABLE_CANONICAL_SERVICE:=0}"
-PRINT_CONFIG="${PRINT_CONFIG:=0}"
-SERVICE_ACCOUNT="${SERVICE_ACCOUNT:=}"
-KEY_FILE="${KEY_FILE:=}"
-OUTPUT_DIR="${OUTPUT_DIR:=}"
-
-CA_CERT="${CA_CERT:=}"
-CA_KEY="${CA_KEY:=}"
-CA_ROOT="${CA_ROOT:=}"
-CA_CHAIN="${CA_CHAIN:=}"
-CA_NAME="${CA_NAME:=}"
-
-DRY_RUN="${DRY_RUN:=0}"
-ONLY_VALIDATE="${ONLY_VALIDATE:=0}"
-ONLY_ENABLE="${ONLY_ENABLE:=0}"
-VERBOSE="${VERBOSE:=0}"
-MANAGED="${MANAGED:=0}"
-MANAGED_SERVICE_ACCOUNT=""
-
-PRINT_HELP=0
-PRINT_VERSION=0
-CUSTOM_CA=0
-USE_HUB_WIP=0
-USE_VM=0
-ENVIRON_PROJECT_ID=""
-HUB_MEMBERSHIP_ID=""
-CUSTOM_REVISION=0
-WI_ENABLED=0
-
 main() {
   init
+
+  context_init
   parse_args "${@}"
-
-  # make sure to redirect stdout as soon as possible if we're dumping the config
-  if [[ "${PRINT_CONFIG}" -eq 1 ]]; then
-    exec 3>&1
-    exec 1>&2
-  fi
-
   validate_args
 
   set_up_local_workspace
@@ -820,176 +765,180 @@ parse_args() {
   trap "$(shopt -p nocasematch)" RETURN
   shopt -s nocasematch
 
+  local OPTIONAL_OVERLAY; OPTIONAL_OVERLAY=""
+  local CUSTOM_OVERLAY; CUSTOM_OVERLAY=""
   while [[ $# != 0 ]]; do
     case "${1}" in
       -l | --cluster_location | --cluster-location)
         arg_required "${@}"
-        CLUSTER_LOCATION="${2}"
+        context_set-option "CLUSTER_LOCATION" "${2}"
         shift 2
         ;;
       -n | --cluster_name | --cluster-name)
         arg_required "${@}"
-        CLUSTER_NAME="${2}"
+        context_set-option "CLUSTER_NAME" "${2}"
         shift 2
         ;;
       --kc | --kubeconfig)
         arg_required "${@}"
-        KUBECONFIG="${2}"
+        context_set-option "KUBECONFIG" "${2}"
         shift 2
         ;;
       --ctx | --context)
         arg_required "${@}"
-        CONTEXT="${2}"
-        shift 2
+        context_set-option "CONTEXT" "${2}"
+      shift 2
         ;;
       -p | --project_id | --project-id)
         arg_required "${@}"
-        PROJECT_ID="${2}"
+        context_set-option "PROJECT_ID" "${2}"
         shift 2
         ;;
       -m | --mode)
         arg_required "${@}"
-        MODE="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+        context_set-option "MODE" "$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
         shift 2
         ;;
       -c | --ca)
         arg_required "${@}"
-        CA="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+        context_set-option "CA" "$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
         shift 2
         ;;
       --ca_name | --ca-name)
         arg_required "${@}"
-        CA_NAME="${2}"
+        context_set-option "CA_NAME" "${2}"
         shift 2
         ;;
       -o | --option)
         arg_required "${@}"
         OPTIONAL_OVERLAY="${2},${OPTIONAL_OVERLAY}"
+        context_set-option "OPTIONAL_OVERLAY" "${OPTIONAL_OVERLAY}"
         if [[ "${2}" == "hub-meshca" ]]; then
-          USE_HUB_WIP=1
+          context_set-option "USE_HUB_WIP" 1
         fi
         if [[ "${2}" == "vm" ]]; then
-          USE_VM=1
+          context_set-option "USE_VM" 1
         fi
         shift 2
         ;;
       --co | --custom_overlay | --custom-overlay)
         arg_required "${@}"
         CUSTOM_OVERLAY="${2},${CUSTOM_OVERLAY}"
+        context_set-option "CUSTOM_OVERLAY" "${CUSTOM_OVERLAY}"
         shift 2
         ;;
       -e | --enable_all | --enable-all)
-        ENABLE_ALL=1
+        context_set-option "ENABLE_ALL" 1
         shift 1
         ;;
       --enable_cluster_roles | --enable-cluster-roles)
-        ENABLE_CLUSTER_ROLES=1
+        context_set-option "ENABLE_CLUSTER_ROLES" 1
         shift 1
         ;;
       --enable_cluster_labels | --enable-cluster-labels)
-        ENABLE_CLUSTER_LABELS=1
+        context_set-option "ENABLE_CLUSTER_LABELS" 1
         shift 1
         ;;
       --enable_gcp_apis | --enable-gcp-apis)
-        ENABLE_GCP_APIS=1
+        context_set-option "ENABLE_GCP_APIS" 1
         shift 1
         ;;
       --enable_gcp_iam_roles | --enable-gcp-iam-roles)
-        ENABLE_GCP_IAM_ROLES=1
+        context_set-option "ENABLE_GCP_IAM_ROLES" 1
         shift 1
         ;;
       --enable_gcp_components | --enable-gcp-components)
-        ENABLE_GCP_COMPONENTS=1
+        context_set-option "ENABLE_GCP_COMPONENTS" 1
         shift 1
         ;;
       --enable_registration | --enable-registration)
-        ENABLE_REGISTRATION=1
+        context_set-option "ENABLE_REGISTRATION" 1
         shift 1
         ;;
       --enable_namespace_creation | --enable-namespace-creation)
-        ENABLE_NAMESPACE_CREATION=1
+        context_set-option "ENABLE_NAMESPACE_CREATION" 1
         shift 1
         ;;
       --managed)
-        MANAGED=1
-        REVISION_LABEL="asm-managed"
+        context_set-option "MANAGED" 1
+        context_set-option "REVISION_LABEL" "asm-managed"
         shift 1
         ;;
       --disable_canonical_service | --disable-canonical-service)
-        DISABLE_CANONICAL_SERVICE=1
+        context_set-option "DISABLE_CANONICAL_SERVICE" 1
         shift 1
         ;;
       --print_config | --print-config)
-        PRINT_CONFIG=1
+        context_set-option "PRINT_CONFIG" 1
         shift 1
         ;;
       -s | --service_account | --service-account)
         arg_required "${@}"
-        SERVICE_ACCOUNT="${2}"
+        context_set-option "SERVICE_ACCOUNT" "${2}"
         shift 2
         ;;
       -k | --key_file | --key-file)
         arg_required "${@}"
-        KEY_FILE="${2}"
+        context_set-option "KEY_FILE" "${2}"
         shift 2
         ;;
       -D | --output_dir | --output-dir)
         arg_required "${@}"
-        OUTPUT_DIR="${2}"
+        context_set-option "OUTPUT_DIR" "${2}"
         shift 2
         ;;
       --dry_run | --dry-run)
-        DRY_RUN=1
+        context_set-option "DRY_RUN" 1
         shift 1
         ;;
       --only_validate | --only-validate)
-        ONLY_VALIDATE=1
+        context_set-option "ONLY_VALIDATE" 1
         shift 1
         ;;
       --only_enable | --only-enable)
-        ONLY_ENABLE=1
+        context_set-option "ONLY_ENABLE" 1
         shift 1
         ;;
       --ca_cert | --ca-cert)
         arg_required "${@}"
-        CA_CERT="${2}"
-        CUSTOM_CA=1
+        context_set-option "CA_CERT" "${2}"
+        context_set-option "CUSTOM_CA" 1
         shift 2
         ;;
       --ca_key | --ca-key)
         arg_required "${@}"
-        CA_KEY="${2}"
-        CUSTOM_CA=1
+        context_set-option "CA_KEY" "${2}"
+        context_set-option "CUSTOM_CA" 1
         shift 2
         ;;
       --root_cert | --root-cert)
         arg_required "${@}"
-        CA_ROOT="${2}"
-        CUSTOM_CA=1
+        context_set-option "CA_ROOT" "${2}"
+        context_set-option "CUSTOM_CA" 1
         shift 2
         ;;
       --cert_chain | --cert-chain)
         arg_required "${@}"
-        CA_CHAIN="${2}"
-        CUSTOM_CA=1
+        context_set-option "CA_CHAIN" "${2}"
+        context_set-option "CUSTOM_CA" 1
         shift 2
         ;;
       -r | --revision_name | --revision-name)
         arg_required "${@}"
-        CUSTOM_REVISION=1
-        REVISION_LABEL="${2}"
+        context_set-option "CUSTOM_REVISION" 1
+        context_set-option "REVISION_LABEL" "${2}"
         shift 2
         ;;
       -v | --verbose)
-        VERBOSE=1
+        context_set-option "VERBOSE" 1
         shift 1
         ;;
       -h | --help)
-        PRINT_HELP=1
+        context_set-option "PRINT_HELP" 1
         shift 1
         ;;
       --version)
-        PRINT_VERSION=1
+        context_set-option "PRINT_VERSION" 1
         shift 1
         ;;
       *)
@@ -997,6 +946,10 @@ parse_args() {
         ;;
     esac
   done
+
+  local PRINT_HELP; PRINT_HELP="$(context_get-option "PRINT_HELP")"
+  local PRINT_VERSION; PRINT_VERSION="$(context_get-option "PRINT_VERSION")"
+  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
   if [[ "${PRINT_HELP}" -eq 1 || "${PRINT_VERSION}" -eq 1 ]]; then
     if [[ "${PRINT_VERSION}" -eq 1 ]]; then
       version_message
@@ -1007,12 +960,60 @@ parse_args() {
     fi
     exit
   fi
-  readonly REVISION_LABEL
+
+  # make sure to redirect stdout as soon as possible if we're dumping the config
+  local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
+  if [[ "${PRINT_CONFIG}" -eq 1 ]]; then
+    exec 3>&1
+    exec 1>&2
+  fi
 }
 
 validate_args() {
+  ### Option variables ###
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local MODE; MODE="$(context_get-option "MODE")"
+  local CA; CA="$(context_get-option "CA")"
+  local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
+  local OPTIONAL_OVERLAY; OPTIONAL_OVERLAY="$(context_get-option "OPTIONAL_OVERLAY")"
+  local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
+  local ENABLE_CLUSTER_ROLES; ENABLE_CLUSTER_ROLES="$(context_get-option "ENABLE_CLUSTER_ROLES")"
+  local ENABLE_CLUSTER_LABELS; ENABLE_CLUSTER_LABELS="$(context_get-option "ENABLE_CLUSTER_LABELS")"
+  local ENABLE_GCP_APIS; ENABLE_GCP_APIS="$(context_get-option "ENABLE_GCP_APIS")"
+  local ENABLE_GCP_IAM_ROLES; ENABLE_GCP_IAM_ROLES="$(context_get-option "ENABLE_GCP_IAM_ROLES")"
+  local ENABLE_GCP_COMPONENTS; ENABLE_GCP_COMPONENTS="$(context_get-option "ENABLE_GCP_COMPONENTS")"
+  local ENABLE_REGISTRATION; ENABLE_REGISTRATION="$(context_get-option "ENABLE_REGISTRATION")"
+  local ENABLE_NAMESPACE_CREATION; ENABLE_NAMESPACE_CREATION="$(context_get-option "ENABLE_NAMESPACE_CREATION")"
+  local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
+  local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
+  local SERVICE_ACCOUNT; SERVICE_ACCOUNT="$(context_get-option "SERVICE_ACCOUNT")"
+  local KEY_FILE; KEY_FILE="$(context_get-option "KEY_FILE")"
+  local CA_CERT; CA_CERT="$(context_get-option "CA_CERT")"
+  local CA_KEY; CA_KEY="$(context_get-option "CA_KEY")"
+  local CA_ROOT; CA_ROOT="$(context_get-option "CA_ROOT")"
+  local CA_CHAIN; CA_CHAIN="$(context_get-option "CA_CHAIN")"
+  local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
+  local DRY_RUN; DRY_RUN="$(context_get-option "DRY_RUN")"
+  local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
+  local ONLY_ENABLE; ONLY_ENABLE="$(context_get-option "ONLY_ENABLE")"
+  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
+  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
+  local MANAGED_SERVICE_ACCOUNT; MANAGED_SERVICE_ACCOUNT="$(context_get-option "MANAGED_SERVICE_ACCOUNT")"
+  local PRINT_HELP; PRINT_HELP="$(context_get-option "PRINT_HELP")"
+  local PRINT_VERSION; PRINT_VERSION="$(context_get-option "PRINT_VERSION")"
+  local CUSTOM_CA; CUSTOM_CA="$(context_get-option "CUSTOM_CA")"
+  local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
+  local USE_VM; USE_VM="$(context_get-option "USE_VM")"
+  local ENVIRON_PROJECT_ID; ENVIRON_PROJECT_ID="$(context_get-option "ENVIRON_PROJECT_ID")"
+  local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
+  local CUSTOM_REVISION; CUSTOM_REVISION="$(context_get-option "CUSTOM_REVISION")"
+  local WI_ENABLED; WI_ENABLED="$(context_get-option "WI_ENABLED")"
+
   if [[ "${MODE}" == "install" && -z "${CA}" ]]; then
     CA="mesh_ca"
+    context_set-option "CA" "${CA}"
   fi
 
   if [[ "${CUSTOM_REVISION}" -eq 1 ]]; then
@@ -1306,6 +1307,7 @@ auth_service_account() {
 # polluting the environment or current working directory
 #######
 set_up_local_workspace() {
+  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
   info "Setting up necessary files..."
   if [[ -z "${OUTPUT_DIR}" ]]; then
     info "Creating temp directory..."
@@ -1332,6 +1334,7 @@ set_up_local_workspace() {
     fi
   fi
   pushd "$OUTPUT_DIR" > /dev/null
+  context_set-option "OUTPUT_DIR" "${OUTPUT_DIR}"
 
   # If KUBECONFIG file is supplied, keep using that.
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then

@@ -3,7 +3,7 @@ package(default_visibility = ["//visibility:public"])
 ASMCLI_MODULES = glob(["asmcli/**"])
 NODE_MODULES = glob(["node_modules/**"])
 ASMCLI_SOURCES = glob(["asmcli/**/*.sh"], exclude = ["**/test*/**"],)
-TESTS = glob(["asmcli/tests/*.bats"])
+TESTS = glob(["asmcli/tests/**/*.bats"])
 MERGE_OUT = ["asmcli"]
 
 genrule(
