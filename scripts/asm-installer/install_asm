@@ -117,6 +117,7 @@ PRINT_HELP=0
 PRINT_VERSION=0
 CUSTOM_CA=0
 USE_HUB_WIP=0
+USE_MCP_CNI=0
 USE_VM=0
 ENVIRON_PROJECT_ID=""
 HUB_MEMBERSHIP_ID=""
@@ -334,6 +335,7 @@ init() {
   BETA_CRD_MANIFEST="${OPTIONS_DIRECTORY}/v1beta1-crds.yaml"; readonly BETA_CRD_MANIFEST;
   MANAGED_MANIFEST="${OPTIONS_DIRECTORY}/managed-control-plane.yaml"; readonly MANAGED_MANIFEST;
   MANAGED_WEBHOOKS="${OPTIONS_DIRECTORY}/managed-control-plane-webhooks.yaml"; readonly MANAGED_WEBHOOKS;
+  MANAGED_CNI="${OPTIONS_DIRECTORY}/cni-managed.yaml"; readonly MANAGED_CNI;
   CONNECT_RBAC="asm/third-party/hub-connect-impersonate-rbac.yaml"; readonly CONNECT_RBAC;
   EXPOSE_ISTIOD_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_SERVICE;
   CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
@@ -863,6 +865,13 @@ parse_args() {
         ;;
       -o | --option)
         arg_required "${@}"
+
+        if [[ "${2}" == "cni-managed" ]]; then
+          USE_MCP_CNI=1
+          shift 2
+          continue
+        fi
+
         OPTIONAL_OVERLAY="${2},${OPTIONAL_OVERLAY}"
         if [[ "${2}" == "hub-meshca" ]]; then
           USE_HUB_WIP=1
@@ -2533,7 +2542,29 @@ expose_istiod() {
 
 start_managed_control_plane() {
   info "Configuring base installation for managed control plane..."
-  kubectl apply --overwrite=true -f "${BASE_REL_PATH}"
+  run kubectl apply --overwrite=true -f "${BASE_REL_PATH}"
+
+  local ASM_OPTS
+  ASM_OPTS="$(kubectl -n istio-system \
+    get --ignore-not-found cm asm-options \
+    -o jsonpath='{.data.ASM_OPTS}' || true)"
+
+  local CNI; CNI="no"
+  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then CNI="yes"; fi
+
+  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=${CNI}"* ]]; then
+    info "Configuring control plane options..."
+    run kubectl apply --overwrite=true -f - <<EOF
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: asm-options
+  namespace: istio-system
+data:
+  ASM_OPTS: "CNI=${CNI}"
+EOF
+  fi
 
   local CR_IMAGE_JSON; CR_IMAGE_JSON="";
   if [[ -n "${_CI_CLOUDRUN_IMAGE_HUB}" ]]; then
@@ -2563,6 +2594,11 @@ scrape_managed_urls() {
 }
 
 install_managed_components() {
+  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then
+    info "Installing CNI into the cluster..."
+    kubectl apply -f "${MANAGED_CNI}"
+  fi
+
   info "Configuring ASM managed control plane validating webhook config..."
   kubectl apply -f "${MANAGED_WEBHOOKS}"
 
