@@ -116,7 +116,7 @@ main() {
 
   if can_register_cluster; then
     register_cluster
-  elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 ]]; then
+  elif should_validate && [[ "$(context_get-option "USE_HUB_WIP")" -eq 1 ]]; then
     exit_if_cluster_unregistered
   fi
 
@@ -140,6 +140,7 @@ main() {
         fatal "Couldn't initialize meshconfig, do you have the required permission resourcemanager.projects.setIamPolicy?"
       fi
       unset MANAGED_SERVICE_JSON
+      context_set-option "MANAGED_SERVICE_ACCOUNT" "${MANAGED_SERVICE_ACCOUNT}"
       bind_user_to_iam_policy "$(required_iam_roles_mcp_sa)" "$(iam_user)"
     fi
   else
@@ -161,7 +162,7 @@ main() {
     if can_modify_gcp_components; then
       enable_workload_identity
       init_meshconfig
-      if [[ "${CA}" = "gcp_cas" ]]; then
+      if [[ "$(context_get-option "CA")" = "gcp_cas" ]]; then
         # This sets up IAM privileges for the project to be able to access GCP CAS.
         # If modify_gcp_component permissions are not granted, it is assumed that the
         # user has taken care of this, else Istio setup will fail
@@ -192,7 +193,7 @@ main() {
     exit_if_istio_namespace_not_exists
   fi
 
-  if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
+  if [[ "$(context_get-option "ONLY_VALIDATE")" -eq 1 ]]; then
     info "Successfully validated all requirements to install ASM in this environment."
     return 0
   fi
@@ -202,11 +203,11 @@ main() {
     return 0
   fi
 
-  if [[ "${PRINT_CONFIG}" -eq 1 && "${USE_HUB_WIP}" -eq 1 ]]; then
+  if [[ "$(context_get-option "PRINT_CONFIG")" -eq 1 && "$(context_get-option "USE_HUB_WIP")" -eq 1 ]]; then
     populate_environ_info
   fi
 
-  if can_modify_at_all && [[ "${MANAGED}" -eq 1 ]]; then
+  if can_modify_at_all && [[ "$(context_get-option "MANAGED")" -eq 1 ]]; then
     start_managed_control_plane
     configure_package
     install_managed_components
@@ -214,19 +215,19 @@ main() {
     return 0
   fi
 
-  if [[ "${USE_VM}" -eq 1 ]]; then
+  if [[ "$(context_get-option "USE_VM")" -eq 1 ]]; then
     register_gce_identity_provider
   fi
 
   configure_package
   handle_multi_yaml_bug
 
-  if [[ "${PRINT_CONFIG}" -eq 1 ]]; then
+  if [[ "$(context_get-option "PRINT_CONFIG")" -eq 1 ]]; then
     print_config >&3
     return 0
   fi
 
-  if [[ "${CUSTOM_CA}" -eq 1 ]]; then
+  if [[ "$(context_get-option "CUSTOM_CA")" -eq 1 ]]; then
     install_secrets
   fi
 
@@ -287,6 +288,9 @@ init() {
 # not enabled it runs the command.
 #######
 run_command() {
+  local DRY_RUN; DRY_RUN="$(context_get-option "DRY_RUN")"
+  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
+
   if [[ "${DRY_RUN}" -eq 1 ]]; then
     warn "Would have executed: ${*}"
     return
@@ -377,6 +381,10 @@ strip_trailing_commas() {
 }
 
 configure_kubectl(){
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
     info "Fetching/writing GCP credentials to kubeconfig file..."
     retry 2 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
@@ -440,26 +448,39 @@ starline() {
 }
 
 is_managed() {
+  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
+
   if [[ "${MANAGED}" -ne 1 ]]; then false; fi
 }
 
 is_sa() {
+  local SERVICE_ACCOUNT; SERVICE_ACCOUNT="$(context_get-option "SERVICE_ACCOUNT")"
+
   if [[ -z "${SERVICE_ACCOUNT}" ]]; then false; fi
 }
 
 should_validate() {
+  local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
+
   if [[ "${PRINT_CONFIG}" -eq 1 || "${_CI_NO_VALIDATE}" -eq 1 ]] || only_enable; then false; fi
 }
 
 only_enable() {
+  local ONLY_ENABLE; ONLY_ENABLE="$(context_get-option "ONLY_ENABLE")"
   if [[ "${ONLY_ENABLE}" -eq 0 ]]; then false; fi
 }
 
 can_modify_at_all() {
+  local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
+  local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
+
   if [[ "${ONLY_VALIDATE}" -eq 1 || "${PRINT_CONFIG}" -eq 1 ]]; then false; fi
 }
 
 can_modify_cluster_roles() {
+  local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
+  local ENABLE_CLUSTER_ROLES; ENABLE_CLUSTER_ROLES="$(context_get-option "ENABLE_CLUSTER_ROLES")"
+
   if ! can_modify_at_all; then false; return; fi
 
   if is_managed || [[ "${ENABLE_ALL}" -eq 1 || "${ENABLE_CLUSTER_ROLES}" -eq 1 ]]; then
@@ -470,6 +491,9 @@ can_modify_cluster_roles() {
 }
 
 can_modify_cluster_labels() {
+  local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
+  local ENABLE_CLUSTER_LABELS; ENABLE_CLUSTER_LABELS="$(context_get-option "ENABLE_CLUSTER_LABELS")"
+
   if ! can_modify_at_all; then false; return; fi
 
   if [[ "${ENABLE_ALL}" -eq 1 || "${ENABLE_CLUSTER_LABELS}" -eq 1 ]]; then
@@ -480,6 +504,9 @@ can_modify_cluster_labels() {
 }
 
 can_modify_gcp_apis() {
+  local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
+  local ENABLE_GCP_APIS; ENABLE_GCP_APIS="$(context_get-option "ENABLE_GCP_APIS")"
+
   if ! can_modify_at_all; then false; return; fi
 
   if [[ "${ENABLE_ALL}" -eq 1 || "${ENABLE_GCP_APIS}" -eq 1 ]]; then
@@ -490,6 +517,9 @@ can_modify_gcp_apis() {
 }
 
 can_modify_gcp_iam_roles() {
+  local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
+  local ENABLE_GCP_IAM_ROLES; ENABLE_GCP_IAM_ROLES="$(context_get-option "ENABLE_GCP_IAM_ROLES")"
+
   if ! can_modify_at_all; then false; return; fi
 
   if is_managed || [[ "${ENABLE_ALL}" -eq 1 || "${ENABLE_GCP_IAM_ROLES}" -eq 1 ]]; then
@@ -500,6 +530,9 @@ can_modify_gcp_iam_roles() {
 }
 
 can_modify_gcp_components() {
+  local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
+  local ENABLE_GCP_COMPONENTS; ENABLE_GCP_COMPONENTS="$(context_get-option "ENABLE_GCP_COMPONENTS")"
+
   if ! can_modify_at_all; then false; return; fi
 
   if is_managed || [[ "${ENABLE_ALL}" -eq 1 || "${ENABLE_GCP_COMPONENTS}" -eq 1 ]]; then
@@ -510,6 +543,11 @@ can_modify_gcp_components() {
 }
 
 can_register_cluster() {
+  local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
+  local USE_VM; USE_VM="$(context_get-option "USE_VM")"
+  local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
+  local ENABLE_REGISTRATION; ENABLE_REGISTRATION="$(context_get-option "ENABLE_REGISTRATION")"
+
   if ! can_modify_at_all; then false; return; fi
 
   if [[ "${ENABLE_ALL}" -eq 1 && ("${USE_VM}" -eq 1 || "${USE_HUB_WIP}" -eq 1) ]] \
@@ -521,6 +559,9 @@ can_register_cluster() {
 }
 
 can_create_namespace() {
+  local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
+  local ENABLE_NAMESPACE_CREATION; ENABLE_NAMESPACE_CREATION="$(context_get-option "ENABLE_NAMESPACE_CREATION")"
+
   if ! can_modify_at_all; then false; return; fi
 
   if [[ "${ENABLE_ALL}" -eq 1 || "${ENABLE_NAMESPACE_CREATION}" -eq 1 ]]; then
@@ -531,6 +572,8 @@ can_create_namespace() {
 }
 
 needs_asm() {
+  local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
+
   if only_enable; then false; return; fi
 
   if [[ "${PRINT_CONFIG}" -eq 1 ]] || can_modify_at_all || should_validate; then
@@ -862,7 +905,7 @@ parse_args() {
         ;;
       --managed)
         context_set-option "MANAGED" 1
-        context_set-option "REVISION_LABEL" "asm-managed"
+        REVISION_LABEL="asm-managed"
         shift 1
         ;;
       --disable_canonical_service | --disable-canonical-service)
@@ -927,7 +970,7 @@ parse_args() {
       -r | --revision_name | --revision-name)
         arg_required "${@}"
         context_set-option "CUSTOM_REVISION" 1
-        context_set-option "REVISION_LABEL" "${2}"
+        REVISION_LABEL="${2}"
         shift 2
         ;;
       -v | --verbose)
@@ -947,6 +990,7 @@ parse_args() {
         ;;
     esac
   done
+  readonly REVISION_LABEL
 
   local PRINT_HELP; PRINT_HELP="$(context_get-option "PRINT_HELP")"
   local PRINT_VERSION; PRINT_VERSION="$(context_get-option "PRINT_VERSION")"
@@ -1011,6 +1055,8 @@ validate_args() {
   local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
   local CUSTOM_REVISION; CUSTOM_REVISION="$(context_get-option "CUSTOM_REVISION")"
   local WI_ENABLED; WI_ENABLED="$(context_get-option "WI_ENABLED")"
+  local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
+  local KUBECONFIG; KUBECONFIG="$(context_get-option "KUBECONFIG")"
 
   if [[ "${MODE}" == "install" && -z "${CA}" ]]; then
     CA="mesh_ca"
@@ -1102,6 +1148,8 @@ EOF
     if [[ -z "${CONTEXT}" ]]; then
       MISSING_ARGS=1
       warn "Missing current-context in the KUBECONFIG. Please provide context with --context flag or set a current-context in the KUBECONFIG"
+    else
+      context_set-option "CONTEXT" "${CONTEXT}"
     fi
   fi
 
@@ -1210,6 +1258,7 @@ EOF
     ABS_OVERLAYS="${OPTIONS_DIRECTORY}/private-ca.yaml,${ABS_OVERLAYS}"
   fi
   CUSTOM_OVERLAY="${ABS_OVERLAYS}"
+  context_set-option "CUSTOM_OVERLAY" "${CUSTOM_OVERLAY}"
 
   set_kpt_package_url
   WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"
@@ -1233,6 +1282,7 @@ validate_revision_label() {
 }
 
 validate_gcp_cas_args() {
+  local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
   local CA_NAME_TEMPLATE
   CA_NAME_TEMPLATE="projects/project_name/locations/ca_region/certificateAuthorities/ca_name"
   readonly CA_NAME_TEMPLATE
@@ -1247,6 +1297,12 @@ validate_gcp_cas_args() {
 }
 
 validate_certs() {
+  local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
+  local CA_ROOT; CA_ROOT="$(context_get-option "CA_ROOT")"
+  local CA_KEY; CA_KEY="$(context_get-option "CA_KEY")"
+  local CA_CHAIN; CA_CHAIN="$(context_get-option "CA_CHAIN")"
+  local CA_CERT; CA_CERT="$(context_get-option "CA_CERT")"
+
   if [[ "${CA}" != "citadel" ]]; then
     fatal "You must select Citadel as the CA in order to use custom certificates."
   fi
@@ -1268,6 +1324,11 @@ EOF
   CA_KEY="$(apath -f "${CA_KEY}")"; readonly CA_KEY;
   CA_CHAIN="$(apath -f "${CA_CHAIN}")"; readonly CA_CHAIN;
   CA_ROOT="$(apath -f "${CA_ROOT}")"; readonly CA_ROOT;
+
+  context_set-option "CA_CERT" "${CA_CERT}"
+  context_set-option "CA_KEY" "${CA_KEY}"
+  context_set-option "CA_CHAIN" "${CA_CHAIN}"
+  context_set-option "CA_ROOT" "${CA_ROOT}"
 
   info "Checking certificate files for consistency..."
   if ! openssl rsa -in "${CA_KEY}" -check >/dev/null 2>/dev/null; then
@@ -1307,6 +1368,10 @@ set_kpt_package_url() {
 }
 
 auth_service_account() {
+  local SERVICE_ACCOUNT; SERVICE_ACCOUNT="$(context_get-option "SERVICE_ACCOUNT")"
+  local KEY_FILE; KEY_FILE="$(context_get-option "KEY_FILE")"
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+
   info "Authorizing ${SERVICE_ACCOUNT} with ${KEY_FILE}..."
   gcloud auth activate-service-account \
     --project="${PROJECT_ID}" \
@@ -1359,6 +1424,8 @@ set_up_local_workspace() {
 
 ### Environment validation functions ###
 validate_dependencies() {
+  local MODE; MODE="$(context_get-option "MODE")"
+
   validate_node_pool
   validate_k8s
   validate_expected_control_plane
@@ -1373,6 +1440,9 @@ validate_dependencies() {
 
 organize_kpt_files() {
   local ABS_YAML
+  local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
+  local OPTIONAL_OVERLAY; OPTIONAL_OVERLAY="$(context_get-option "OPTIONAL_OVERLAY")"
+
   while read -d ',' -r yaml_file; do
     ABS_YAML="${OPTIONS_DIRECTORY}/${yaml_file}.yaml"
     if [[ ! -f "${ABS_YAML}" ]]; then
@@ -1385,13 +1455,16 @@ EOF
   done <<EOF
 ${OPTIONAL_OVERLAY}
 EOF
-  unset OPTIONAL_OVERLAY
+
+  context_set-option "CUSTOM_OVERLAY" "${CUSTOM_OVERLAY}"
+  context_set-option "OPTIONAL_OVERLAY" ""  # unset OPTIONAL_OVERLAY
 }
 
 # This is a workaround for https://github.com/istio/istio/issues/30632
 # which doesn't handle files with multiple operator specs correctly.
 # This will split all of the files based off of the yaml document separator.
 handle_multi_yaml_bug() {
+  local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
   local CSPLIT_OUTPUT; CSPLIT_OUTPUT="";
   local BASE_NAME
   while read -d ',' -r yaml_file; do
@@ -1410,12 +1483,14 @@ ${CUSTOM_OVERLAY}
 EOF
   if [[ -n "${CSPLIT_OUTPUT}" ]]; then
     CUSTOM_OVERLAY="${CSPLIT_OUTPUT:1:${#CSPLIT_OUTPUT}},"
+    context_set-option "CUSTOM_OVERLAY" "${CUSTOM_OVERLAY}"
   fi
 }
 
 validate_cli_dependencies() {
   local NOTFOUND; NOTFOUND="";
   local EXITCODE; EXITCODE=0;
+  local CUSTOM_CA; CUSTOM_CA="$(context_get-option "CUSTOM_CA")"
 
   info "Checking installation tool dependencies..."
   while read -r dependency; do
@@ -1474,6 +1549,7 @@ EOF
 
 download_asm() {
   local OS
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
 
   case "$(uname)" in
     Linux ) OS="linux-amd64";;
@@ -1502,6 +1578,8 @@ EOF
 }
 
 necessary_files_exist() {
+  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+
   if [[ ! -f "${OUTPUT_DIR}/${ISTIOCTL_REL_PATH}" ]]; then
     false
     return
@@ -1533,6 +1611,10 @@ validate_gcp_resources() {
 }
 
 populate_cluster_values() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+
   if [[ -z "${GKE_CLUSTER_URI}" && -z "${GCE_NETWORK_NAME}" ]]; then
     CLUSTER_DATA="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
       --zone="${CLUSTER_LOCATION}" \
@@ -1548,6 +1630,7 @@ EOF
 }
 
 get_project_number() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local RESULT; RESULT=""
 
   info "Checking for project ${PROJECT_ID}..."
@@ -1565,6 +1648,9 @@ EOF
 }
 
 validate_cluster() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local RESULT; RESULT=""
 
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
@@ -1597,6 +1683,10 @@ validate_k8s() {
 }
 
 list_valid_pools() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+
   gcloud container node-pools list \
     --project="${PROJECT_ID}" \
     --region "${CLUSTER_LOCATION}" \
@@ -1620,6 +1710,9 @@ EOF
 # requirements
 #######
 validate_node_pool() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local MACHINE_CPU_REQ; MACHINE_CPU_REQ=4; readonly MACHINE_CPU_REQ;
   local TOTAL_CPU_REQ; TOTAL_CPU_REQ=8; readonly TOTAL_CPU_REQ;
 
@@ -1651,6 +1744,8 @@ EOF
 }
 
 validate_expected_control_plane(){
+  local MODE; MODE="$(context_get-option "MODE")"
+
   info "Checking Istio installations..."
   check_no_istiod_outside_of_istio_system_namespace
   if [[ "${MODE}" = "migrate" || "${MODE}" = "upgrade" ]]; then
@@ -1685,6 +1780,8 @@ EOF
 
 check_istio_deployed(){
   local ISTIOD_COUNT; ISTIOD_COUNT="$(get_istio_deployment_count)";
+  local MODE; MODE="$(context_get-option "MODE")"
+
   info "Found ${ISTIOD_COUNT} deployment(s)."
   if [[ "$ISTIOD_COUNT" -eq 0 ]]; then
     warn_pause "${MODE} mode specified but no istiod deployment found. (Expected >=1.)"
@@ -1792,6 +1889,8 @@ is_rev_invalid() {
 
 validate_ca_consistency() {
   local CURRENT_CA; CURRENT_CA="citadel"
+  local CA; CA="$(context_get-option "CA")"
+
   if is_meshca_installed; then
     CURRENT_CA="mesh_ca"
   elif is_gcp_cas_installed; then
@@ -1802,6 +1901,7 @@ validate_ca_consistency() {
 
   if [[ -z "${CA}" ]]; then
     CA="${CURRENT_CA}"
+    context_set-option "CA" "${CA}"
   fi
 
   if [[ "${CA}" != "${CURRENT_CA}" ]]; then
@@ -1824,6 +1924,8 @@ is_gcp_cas_installed() {
 bind_user_to_iam_policy(){
   local ROLES; ROLES="${1}"
   local GCLOUD_MEMBER; GCLOUD_MEMBER="${2}"
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+
   info "Binding ${GCLOUD_MEMBER} to required IAM roles..."
   while read -r role; do
   retry 3 gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
@@ -1835,6 +1937,7 @@ EOF
 }
 
 exit_if_out_of_iam_policy() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local GCLOUD_MEMBER; GCLOUD_MEMBER="$(iam_user)";
   local MEMBER_ROLES
   MEMBER_ROLES="$(gcloud projects \
@@ -1866,6 +1969,7 @@ EOF
 }
 
 iam_user() {
+  local MANAGED_SERVICE_ACCOUNT; MANAGED_SERVICE_ACCOUNT="$(context_get-option "MANAGED_SERVICE_ACCOUNT")"
   if ! is_managed; then
     local_iam_user
     return
@@ -1914,6 +2018,7 @@ EOF
 required_iam_roles() {
   # meshconfig.admin - required for init, stackdriver, UI elements, etc.
   # servicemanagement.admin/serviceusage.serviceUsageAdmin - enables APIs
+  local CA; CA="$(context_get-option "CA")"
   if can_modify_gcp_components || \
      can_modify_cluster_labels || \
      can_modify_cluster_roles; then
@@ -1947,6 +2052,7 @@ required_iam_roles() {
 
 # [START required_apis]
 required_apis() {
+    local CA; CA="$(context_get-option "CA")"
     cat << EOF
 container.googleapis.com
 monitoring.googleapis.com
@@ -1977,12 +2083,15 @@ EOF
 # [END required_apis]
 
 enable_gcloud_apis(){
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+
   info "Enabling required APIs..."
   # shellcheck disable=SC2046
   retry 3 gcloud services enable --project="${PROJECT_ID}" $(required_apis | tr '\n' ' ')
 }
 
 get_enabled_apis() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local OUTPUT
   OUTPUT="$(retry 3 gcloud services list \
     --enabled \
@@ -2013,6 +2122,11 @@ EOF
 }
 
 init_meshconfig() {
+  local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
+  local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
+  local ENVIRON_PROJECT_ID; ENVIRON_PROJECT_ID="$(context_get-option "ENVIRON_PROJECT_ID")"
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+
   info "Initializing meshconfig API..."
   if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
     populate_environ_info
@@ -2037,6 +2151,8 @@ init_meshconfig() {
 }
 
 init_meshconfig_managed() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+
   info "Initializing meshconfig managed API..."
   run_command curl --request POST --fail \
     --data '{"prepare_istiod": true}' \
@@ -2047,6 +2163,7 @@ init_meshconfig_managed() {
 }
 
 get_auth_token() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
   echo "${TOKEN}"
 }
@@ -2066,6 +2183,10 @@ add_cluster_labels(){
   local WANT; WANT="$(mesh_id_label; echo "asmv=${VERSION_TAG}")";
 
   local NOTFOUND; NOTFOUND="$(find_missing_strings "${WANT}" "${LABELS}")"
+
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
 
   if [[ -z "${NOTFOUND}" ]]; then return 0; fi
 
@@ -2104,6 +2225,10 @@ mesh_id_label() {
 }
 
 get_cluster_labels() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+
   info "Reading labels for ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
   local LABELS
   LABELS="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
@@ -2128,6 +2253,10 @@ is_cluster_registered() {
   fi
 
   populate_environ_info
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local ENVIRON_PROJECT_ID; ENVIRON_PROJECT_ID="$(context_get-option "ENVIRON_PROJECT_ID")"
 
   local WANT
   WANT="//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
@@ -2143,6 +2272,10 @@ EOF
 }
 
 generate_membership_name() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+
   local MEMBERSHIP_NAME
   MEMBERSHIP_NAME="${CLUSTER_NAME}"
   if [[ "$(retry 2 gcloud container hub memberships list --format='value(name)' \
@@ -2172,6 +2305,8 @@ register_cluster() {
   local MEMBERSHIP_NAME
   MEMBERSHIP_NAME="$(generate_membership_name)"
   info "Registering the cluster as ${MEMBERSHIP_NAME}..."
+
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   retry 2 gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
     --project="${PROJECT_ID}" \
     --gke-uri="${GKE_CLUSTER_URI}" \
@@ -2189,7 +2324,12 @@ EOF
 }
 
 is_workload_identity_enabled() {
+  local WI_ENABLED; WI_ENABLED="$(context_get-option "WI_ENABLED")"
   if [[ "${WI_ENABLED}" -eq 1 ]]; then return; fi
+
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
 
   local ENABLED
   ENABLED="$(gcloud container clusters describe \
@@ -2199,7 +2339,12 @@ is_workload_identity_enabled() {
     --format=json | \
     jq .workloadIdentityConfig)"
 
-  if [[ "${ENABLED}" = 'null' ]]; then false; else WI_ENABLED=1; fi
+  if [[ "${ENABLED}" = 'null' ]]; then 
+    false; 
+  else 
+    WI_ENABLED=1;
+    context_set-option "WI_ENABLED" "${WI_ENABLED}"
+  fi
 }
 
 is_membership_crd_installed() {
@@ -2215,13 +2360,23 @@ is_membership_crd_installed() {
 }
 
 populate_environ_info() {
+  local ENVIRON_PROJECT_ID; ENVIRON_PROJECT_ID="$(context_get-option "ENVIRON_PROJECT_ID")"
+  local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
+
   if [[ -n "${ENVIRON_PROJECT_ID}" && -n "${HUB_MEMBERSHIP_ID}" ]]; then return; fi
   if ! is_membership_crd_installed; then return; fi
   HUB_MEMBERSHIP_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.owner.id | sed 's/^\"\/\/gkehub.googleapis.com\/projects\/\(.*\)\/locations\/global\/memberships\/\(.*\)\"$/\2/g')"
+  context_set-option "HUB_MEMBERSHIP_ID" "${HUB_MEMBERSHIP_ID}"
+
   ENVIRON_PROJECT_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.workload_identity_pool | sed 's/^\"\(.*\).\(svc\|hub\).id.goog\"$/\1/g')"
+  context_set-option "ENVIRON_PROJECT_ID" "${ENVIRON_PROJECT_ID}"
 }
 
 enable_workload_identity(){
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+
   if is_workload_identity_enabled; then return; fi
   info "Enabling Workload Identity on ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
   info "(This could take awhile, up to 10 minutes)"
@@ -2243,6 +2398,10 @@ EOF
 }
 
 is_stackdriver_enabled() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+
   local ENABLED
   ENABLED="$(gcloud container clusters describe \
     --project="${PROJECT_ID}" \
@@ -2260,6 +2419,10 @@ is_stackdriver_enabled() {
 }
 
 enable_stackdriver_kubernetes(){
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+
   info "Enabling Stackdriver on ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
   retry 2 gcloud container clusters update "${CLUSTER_NAME}" \
     --project="${PROJECT_ID}" \
@@ -2279,6 +2442,7 @@ EOF
 }
 
 is_user_cluster_admin() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local GCLOUD_USER; GCLOUD_USER="$(gcloud config get-value core/account)"
   local IAM_USER; IAM_USER="$(local_iam_user)"
   local ROLES
@@ -2361,12 +2525,16 @@ register_gce_identity_provider() {
 }
 
 should_enable_service_mesh_feature() {
+  local USE_VM; USE_VM="$(context_get-option "USE_VM")"
+
   if [[ "${USE_VM}" -eq 0 ]]; then
     false
   fi
 }
 
 enable_service_mesh_feature() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+
   info "Enabling the service mesh feature..."
 
   # IAM permission: gkehub.features.create
@@ -2388,6 +2556,8 @@ EOF
 }
 
 is_service_mesh_feature_enabled() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+
   local RESPONSE
   # IAM permission: gkehub.features.get
   RESPONSE="$(run_command curl -s -H "X-Goog-User-Project: ${PROJECT_ID}"  \
@@ -2401,6 +2571,17 @@ is_service_mesh_feature_enabled() {
 
 ### Installation functions ###
 configure_package() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
+  local ENVIRON_PROJECT_ID; ENVIRON_PROJECT_ID="$(context_get-option "ENVIRON_PROJECT_ID")"
+  local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
+  local CA; CA="$(context_get-option "CA")"
+  local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
+  local USE_VM; USE_VM="$(context_get-option "USE_VM")"
+  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
+
   info "Configuring kpt package..."
 
   populate_cluster_values
@@ -2461,6 +2642,9 @@ EOF
 }
 
 print_config() {
+  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
+  local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
+
   if [[ "${MANAGED}" -eq 1 ]]; then
     cat "${MANAGED_MANIFEST}"
     return
@@ -2477,6 +2661,11 @@ EOF
 }
 
 install_secrets() {
+  local CA_CERT; CA_CERT="$(context_get-option "CA_CERT")"
+  local CA_KEY; CA_KEY="$(context_get-option "CA_KEY")"
+  local CA_ROOT; CA_ROOT="$(context_get-option "CA_ROOT")"
+  local CA_CHAIN; CA_CHAIN="$(context_get-option "CA_CHAIN")"
+
   info "Installing certificates into the cluster..."
   kubectl create secret generic cacerts -n istio-system \
     --from-file="${CA_CERT}" \
@@ -2486,6 +2675,8 @@ install_secrets() {
 }
 
 init_gcp_cas() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
   local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="$PROJECT_ID.svc.id.goog[istio-system/istiod-service-account]"
 
   local NAME; NAME=$(echo "${CA_NAME}" | cut -f6 -d/)
@@ -2509,6 +2700,11 @@ does_istiod_exist(){
 }
 
 install_asm() {
+  local MODE; MODE="$(context_get-option "MODE")"
+  local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
+  local USE_VM; USE_VM="$(context_get-option "USE_VM")"
+  local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
+
   if ! does_istiod_exist && [[ "${_CI_NO_REVISION}" -ne 1 ]]; then
     info "Installing validation webhook fix..."
     retry 3 kubectl apply -f "${VALIDATION_FIX_SERVICE}"
@@ -2582,6 +2778,10 @@ expose_istiod() {
 }
 
 start_managed_control_plane() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+
   local CR_IMAGE_JSON; CR_IMAGE_JSON="";
   if [[ -n "${_CI_CLOUDRUN_IMAGE_HUB}" ]]; then
     CR_IMAGE_JSON=$(cat <<EOF
@@ -2609,6 +2809,8 @@ scrape_managed_urls() {
 }
 
 install_managed_components() {
+  local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
+
   info "Configuring base installation for managed control plane..."
   kubectl apply --overwrite=true -f "${BASE_REL_PATH}"
 
@@ -2625,6 +2827,8 @@ install_managed_components() {
 }
 
 outro() {
+  local MODE; MODE="$(context_get-option "MODE")"
+  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
 
   info ""
   info "$(starline)"
