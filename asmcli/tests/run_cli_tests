@@ -49,6 +49,8 @@ clear_variables() {
   ONLY_VALIDATE=0; export ONLY_VALIDATE;
   VERBOSE=0; export VERBOSE;
   _SLEEP_TIME=0; export _SLEEP_TIME;
+
+  context_init
 }
 
 nc() {
