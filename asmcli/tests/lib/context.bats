@@ -45,5 +45,27 @@ teardown() {
   assert_success
 
   run context_get-option "MODE"
-  assert_output install
+  assert_output "install"
+}
+
+@test "test context_FILE_LOCATION append istioctl files" {
+  run context_list-istio-yamls
+  assert_output ""
+
+  run context_append-istio-yaml "istio.yaml"
+  assert_success
+
+  run context_list-istio-yamls
+  assert_output "istio.yaml"
+}
+
+@test "test context_FILE_LOCATION append kubectl files" {
+  run context_list-kube-yamls
+  assert_output ""
+
+  run context_append-kube-yaml "kube.yaml"
+  assert_success
+
+  run context_list-kube-yamls
+  assert_output "kube.yaml"
 }
