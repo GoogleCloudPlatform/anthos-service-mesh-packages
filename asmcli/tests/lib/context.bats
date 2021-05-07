@@ -45,5 +45,67 @@ teardown() {
   assert_success
 
   run context_get-option "MODE"
-  assert_output install
+  assert_output "install"
+}
+
+@test "test context_FILE_LOCATION append a istioctl file" {
+  run context_list-istio-yamls
+  assert_output ""
+
+  run context_append-istio-yaml "istio-1.yaml"
+  assert_success
+
+  run context_list-istio-yamls
+  assert_output "istio-1.yaml"
+}
+
+@test "test context_FILE_LOCATION append a kubectl file" {
+  run context_list-kube-yamls
+  assert_output ""
+
+  run context_append-kube-yaml "kube-1.yaml"
+  assert_success
+
+  run context_list-kube-yamls
+  assert_output "kube-1.yaml"
+}
+
+@test "test context_FILE_LOCATION append multiple istioctl files" {
+  run context_list-istio-yamls
+  assert_output ""
+
+  run context_append-istio-yaml "istio-1.yaml"
+  assert_success
+
+  run context_list-istio-yamls
+  assert_output "istio-1.yaml"
+
+  run context_append-istio-yaml "istio-2.yaml"
+  assert_success
+
+  run context_list-istio-yamls
+  assert_output --stdin <<EOF
+istio-1.yaml
+istio-2.yaml
+EOF
+}
+
+@test "test context_FILE_LOCATION append kubectl files" {
+  run context_list-kube-yamls
+  assert_output ""
+
+  run context_append-kube-yaml "kube-1.yaml"
+  assert_success
+
+  run context_list-kube-yamls
+  assert_output "kube-1.yaml"
+
+  run context_append-kube-yaml "kube-2.yaml"
+  assert_success
+
+  run context_list-kube-yamls
+  assert_output --stdin <<EOF
+kube-1.yaml
+kube-2.yaml
+EOF
 }
