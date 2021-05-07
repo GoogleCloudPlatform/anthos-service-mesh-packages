@@ -1998,6 +1998,7 @@ local_iam_user() {
   fi
 
   info "Getting account information..."
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local ACCOUNT_NAME
   ACCOUNT_NAME="$(retry 3 gcloud auth list \
     --project="${PROJECT_ID}" \
