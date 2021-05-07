@@ -81,9 +81,7 @@ main() {
   validate_args
 
   set_up_local_workspace
-  if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
-    configure_kubectl
-  fi
+  configure_kubectl
 
   validate_cli_dependencies
 
@@ -314,7 +312,12 @@ gcloud() {
 }
 
 kubectl() {
-  run_command "${AKUBECTL}" "${@}"
+  local KCF
+  KCF="$(context_get-option "KUBECONFIG")"
+  if [[ -z "${KCF}" ]]; then
+    KCF="${KUBECONFIG}"
+  fi
+  run_command "${AKUBECTL}" --kubeconfig "${KCF}" "${@}"
 }
 
 kpt() {
@@ -387,9 +390,12 @@ configure_kubectl(){
 
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
     info "Fetching/writing GCP credentials to kubeconfig file..."
-    retry 2 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
+    KUBECONFIG="${KUBECONFIG}" retry 2 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
       --project="${PROJECT_ID}" \
       --zone="${CLUSTER_LOCATION}"
+    context_set-option "KUBECONFIG" "${KUBECONFIG}"
+  else
+    KUBECONFIG="$(context_get-option "KUBECONFIG")"
   fi
 
   if ! hash nc 2>/dev/null; then
@@ -400,7 +406,8 @@ configure_kubectl(){
 
   info "Verifying connectivity (10s)..."
   local ADDR
-  ADDR="$(kubectl config view --minify=true -ojson | jq .clusters[0].cluster.server -r)"
+  ADDR="$(kubectl config view --minify=true -ojson | \
+    jq .clusters[0].cluster.server -r)"
 
   local RETVAL; RETVAL=0;
   run_command nc -zvw 10 "${ADDR:8:${#ADDR}}" 443 || RETVAL=$?
@@ -451,6 +458,10 @@ is_managed() {
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
 
   if [[ "${MANAGED}" -ne 1 ]]; then false; fi
+}
+
+is_gcp() {
+  true # hook for later
 }
 
 is_sa() {
@@ -608,8 +619,8 @@ OPTIONS:
   -l|--cluster_location  <LOCATION>
   -n|--cluster_name      <NAME>
   -p|--project_id        <ID>
-  --kubeconfig           <KUBECONFIG_FILE>
-  --context              <CONTEXT>
+  --kc|--kubeconfig      <KUBECONFIG_FILE>
+  --ctx|--context        <CONTEXT>
   -m|--mode              <MODE>
   -c|--ca                <CA>
 
@@ -826,6 +837,7 @@ parse_args() {
       --kc | --kubeconfig)
         arg_required "${@}"
         context_set-option "KUBECONFIG" "${2}"
+        KUBECONFIG_SUPPLIED=1
         shift 2
         ;;
       --ctx | --context)
@@ -1103,7 +1115,6 @@ validate_args() {
       MISSING_ARGS=1
       warn "Missing value for ${REQUIRED_ARG}"
     fi
-    readonly "${REQUIRED_ARG}"
   done <<EOF
 MODE
 EOF
@@ -1117,14 +1128,10 @@ EOF
       CLUSTER_DETAIL_SUPPLIED=1 # gke cluster param usage intended
     fi
   done <<EOF
+PROJECT_ID
 CLUSTER_LOCATION
 CLUSTER_NAME
-PROJECT_ID
 EOF
-
-  if [[ -n "${KUBECONFIG}" ]]; then
-    KUBECONFIG_SUPPLIED=1 # kubeconfig usage intended
-  fi
 
   # Script will not infer the intent between the 2 use cases in case both values are provided
   if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 1 && "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
@@ -1144,12 +1151,24 @@ EOF
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 && -z "${CONTEXT}" ]]; then
     # set CONTEXT to current-context in the KUBECONFIG
     # or fail-fast if current-context doesn't exist
-    CONTEXT="$(kubectl --kubeconfig config config current-context)"
+    CONTEXT="$(kubectl config current-context)"
     if [[ -z "${CONTEXT}" ]]; then
       MISSING_ARGS=1
       warn "Missing current-context in the KUBECONFIG. Please provide context with --context flag or set a current-context in the KUBECONFIG"
     else
       context_set-option "CONTEXT" "${CONTEXT}"
+    fi
+  fi
+
+  if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
+    info "Reading cluster information for ${CONTEXT}"
+    IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
+${CONTEXT}
+EOF
+    if is_gcp; then
+      context_set-option "PROJECT_ID" "${PROJECT_ID}"
+      context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
+      context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
     fi
   fi
 
@@ -1414,11 +1433,13 @@ set_up_local_workspace() {
   context_set-option "OUTPUT_DIR" "${OUTPUT_DIR}"
 
   # If KUBECONFIG file is supplied, keep using that.
+  KUBECONFIG="$(context_get-option "KUBECONFIG")"
+
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
     KUBECONFIG="asm_kubeconfig"
+    context_set-option "KUBECONFIG" "${KUBECONFIG}"
   fi
 
-  export KUBECONFIG
   info "Using ${KUBECONFIG} as the kubeconfig..."
 }
 
@@ -1652,14 +1673,6 @@ validate_cluster() {
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local RESULT; RESULT=""
-
-  if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
-    local CURRENT_CONTEXT; CURRENT_CONTEXT="$(kubectl config current-context)"
-    info "Confirming cluster information for ${CURRENT_CONTEXT}"
-    IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
-${CURRENT_CONTEXT}
-EOF
-  fi
 
   RESULT="$(gcloud container clusters list \
     --project="${PROJECT_ID}" \
