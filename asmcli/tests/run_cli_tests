@@ -565,7 +565,7 @@ EOF
   fi
   echo "***"
 
-  PROJECT_ID="sa"
+  context_set-option PROJECT_ID sa
   TYPE="$(local_iam_user | cut -f 1 -d":")"
   echo "Got type ${TYPE}"
 
@@ -577,7 +577,7 @@ EOF
   fi
   echo "***"
 
-  PROJECT_ID="notloggedin"
+  context_set-option PROJECT_ID notloggedin
 
   FATAL_EXITS=0
   if [[ "$(local_iam_user)" != "user:" ]]; then
