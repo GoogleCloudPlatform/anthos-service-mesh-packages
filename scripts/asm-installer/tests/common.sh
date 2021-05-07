@@ -290,6 +290,9 @@ configure_kubectl() {
   local PROJECT_ID; PROJECT_ID="${2}";
   local CLUSTER_LOCATION; CLUSTER_LOCATION="${3}";
 
+  KUBECONFIG="$(mktemp)"
+  export KUBECONFIG
+
   gcloud container clusters get-credentials \
     "${CLUSTER_NAME}" \
     --project "${PROJECT_ID}" \
@@ -716,6 +719,9 @@ run_basic_test() {
     --output-dir ${OUTPUT_DIR} \
     ${EXTRA_FLAGS}"
   # shellcheck disable=SC2086
+  CLUSTER_LOCATION="" \
+  CLUSTER_NAME="" \
+  PROJECT_ID="" \
   _CI_REVISION_PREFIX="${LT_NAMESPACE}" \
     ../install_asm ${KEY_FILE} ${SERVICE_ACCOUNT} \
     -l "${LT_CLUSTER_LOCATION}" \
@@ -725,6 +731,7 @@ run_basic_test() {
     -c "${CA}" -v \
     --output-dir "${OUTPUT_DIR}" \
     ${EXTRA_FLAGS} ${_EXTRA_FLAGS} 2>&1 | tee "${LT_NAMESPACE}" &
+
 
   LABEL="$(grep -o -m 1 'istio.io/rev=\S*' "${LT_NAMESPACE}")"
   REV="$(echo "${LABEL}" | cut -f 2 -d =)"
