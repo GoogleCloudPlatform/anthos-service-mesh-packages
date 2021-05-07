@@ -73,6 +73,7 @@ context_set-option() {
   && mv "${TEMP_FILE}" "${context_FILE_LOCATION}"
 }
 
+# TODO: support appending multiple files at once
 context_append-istio-yaml() {
   local YAML; YAML="${1}"
   local TEMP_FILE; TEMP_FILE="$(mktemp)"
@@ -85,6 +86,7 @@ context_list-istio-yamls() {
   jq -S -r '.istioctlFiles[]' "${context_FILE_LOCATION}"
 }
 
+# TODO: support appending multiple files at once
 context_append-kube-yaml() {
   local YAML; YAML="${1}"
   local TEMP_FILE; TEMP_FILE="$(mktemp)"
