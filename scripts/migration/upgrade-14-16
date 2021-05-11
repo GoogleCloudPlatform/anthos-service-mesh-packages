@@ -28,6 +28,7 @@ usage() {
     echo "  ./upgrade-14-16 [OPTIONS]"
     echo
     echo "  --reset               reset the upgrade tool to start from the beginning."
+    echo "  --rollback            roll back the installation to the original (1.4) state."
     echo "  --skip-confirm, -y    select 'yes' for any prompts."
     echo
 }
@@ -141,7 +142,6 @@ disable_galley_webhook() {
 
 enable_galley_webhook() {
   echo "Enabling the Istio validating webhook:"
-  echo ":"
   kubectl patch clusterrole -n istio-system istio-galley-istio-system --type='json' -p='[{"op": "replace", "path": "/rules/2/verbs/0", "value": '\''*'\''}]'
   echo "OK"
 }
@@ -171,6 +171,7 @@ generate_auth_migration_crs() {
 prompt_check_auth_crs () {
   echo
   echo "Please inspect ${TMP_DIR}/beta-policy.yaml and ensure that the translated CRs look correct."
+  echo "Make a backup of any alpha policies in case you need to roll back."
   echo "When ready, re-run this tool to continue the migration."
   echo "The tool will automatically resume from this point."
   echo
@@ -205,11 +206,284 @@ move_gateway_to_new_istio() {
   echo "OK"
 }
 
-turn_down_old_istio() {
-  echo "Turning down old control plane:"
-  kubectl scale deploy -n istio-system --replicas=0 \
+move_gateway_to_old_istio() {
+  echo "Updating ingress gateway to use the old control plane:"
+  operator_cr_name=$(kubectl get istiooperators -n istio-system --no-headers | awk '{print $1}')
+  kubectl patch istiooperator -n istio-system "${operator_cr_name}" --type='json' -p='[{"op": "replace", "path": "/spec/components/ingressGateways/0/enabled", "value": false}]'
+  cat <<EOF >| "${TMP_DIR}/gateway-14.yaml"
+apiVersion: v1
+kind: Service
+metadata:
+  annotations: null
+  labels:
+    addonmanager.kubernetes.io/mode: EnsureExists
+    app: istio-ingressgateway
+    chart: gateways
+    heritage: Tiller
+    istio: ingressgateway
+    k8s-app: istio
+    kubernetes.io/cluster-service: "true"
+    release: istio
+  name: istio-ingressgateway
+  namespace: istio-system
+spec:
+  ports:
+  - name: status-port
+    port: 15020
+    targetPort: 15020
+  - name: http2
+    port: 80
+    targetPort: 80
+  - name: https
+    port: 443
+  - name: tcp
+    port: 31400
+  - name: https-kiali
+    port: 15029
+    targetPort: 15029
+  - name: https-prometheus
+    port: 15030
+    targetPort: 15030
+  - name: https-grafana
+    port: 15031
+    targetPort: 15031
+  - name: https-tracing
+    port: 15032
+    targetPort: 15032
+  - name: tls
+    port: 15443
+    targetPort: 15443
+  selector:
+    app: istio-ingressgateway
+    istio: ingressgateway
+    release: istio
+  type: LoadBalancer
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    addonmanager.kubernetes.io/mode: EnsureExists
+    app: istio-ingressgateway
+    chart: gateways
+    heritage: Tiller
+    istio: ingressgateway
+    k8s-app: istio
+    release: istio
+  name: istio-ingressgateway
+  namespace: istio-system
+spec:
+  selector:
+    matchLabels:
+      app: istio-ingressgateway
+      istio: ingressgateway
+  strategy:
+    rollingUpdate:
+      maxSurge: 100%
+      maxUnavailable: 25%
+  template:
+    metadata:
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: docker/default
+        sidecar.istio.io/inject: "false"
+      labels:
+        app: istio-ingressgateway
+        chart: gateways
+        heritage: Tiller
+        istio: ingressgateway
+        release: istio
+    spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+            weight: 2
+          - preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - ppc64le
+            weight: 2
+          - preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - s390x
+            weight: 2
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+                - ppc64le
+                - s390x
+      containers:
+      - args:
+        - proxy
+        - router
+        - --domain
+        - \$(POD_NAMESPACE).svc.cluster.local
+        - --log_output_level=default:info
+        - --drainDuration
+        - 45s
+        - --parentShutdownDuration
+        - 1m0s
+        - --connectTimeout
+        - 10s
+        - --serviceCluster
+        - istio-ingressgateway
+        - --zipkinAddress
+        - zipkin:9411
+        - --proxyAdminPort
+        - "15000"
+        - --statusPort
+        - "15020"
+        - --controlPlaneAuthPolicy
+        - NONE
+        - --discoveryAddress
+        - istio-pilot:15010
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: INSTANCE_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.podIP
+        - name: HOST_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.hostIP
+        - name: SERVICE_ACCOUNT
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.serviceAccountName
+        - name: ISTIO_META_POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: ISTIO_META_CONFIG_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: ISTIO_METAJSON_LABELS
+          value: |
+            {"app":"istio-ingressgateway","chart":"gateways","heritage":"Tiller","istio":"ingressgateway","release":"istio"}
+        - name: ISTIO_META_CLUSTER_ID
+          value: Kubernetes
+        - name: SDS_ENABLED
+          value: "false"
+        - name: ISTIO_META_WORKLOAD_NAME
+          value: istio-ingressgateway
+        - name: ISTIO_META_OWNER
+          value: kubernetes://apis/apps/v1/namespaces/istio-system/deployments/istio-ingressgateway
+        - name: ISTIO_META_ROUTER_MODE
+          value: sni-dnat
+        image: gke.gcr.io/istio/proxyv2:1.4.10-gke.8
+        imagePullPolicy: IfNotPresent
+        name: istio-proxy
+        ports:
+        - containerPort: 15020
+        - containerPort: 80
+        - containerPort: 443
+        - containerPort: 31400
+        - containerPort: 15029
+        - containerPort: 15030
+        - containerPort: 15031
+        - containerPort: 15032
+        - containerPort: 15443
+        - containerPort: 15090
+          name: http-envoy-prom
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 30
+          httpGet:
+            path: /healthz/ready
+            port: 15020
+            scheme: HTTP
+          initialDelaySeconds: 1
+          periodSeconds: 2
+          successThreshold: 1
+          timeoutSeconds: 1
+        volumeMounts:
+        - mountPath: /etc/certs
+          name: istio-certs
+          readOnly: true
+        - mountPath: /etc/istio/ingressgateway-certs
+          name: ingressgateway-certs
+          readOnly: true
+        - mountPath: /etc/istio/ingressgateway-ca-certs
+          name: ingressgateway-ca-certs
+          readOnly: true
+      serviceAccountName: istio-ingressgateway-service-account
+      volumes:
+      - name: istio-certs
+        secret:
+          optional: true
+          secretName: istio.istio-ingressgateway-service-account
+      - name: ingressgateway-certs
+        secret:
+          optional: true
+          secretName: istio-ingressgateway-certs
+      - name: ingressgateway-ca-certs
+        secret:
+          optional: true
+          secretName: istio-ingressgateway-ca-certs
+
+EOF
+  echo "OK"
+}
+
+scale_old_istio() {
+  local replicas="${1}"
+  echo "Scaling 1.4 control plane to ${replicas}:"
+  kubectl scale deploy -n istio-system --replicas="${replicas}" \
     istio-citadel istio-galley istio-pilot istio-policy istio-sidecar-injector istio-telemetry prometheus promsd
   echo "OK"
+}
+
+rollback() {
+  echo "This command option will roll back your addon back to 1.4."
+  prompt "Do you want to proceed?" || exit 0
+  echo "Rolling back to 1.4..."
+  scale_old_istio 1
+  enable_galley_webhook
+  move_gateway_to_old_istio
+  set_state "${STATE_START}"
+  get_istio_rev_label
+  echo "You may need to take further manual steps to complete the rollback:"
+  echo "1. Delete the beta auth policies with 'kubectl delete -f ${TMP_DIR}/beta-policy.yaml'"
+  echo "2. Restore the old alpha auth policies using 'kubectl apply -f <alpha auth backup you created earlier>.'"
+  echo "3. If you previously scaled any of the Istio deployments to values other than 1, restore them to your previous"
+  echo "   setting using the 'kubectl scale' command."
+  echo "4. If you re-labeled any namespaces with the new istio.io/rev label, restore the old label using:"
+  echo "     kubectl label namespace <NAMESPACE> istio-injection istio.io/rev- --overwrite"
+  echo "   and restart any workloads that have been injected with new 1.6 proxies."
 }
 
 mkdir -p "${TMP_DIR}" || die "Failed to create temp directory ${TMP_DIR} under /tmp."
@@ -226,6 +500,10 @@ while (( "$#" )); do
             ;;
         --reset)
             set_state "${STATE_START}"
+            exit 0
+            ;;
+        --rollback)
+            rollback
             exit 0
             ;;
         -y | --skip-confirm)
@@ -261,7 +539,7 @@ fi
 
 if [[ "${STATE}" == "${STATE_AFTER_RESTART}" ]]; then
   move_gateway_to_new_istio
-  turn_down_old_istio
+  scale_old_istio 0
   set_state "${STATE_COMPLETE}"
   echo "Upgrade successfully completed."
   exit 0
