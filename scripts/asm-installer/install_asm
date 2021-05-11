@@ -2549,8 +2549,8 @@ start_managed_control_plane() {
     get --ignore-not-found cm asm-options \
     -o jsonpath='{.data.ASM_OPTS}' || true)"
 
-  local CNI; CNI="no"
-  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then CNI="yes"; fi
+  local CNI; CNI="off"
+  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then CNI="on"; fi
 
   if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=${CNI}"* ]]; then
     info "Configuring control plane options..."
