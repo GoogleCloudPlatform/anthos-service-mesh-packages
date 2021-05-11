@@ -1,0 +1,231 @@
+#!/bin/bash
+
+set -ex
+
+KEY_FILE="${KEY_FILE:=}"
+OUTPUT_DIR="${OUTPUT_DIR:="vm"}"
+WORK_DIR="${WORK_DIR:=}"
+SERVICE_ACCOUNT="${SERVICE_ACCOUNT:=}"
+VM_NAMESPACE="${VM_NAMESPACE:="vm"}"
+VM_NETWORK="${VM_NETWORK:="default"}" # Customize values for multi-cluster/multi-network as needed
+VM_APP="${VM_APP:=}"
+VM_IP="${VM_IP:=}"
+
+
+main() {
+  init
+  parse_validate_args "${@}"
+  prepare_vm
+  create_workloadgroup
+  create_workloadentry
+  register_vm_transfer_file
+
+  sleep 3
+
+  # SSH to VM and execute runagent.sh on VM
+  until ssh -i "${KEY_FILE}" -o StrictHostKeyChecking=no root@${VM_IP} 'chmod +x runagent.sh; ./runagent.sh'; do
+      sleep 3
+  done
+}
+
+init() {
+  # BSD-style readlink apparently doesn't have the same -f toggle on readlink
+  case "$(uname)" in
+    Linux ) APATH="readlink";;
+    Darwin) APATH="stat";;
+    *);;
+  esac
+}
+
+parse_validate_args() {
+
+  # use the absolute path for the key file
+  if [[ -f "${KEY_FILE}" ]]; then
+    KEY_FILE="$(apath -f "${KEY_FILE}")"
+    readonly KEY_FILE
+  elif [[ -n "${KEY_FILE}" ]]; then
+    fatal "Couldn't find key file ${KEY_FILE}."
+  fi
+
+  retrieve_cluster_network
+
+  case "${1}" in
+    multi-network | multi-network)
+      read_args "${@}"
+      if [[ ${NETWORK} -eq ${VM_NETWORK} ]]; then
+        warn "vm is in same network: ${VM_NETWORK} as BM cluster "
+      fi
+      shift 1
+      ;;
+    single-network | single-network)
+      read_args "${@}"
+      if [[ -z ${VM_NETWORK} && ${NETWORK} -ne ${VM_NETWORK} ]]; then
+        warn "vm is in different network: ${VM_NETWORK} as BM cluster "
+      fi
+      shift 1
+      ;;
+    -h | --help)
+      usage_vm_setup
+      exit
+      ;;
+    *)
+      warn "Unknown command ${1}"
+      exit 2
+      ;;
+  esac
+
+  # name of the Kubernetes service account you want to use for your VM. same as $VM_APP by default
+  if [[ -n "${SERVICE_ACCOUNT}" ]]; then
+    echo "Service Account is not specified. Set Service Account as ${VM_APP}"
+    SERVICE_ACCOUNT=${VM_APP}
+  fi
+}
+
+prepare_vm() {
+  # Create VM namespace and service account.
+  if ! kubectl get ns "${VM_NAMESPACE}"; then
+    kubectl create namespace "${VM_NAMESPACE}"
+  fi
+
+  if ! kubectl get serviceaccount "${SERVICE_ACCOUNT}" -n "${VM_NAMESPACE}"; then
+    kubectl create serviceaccount "${SERVICE_ACCOUNT}" -n "${VM_NAMESPACE}"
+  fi
+
+  scp -i "${KEY_FILE}" ${WORK_DIR}/runagent.sh root@${VM_IP}:~
+
+  mkdir -p ${OUTPUT_DIR}/vm-${VM_APP}
+
+  cd ${OUTPUT_DIR}/vm-${VM_APP}
+}
+
+create_workloadgroup() {
+  # Register VM and create a service for the VM
+  cat <<EOF > workloadgroup.yaml
+  apiVersion: networking.istio.io/v1alpha3
+  kind: WorkloadGroup
+  metadata:
+    name: "${VM_APP}"
+    namespace: "${VM_NAMESPACE}"
+  spec:
+    metadata:
+      labels:
+        app: "${VM_APP}"
+    template:
+      serviceAccount: "${SERVICE_ACCOUNT}"
+      network: "${VM_NETWORK}"
+EOF
+
+  kubectl --namespace "${VM_NAMESPACE}" apply -f workloadgroup.yaml
+}
+
+create_workloadentry() {
+  cat <<EOF > k8sservice.yaml
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: "${VM_APP}"
+    namespace: "${VM_NAMESPACE}"
+    labels:
+      asm_resource_type: VM
+  spec:
+    ports:
+    - port: 8080
+      name: http
+      targetPort: 8080
+    selector:
+      service.istio.io/canonical-name: "${VM_APP}"
+EOF
+
+  kubectl --namespace "${VM_NAMESPACE}" apply -f k8sservice.yaml
+}
+
+register_vm_transfer_file() {
+  # Create files to transfer to VM
+  cd ${WORK_DIR}
+
+  ./istioctl x workload entry configure -f ${OUTPUT_DIR}/vm-${VM_APP}/workloadgroup.yaml -o ${OUTPUT_DIR}/vm-${VM_APP} --clusterID ${CLUSTER} --autoregister
+
+  scp -i "${KEY_FILE}" istio-sidecar.rpm root@${VM_IP}:~
+  scp -i "${KEY_FILE}" server root@${VM_IP}:~
+
+  cd ${OUTPUT_DIR}/vm-${VM_APP}
+
+  scp -i "${KEY_FILE}" cluster.env hosts istio-token mesh.yaml root-cert.pem root@${VM_IP}:~
+
+}
+
+
+apath() {
+  "${APATH}" "${@}"
+}
+
+arg_required() {
+  if [[ ! "${2:-}" || "${2:0:1}" = '-' ]]; then
+    fatal "Option ${1} requires an argument."
+  fi
+}
+
+read_args() {
+  while [[ ${#} != 0 ]]; do
+    case "${1}" in
+      vm_ip | vm-ip)
+        arg_required "${@}"
+        VM_IP="${2}"
+        shift 2
+        ;;
+      vm_app | vm-app)
+        arg_required "${@}"
+        VM_APP="${2}"
+        shift 2
+        ;;
+      mesh_id | mesh-id)
+        arg_required "${@}"
+        MESH_ID="${2}"
+        shift 2
+        ;;
+      vm_network | vm-network)
+        arg_required "${@}"
+        VM_NETWORK="${2}"
+        shift 2
+        ;;
+      -k | --key_file | --key-file)
+        arg_required "${@}"
+        KEY_FILE="${2}"
+        shift 2
+        ;;
+      -s | --service_account | --service-account)
+        arg_required "${@}"
+        SERVICE_ACCOUNT="${2}"
+        shift 2
+        ;;
+      -l | --cluster_location | --cluster-location)
+        arg_required "${@}"
+        CLUSTER_LOCATION="${2}"
+        shift 2
+        ;;
+      -n | --cluster_name | --cluster-name)
+        arg_required "${@}"
+        CLUSTER_NAME="${2}"
+        shift 2
+        ;;
+      -p | --project_id | --project-id)
+        arg_required "${@}"
+        PROJECT_ID="${2}"
+        shift 2
+        ;;
+      *)
+        warn "Unknown option ${1}"
+        exit 2
+        ;;
+    esac
+  done
+}
+
+retrieve_cluster_network() {
+  info "Retrieving the cluster's network name..."
+
+  NETWORK="$(retry 2 run gcloud container clusters describe "${CLUSTER_NAME}" \
+    --zone="${CLUSTER_LOCATION}" \
+    --project="${PROJECT_ID}" \
+    --format="value(network)")"
+}
