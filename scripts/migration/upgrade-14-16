@@ -210,8 +210,7 @@ move_gateway_to_old_istio() {
   echo "Updating ingress gateway to use the old control plane:"
   operator_cr_name=$(kubectl get istiooperators -n istio-system --no-headers | awk '{print $1}')
   kubectl patch istiooperator -n istio-system "${operator_cr_name}" --type='json' -p='[{"op": "replace", "path": "/spec/components/ingressGateways/0/enabled", "value": false}]'
-  rm -f "${TMP_DIR}/gateway-14.yaml"
-  cat <<EOF > "${TMP_DIR}/gateway-14.yaml"
+  cat <<EOF >| "${TMP_DIR}/gateway-14.yaml"
 apiVersion: v1
 kind: Service
 metadata:
@@ -478,7 +477,7 @@ rollback() {
   set_state "${STATE_START}"
   get_istio_rev_label
   echo "You may need to take further manual steps to complete the rollback:"
-  echo "1. Delete the beta auth policies with kubectl delete -f ${TMP_DIR}/beta-policy.yaml"
+  echo "1. Delete the beta auth policies with 'kubectl delete -f ${TMP_DIR}/beta-policy.yaml'"
   echo "2. Restore the old alpha auth policies using 'kubectl apply -f <alpha auth backup you created earlier>.'"
   echo "3. If you previously scaled any of the Istio deployments to values other than 1, restore them to your previous"
   echo "   setting using the 'kubectl scale' command."
