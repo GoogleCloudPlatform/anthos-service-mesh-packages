@@ -186,7 +186,7 @@ spec:
               name: cni-net-dir
         - name: repair-cni
           image: "IMAGE_HUB/install-cni:IMAGE_TAG"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cni-image"}
-          command: ["/opt/cni/bin/istio-cni-repair"]
+          command: ["/opt/local/bin/istio-cni-repair"]
           env:
             - name: "REPAIR_NODE-NAME"
               valueFrom:
