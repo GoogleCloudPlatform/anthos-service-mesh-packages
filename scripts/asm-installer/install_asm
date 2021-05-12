@@ -35,7 +35,7 @@ MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=9}"; readonly MINOR;
 POINT="${POINT:=3}"; readonly POINT;
 REV="${REV:=2}"; readonly REV;
-CONFIG_VER="${CONFIG_VER:="4"}"; readonly CONFIG_VER;
+CONFIG_VER="${CONFIG_VER:="5"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
 ### File related constants ###
@@ -51,6 +51,7 @@ OPERATOR_MANIFEST=""
 BETA_CRD_MANIFEST=""
 MANAGED_MANIFEST=""
 MANAGED_WEBHOOKS=""
+CONNECT_RBAC=""
 EXPOSE_ISTIOD_SERVICE=""
 CANONICAL_CONTROLLER_MANIFEST=""
 
@@ -115,11 +116,14 @@ PRINT_HELP=0
 PRINT_VERSION=0
 CUSTOM_CA=0
 USE_HUB_WIP=0
+USE_MCP_CNI=0
 USE_VM=0
 ENVIRON_PROJECT_ID=""
 HUB_MEMBERSHIP_ID=""
 WI_ENABLED=0
 CUSTOM_REVISION=0
+NETWORK_POLICY_ENABLED=0
+HAS_TS=0
 
 main() {
   init
@@ -177,9 +181,15 @@ main() {
     if can_modify_gcp_components; then
       enable_workload_identity
       enable_stackdriver_kubernetes
+      if is_mcp_cni; then
+        enable_network_policy
+      fi
     else
       exit_if_no_workload_identity
       exit_if_stackdriver_not_enabled
+      if is_mcp_cni; then
+        exit_if_no_network_policy
+      fi
     fi
     if can_modify_gcp_iam_roles; then
       bind_user_to_iam_policy "roles/meshconfig.admin" "$(local_iam_user)"
@@ -295,6 +305,10 @@ init() {
     *);;
   esac
 
+  if hash ts 2>/dev/null; then
+    HAS_TS=1
+  fi
+
   if [[ "${POINT}" == "alpha" ]]; then
     RELEASE="${MAJOR}.${MINOR}-alpha.${REV}"
     REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}"
@@ -318,6 +332,8 @@ init() {
   BETA_CRD_MANIFEST="${OPTIONS_DIRECTORY}/v1beta1-crds.yaml"; readonly BETA_CRD_MANIFEST;
   MANAGED_MANIFEST="${OPTIONS_DIRECTORY}/managed-control-plane.yaml"; readonly MANAGED_MANIFEST;
   MANAGED_WEBHOOKS="${OPTIONS_DIRECTORY}/managed-control-plane-webhooks.yaml"; readonly MANAGED_WEBHOOKS;
+  MANAGED_CNI="${OPTIONS_DIRECTORY}/cni-managed.yaml"; readonly MANAGED_CNI;
+  CONNECT_RBAC="asm/third-party/hub-connect-impersonate-rbac.yaml"; readonly CONNECT_RBAC;
   EXPOSE_ISTIOD_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_SERVICE;
   CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
 
@@ -341,6 +357,7 @@ run() {
     "${@}" 2>/dev/null
     return "$?"
   fi
+
   info "Running: '${*}'"
   info "-------------"
   local RETVAL
@@ -465,7 +482,11 @@ error() {
 }
 
 info() {
-  echo "${SCRIPT_NAME}: ${1}" >&2
+  if [[ "${VERBOSE}" -eq 1 && "${HAS_TS}" -eq 1 ]]; then
+    echo "${SCRIPT_NAME}: ${1}" | TZ=utc ts '%Y-%m-%dT%.T' >&2
+  else
+    echo "${SCRIPT_NAME}: ${1}" >&2
+  fi
 }
 
 fatal() {
@@ -485,6 +506,10 @@ starline() {
 
 is_managed() {
   if [[ "${MANAGED}" -ne 1 ]]; then false; fi
+}
+
+is_mcp_cni() {
+  if [[ "${USE_MCP_CNI}" -ne 1 ]]; then false; fi
 }
 
 is_sa() {
@@ -821,6 +846,13 @@ parse_args() {
         ;;
       -o | --option)
         arg_required "${@}"
+
+        if [[ "${2}" == "cni-managed" ]]; then
+          USE_MCP_CNI=1
+          shift 2
+          continue
+        fi
+
         OPTIONAL_OVERLAY="${2},${OPTIONAL_OVERLAY}"
         if [[ "${2}" == "hub-meshca" ]]; then
           USE_HUB_WIP=1
@@ -1803,6 +1835,9 @@ required_iam_roles_mcp_sa() {
 roles/serviceusage.serviceUsageConsumer
 roles/container.admin
 roles/monitoring.metricWriter
+roles/logging.logWriter
+roles/gkehub.gatewayAdmin
+roles/gkehub.viewer
 EOF
 }
 
@@ -2098,6 +2133,20 @@ is_workload_identity_enabled() {
   if [[ "${ENABLED}" = 'null' ]]; then false; else WI_ENABLED=1; fi
 }
 
+is_network_policy_enabled() {
+  if [[ "${NETWORK_POLICY_ENABLED}" -eq 1 ]]; then return; fi
+
+  local ENABLED
+  ENABLED="$(gcloud container clusters describe \
+    --project="${PROJECT_ID}" \
+    --region "${CLUSTER_LOCATION}" \
+    "${CLUSTER_NAME}" \
+    --format=json | \
+    jq .networkPolicy.enabled)"
+
+  if [[ "${ENABLED}" = 'false' ]]; then false; else NETWORK_POLICY_ENABLED=1; fi
+}
+
 is_membership_crd_installed() {
   if ! kubectl api-resources --api-group=hub.gke.io | grep -q memberships; then
     false
@@ -2114,7 +2163,23 @@ populate_environ_info() {
   if [[ -n "${ENVIRON_PROJECT_ID}" && -n "${HUB_MEMBERSHIP_ID}" ]]; then return; fi
   if ! is_membership_crd_installed; then return; fi
   HUB_MEMBERSHIP_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.owner.id | sed 's/^\"\/\/gkehub.googleapis.com\/projects\/\(.*\)\/locations\/global\/memberships\/\(.*\)\"$/\2/g')"
-  ENVIRON_PROJECT_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.workload_identity_pool | sed 's/^\"\(.*\).\(svc\|hub\).id.goog\"$/\1/g')"
+  ENVIRON_PROJECT_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.workload_identity_pool | sed -E 's/^\"(.*)\.(svc|hub)\.id\.goog\"$/\1/')"
+}
+
+enable_network_policy(){
+  if is_network_policy_enabled; then return; fi
+  info "Enabling Network Policy on ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
+  info "(This could take awhile, up to 10 minutes)"
+  retry 2 gcloud container clusters update "${CLUSTER_NAME}" \
+    --project="${PROJECT_ID}" \
+    --zone="${CLUSTER_LOCATION}" \
+    --update-addons=NetworkPolicy=ENABLED
+
+  retry 2 gcloud container clusters update "${CLUSTER_NAME}" \
+    --project="${PROJECT_ID}" \
+    --zone="${CLUSTER_LOCATION}" \
+    --quiet \
+    --enable-network-policy
 }
 
 enable_workload_identity(){
@@ -2131,6 +2196,17 @@ exit_if_no_workload_identity() {
   if ! is_workload_identity_enabled; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Workload identity is not enabled on ${CLUSTER_NAME}. Please enable it and
+retry, or run the script with the '--enable_gcp_components' flag to allow
+the script to enable it on your behalf.
+$(enable_common_message)
+EOF
+  fi
+}
+
+exit_if_no_network_policy() {
+  if ! is_network_policy_enabled; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Network Policy is not enabled on ${CLUSTER_NAME}. Please enable it and
 retry, or run the script with the '--enable_gcp_components' flag to allow
 the script to enable it on your behalf.
 $(enable_common_message)
@@ -2350,6 +2426,7 @@ EOF
 $(scrape_managed_urls)
 EOF
 
+    kpt cfg set asm anthos.servicemesh.managed-controlplane.service-account "${MANAGED_SERVICE_ACCOUNT}"
     kpt cfg set asm anthos.servicemesh.controlplane.validation-url "${VALIDATION_URL}"
     kpt cfg set asm anthos.servicemesh.managed-controlplane.cloudrun-addr "${CLOUDRUN_ADDR}"
   fi
@@ -2477,6 +2554,31 @@ expose_istiod() {
 }
 
 start_managed_control_plane() {
+  info "Configuring base installation for managed control plane..."
+  run kubectl apply --overwrite=true -f "${BASE_REL_PATH}"
+
+  local ASM_OPTS
+  ASM_OPTS="$(kubectl -n istio-system \
+    get --ignore-not-found cm asm-options \
+    -o jsonpath='{.data.ASM_OPTS}' || true)"
+
+  local CNI; CNI="off"
+  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then CNI="on"; fi
+
+  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=${CNI}"* ]]; then
+    info "Configuring control plane options..."
+    run kubectl apply --overwrite=true -f - <<EOF
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: asm-options
+  namespace: istio-system
+data:
+  ASM_OPTS: "CNI=${CNI}"
+EOF
+  fi
+
   local CR_IMAGE_JSON; CR_IMAGE_JSON="";
   if [[ -n "${_CI_CLOUDRUN_IMAGE_HUB}" ]]; then
     CR_IMAGE_JSON=$(cat <<EOF
@@ -2484,6 +2586,7 @@ start_managed_control_plane() {
 EOF
 )
   fi
+  info "Provisioning managed control plane..."
   retry 2 run curl --request POST \
     "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}:runIstiod" \
     --data "${CR_IMAGE_JSON}" \
@@ -2504,11 +2607,16 @@ scrape_managed_urls() {
 }
 
 install_managed_components() {
-  info "Configuring base installation for managed control plane..."
-  kubectl apply --overwrite=true -f "${BASE_REL_PATH}"
+  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then
+    info "Installing CNI into the cluster..."
+    kubectl apply -f "${MANAGED_CNI}"
+  fi
 
   info "Configuring ASM managed control plane validating webhook config..."
   kubectl apply -f "${MANAGED_WEBHOOKS}"
+
+  info "Configuring service account for GKE Connect..."
+  kubectl apply -f "${CONNECT_RBAC}"
 
   info "Configuring ASM managed control plane components..."
   print_config >| managed_control_plane_gateway.yaml

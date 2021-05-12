@@ -159,6 +159,12 @@ openAPI:
           values:
           - marker: NETWORK_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.network'
+    io.k8s.cli.setters.anthos.servicemesh.managed-controlplane.service-account:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.managed-controlplane.service-account
+          value: MCP_ACCOUNT
     io.k8s.cli.substitutions.mesh-id:
       type: string
       x-k8s-cli:
@@ -192,6 +198,17 @@ openAPI:
             ref: '#/definitions/io.k8s.cli.setters.gcloud.container.cluster'
           - marker: us-central1-c
             ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.location'
+    io.k8s.cli.substitutions.gke-cni-image:
+      type: string
+      x-k8s-cli:
+        substitution:
+          name: gke-cni-image
+          pattern: "IMAGE_HUB/install-cni:IMAGE_TAG"
+          values:
+          - marker: IMAGE_HUB
+            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub'
+          - marker: IMAGE_TAG
+            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag'
     io.k8s.cli.substitutions.gke-hub-metadata:
       type: string
       x-k8s-cli:
