@@ -10,3 +10,5 @@
 
 # Ignore dist output directory
 dist/
+bazel-*
+node_modules/
