@@ -10,9 +10,5 @@
 
 # Ignore dist output directory
 dist/
-
-# Ignore Bazel outs
-bazel*
-
-# Ignore nodeJS packages
+bazel-*
 node_modules/
