@@ -209,6 +209,7 @@ main() {
     start_managed_control_plane
     configure_package
     install_managed_components
+    apply_kube_yamls
     outro
     return 0
   fi
@@ -218,7 +219,7 @@ main() {
   fi
 
   configure_package
-  handle_multi_yaml_bug
+  post_process_istio_yamls
 
   if [[ "$(context_get-option "PRINT_CONFIG")" -eq 1 ]]; then
     print_config >&3
@@ -1508,6 +1509,16 @@ EOF
   fi
 }
 
+post_process_istio_yamls() {
+  handle_multi_yaml_bug
+
+  while read -d ',' -r yaml_file; do
+    context_append-istio-yaml "${yaml_file}"
+  done <<EOF
+$(context_get-option "CUSTOM_OVERLAY")
+EOF
+}
+
 validate_cli_dependencies() {
   local NOTFOUND; NOTFOUND="";
   local EXITCODE; EXITCODE=0;
@@ -2534,8 +2545,8 @@ istio_namespace_exists() {
 
 register_gce_identity_provider() {
   info "Registering GCE Identity Provider in the cluster..."
-  retry 3 kubectl apply -f asm/identity-provider/identityprovider-crd.yaml
-  retry 3 kubectl apply -f asm/identity-provider/googleidp.yaml
+  context_append-kube-yaml "asm/identity-provider/identityprovider-crd.yaml"
+  context_append-kube-yaml "asm/identity-provider/googleidp.yaml"
 }
 
 should_enable_service_mesh_feature() {
@@ -2657,7 +2668,6 @@ EOF
 
 print_config() {
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
-  local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
 
   if [[ "${MANAGED}" -eq 1 ]]; then
     cat "${MANAGED_MANIFEST}"
@@ -2665,11 +2675,9 @@ print_config() {
   fi
 
   PARAMS="-f ${OPERATOR_MANIFEST}"
-  while read -d ',' -r yaml_file; do
+  for yaml_file in $(context_list-istio-yamls); do
     PARAMS="${PARAMS} -f ${yaml_file} "
-  done <<EOF
-${CUSTOM_OVERLAY}
-EOF
+  done
   # shellcheck disable=SC2086
   istioctl profile dump ${PARAMS}
 }
@@ -2717,22 +2725,19 @@ install_asm() {
   local MODE; MODE="$(context_get-option "MODE")"
   local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
   local USE_VM; USE_VM="$(context_get-option "USE_VM")"
-  local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
 
   if ! does_istiod_exist && [[ "${_CI_NO_REVISION}" -ne 1 ]]; then
     info "Installing validation webhook fix..."
-    retry 3 kubectl apply -f "${VALIDATION_FIX_SERVICE}"
+    context_append-kube-yaml "${VALIDATION_FIX_SERVICE}"
   elif [[ "${MODE}" == "upgrade" ]]; then
     cp "${VALIDATION_FIX_SERVICE}" .
   fi
 
   local PARAMS
   PARAMS="-f ${OPERATOR_MANIFEST}"
-  while read -d ',' -r yaml_file; do
+  for yaml_file in $(context_list-istio-yamls); do
     PARAMS="${PARAMS} -f ${yaml_file}"
-  done <<EOF
-${CUSTOM_OVERLAY}
-EOF
+  done
 
   if [[ "${_CI_NO_REVISION}" -ne 1 ]]; then
     PARAMS="${PARAMS} --set revision=${REVISION_LABEL}"
@@ -2775,7 +2780,15 @@ EOF
     expose_istiod
   fi
 
+  apply_kube_yamls
   outro
+}
+
+apply_kube_yamls() {
+  for yaml_file in $(context_list-kube-yamls); do
+    info "Applying ${yaml_file}..."
+    retry 3 kubectl apply --overwrite=true -f "${yaml_file}"
+  done
 }
 
 install_canonical_controller() {
@@ -2788,7 +2801,7 @@ install_canonical_controller() {
 }
 
 expose_istiod() {
-  retry 3 kubectl apply -f "${EXPOSE_ISTIOD_SERVICE}"
+  context_append-kube-yaml "${EXPOSE_ISTIOD_SERVICE}"
 }
 
 start_managed_control_plane() {
@@ -2826,10 +2839,10 @@ install_managed_components() {
   local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
 
   info "Configuring base installation for managed control plane..."
-  kubectl apply --overwrite=true -f "${BASE_REL_PATH}"
+  context_append-kube-yaml "${BASE_REL_PATH}"
 
   info "Configuring ASM managed control plane validating webhook config..."
-  kubectl apply -f "${MANAGED_WEBHOOKS}"
+  context_append-kube-yaml "${MANAGED_WEBHOOKS}"
 
   info "Configuring ASM managed control plane components..."
   print_config >| managed_control_plane_gateway.yaml
