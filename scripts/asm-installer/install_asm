@@ -96,6 +96,7 @@ ENABLE_NAMESPACE_CREATION="${ENABLE_NAMESPACE_CREATION:=0}"
 
 DISABLE_CANONICAL_SERVICE="${DISABLE_CANONICAL_SERVICE:=0}"
 PRINT_CONFIG="${PRINT_CONFIG:=0}"
+IMPERSONATE_SERVICE_ACCOUNT="${IMPERSONATE_SERVICE_ACCOUNT:=}"
 SERVICE_ACCOUNT="${SERVICE_ACCOUNT:=}"
 KEY_FILE="${KEY_FILE:=}"
 OUTPUT_DIR="${OUTPUT_DIR:=}"
@@ -380,7 +381,11 @@ apath() {
 }
 
 gcloud() {
-  run "${AGCLOUD}" "${@}"
+  if [[ -n "${IMPERSONATE_SERVICE_ACCOUNT}" ]]; then
+    run "${AGCLOUD}" "--impersonate-service-account=${IMPERSONATE_SERVICE_ACCOUNT}" "${@}"
+  else
+    run "${AGCLOUD}" "${@}"
+  fi
 }
 
 kubectl() {
@@ -652,24 +657,25 @@ Set up, validate, and install ASM in a Google Cloud environment.
 Use -h|--help with -v|--verbose to show detailed descriptions.
 
 OPTIONS:
-  -l|--cluster_location  <LOCATION>
-  -n|--cluster_name      <NAME>
-  -p|--project_id        <ID>
-  -m|--mode              <MODE>
-  -c|--ca                <CA>
+  -l|--cluster_location             <LOCATION>
+  -n|--cluster_name                 <NAME>
+  -p|--project_id                   <ID>
+  -m|--mode                         <MODE>
+  -c|--ca                           <CA>
 
-  -o|--option            <FILE NAME>
-  -s|--service_account   <ACCOUNT>
-  -k|--key_file          <FILE PATH>
-  -D|--output_dir        <DIR PATH>
-  --co|--custom_overlay  <FILE NAME>
+  -o|--option                       <FILE NAME>
+  -i|--impersonate_service_account  <ACCOUNT>
+  -s|--service_account              <ACCOUNT>
+  -k|--key_file                     <FILE PATH>
+  -D|--output_dir                   <DIR PATH>
+  --co|--custom_overlay             <FILE NAME>
 
-  --ca_cert              <FILE PATH>
-  --ca_key               <FILE PATH>
-  --root_cert            <FILE PATH>
-  --cert_chain           <FILE PATH>
-  --ca_name              <CA NAME>
-  -r|--revision_name     <REVISION NAME>
+  --ca_cert                         <FILE PATH>
+  --ca_key                          <FILE PATH>
+  --root_cert                       <FILE PATH>
+  --cert_chain                      <FILE PATH>
+  --ca_name                         <CA NAME>
+  -r|--revision_name                <REVISION NAME>
 
 FLAGS:
   -e|--enable_all
@@ -705,59 +711,62 @@ the ALL_CAPS name. Options specified via flags take precedence over environment
 variables.
 
 OPTIONS:
-  -l|--cluster_location  <LOCATION>   The GCP location of the target cluster.
-  -n|--cluster_name      <NAME>       The name of the target cluster.
-  -p|--project_id        <ID>         The GCP project ID.
-  -m|--mode              <MODE>       The type of installation to perform.
-                                      Passing --mode install will attempt a
-                                      new ASM installation. Passing --mode
-                                      migrate will attempt to migrate an Istio
-                                      installation to ASM. Passing --mode
-                                      upgrade will attempt to upgrade an
-                                      existing ASM installation to a newer
-                                      version. Allowed values for
-                                      <MODE> are {install|migrate|upgrade}.
-  -c|--ca                <CA>         The type of certificate authority to be
-                                      used. Defaults to "mesh_ca" for --mode
-                                      install. Specifying the CA is required
-                                      for --mode migrate.  Allowed values for
-                                      <CA> are {citadel|mesh_ca|gcp_cas}.
-  -o|--option            <FILE NAME>  The name of a YAML file in the kpt pkg to
-                                      apply. For options, see the
-                                      anthos-service-mesh-package GitHub
-                                      repo under GoogleCloudPlatform. Files
-                                      should be in "asm/istio/options" folder,
-                                      and shouldn't include the .yaml extension.
-                                      (See https://git.io/JTDdi for options.)
-                                      To add multiple files, specify them with
-                                      multiple options one at a time.
-  -s|--service_account   <ACCOUNT>    The name of a service account used to
-                                      install ASM. If not specified, the gcloud
-                                      user currently configured will be used.
-  -k|--key_file          <FILE PATH>  The key file for a service account. This
-                                      option can be omitted if not using a
-                                      service account.
-  -D|--output_dir        <DIR PATH>   The directory where this script will place
-                                      downloaded ASM packages and configuration.
-                                      If not specified, a temporary directory
-                                      will be created. If specified and the
-                                      directory already contains the necessary
-                                      files, they will be used instead of
-                                      downloading them again.
-  --co|--custom_overlay  <FILE PATH>  The location of a YAML file to overlay on
-                                      the ASM IstioOperator. This option can be
-                                      omitted if not installing optional
-                                      features. To add multiple files, specify
-                                      them with multiple options one at a time.
-  --ca_name              <CA NAME>    Required only if --ca option is gcp_cas.
-                                      Name of the ca in the GCP CAS service used to
-                                      sign certificates in the format
-                                      'projects/project_name/locations/ \
-                                      ca_region/certificateAuthorities/ca_name'.
-  -r|--revision_name <REVISION NAME>  Custom revision label. Label needs to follow DNS
-                                      label formats (re: RFC 1123). Not supported if
-                                      control plane is managed. Prefixing the revision
-                                      name with 'asm' is recommended.
+  -l|--cluster_location             <LOCATION>   The GCP location of the target cluster.
+  -n|--cluster_name                 <NAME>       The name of the target cluster.
+  -p|--project_id                   <ID>         The GCP project ID.
+  -m|--mode                         <MODE>       The type of installation to perform.
+                                                 Passing --mode install will attempt a
+                                                 new ASM installation. Passing --mode
+                                                 migrate will attempt to migrate an Istio
+                                                 installation to ASM. Passing --mode
+                                                 upgrade will attempt to upgrade an
+                                                 existing ASM installation to a newer
+                                                 version. Allowed values for
+                                                 <MODE> are {install|migrate|upgrade}.
+  -c|--ca                           <CA>         The type of certificate authority to be
+                                                 used. Defaults to "mesh_ca" for --mode
+                                                 install. Specifying the CA is required
+                                                 for --mode migrate.  Allowed values for
+                                                 <CA> are {citadel|mesh_ca|gcp_cas}.
+  -o|--option                       <FILE NAME>  The name of a YAML file in the kpt pkg to
+                                                 apply. For options, see the
+                                                 anthos-service-mesh-package GitHub
+                                                 repo under GoogleCloudPlatform. Files
+                                                 should be in "asm/istio/options" folder,
+                                                 and shouldn't include the .yaml extension.
+                                                 (See https://git.io/JTDdi for options.)
+                                                 To add multiple files, specify them with
+                                                 multiple options one at a time.
+  -i|--impersonate_service_account  <ACCOUNT>    All API requests will be made as the given
+                                                 service account instead of the currently
+                                                 selected account when installing ASM.
+  -s|--service_account              <ACCOUNT>    The name of a service account used to
+                                                 install ASM. If not specified, the gcloud
+                                                 user currently configured will be used.
+  -k|--key_file                     <FILE PATH>  The key file for a service account. This
+                                                 option can be omitted if not using a
+                                                 service account.
+  -D|--output_dir                   <DIR PATH>   The directory where this script will place
+                                                 downloaded ASM packages and configuration.
+                                                 If not specified, a temporary directory
+                                                 will be created. If specified and the
+                                                 directory already contains the necessary
+                                                 files, they will be used instead of
+                                                 downloading them again.
+  --co|--custom_overlay             <FILE PATH>  The location of a YAML file to overlay on
+                                                 the ASM IstioOperator. This option can be
+                                                 omitted if not installing optional
+                                                 features. To add multiple files, specify
+                                                 them with multiple options one at a time.
+  --ca_name                         <CA NAME>    Required only if --ca option is gcp_cas.
+                                                 Name of the ca in the GCP CAS service used to
+                                                 sign certificates in the format
+                                                 'projects/project_name/locations/ \
+                                                 ca_region/certificateAuthorities/ca_name'.
+  -r|--revision_name            <REVISION NAME>  Custom revision label. Label needs to follow DNS
+                                                 label formats (re: RFC 1123). Not supported if
+                                                 control plane is managed. Prefixing the revision
+                                                 name with 'asm' is recommended.
   The following four options must be passed together and are only necessary
   for using a custom certificate for Citadel. Users that aren't sure whether
   they need this probably don't.
@@ -941,6 +950,11 @@ parse_args() {
       --print_config | --print-config)
         PRINT_CONFIG=1
         shift 1
+        ;;
+      -s | --impersonate_service_account | --impersonate_service-account)
+        arg_required "${@}"
+        IMPERSONATE_SERVICE_ACCOUNT="${2}"
+        shift 2
         ;;
       -s | --service_account | --service-account)
         arg_required "${@}"
@@ -1157,6 +1171,14 @@ EOF
     fi
   elif only_enable; then
     fatal "You must specify at least one --enable* flag with --only_enable"
+  fi
+
+  if [[ -n "$SERVICE_ACCOUNT" && -n "$IMPERSONATE_SERVICE_ACCOUNT" ]]; then
+    fatal "Service account cannot be used with service account impersonation."
+  fi
+
+  if [[ -n "$KEY_FILE" && -n "$IMPERSONATE_SERVICE_ACCOUNT" ]]; then
+    fatal "Key file cannot be used with service account impersonation."
   fi
 
   if [[ -n "$SERVICE_ACCOUNT" && -z "$KEY_FILE" || -z "$SERVICE_ACCOUNT" && -n "$KEY_FILE" ]]; then
