@@ -585,7 +585,7 @@ can_modify_gcp_apis() {
 }
 
 can_modify_gcp_iam_roles() {
-  if ! can_modify_at_all; then false; return; fi
+  if ! can_modify_at_all || [[ -n "${IMPERSONATE_SERVICE_ACCOUNT}" ]]; then false; return; fi
 
   if is_managed || [[ "${ENABLE_ALL}" -eq 1 || "${ENABLE_GCP_IAM_ROLES}" -eq 1 ]]; then
     true
@@ -1860,6 +1860,10 @@ iam_user() {
 }
 
 local_iam_user() {
+  if [[ -n "${IMPERSONATE_SERVICE_ACCOUNT}" ]]; then
+    echo "${IMPERSONATE_SERVICE_ACCOUNT}"
+    return
+  fi
   if [[ -n "${GCLOUD_USER_OR_SA}" ]]; then
     echo "${GCLOUD_USER_OR_SA}"
     return
