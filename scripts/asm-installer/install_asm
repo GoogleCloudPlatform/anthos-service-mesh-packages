@@ -951,7 +951,7 @@ parse_args() {
         PRINT_CONFIG=1
         shift 1
         ;;
-      -s | --impersonate_service_account | --impersonate_service-account)
+      -s | --impersonate_service_account | --impersonate-service-account)
         arg_required "${@}"
         IMPERSONATE_SERVICE_ACCOUNT="${2}"
         shift 2
