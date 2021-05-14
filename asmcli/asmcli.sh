@@ -455,9 +455,9 @@ is_managed() {
 
 is_gcp() {
   if [[ "${PLATFORM}" == "gcp" ]]; then
-    return true
+    true
   else
-    return false
+    false
   fi
 }
 
