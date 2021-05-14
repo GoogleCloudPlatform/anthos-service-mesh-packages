@@ -121,13 +121,13 @@ main() {
 
 prepare_environment() {
   set_up_local_workspace
-  configure_kubectl
-
   validate_cli_dependencies
 
   if is_sa; then
     auth_service_account
   fi
+
+  configure_kubectl
 
   if should_validate || can_modify_at_all; then
     local_iam_user > /dev/null
