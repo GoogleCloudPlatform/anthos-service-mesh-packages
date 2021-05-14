@@ -1119,10 +1119,6 @@ validate_args() {
 
   case "${PLATFORM}" in
       gcp | multicloud);;
-      "")
-        MISSING_ARGS=1
-        warn "Missing value for PLATFORM"
-        ;;
       *) fatal "PLATFORM must be one of 'gcp', 'multicloud'";;
   esac
 
