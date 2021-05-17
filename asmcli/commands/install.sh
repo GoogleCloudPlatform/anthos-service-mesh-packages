@@ -112,6 +112,9 @@ install_in_cluster_control_plane() {
     <"${RAW_YAML}" \
     >|"${EXPANDED_YAML}"
 
+  context_set-option "RAW_YAML" "${RAW_YAML}"
+  context_set-option "EXPANDED_YAML" "${EXPANDED_YAML}"
+
   if [[ "${USE_VM}" -eq 1 ]]; then
     info "Exposing the control plane for VM workloads..."
     expose_istiod
@@ -189,6 +192,8 @@ outro() {
   info "A symlink to the istioctl binary can be found at:"
   info "${OUTPUT_DIR}/istioctl"
   if ! is_managed; then
+    local RAW_YAML; RAW_YAML="$(context_get-option "RAW_YAML")"
+    local EXPANDED_YAML; EXPANDED_YAML="$(context_get-option "EXPANDED_YAML")"
     info "The combined configuration generated for installation can be found at:"
     info "${OUTPUT_DIR}/${RAW_YAML}"
     info "The full, expanded set of kubernetes resources can be found at:"
