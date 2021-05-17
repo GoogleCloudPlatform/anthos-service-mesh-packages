@@ -59,6 +59,7 @@ GCE_NETWORK_NAME=""
 GCLOUD_USER_OR_SA=""
 KPT_URL=""
 KUBECONFIG=""
+PLATFORM="gcp"
 CONTEXT=""
 APATH=""
 AKUBECTL=""
@@ -453,7 +454,11 @@ is_managed() {
 }
 
 is_gcp() {
-  true # hook for later
+  if [[ "${PLATFORM}" == "gcp" ]]; then
+    true
+  else
+    false
+  fi
 }
 
 is_sa() {
@@ -628,6 +633,7 @@ OPTIONS:
   --cert_chain           <FILE PATH>
   --ca_name              <CA NAME>
   -r|--revision_name     <REVISION NAME>
+  --platform             <PLATFORM>
 
 FLAGS:
   -e|--enable_all
@@ -721,6 +727,10 @@ OPTIONS:
                                       label formats (re: RFC 1123). Not supported if
                                       control plane is managed. Prefixing the revision
                                       name with 'asm' is recommended.
+  --platform             <PLATFORM>   The platorm or the provider of the kubernetes
+                                      cluster. Defaults to "gcp" (for GKE clusters).
+                                      For all other platforms use "multicloud".
+                                      Allowed values for <PLATFORM> are {gcp|multicloud}.
   The following four options must be passed together and are only necessary
   for using a custom certificate for Citadel. Users that aren't sure whether
   they need this probably don't.
@@ -977,6 +987,11 @@ parse_args() {
         REVISION_LABEL="${2}"
         shift 2
         ;;
+      --platform)
+        arg_required "${@}"
+        context_set-option "PLATFORM" "$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+        shift 2
+        ;;
       -v | --verbose)
         context_set-option "VERBOSE" 1
         shift 1
@@ -1024,6 +1039,7 @@ validate_args() {
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local MODE; MODE="$(context_get-option "MODE")"
+  local PLATFORM; PLATFORM="$(context_get-option "PLATFORM")"
   local CA; CA="$(context_get-option "CA")"
   local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
   local OPTIONAL_OVERLAY; OPTIONAL_OVERLAY="$(context_get-option "OPTIONAL_OVERLAY")"
@@ -1100,6 +1116,11 @@ validate_args() {
       fatal "Specifying a custom overlay file with managed control plane is not supported."
     fi
   fi
+
+  case "${PLATFORM}" in
+      gcp | multicloud);;
+      *) fatal "PLATFORM must be one of 'gcp', 'multicloud'";;
+  esac
 
   local MISSING_ARGS=0
   while read -r REQUIRED_ARG; do

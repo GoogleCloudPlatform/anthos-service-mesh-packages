@@ -6,6 +6,7 @@ context_init() {
     "CLUSTER_NAME": "${CLUSTER_NAME:-}",
     "CLUSTER_LOCATION": "${CLUSTER_LOCATION:-}",
     "MODE": "${MODE:-}",
+    "PLATFORM": "${PLATFORM:-}",
     "CA": "${CA:-}",
     "KUBECONFIG": "${KUBECONFIG_FILE:-}",
     "CONTEXT": "${CONTEXT:-}",
