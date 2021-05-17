@@ -440,6 +440,11 @@ is_sa() {
   if [[ -z "${SERVICE_ACCOUNT}" ]]; then false; fi
 }
 
+is_sa_impersonation() {
+  local IMPERSONATE_USER; IMPERSONATE_USER="$(gcloud config get-value auth/impersonate_service_account)"
+  if [[ -z "${IMPERSONATE_USER}" ]]; then false; fi
+}
+
 should_validate() {
   local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
 
@@ -1708,8 +1713,14 @@ local_iam_user() {
     ACCOUNT_TYPE="serviceAccount"
   fi
 
-  GCLOUD_USER_OR_SA="${ACCOUNT_TYPE}:${ACCOUNT_NAME}"; readonly GCLOUD_USER_OR_SA
+  if is_sa_impersonation; then
+    ACCOUNT_NAME="$(gcloud config get-value auth/impersonate_service_account)"
+    ACCOUNT_TYPE="serviceAccount"
+    warn "Service account impersonation currently configured to impersonate '${ACCOUNT_NAME}'."
+  fi
 
+  GCLOUD_USER_OR_SA="${ACCOUNT_TYPE}:${ACCOUNT_NAME}"
+  readonly GCLOUD_USER_OR_SA
   echo "${GCLOUD_USER_OR_SA}"
 }
 
