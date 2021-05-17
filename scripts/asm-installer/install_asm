@@ -1868,7 +1868,7 @@ local_iam_user() {
   if is_sa_impersonation; then
     ACCOUNT_NAME="$(gcloud config get-value auth/impersonate_service_account)"
     ACCOUNT_TYPE="serviceAccount"
-    warn "Service account impersonation current configured to impersonate '${ACCOUNT_NAME}'."
+    warn "Service account impersonation currently configured to impersonate '${ACCOUNT_NAME}'."
   fi
 
   GCLOUD_USER_OR_SA="${ACCOUNT_TYPE}:${ACCOUNT_NAME}"
