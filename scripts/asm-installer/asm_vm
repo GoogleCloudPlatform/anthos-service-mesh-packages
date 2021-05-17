@@ -946,10 +946,7 @@ uses_environ_workload_identity() {
 
   if [[ "$(retry 2 kubectl get configmap "${CONFIGMAP}" -n istio-system \
     -ojsonpath='{.data.mesh}' | grep -x -c "^trustDomain: ${PROJECT_ID}.\(hub\|svc\).id.goog$" \
-    || true)" -eq 1 ]]; then
-    true
-    return
-  else
+    || true)" -eq 0 ]]; then
     false
   fi
 }
