@@ -1,50 +1,27 @@
 install_subcommand() {
-  # TODO: validate (mesh_ca | citadel | private_ca).
-  # TODO: validate (mcp | in-cluster) control plane.
-
-  # TODO: configure (mesh_ca | citadel | private_ca).
-  # TODO: configure (mcp | in-cluster) control plane.
-
+  local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
+  local CA; CA="$(context_get-option "CA")"
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
   local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
 
-  if [[ "${MANAGED}" -eq 1 ]]; then
-    start_managed_control_plane
-  else
-    install_in_cluster_control_plane
-  fi
+  # TODO: validate (mesh_ca | citadel | private_ca).
+  # TODO: validate (mcp | in-cluster) control plane.
 
-  if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
-    install_canonical_controller
-  fi
+  ### Configure ###
+  configure_ca
+  configure_control_plane
 
-  apply_kube_yamls
+  ### Install ###
+  install_ca
+  install_control_plane
+
+  ### Completion ###
   outro
+  info "Successfully installed ASM."
+  return 0
 }
 
-start_managed_control_plane() {
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
-  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
-
-  local CR_IMAGE_JSON; CR_IMAGE_JSON="";
-  if [[ -n "${_CI_CLOUDRUN_IMAGE_HUB}" ]]; then
-    CR_IMAGE_JSON="{\"image\": \"${_CI_CLOUDRUN_IMAGE_HUB}:${_CI_CLOUDRUN_IMAGE_TAG}\"}"
-  fi
-  retry 2 run_command curl --request POST \
-    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}:runIstiod" \
-    --data "${CR_IMAGE_JSON}" \
-    --header "X-Server-Timeout: 600" \
-    --header "Content-Type: application/json" \
-    -K <(auth_header "$(get_auth_token)")
-
-  local VALIDATION_URL; local CLOUDRUN_ADDR;
-  read -r VALIDATION_URL CLOUDRUN_ADDR <<EOF
-$(scrape_managed_urls)
-EOF
-  kpt cfg set asm anthos.servicemesh.controlplane.validation-url "${VALIDATION_URL}"
-  kpt cfg set asm anthos.servicemesh.managed-controlplane.cloudrun-addr "${CLOUDRUN_ADDR}"
-
+install_managed_components() {
   info "Configuring base installation for managed control plane..."
   context_append-kube-yaml "${BASE_REL_PATH}"
 
@@ -204,4 +181,40 @@ outro() {
   fi
 
   info "$(starline)"
+}
+
+configure_ca() {
+  local CA; CA="$(context_get-option "CA")"
+  case "${CA}" in
+    mesh_ca) configure_meshca;;
+    gcp_cas) configure_private_ca;;
+    citadel) configure_citadel;;
+  esac
+}
+
+configure_control_plane() {
+  if [[ "${MANAGED}" -eq 1 ]]; then
+    configure_managed_control_plane
+  fi
+}
+
+install_ca() {
+  local CA; CA="$(context_get-option "CA")"
+  if [[ "${CA}" == "citadel" ]]; then
+    install_citadel
+  fi
+}
+
+install_control_plane() {
+  if [[ "${MANAGED}" -eq 1 ]]; then
+    install_managed_components
+  else
+    install_in_cluster_control_plane
+  fi
+
+  if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
+    install_canonical_controller
+  fi
+
+  apply_kube_yamls
 }

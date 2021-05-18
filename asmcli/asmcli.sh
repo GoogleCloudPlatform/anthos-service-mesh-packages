@@ -218,14 +218,7 @@ main() {
     return 0
   fi
 
-  if [[ "$(context_get-option "CUSTOM_CA")" -eq 1 ]]; then
-    install_secrets
-  fi
-
   install_subcommand
-
-  info "Successfully installed ASM."
-  return 0
 }
 
 init() {
@@ -2644,27 +2637,11 @@ configure_package() {
     kpt cfg set asm gcloud.project.environProjectID "${ENVIRON_PROJECT_ID}"
     kpt cfg set asm anthos.servicemesh.hubMembershipID "${HUB_MEMBERSHIP_ID}"
   fi
-  if [[ -n "${CA_NAME}" && "${CA}" = "gcp_cas" ]]; then
-    kpt cfg set asm anthos.servicemesh.external_ca.ca_name "${CA_NAME}"
-  fi
 
   if [[ "${USE_VM}" -eq 1 ]] && [[ "${_CI_NO_REVISION}" -eq 0 ]]; then
     kpt cfg set asm anthos.servicemesh.istiodHost "istiod-${REVISION_LABEL}.istio-system.svc"
     kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod-${REVISION_LABEL}.istio-system.svc.cluster.local"
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${REVISION_LABEL}"
-  fi
-
-  if [[ "${CA}" == "mesh_ca" && -n "${_CI_TRUSTED_GCP_PROJECTS}" ]]; then
-    # Gather the trust domain aliases from projects.
-    TRUST_DOMAIN_ALIASES="${PROJECT_ID}.svc.id.goog"
-    while IFS=',' read -r trusted_gcp_project; do
-      TRUST_DOMAIN_ALIASES="${TRUST_DOMAIN_ALIASES} ${trusted_gcp_project}.svc.id.goog"
-    done <<EOF
-${_CI_TRUSTED_GCP_PROJECTS}
-EOF
-    # kpt treats words in quotes as a single param, while kpt need ${TRUST_DOMAIN_ALIASES} to be splitting params for a list. If we remove quotes, the lint will complain.
-    # eval will translate the quoted TRUST_DOMAIN_ALIASES into params to workaround both.
-    run_command eval kpt cfg set asm anthos.servicemesh.trustDomainAliases "${TRUST_DOMAIN_ALIASES}"
   fi
 }
 
@@ -2682,20 +2659,6 @@ print_config() {
   done
   # shellcheck disable=SC2086
   istioctl profile dump ${PARAMS}
-}
-
-install_secrets() {
-  local CA_CERT; CA_CERT="$(context_get-option "CA_CERT")"
-  local CA_KEY; CA_KEY="$(context_get-option "CA_KEY")"
-  local CA_ROOT; CA_ROOT="$(context_get-option "CA_ROOT")"
-  local CA_CHAIN; CA_CHAIN="$(context_get-option "CA_CHAIN")"
-
-  info "Installing certificates into the cluster..."
-  kubectl create secret generic cacerts -n istio-system \
-    --from-file="${CA_CERT}" \
-    --from-file="${CA_KEY}" \
-    --from-file="${CA_ROOT}" \
-    --from-file="${CA_CHAIN}"
 }
 
 init_gcp_cas() {
