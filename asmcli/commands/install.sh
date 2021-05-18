@@ -105,6 +105,38 @@ install_in_cluster_control_plane() {
   fi
 }
 
+install_citadel() {
+  local CA_CERT; CA_CERT="$(context_get-option "CA_CERT")"
+  local CA_KEY; CA_KEY="$(context_get-option "CA_KEY")"
+  local CA_ROOT; CA_ROOT="$(context_get-option "CA_ROOT")"
+  local CA_CHAIN; CA_CHAIN="$(context_get-option "CA_CHAIN")"
+
+  info "Installing certificates into the cluster..."
+  kubectl create secret generic cacerts -n istio-system \
+    --from-file="${CA_CERT}" \
+    --from-file="${CA_KEY}" \
+    --from-file="${CA_ROOT}" \
+    --from-file="${CA_CHAIN}"
+}
+
+install_private_ca() {
+  # This sets up IAM privileges for the project to be able to access GCP CAS.
+  # If modify_gcp_component permissions are not granted, it is assumed that the
+  # user has taken care of this, else Istio setup will fail
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+
+  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="$PROJECT_ID.svc.id.goog[istio-system/istiod-service-account]"
+  local NAME; NAME=$(echo "${CA_NAME}" | cut -f6 -d/)
+  local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
+  local CA_PROJECT; CA_PROJECT=$(echo "${CA_NAME}" | cut -f2 -d/)
+
+  retry 3 gcloud beta privateca subordinates add-iam-policy-binding "${NAME}" \
+    --location "${CA_LOCATION}" \
+    --project "${CA_PROJECT}" \
+    --member "serviceAccount:${WORKLOAD_IDENTITY}" \
+    --role "roles/privateca.certificateManager"
+}
+
 does_istiod_exist(){
   local RETVAL; RETVAL=0;
   kubectl get service \
@@ -200,9 +232,11 @@ configure_control_plane() {
 
 install_ca() {
   local CA; CA="$(context_get-option "CA")"
-  if [[ "${CA}" == "citadel" ]]; then
-    install_citadel
-  fi
+  case "${CA}" in
+    mesh_ca) ;;
+    gcp_cas) install_private_ca;;
+    citadel) install_citadel;;
+  esac
 }
 
 install_control_plane() {

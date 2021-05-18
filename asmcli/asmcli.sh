@@ -77,10 +77,37 @@ KUBECONFIG_SUPPLIED=0
 main() {
   init
 
+  ### Preparation ###
   context_init
   parse_args "${@}"
   validate_args
+  prepare_environment
 
+  ### Validate ###
+  validate_subcommand
+
+  if [[ "$(context_get-option "PRINT_CONFIG")" -eq 1 && "$(context_get-option "USE_HUB_WIP")" -eq 1 ]]; then
+    populate_environ_info
+  fi
+
+  if [[ "$(context_get-option "USE_VM")" -eq 1 ]]; then
+    register_gce_identity_provider
+  fi
+
+  ### Configure ###
+  configure_package
+  post_process_istio_yamls
+
+  if [[ "$(context_get-option "PRINT_CONFIG")" -eq 1 ]]; then
+    print_config >&3
+    return 0
+  fi
+
+  ### Install ###
+  install_subcommand
+}
+
+prepare_environment() {
   set_up_local_workspace
   configure_kubectl
 
@@ -95,130 +122,12 @@ main() {
     validate_gcp_resources
   fi
 
-  if needs_asm && ! necessary_files_exist; then
-    download_asm
-  fi
-
   if needs_asm; then
+    if ! necessary_files_exist; then
+      download_asm
+    fi
     organize_kpt_files
   fi
-
-  if should_validate && ! is_managed; then
-    validate_dependencies
-  fi
-
-  if can_modify_gcp_apis; then
-    enable_gcloud_apis
-  elif should_validate; then
-    exit_if_apis_not_enabled
-  fi
-
-  if can_register_cluster; then
-    register_cluster
-  elif should_validate && [[ "$(context_get-option "USE_HUB_WIP")" -eq 1 ]]; then
-    exit_if_cluster_unregistered
-  fi
-
-  # Managed must be able to set IAM permissions on a generated user, so the flow
-  # is a bit different
-  if is_managed; then
-    if can_modify_gcp_components; then
-      enable_workload_identity
-      enable_stackdriver_kubernetes
-    else
-      exit_if_no_workload_identity
-      exit_if_stackdriver_not_enabled
-    fi
-    if can_modify_gcp_iam_roles; then
-      bind_user_to_iam_policy "roles/meshconfig.admin" "$(local_iam_user)"
-    fi
-    if can_modify_at_all; then
-      MANAGED_SERVICE_JSON="$(init_meshconfig_managed)"
-      MANAGED_SERVICE_ACCOUNT="$(echo "${MANAGED_SERVICE_JSON}" | jq -r .serviceAccount)"
-      if [[ -z "${MANAGED_SERVICE_JSON}" || "${MANAGED_SERVICE_ACCOUNT}" == "null" ]]; then
-        fatal "Couldn't initialize meshconfig, do you have the required permission resourcemanager.projects.setIamPolicy?"
-      fi
-      unset MANAGED_SERVICE_JSON
-      context_set-option "MANAGED_SERVICE_ACCOUNT" "${MANAGED_SERVICE_ACCOUNT}"
-      bind_user_to_iam_policy "$(required_iam_roles_mcp_sa)" "$(iam_user)"
-    fi
-  else
-    if can_modify_gcp_iam_roles; then
-      bind_user_to_iam_policy "$(required_iam_roles)" "$(iam_user)"
-    elif should_validate; then
-      exit_if_out_of_iam_policy
-    fi
-  fi
-
-  get_project_number
-  if can_modify_cluster_labels; then
-    add_cluster_labels
-  elif should_validate; then
-    exit_if_cluster_unlabeled
-  fi
-
-  if ! is_managed; then
-    if can_modify_gcp_components; then
-      enable_workload_identity
-      init_meshconfig
-      if [[ "$(context_get-option "CA")" = "gcp_cas" ]]; then
-        # This sets up IAM privileges for the project to be able to access GCP CAS.
-        # If modify_gcp_component permissions are not granted, it is assumed that the
-        # user has taken care of this, else Istio setup will fail
-        init_gcp_cas
-      fi
-      enable_stackdriver_kubernetes
-      if should_enable_service_mesh_feature; then
-        enable_service_mesh_feature
-      fi
-    elif should_validate; then
-      exit_if_no_workload_identity
-      exit_if_stackdriver_not_enabled
-      if should_enable_service_mesh_feature; then
-        exit_if_service_mesh_feature_not_enabled
-      fi
-    fi
-  fi
-
-  if can_modify_cluster_roles; then
-    bind_user_to_cluster_admin
-  elif should_validate; then
-    exit_if_not_cluster_admin
-  fi
-
-  if can_create_namespace; then
-    create_istio_namespace
-  elif should_validate; then
-    exit_if_istio_namespace_not_exists
-  fi
-
-  if [[ "$(context_get-option "ONLY_VALIDATE")" -eq 1 ]]; then
-    info "Successfully validated all requirements to install ASM in this environment."
-    return 0
-  fi
-
-  if only_enable; then
-    info "Successfully performed specified --enable actions."
-    return 0
-  fi
-
-  if [[ "$(context_get-option "PRINT_CONFIG")" -eq 1 && "$(context_get-option "USE_HUB_WIP")" -eq 1 ]]; then
-    populate_environ_info
-  fi
-
-  if [[ "$(context_get-option "USE_VM")" -eq 1 ]]; then
-    register_gce_identity_provider
-  fi
-
-  configure_package
-  post_process_istio_yamls
-
-  if [[ "$(context_get-option "PRINT_CONFIG")" -eq 1 ]]; then
-    print_config >&3
-    return 0
-  fi
-
-  install_subcommand
 }
 
 init() {
@@ -1198,30 +1107,11 @@ EOF
     warn "Update will proceed with the currently installed CA."
   fi
 
-  if [[ "${CA}" = "gcp_cas" ]]; then
-    validate_gcp_cas_args
-  fi
-
   # shellcheck disable=SC2064
   case "${MODE}" in
     install | migrate | upgrade);;
     *) fatal "MODE must be one of 'install', 'migrate', 'upgrade'";;
   esac
-
-  if [[ "${MODE}" != "install" && "${USE_HUB_WIP}" -eq 1 ]]; then
-    fatal "Hub Workload Identity Pool is only supported in new installation"
-  fi
-  if [[ "${CA}" == "citadel" && "${USE_HUB_WIP}" -eq 1 ]]; then
-    fatal "Hub Workload Identity Pool is only supported for Mesh CA"
-  fi
-
-  if [[ "${USE_VM}" -eq 1 && "${USE_HUB_WIP}" -eq 0 ]]; then
-    fatal "Hub Workload Identity Pool is required to add VM workloads. Run the script with the -o hub-meshca option."
-  fi
-
-  if [[ "${CUSTOM_CA}" -eq 1 ]]; then
-    validate_certs
-  fi
 
   while read -r FLAG; do
     if [[ "${!FLAG}" -ne 0 && "${!FLAG}" -ne 1 ]]; then
@@ -1277,16 +1167,14 @@ EOF
   done <<EOF
 ${CUSTOM_OVERLAY}
 EOF
-  if [[ "${CA}" = "citadel" ]]; then
-    ABS_OVERLAYS="${OPTIONS_DIRECTORY}/citadel-ca.yaml,${ABS_OVERLAYS}"
-  elif [[ "${CA}" = "gcp_cas" ]]; then
-    ABS_OVERLAYS="${OPTIONS_DIRECTORY}/private-ca.yaml,${ABS_OVERLAYS}"
-  fi
   CUSTOM_OVERLAY="${ABS_OVERLAYS}"
   context_set-option "CUSTOM_OVERLAY" "${CUSTOM_OVERLAY}"
 
   set_kpt_package_url
   WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"
+
+  validate_hub
+  validate_ca
 }
 
 validate_revision_label() {
@@ -1306,83 +1194,21 @@ validate_revision_label() {
   fi
 }
 
-validate_gcp_cas_args() {
-  local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
-  local CA_NAME_TEMPLATE
-  CA_NAME_TEMPLATE="projects/project_name/locations/ca_region/certificateAuthorities/ca_name"
-  readonly CA_NAME_TEMPLATE
+validate_hub() {
+  local MODE; MODE="$(context_get-option "MODE")"
+  local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
+  local CA; CA="$(context_get-option "CA")"
+  local USE_VM; USE_VM="$(context_get-option "USE_VM")"
 
-  if [[ -z ${CA_NAME} ]]; then
-    fatal "A ca-name must be provided for integration with Google Certificate Authority Service."
-  elif [[ $(grep -o "/" <<< "${CA_NAME}" | wc -l) != $(grep -o "/" <<< "${CA_NAME_TEMPLATE}" | wc -l) ]]; then
-    fatal "Malformed ca-name. ca-name must be of the form ${CA_NAME_TEMPLATE}."
-  elif [[ "$(echo "${CA_NAME}" | cut -f1 -d/)" != "$(echo "${CA_NAME_TEMPLATE}" | cut -f1 -d/)" ]]; then
-    fatal "Malformed ca-name. ca-name must be of the form ${CA_NAME_TEMPLATE}."
+  if [[ "${MODE}" != "install" && "${USE_HUB_WIP}" -eq 1 ]]; then
+    fatal "Hub Workload Identity Pool is only supported in new installation"
   fi
-}
-
-validate_certs() {
-  local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
-  local CA_ROOT; CA_ROOT="$(context_get-option "CA_ROOT")"
-  local CA_KEY; CA_KEY="$(context_get-option "CA_KEY")"
-  local CA_CHAIN; CA_CHAIN="$(context_get-option "CA_CHAIN")"
-  local CA_CERT; CA_CERT="$(context_get-option "CA_CERT")"
-
-  if [[ "${CA}" != "citadel" ]]; then
-    fatal "You must select Citadel as the CA in order to use custom certificates."
-  fi
-  if [[ -z "${CA_ROOT}" || -z "${CA_KEY}" || -z "${CA_CHAIN}" || -z "${CA_CERT}" ]]; then
-    fatal "All four certificate options must be present to use a custom cert."
-  fi
-  while read -r CERT_FILE; do
-    if ! [[ -f "${!CERT_FILE}" ]]; then
-      fatal "Couldn't find file ${!CERT_FILE}."
-    fi
-  done <<EOF
-CA_CERT
-CA_ROOT
-CA_KEY
-CA_CHAIN
-EOF
-
-  CA_CERT="$(apath -f "${CA_CERT}")"; readonly CA_CERT;
-  CA_KEY="$(apath -f "${CA_KEY}")"; readonly CA_KEY;
-  CA_CHAIN="$(apath -f "${CA_CHAIN}")"; readonly CA_CHAIN;
-  CA_ROOT="$(apath -f "${CA_ROOT}")"; readonly CA_ROOT;
-
-  context_set-option "CA_CERT" "${CA_CERT}"
-  context_set-option "CA_KEY" "${CA_KEY}"
-  context_set-option "CA_CHAIN" "${CA_CHAIN}"
-  context_set-option "CA_ROOT" "${CA_ROOT}"
-
-  info "Checking certificate files for consistency..."
-  if ! openssl rsa -in "${CA_KEY}" -check >/dev/null 2>/dev/null; then
-    fatal "${CA_KEY} failed an openssl consistency check."
-  fi
-  if ! openssl x509 -in "${CA_CERT}" -text -noout >/dev/null; then
-    fatal "${CA_CERT} failed an openssl consistency check."
-  fi
-  if ! openssl x509 -in "${CA_CHAIN}" -text -noout >/dev/null; then
-    fatal "${CA_CHAIN} failed an openssl consistency check."
-  fi
-  if ! openssl x509 -in "${CA_ROOT}" -text -noout >/dev/null; then
-    fatal "${CA_ROOT} failed an openssl consistency check."
+  if [[ "${CA}" == "citadel" && "${USE_HUB_WIP}" -eq 1 ]]; then
+    fatal "Hub Workload Identity Pool is only supported for Mesh CA"
   fi
 
-  info "Checking key matches certificate..."
-  local CERT_HASH; local KEY_HASH;
-  CERT_HASH="$(openssl x509 -noout -modulus -in "${CA_CERT}" | openssl md5)";
-  KEY_HASH="$(openssl rsa -noout -modulus -in "${CA_KEY}" | openssl md5)";
-  if [[ "${CERT_HASH}" != "${KEY_HASH}" ]]; then
-    fatal "Keyfile does not match the given certificate."
-    fatal "Cert: ${CA_CERT}"
-    fatal "Key: ${CA_KEY}"
-  fi
-  unset CERT_HASH; unset KEY_HASH;
-
-  info "Verifying certificate chain of trust..."
-  if ! openssl verify -trusted "${CA_ROOT}" -untrusted "${CA_CHAIN}" "${CA_CERT}"; then
-    fatal "Unable to verify chain of trust."
+  if [[ "${USE_VM}" -eq 1 && "${USE_HUB_WIP}" -eq 0 ]]; then
+    fatal "Hub Workload Identity Pool is required to add VM workloads. Run the script with the -o hub-meshca option."
   fi
 }
 
@@ -1450,7 +1276,7 @@ set_up_local_workspace() {
 }
 
 ### Environment validation functions ###
-validate_dependencies() {
+validate_environment() {
   local MODE; MODE="$(context_get-option "MODE")"
 
   validate_node_pool
@@ -1897,6 +1723,17 @@ EOF
   fi
 }
 
+validate_ca() {
+  local CA; CA="$(context_get-option "CA")"
+  local CUSTOM_CA; CUSTOM_CA="$(context_get-option "CUSTOM_CA")"
+
+  if [[ "${CA}" = "gcp_cas" ]]; then
+    validate_private_ca
+  elif [[ "${CUSTOM_CA}" -eq 1 ]]; then
+    validate_citadel
+  fi
+}
+
 is_major_minor_invalid() {
   [[ "$VERSION_MAJOR" -ne 1 ]] && return 0
   [[ "$VERSION_MINOR" -lt $((MINOR-1))  ]] && return 0
@@ -2149,47 +1986,6 @@ your behalf.
 $(enable_common_message)
 EOF
   fi
-}
-
-init_meshconfig() {
-  local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
-  local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
-  local ENVIRON_PROJECT_ID; ENVIRON_PROJECT_ID="$(context_get-option "ENVIRON_PROJECT_ID")"
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-
-  info "Initializing meshconfig API..."
-  if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
-    populate_environ_info
-    info "Cluster has Membership ID ${HUB_MEMBERSHIP_ID} in the Hub of project ${ENVIRON_PROJECT_ID}"
-    if [[ "${ENVIRON_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
-      info "Skip initializing meshconfig API as the Hub is not hosted in the project ${PROJECT_ID}"
-      return 0
-    fi
-    # initialize replaces the existing Workload Identity Pools in the IAM binding, so we need to support both Hub and GKE Workload Identity Pools
-    local POST_DATA; POST_DATA='{"workloadIdentityPools":["'${ENVIRON_PROJECT_ID}'.hub.id.goog","'${ENVIRON_PROJECT_ID}'.svc.id.goog"]}'
-    run_command curl --request POST --fail \
-    --data "${POST_DATA}" -o /dev/null \
-    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
-    --header "Content-Type: application/json" \
-    -K <(auth_header "$(get_auth_token)")
-  else
-    run_command curl --request POST --fail \
-    --data '' -o /dev/null \
-    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
-    -K <(auth_header "$(get_auth_token)")
-  fi
-}
-
-init_meshconfig_managed() {
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-
-  info "Initializing meshconfig managed API..."
-  run_command curl --request POST --fail \
-    --data '{"prepare_istiod": true}' \
-    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
-    --header "X-Server-Timeout: 600" \
-    --header "Content-Type: application/json" \
-    -K <(auth_header "$(get_auth_token)")
 }
 
 get_auth_token() {
@@ -2659,20 +2455,4 @@ print_config() {
   done
   # shellcheck disable=SC2086
   istioctl profile dump ${PARAMS}
-}
-
-init_gcp_cas() {
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
-  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="$PROJECT_ID.svc.id.goog[istio-system/istiod-service-account]"
-
-  local NAME; NAME=$(echo "${CA_NAME}" | cut -f6 -d/)
-  local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
-  local CA_PROJECT; CA_PROJECT=$(echo "${CA_NAME}" | cut -f2 -d/)
-
-  retry 3 gcloud beta privateca subordinates add-iam-policy-binding "${NAME}" \
-    --location "${CA_LOCATION}" \
-    --project "${CA_PROJECT}" \
-    --member "serviceAccount:${WORKLOAD_IDENTITY}" \
-    --role "roles/privateca.certificateManager"
 }
