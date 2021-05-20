@@ -124,6 +124,7 @@ USE_HUB_WIP=0
 USE_MCP_CNI=0
 USE_VM=0
 ENVIRON_PROJECT_ID=""
+HUB_IDP_URL=""
 HUB_MEMBERSHIP_ID=""
 CUSTOM_REVISION=0
 WI_ENABLED=0
@@ -2288,6 +2289,7 @@ populate_environ_info() {
   if ! is_membership_crd_installed; then return; fi
   HUB_MEMBERSHIP_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.owner.id | sed 's/^\"\/\/gkehub.googleapis.com\/projects\/\(.*\)\/locations\/global\/memberships\/\(.*\)\"$/\2/g')"
   ENVIRON_PROJECT_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.workload_identity_pool | sed -E 's/^\"(.*)\.(svc|hub)\.id\.goog\"$/\1/')"
+  HUB_IDP_URL="$(kubectl get memberships.hub.gke.io membership -o=jsonpath='{.spec.identity_provider}')"
 }
 
 enable_network_policy(){
@@ -2522,6 +2524,7 @@ configure_package() {
   if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
     kpt cfg set asm gcloud.project.environProjectID "${ENVIRON_PROJECT_ID}"
     kpt cfg set asm anthos.servicemesh.hubMembershipID "${HUB_MEMBERSHIP_ID}"
+    kpt cfg set asm anthos.servicemesh.hub-idp-url ${HUB_IDP_URL}
   fi
   if [[ -n "${CA_NAME}" && "${CA}" = "gcp_cas" ]]; then
     kpt cfg set asm anthos.servicemesh.external_ca.ca_name "${CA_NAME}"
