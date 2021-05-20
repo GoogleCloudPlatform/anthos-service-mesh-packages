@@ -711,9 +711,7 @@ run_basic_test() {
   echo "Installing ASM with MeshCA..."
   echo "_CI_REVISION_PREFIX=${LT_NAMESPACE} \
   ../install_asm ${KEY_FILE} ${SERVICE_ACCOUNT} \
-    -l ${LT_CLUSTER_LOCATION} \
-    -n ${LT_CLUSTER_NAME} \
-    -p ${PROJECT_ID} \
+    --kc ${KUBECONFIG} \
     -m ${MODE} \
     -c ${CA} -v \
     --output-dir ${OUTPUT_DIR} \
@@ -724,9 +722,7 @@ run_basic_test() {
   PROJECT_ID="" \
   _CI_REVISION_PREFIX="${LT_NAMESPACE}" \
     ../install_asm ${KEY_FILE} ${SERVICE_ACCOUNT} \
-    -l "${LT_CLUSTER_LOCATION}" \
-    -n "${LT_CLUSTER_NAME}" \
-    -p "${PROJECT_ID}" \
+    --kc "${KUBECONFIG}" \
     -m "${MODE}" \
     -c "${CA}" -v \
     --output-dir "${OUTPUT_DIR}" \

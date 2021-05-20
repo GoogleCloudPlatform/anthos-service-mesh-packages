@@ -390,12 +390,7 @@ gcloud() {
 }
 
 kubectl() {
-  local KCF
-  KCF="$(context_get-option "KUBECONFIG")"
-  if [[ -z "${KCF}" ]]; then
-    KCF="${KUBECONFIG}"
-  fi
-  run "${AKUBECTL}" --kubeconfig "${KCF}" "${@}"
+  run "${AKUBECTL}" --kubeconfig "${KUBECONFIG}" "${@}"
 }
 
 kpt() {
@@ -478,9 +473,6 @@ configure_kubectl(){
     KUBECONFIG="${KUBECONFIG}" retry 2 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
       --project="${PROJECT_ID}" \
       --zone="${CLUSTER_LOCATION}"
-    context_set-option "KUBECONFIG" "${KUBECONFIG}"
-  else
-    KUBECONFIG="$(context_get-option "KUBECONFIG")"
   fi
 
   if ! hash nc 2>/dev/null; then
@@ -549,10 +541,6 @@ is_managed() {
 
 is_mcp_cni() {
   if [[ "${USE_MCP_CNI}" -ne 1 ]]; then false; fi
-}
-
-is_gcp() {
-  true # hook for later
 }
 
 is_sa() {
@@ -1174,11 +1162,6 @@ EOF
     IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
 ${CONTEXT}
 EOF
-    if is_gcp; then
-      context_set-option "PROJECT_ID" "${PROJECT_ID}"
-      context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
-      context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
-    fi
   fi
 
   if [[ "${MODE}" != "upgrade" ]]; then
@@ -1422,12 +1405,8 @@ set_up_local_workspace() {
   fi
   pushd "$OUTPUT_DIR" > /dev/null
 
-  # If KUBECONFIG file is supplied, keep using that.
-  KUBECONFIG="$(context_get-option "KUBECONFIG")"
-
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
     KUBECONFIG="asm_kubeconfig"
-    context_set-option "KUBECONFIG" "${KUBECONFIG}"
   fi
 
   info "Using ${KUBECONFIG} as the kubeconfig..."
