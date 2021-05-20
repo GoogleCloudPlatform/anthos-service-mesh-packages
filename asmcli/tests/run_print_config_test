@@ -34,21 +34,21 @@ spec:
 EOF
 
   echo "../asmcli \
+    print-config \
     -l us-central1-c \
     -n long-term-test-cluster \
     -p asm-scriptaro-oss \
-    --print-config \
     -d test_output_dir \
     --option egressgateways \
     --custom_overlay ${CUSTOM_OVERLAY} \
     -m install"
 
   CONFIG="$(../asmcli \
+    print-config \
     -l us-central1-c \
     -n long-term-test-cluster \
     -p asm-scriptaro-oss \
     -d test_output_dir \
-    --print-config \
     --option egressgateways \
     --custom_overlay ${CUSTOM_OVERLAY} \
     -m install)"

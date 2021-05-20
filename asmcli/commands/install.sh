@@ -1,11 +1,29 @@
 install_subcommand() {
+  ### Preparation ###
+  context_init
+  parse_args "${@}"
+  validate_args
+  prepare_environment
+
+  ### Validate ###
+  validate
+
+  if [[ "$(context_get-option "USE_VM")" -eq 1 ]]; then
+    register_gce_identity_provider
+  fi
+
+  ### Configure ###
+  configure_package
+  post_process_istio_yamls
+
+  install
+}
+
+install() {
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
   local CA; CA="$(context_get-option "CA")"
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
   local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
-
-  # TODO: validate (mesh_ca | citadel | private_ca).
-  # TODO: validate (mcp | in-cluster) control plane.
 
   ### Configure ###
   configure_ca
