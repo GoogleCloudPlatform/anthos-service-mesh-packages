@@ -86,10 +86,6 @@ main() {
   ### Validate ###
   validate_subcommand
 
-  if [[ "$(context_get-option "PRINT_CONFIG")" -eq 1 && "$(context_get-option "USE_HUB_WIP")" -eq 1 ]]; then
-    populate_environ_info
-  fi
-
   if [[ "$(context_get-option "USE_VM")" -eq 1 ]]; then
     register_gce_identity_provider
   fi
@@ -98,10 +94,7 @@ main() {
   configure_package
   post_process_istio_yamls
 
-  if [[ "$(context_get-option "PRINT_CONFIG")" -eq 1 ]]; then
-    print_config >&3
-    return 0
-  fi
+  print-config_subcommand
 
   ### Install ###
   install_subcommand
@@ -2439,20 +2432,4 @@ configure_package() {
     kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod-${REVISION_LABEL}.istio-system.svc.cluster.local"
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${REVISION_LABEL}"
   fi
-}
-
-print_config() {
-  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
-
-  if [[ "${MANAGED}" -eq 1 ]]; then
-    cat "${MANAGED_MANIFEST}"
-    return
-  fi
-
-  PARAMS="-f ${OPERATOR_MANIFEST}"
-  for yaml_file in $(context_list-istio-yamls); do
-    PARAMS="${PARAMS} -f ${yaml_file} "
-  done
-  # shellcheck disable=SC2086
-  istioctl profile dump ${PARAMS}
 }
