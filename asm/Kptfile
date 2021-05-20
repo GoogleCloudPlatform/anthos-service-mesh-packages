@@ -217,7 +217,7 @@ openAPI:
       x-k8s-cli:
         substitution:
           name: token-audiences-hub
-          pattern: "istio-ca,ENVIRON_PROJECT_ID.hub.id.goog"
+          pattern: "istio-ca,ENVIRON_PROJECT_ID.svc.id.goog"
           values:
           - marker: ENVIRON_PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectID'
@@ -286,7 +286,7 @@ openAPI:
       x-k8s-cli:
         substitution:
           name: spiffe-bundle-endpoints-hub
-          pattern: ENVIRON_PROJECT_ID.hub.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json
+          pattern: ENVIRON_PROJECT_ID.svc.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json
           values:
           - marker: ENVIRON_PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectID'
@@ -295,7 +295,7 @@ openAPI:
       x-k8s-cli:
         substitution:
           name: trust-domain-hub
-          pattern: "ENVIRON_PROJECT_ID.hub.id.goog"
+          pattern: "ENVIRON_PROJECT_ID.svc.id.goog"
           values:
           - marker: ENVIRON_PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectID'
