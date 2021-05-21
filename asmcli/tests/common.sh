@@ -604,7 +604,7 @@ run_required_role() {
   local MODE; MODE="${1}";
   local CA; CA="${2}";
   local EXPECTED_ROLES; EXPECTED_ROLES="${3}"
-  shift 3 # increment this if more arguments are added
+  shift 4 # increment this if more arguments are added
   local EXTRA_FLAGS; EXTRA_FLAGS="${*}"
 
   date +"%T"
@@ -672,9 +672,10 @@ run_required_role() {
 }
 
 run_basic_test() {
-  local MODE; MODE="${1}";
-  local CA; CA="${2}";
-  shift 2 # increment this if more arguments are added
+  local SUBCOMMAND; SUBCOMMAND="${1}"
+  local MODE; MODE="${2}";
+  local CA; CA="${3}";
+  shift 3 # increment this if more arguments are added
   local EXTRA_FLAGS; EXTRA_FLAGS="${*}"
 
   date +"%T"
@@ -710,7 +711,7 @@ run_basic_test() {
   # Test starts here
   echo "Installing ASM with MeshCA..."
   echo "_CI_REVISION_PREFIX=${LT_NAMESPACE} \
-  ../asmcli ${KEY_FILE} ${SERVICE_ACCOUNT} \
+  ../asmcli ${SUBCOMMAND} ${KEY_FILE} ${SERVICE_ACCOUNT} \
     -m ${MODE} \
     --kc ${KUBECONFIG} \
     -c ${CA} -v \
@@ -721,7 +722,7 @@ run_basic_test() {
   CLUSTER_NAME="" \
   PROJECT_ID="" \
   _CI_REVISION_PREFIX="${LT_NAMESPACE}" \
-    ../asmcli ${KEY_FILE} ${SERVICE_ACCOUNT} \
+    ../asmcli ${SUBCOMMAND} ${KEY_FILE} ${SERVICE_ACCOUNT} \
     -m "${MODE}" \
     --kc "${KUBECONFIG}" \
     -c "${CA}" -v \

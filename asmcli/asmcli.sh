@@ -77,27 +77,35 @@ KUBECONFIG_SUPPLIED=0
 main() {
   init
 
-  ### Preparation ###
-  context_init
-  parse_args "${@}"
-  validate_args
-  prepare_environment
-
-  ### Validate ###
-  validate_subcommand
-
-  if [[ "$(context_get-option "USE_VM")" -eq 1 ]]; then
-    register_gce_identity_provider
+  if [[ "${*}" = '' ]]; then
+    usage_short >&2
+    exit 2
   fi
 
-  ### Configure ###
-  configure_package
-  post_process_istio_yamls
+  # shellcheck disable=SC2064
+  trap "$(shopt -p nocasematch)" RETURN
+  shopt -s nocasematch
 
-  print-config_subcommand
-
-  ### Install ###
-  install_subcommand
+  local OPTIONAL_OVERLAY; OPTIONAL_OVERLAY=""
+  local CUSTOM_OVERLAY; CUSTOM_OVERLAY=""
+  case "${1}" in
+    install)
+      shift 1
+      install_subcommand "${@}"
+      ;;
+    validate)
+      shift 1
+      validate_subcommand "${@}"
+      ;;
+    print-config)
+      shift 1
+      print-config_subcommand "${@}"
+      ;;
+    *)
+      fatal_with_usage "Unknown subcommand ${1}"
+      ;;
+  esac
+  
 }
 
 prepare_environment() {
@@ -507,6 +515,11 @@ usage: ${SCRIPT_NAME} [OPTION]...
 Set up, validate, and install ASM in a Google Cloud environment.
 Use -h|--help with -v|--verbose to show detailed descriptions.
 
+SUBCOMMANDS:
+  install
+  validate
+  print-config
+
 OPTIONS:
   -l|--cluster_location  <LOCATION>
   -n|--cluster_name      <NAME>
@@ -562,6 +575,12 @@ Set up, validate, and install ASM in a Google Cloud environment.
 Single argument options can also be passed via environment variables by using
 the ALL_CAPS name. Options specified via flags take precedence over environment
 variables.
+
+SUBCOMMANDS:
+  install                             Install will attempt a new ASM installation
+  validate                            Validate will attempt a new ASM validation
+  print-config                        Print Config will attempt to print the configurations 
+                                      used by the current mode
 
 OPTIONS:
   -l|--cluster_location  <LOCATION>   The GCP location of the target cluster.
@@ -918,13 +937,6 @@ parse_args() {
       usage_short
     fi
     exit
-  fi
-
-  # make sure to redirect stdout as soon as possible if we're dumping the config
-  local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
-  if [[ "${PRINT_CONFIG}" -eq 1 ]]; then
-    exec 3>&1
-    exec 1>&2
   fi
 }
 

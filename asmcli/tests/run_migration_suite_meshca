@@ -62,6 +62,7 @@ main() {
   echo "Installing ASM with MeshCA..."
   if [[ -n "${SERVICE_ACCOUNT}" ]]; then
     echo "../asmcli \
+      install \
       -l ${CLUSTER_LOCATION} \
       -n ${CLUSTER_NAME} \
       -p ${PROJECT_ID} \
@@ -71,6 +72,7 @@ main() {
       -s ${SERVICE_ACCOUNT} \
       -k ${KEY_FILE} -v -e"
     ../asmcli \
+      install \
       -l "${CLUSTER_LOCATION}" \
       -n "${CLUSTER_NAME}" \
       -p "${PROJECT_ID}" \
@@ -82,6 +84,7 @@ main() {
       2>&1 | tee "${CLUSTER_NAME}" &
   else
     echo "../asmcli \
+      install \
       -l ${CLUSTER_LOCATION} \
       -n ${CLUSTER_NAME} \
       -p ${PROJECT_ID} \
@@ -89,6 +92,7 @@ main() {
       -D mesh_migration \
       -c mesh_ca -v -e"
     ../asmcli \
+      install \
       -l "${CLUSTER_LOCATION}" \
       -n "${CLUSTER_NAME}" \
       -p "${PROJECT_ID}" \

@@ -1,4 +1,16 @@
 validate_subcommand() {
+  ### Preparation ###
+  context_init
+  context_set-option "ONLY_VALIDATE" 1
+  parse_args "${@}"
+  validate_args
+  prepare_environment
+
+  ### Validate ###
+  validate
+}
+
+validate() {
   validate_dependencies
   validate_control_plane
 

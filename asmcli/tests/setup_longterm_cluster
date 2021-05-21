@@ -19,11 +19,11 @@ setup_cluster() {
 
   OUTPUT_DIR=$(mktemp -d)
   ../asmcli \
+    print-config \
     -l "${LT_CLUSTER_LOCATION}" \
     -n "${LT_CLUSTER_NAME}" \
     -p "${LT_PROJECT_ID}" \
     -m install \
-    --print-config \
     -D "${OUTPUT_DIR}" > /dev/null
 
   cleanup_old_instance_templates
@@ -74,6 +74,7 @@ setup_cluster() {
 
   _CI_I_AM_A_TEST_ROBOT=1 \
   ../asmcli \
+    install \
     -l "${LT_CLUSTER_LOCATION}" \
     -n "${cluster}" \
     -p "${LT_PROJECT_ID}" \
