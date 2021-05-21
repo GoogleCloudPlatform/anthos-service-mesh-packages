@@ -66,14 +66,11 @@ scrape_managed_urls() {
 }
 
 install_in_cluster_control_plane() {
-  local MODE; MODE="$(context_get-option "MODE")"
   local USE_VM; USE_VM="$(context_get-option "USE_VM")"
 
   if ! does_istiod_exist && [[ "${_CI_NO_REVISION}" -ne 1 ]]; then
     info "Installing validation webhook fix..."
     context_append-kube-yaml "${VALIDATION_FIX_SERVICE}"
-  elif [[ "${MODE}" == "upgrade" ]]; then
-    cp "${VALIDATION_FIX_SERVICE}" .
   fi
 
   local PARAMS
@@ -185,7 +182,6 @@ expose_istiod() {
 }
 
 outro() {
-  local MODE; MODE="$(context_get-option "MODE")"
   local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
 
   info ""
@@ -199,19 +195,10 @@ outro() {
   info "to specify the option '--set revision=${REVISION_LABEL}' to target this control plane"
   info "instead of installing a new one."
 
+  info "To finish the installation, enable Istio sidecar injection and restart your workloads."
+  info "For more information, see:"
+  info "https://cloud.google.com/service-mesh/docs/proxy-injection"
 
-  if [[ "${MODE}" = "migrate" || "${MODE}" = "upgrade" ]]; then
-    info "Please verify the new control plane and then: 1) migrate your workloads 2) remove old control plane."
-    info "For more information, see:"
-    info "https://cloud.google.com/service-mesh/docs/upgrading-gke#redeploying_workloads"
-    info "Before removing the old control plane, update the service used by validation if necessary."
-    info "If the 'istiod' service has a revision label different than ${REVISION_LABEL}, then apply"
-    info "${OUTPUT_DIR}/${VALIDATION_FIX_FILE_NAME} using 'kubectl apply'"
-  elif [[ "${MODE}" = "install" ]]; then
-    info "To finish the installation, enable Istio sidecar injection and restart your workloads."
-    info "For more information, see:"
-    info "https://cloud.google.com/service-mesh/docs/proxy-injection"
-  fi
   info "The ASM package used for installation can be found at:"
   info "${OUTPUT_DIR}/asm"
   info "The version of istioctl that matches the installation can be found at:"

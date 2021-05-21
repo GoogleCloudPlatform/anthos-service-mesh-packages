@@ -42,7 +42,7 @@ main() {
   popd
   EXTRA_FLAGS="--ca-cert ${TEST_CERT} --ca-key ${TEST_KEY} --root-cert ${TEST_ROOT} --cert-chain ${TEST_CHAIN}"
 
-  run_basic_test "install" "install" "citadel" "${EXTRA_FLAGS}"; RETVAL=$?;
+  run_basic_test "install" "citadel" "${EXTRA_FLAGS}"; RETVAL=$?;
   trap 'kubectl delete secrets cacerts -n istio-system; cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"' ERR
   install_strict_policy "${LT_NAMESPACE}"
   roll "${LT_NAMESPACE}"

@@ -601,10 +601,10 @@ EOF
 }
 
 run_required_role() {
-  local MODE; MODE="${1}";
+  local SUBCOMMAND; SUBCOMMAND="${1}"
   local CA; CA="${2}";
   local EXPECTED_ROLES; EXPECTED_ROLES="${3}"
-  shift 4 # increment this if more arguments are added
+  shift 3 # increment this if more arguments are added
   local EXTRA_FLAGS; EXTRA_FLAGS="${*}"
 
   date +"%T"
@@ -628,21 +628,19 @@ run_required_role() {
   # Test starts here
   echo "Installing ASM with MeshCA..."
   echo "_CI_REVISION_PREFIX=${LT_NAMESPACE} \
-  ../asmcli ${KEY_FILE} ${SERVICE_ACCOUNT} \
+  ../asmcli ${SUBCOMMAND} ${KEY_FILE} ${SERVICE_ACCOUNT} \
     -l ${LT_CLUSTER_LOCATION} \
     -n ${LT_CLUSTER_NAME} \
     -p ${PROJECT_ID} \
-    -m ${MODE} \
     -c ${CA} -v \
     --output-dir ${OUTPUT_DIR} \
     ${EXTRA_FLAGS}"
   # shellcheck disable=SC2086
   _CI_REVISION_PREFIX="${LT_NAMESPACE}" \
-    ../asmcli ${KEY_FILE} ${SERVICE_ACCOUNT} \
+    ../asmcli ${SUBCOMMAND} ${KEY_FILE} ${SERVICE_ACCOUNT} \
     -l "${LT_CLUSTER_LOCATION}" \
     -n "${LT_CLUSTER_NAME}" \
     -p "${PROJECT_ID}" \
-    -m "${MODE}" \
     -c "${CA}" -v \
     --output-dir "${OUTPUT_DIR}" \
     ${EXTRA_FLAGS} ${_EXTRA_FLAGS} 2>&1
@@ -673,9 +671,8 @@ run_required_role() {
 
 run_basic_test() {
   local SUBCOMMAND; SUBCOMMAND="${1}"
-  local MODE; MODE="${2}";
-  local CA; CA="${3}";
-  shift 3 # increment this if more arguments are added
+  local CA; CA="${2}";
+  shift 2 # increment this if more arguments are added
   local EXTRA_FLAGS; EXTRA_FLAGS="${*}"
 
   date +"%T"
@@ -712,7 +709,6 @@ run_basic_test() {
   echo "Installing ASM with MeshCA..."
   echo "_CI_REVISION_PREFIX=${LT_NAMESPACE} \
   ../asmcli ${SUBCOMMAND} ${KEY_FILE} ${SERVICE_ACCOUNT} \
-    -m ${MODE} \
     --kc ${KUBECONFIG} \
     -c ${CA} -v \
     --output-dir ${OUTPUT_DIR} \
@@ -723,7 +719,6 @@ run_basic_test() {
   PROJECT_ID="" \
   _CI_REVISION_PREFIX="${LT_NAMESPACE}" \
     ../asmcli ${SUBCOMMAND} ${KEY_FILE} ${SERVICE_ACCOUNT} \
-    -m "${MODE}" \
     --kc "${KUBECONFIG}" \
     -c "${CA}" -v \
     --output-dir "${OUTPUT_DIR}" \

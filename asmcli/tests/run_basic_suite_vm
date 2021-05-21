@@ -15,7 +15,7 @@ main() {
   # CLI setup
   parse_args "$@"
 
-  run_basic_test "install" "install" "mesh_ca" "-o vm -o hub-meshca --enable_gcp_components"; RETVAL=$?;
+  run_basic_test "install" "mesh_ca" "-o vm -o hub-meshca --enable_gcp_components"; RETVAL=$?;
   trap 'cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"' ERR
 
   echo "Verifying east-west gateway is installed and running..."

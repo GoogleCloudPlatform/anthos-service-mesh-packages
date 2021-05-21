@@ -40,8 +40,7 @@ EOF
     -p asm-scriptaro-oss \
     -d test_output_dir \
     --option egressgateways \
-    --custom_overlay ${CUSTOM_OVERLAY} \
-    -m install"
+    --custom_overlay ${CUSTOM_OVERLAY}"
 
   CONFIG="$(../asmcli \
     print-config \
@@ -50,8 +49,7 @@ EOF
     -p asm-scriptaro-oss \
     -d test_output_dir \
     --option egressgateways \
-    --custom_overlay ${CUSTOM_OVERLAY} \
-    -m install)"
+    --custom_overlay ${CUSTOM_OVERLAY})"
 
   if [[ ! -d test_output_dir ]]; then
     echo "Didn't properly create output directory!"

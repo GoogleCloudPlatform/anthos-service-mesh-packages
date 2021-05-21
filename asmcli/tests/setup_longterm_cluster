@@ -23,7 +23,6 @@ setup_cluster() {
     -l "${LT_CLUSTER_LOCATION}" \
     -n "${LT_CLUSTER_NAME}" \
     -p "${LT_PROJECT_ID}" \
-    -m install \
     -D "${OUTPUT_DIR}" > /dev/null
 
   cleanup_old_instance_templates
@@ -78,7 +77,6 @@ setup_cluster() {
     -l "${LT_CLUSTER_LOCATION}" \
     -n "${cluster}" \
     -p "${LT_PROJECT_ID}" \
-    -m install \
     --only-enable -e -v
 }
 
