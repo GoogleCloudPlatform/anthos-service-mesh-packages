@@ -201,7 +201,7 @@ substitutions:
   _IMAGE_NAME: gcloud-with-kpt
   _SCRIPT_NAME: install_asm
   _ASM_VM_SCRIPT_NAME: asm_vm
-  _ASM_PKG_BRANCH: ${COMMIT_SHA}
+  _ASM_PKG_BRANCH: $COMMIT_SHA
   _SERVICE_ACCOUNT: asm-installer
   _SECRET_NAME: asm-installer-creds
   _KEY_FILE: key.json
