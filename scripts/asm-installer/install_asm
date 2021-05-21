@@ -2524,7 +2524,7 @@ configure_package() {
   if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
     kpt cfg set asm gcloud.project.environProjectID "${ENVIRON_PROJECT_ID}"
     kpt cfg set asm anthos.servicemesh.hubMembershipID "${HUB_MEMBERSHIP_ID}"
-    kpt cfg set asm anthos.servicemesh.hub-idp-url ${HUB_IDP_URL}
+    kpt cfg set asm anthos.servicemesh.hub-idp-url "${HUB_IDP_URL}"
   fi
   if [[ -n "${CA_NAME}" && "${CA}" = "gcp_cas" ]]; then
     kpt cfg set asm anthos.servicemesh.external_ca.ca_name "${CA_NAME}"
