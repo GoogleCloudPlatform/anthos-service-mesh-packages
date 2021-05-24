@@ -274,7 +274,7 @@ substitutions:
   _CLUSTER_LOCATION: us-central1-c
   _IMAGE_NAME: gcloud-with-kpt
   _SCRIPT_NAME: install_asm
-  _ASM_PKG_BRANCH: ""
+  _ASM_PKG_BRANCH: $COMMIT_SHA
   _SERVICE_ACCOUNT: asm-installer
   _SECRET_NAME: asm-installer-creds
   _KEY_FILE: key.json
