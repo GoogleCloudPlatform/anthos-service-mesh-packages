@@ -1973,12 +1973,17 @@ is_membership_crd_installed() {
 populate_environ_info() {
   local ENVIRON_PROJECT_ID; ENVIRON_PROJECT_ID="$(context_get-option "ENVIRON_PROJECT_ID")"
   local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
+  local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
 
-  if [[ -n "${ENVIRON_PROJECT_ID}" && -n "${HUB_MEMBERSHIP_ID}" ]]; then return; fi
+  if [[ -n "${ENVIRON_PROJECT_ID}" && \
+    -n "${HUB_MEMBERSHIP_ID}" && \
+    -n "${HUB_IDP_URL}" ]]; then return; fi
+
   if ! is_membership_crd_installed; then return; fi
   HUB_MEMBERSHIP_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.owner.id | sed 's/^\"\/\/gkehub.googleapis.com\/projects\/\(.*\)\/locations\/global\/memberships\/\(.*\)\"$/\2/g')"
   context_set-option "HUB_MEMBERSHIP_ID" "${HUB_MEMBERSHIP_ID}"
-
+  HUB_IDP_URL="$(kubectl get memberships.hub.gke.io membership -o=jsonpath='{.spec.identity_provider}')"
+  context_set-option "HUB_IDP_URL" "${HUB_IDP_URL}"
   ENVIRON_PROJECT_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.workload_identity_pool | sed 's/^\"\(.*\).\(svc\|hub\).id.goog\"$/\1/g')"
   context_set-option "ENVIRON_PROJECT_ID" "${ENVIRON_PROJECT_ID}"
 }
@@ -2192,6 +2197,7 @@ configure_package() {
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
   local USE_VM; USE_VM="$(context_get-option "USE_VM")"
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
+  local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
 
   info "Configuring kpt package..."
 
@@ -2217,6 +2223,7 @@ configure_package() {
   if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
     kpt cfg set asm gcloud.project.environProjectID "${ENVIRON_PROJECT_ID}"
     kpt cfg set asm anthos.servicemesh.hubMembershipID "${HUB_MEMBERSHIP_ID}"
+    kpt cfg set asm anthos.servicemesh.hub-idp-url "${HUB_IDP_URL}"
   fi
 
   if [[ "${USE_VM}" -eq 1 ]] && [[ "${_CI_NO_REVISION}" -eq 0 ]]; then
