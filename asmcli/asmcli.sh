@@ -102,7 +102,7 @@ main() {
       print-config_subcommand "${@}"
       ;;
     *)
-      fatal_with_usage "Unknown subcommand ${1}"
+      help_subcommand "${@}"
       ;;
   esac
   
@@ -498,228 +498,6 @@ enable_common_message() {
   echo "Alternatively, use --enable_all|-e to allow this tool to handle all dependencies."
 }
 
-version_message() {
-  local VER; VER="${MAJOR}.${MINOR}.${POINT}-asm.${REV}+config${CONFIG_VER}";
-  if [[ "${_CI_CRC_VERSION}" -eq 1 ]]; then
-    VER="${VER}-$(crc32 "$0")"
-  fi
-  echo "${VER}"
-}
-
-### CLI/initial setup functions ###
-usage_short() {
-  cat << EOF
-${SCRIPT_NAME} $(version_message)
-usage: ${SCRIPT_NAME} [OPTION]...
-
-Set up, validate, and install ASM in a Google Cloud environment.
-Use -h|--help with -v|--verbose to show detailed descriptions.
-
-SUBCOMMANDS:
-  install
-  validate
-  print-config
-
-OPTIONS:
-  -l|--cluster_location  <LOCATION>
-  -n|--cluster_name      <NAME>
-  -p|--project_id        <ID>
-  --kc|--kubeconfig      <KUBECONFIG_FILE>
-  --ctx|--context        <CONTEXT>
-  -m|--mode              <MODE>
-  -c|--ca                <CA>
-
-  -o|--option            <FILE NAME>
-  -s|--service_account   <ACCOUNT>
-  -k|--key_file          <FILE PATH>
-  -D|--output_dir        <DIR PATH>
-  --co|--custom_overlay  <FILE NAME>
-
-  --ca_cert              <FILE PATH>
-  --ca_key               <FILE PATH>
-  --root_cert            <FILE PATH>
-  --cert_chain           <FILE PATH>
-  --ca_name              <CA NAME>
-  -r|--revision_name     <REVISION NAME>
-  --platform             <PLATFORM>
-
-FLAGS:
-  -e|--enable_all
-     --enable_cluster_roles
-     --enable_cluster_labels
-     --enable_gcp_apis
-     --enable_gcp_iam_roles
-     --enable_gcp_components
-     --enable_registration
-     --enable_namespace_creation
-
-     --managed
-
-     --print_config
-     --disable_canonical_service
-  -v|--verbose
-     --dry_run
-     --only_validate
-     --only_enable
-  -h|--help
-  --version
-EOF
-}
-
-usage() {
-  cat << EOF
-${SCRIPT_NAME} $(version_message)
-usage: ${SCRIPT_NAME} [OPTION]...
-
-Set up, validate, and install ASM in a Google Cloud environment.
-Single argument options can also be passed via environment variables by using
-the ALL_CAPS name. Options specified via flags take precedence over environment
-variables.
-
-SUBCOMMANDS:
-  install                             Install will attempt a new ASM installation
-  validate                            Validate will attempt a new ASM validation
-  print-config                        Print Config will attempt to print the configurations 
-                                      used by the current mode
-
-OPTIONS:
-  -l|--cluster_location  <LOCATION>   The GCP location of the target cluster.
-  -n|--cluster_name      <NAME>       The name of the target cluster.
-  -p|--project_id        <ID>         The GCP project ID.
-  --kc|--kubeconfig      <KUBECONFIG> Path to the kubeconfig file to use for CLI requests.
-                                      Required if not supplying --cluster_location,
-                                      --cluster_name, --project_id in order to locate
-                                      and connect to the intended cluster.
-  --ctx|--context        <CONTEXT>    The name of the kubeconfig context to use.
-  -m|--mode              <MODE>       The type of installation to perform.
-                                      Passing --mode install will attempt a
-                                      new ASM installation. Passing --mode
-                                      migrate will attempt to migrate an Istio
-                                      installation to ASM. Passing --mode
-                                      upgrade will attempt to upgrade an
-                                      existing ASM installation to a newer
-                                      version. Allowed values for
-                                      <MODE> are {install|migrate|upgrade}.
-  -c|--ca                <CA>         The type of certificate authority to be
-                                      used. Defaults to "mesh_ca" for --mode
-                                      install. Specifying the CA is required
-                                      for --mode migrate.  Allowed values for
-                                      <CA> are {citadel|mesh_ca|gcp_cas}.
-  -o|--option            <FILE NAME>  The name of a YAML file in the kpt pkg to
-                                      apply. For options, see the
-                                      anthos-service-mesh-package GitHub
-                                      repo under GoogleCloudPlatform. Files
-                                      should be in "asm/istio/options" folder,
-                                      and shouldn't include the .yaml extension.
-                                      (See https://git.io/JTDdi for options.)
-                                      To add multiple files, specify them with
-                                      multiple options one at a time.
-  -s|--service_account   <ACCOUNT>    The name of a service account used to
-                                      install ASM. If not specified, the gcloud
-                                      user currently configured will be used.
-  -k|--key_file          <FILE PATH>  The key file for a service account. This
-                                      option can be omitted if not using a
-                                      service account.
-  -D|--output_dir        <DIR PATH>   The directory where this script will place
-                                      downloaded ASM packages and configuration.
-                                      If not specified, a temporary directory
-                                      will be created. If specified and the
-                                      directory already contains the necessary
-                                      files, they will be used instead of
-                                      downloading them again.
-  --co|--custom_overlay  <FILE PATH>  The location of a YAML file to overlay on
-                                      the ASM IstioOperator. This option can be
-                                      omitted if not installing optional
-                                      features. To add multiple files, specify
-                                      them with multiple options one at a time.
-  --ca_name              <CA NAME>    Required only if --ca option is gcp_cas.
-                                      Name of the ca in the GCP CAS service used to
-                                      sign certificates in the format
-                                      'projects/project_name/locations/ \
-                                      ca_region/certificateAuthorities/ca_name'.
-  -r|--revision_name <REVISION NAME>  Custom revision label. Label needs to follow DNS
-                                      label formats (re: RFC 1123). Not supported if
-                                      control plane is managed. Prefixing the revision
-                                      name with 'asm' is recommended.
-  --platform             <PLATFORM>   The platorm or the provider of the kubernetes
-                                      cluster. Defaults to "gcp" (for GKE clusters).
-                                      For all other platforms use "multicloud".
-                                      Allowed values for <PLATFORM> are {gcp|multicloud}.
-  The following four options must be passed together and are only necessary
-  for using a custom certificate for Citadel. Users that aren't sure whether
-  they need this probably don't.
-
-  --ca_cert              <FILE PATH>  The intermediate certificate
-  --ca_key               <FILE PATH>  The key for the intermediate certificate
-  --root_cert            <FILE PATH>  The root certificate
-  --cert_chain           <FILE PATH>  The certificate chain
-
-FLAGS:
-
-  The following several flags all relate to allowing the script to create, set,
-  or enable required APIs, roles, or services. These can all be performed
-  manually before running the script if desired. To allow the script to perform
-  every necessary action, pass the -e|--enable_all flag. All of these flags
-  are incompatible with --only_validate.
-
-  -e|--enable_all                     Allow the script to perform all of the
-                                      individual enable actions below. (Environ
-                                      registration won't happen unless necessary
-                                      for a selected option.)
-     --enable_cluster_roles           Allow the script to attempt to set
-                                      the necessary cluster roles.
-     --enable_cluster_labels          Allow the script to attempt to set
-                                      necessary cluster labels.
-     --enable_gcp_apis                Allow the script to enable GCP APIs on
-                                      the user's behalf
-     --enable_gcp_iam_roles           Allow the script to set the required GCP
-                                      IAM permissions
-     --enable_gcp_components          Allow the script to enable required GCP
-                                      managed services and components
-     --enable_registration            Allow the script to register the cluster
-                                      to an environ
-     --enable_namespace_creation      Allow the script to create the istio-system
-                                      namespace for the user
-
-     --managed                        Provision a remote, managed control plane
-                                      instead of installing one in-cluster.
-
-     --print_config                   Instead of installing ASM, print all of
-                                      the compiled YAML to stdout. All other
-                                      output will be written to stderr, even if
-                                      it would normally go to stdout. Skip all
-                                      validations and setup.
-     --disable_canonical_service      Do not install the CanonicalService
-                                      controller. This is required for ASM UI to
-                                      support various features.
-  -v|--verbose                        Print commands before and after execution.
-     --dry_run                        Print commands, but don't execute them.
-     --only_validate                  Run validation, but don't install.
-     --only_enable                    Perform the specified steps to set up the
-                                      current user/cluster but don't install
-                                      anything.
-  -h|--help                           Show this message and exit.
-  --version                           Print the version of this tool and exit.
-
-EXAMPLE:
-The following invocation will install ASM to a cluster named "my_cluster" in
-project "my_project" in region "us-central1-c" using the default "mesh_ca" as
-the certificate authority:
-  $> ${SCRIPT_NAME} \\
-      -n my_cluster \\
-      -p my_project \\
-      -l us-central1-c \\
-      -m install
-
-  or
-
-  $> ${SCRIPT_NAME} \\
-      --kubeconfig kubeconfig_file \\
-      --context kube context \\
-      -m install
-EOF
-}
-
 arg_required() {
   if [[ ! "${2:-}" || "${2:0:1}" = '-' ]]; then
     fatal "Option ${1} requires an argument."
@@ -767,8 +545,7 @@ parse_args() {
         shift 2
         ;;
       -m | --mode)
-        arg_required "${@}"
-        context_set-option "MODE" "$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+        warn "As of version 1.10 the --mode flag is deprecated and will be ignored."
         shift 2
         ;;
       -c | --ca)
@@ -945,7 +722,6 @@ validate_args() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
-  local MODE; MODE="$(context_get-option "MODE")"
   local PLATFORM; PLATFORM="$(context_get-option "PLATFORM")"
   local CA; CA="$(context_get-option "CA")"
   local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
@@ -985,7 +761,7 @@ validate_args() {
   local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
   local KUBECONFIG; KUBECONFIG="$(context_get-option "KUBECONFIG")"
 
-  if [[ "${MODE}" == "install" && -z "${CA}" ]]; then
+  if [[ -z "${CA}" ]]; then
     CA="mesh_ca"
     context_set-option "CA" "${CA}"
   fi
@@ -995,10 +771,6 @@ validate_args() {
   fi
 
   if is_managed; then
-    if [[ "${MODE}" != "install" ]]; then
-      fatal "Migrate and upgrade are incompatible with managed control plane."
-    fi
-
     if [[ "${CA}" == "citadel" ]]; then
       fatal "Citadel is not supported with managed control plane."
     fi
@@ -1030,14 +802,6 @@ validate_args() {
   esac
 
   local MISSING_ARGS=0
-  while read -r REQUIRED_ARG; do
-    if [[ -z "${!REQUIRED_ARG}" ]]; then
-      MISSING_ARGS=1
-      warn "Missing value for ${REQUIRED_ARG}"
-    fi
-  done <<EOF
-MODE
-EOF
 
   local CLUSTER_DETAIL_SUPPLIED=0
   local CLUSTER_DETAIL_VALID=1
@@ -1092,31 +856,9 @@ EOF
     fi
   fi
 
-  if [[ "${MODE}" != "upgrade" ]]; then
-    case "${CA}" in
-      citadel | mesh_ca | gcp_cas);;
-      "")
-        MISSING_ARGS=1
-        warn "Missing value for CA"
-        ;;
-      *) fatal "CA must be one of 'citadel', 'mesh_ca', 'gcp_cas'";;
-    esac
-  fi
-
   if [[ "${MISSING_ARGS}" -ne 0 ]]; then
     fatal_with_usage "Missing one or more required options."
   fi
-
-  if [[ "${MODE}" == "upgrade" && -n "${CA}" ]]; then
-    warn "The CA flag is ignored during an update operation."
-    warn "Update will proceed with the currently installed CA."
-  fi
-
-  # shellcheck disable=SC2064
-  case "${MODE}" in
-    install | migrate | upgrade);;
-    *) fatal "MODE must be one of 'install', 'migrate', 'upgrade'";;
-  esac
 
   while read -r FLAG; do
     if [[ "${!FLAG}" -ne 0 && "${!FLAG}" -ne 1 ]]; then
@@ -1200,14 +942,10 @@ validate_revision_label() {
 }
 
 validate_hub() {
-  local MODE; MODE="$(context_get-option "MODE")"
   local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
   local CA; CA="$(context_get-option "CA")"
   local USE_VM; USE_VM="$(context_get-option "USE_VM")"
 
-  if [[ "${MODE}" != "install" && "${USE_HUB_WIP}" -eq 1 ]]; then
-    fatal "Hub Workload Identity Pool is only supported in new installation"
-  fi
   if [[ "${CA}" == "citadel" && "${USE_HUB_WIP}" -eq 1 ]]; then
     fatal "Hub Workload Identity Pool is only supported for Mesh CA"
   fi
@@ -1282,18 +1020,9 @@ set_up_local_workspace() {
 
 ### Environment validation functions ###
 validate_environment() {
-  local MODE; MODE="$(context_get-option "MODE")"
-
   validate_node_pool
   validate_k8s
   validate_expected_control_plane
-
-  if [[ "${MODE}" = "migrate" ]]; then
-    validate_istio_version
-  elif [[ "${MODE}" = "upgrade" ]]; then
-    validate_asm_version
-    validate_ca_consistency
-  fi
 }
 
 organize_kpt_files() {
@@ -1604,15 +1333,8 @@ EOF
 }
 
 validate_expected_control_plane(){
-  local MODE; MODE="$(context_get-option "MODE")"
-
   info "Checking Istio installations..."
   check_no_istiod_outside_of_istio_system_namespace
-  if [[ "${MODE}" = "migrate" || "${MODE}" = "upgrade" ]]; then
-    check_istio_deployed
-  elif [[ "${MODE}" = "install" ]]; then
-    check_istio_not_deployed
-  fi
 }
 
 check_no_istiod_outside_of_istio_system_namespace() {
@@ -1640,11 +1362,10 @@ EOF
 
 check_istio_deployed(){
   local ISTIOD_COUNT; ISTIOD_COUNT="$(get_istio_deployment_count)";
-  local MODE; MODE="$(context_get-option "MODE")"
 
   info "Found ${ISTIOD_COUNT} deployment(s)."
   if [[ "$ISTIOD_COUNT" -eq 0 ]]; then
-    warn_pause "${MODE} mode specified but no istiod deployment found. (Expected >=1.)"
+    warn_pause "no istiod deployment found. (Expected >=1.)"
   fi
 }
 
@@ -1731,6 +1452,15 @@ EOF
 validate_ca() {
   local CA; CA="$(context_get-option "CA")"
   local CUSTOM_CA; CUSTOM_CA="$(context_get-option "CUSTOM_CA")"
+
+  case "${CA}" in
+    citadel | mesh_ca | gcp_cas);;
+    "")
+      MISSING_ARGS=1
+      warn "Missing value for CA"
+      ;;
+    *) fatal "CA must be one of 'citadel', 'mesh_ca', 'gcp_cas'";;
+  esac
 
   if [[ "${CA}" = "gcp_cas" ]]; then
     validate_private_ca

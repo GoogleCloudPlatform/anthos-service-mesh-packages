@@ -38,14 +38,14 @@ teardown() {
 }
 
 @test "test context_FILE_LOCATION getter and setter on string values" {
-  run context_get-option "MODE"
+  run context_get-option "CA"
   assert_output ""
 
-  run context_set-option "MODE" "install"
+  run context_set-option "CA" "meshca"
   assert_success
 
-  run context_get-option "MODE"
-  assert_output "install"
+  run context_get-option "CA"
+  assert_output "meshca"
 }
 
 @test "test context_FILE_LOCATION append a istioctl file" {

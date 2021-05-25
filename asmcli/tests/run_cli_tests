@@ -30,7 +30,6 @@ clear_variables() {
   PROJECT_ID=""; export PROJECT_ID;
   CLUSTER_NAME=""; export CLUSTER_NAME;
   CLUSTER_LOCATION=""; export CLUSTER_LOCATION;
-  MODE=""; export MODE;
   CA=""; export CA;
 
   OPERATOR_OVERLAY=""; export OPERATOR_OVERLAY;
@@ -123,7 +122,6 @@ test_main() {
   CMD="${CMD} -l this_should_pass"
   CMD="${CMD} -n this_should_pass"
   CMD="${CMD} -p this_should_pass"
-  CMD="${CMD} -m install"
   CMD="${CMD} -c mesh_ca"
 
   RETVAL=0
@@ -146,7 +144,6 @@ test_main() {
   CMD="${CMD} -l this_should_pass"
   CMD="${CMD} -n this_should_pass"
   CMD="${CMD} -p owner_this_should_pass"
-  CMD="${CMD} -m install"
   CMD="${CMD} -c mesh_ca"
 
   RETVAL=0
@@ -162,6 +159,64 @@ test_main() {
   echo "***"
 
   #################
+  # The --help option should pass
+  #################
+
+  CMD="-h -v"
+
+  RETVAL=0
+  clear_variables
+  _="$(main ${CMD})" || RETVAL="${?}"
+
+  if [[ "${RETVAL}" -eq 0 ]]; then
+    echo "Passes with --help: PASS"
+  else
+    echo "Passes with --help: FAIL"
+    ((++FAILURES))
+  fi
+  echo "***"
+
+  #################
+  # The --version option should pass
+  #################
+
+  CMD="--version"
+
+  RETVAL=0
+  clear_variables
+  _="$(main ${CMD})" || RETVAL="${?}"
+
+  if [[ "${RETVAL}" -eq 0 ]]; then
+    echo "Passes with --version: PASS"
+  else
+    echo "Passes with --version: FAIL"
+    ((++FAILURES))
+  fi
+  echo "***"
+
+  #################
+  # Should fail on invalid subcommands
+  #################
+  
+  CMD="this_is_an_invalid_subcommand"
+  CMD="${CMD} -l this_should_pass"
+  CMD="${CMD} -n this_should_pass"
+  CMD="${CMD} -p this_should_pass"
+  CMD="${CMD} -c mesh_ca"
+
+  RETVAL=0
+  clear_variables
+  _="$(main ${CMD})" || RETVAL="${?}"
+
+  if [[ "${RETVAL}" -ne 0 ]]; then
+    echo "Fails on invalid subcommands: PASS"
+  else
+    echo "Fails on invalid subcommands: FAIL"
+    ((++FAILURES))
+  fi
+  echo "***"
+
+  #################
   # Should fail on non-existing project
   #################
   
@@ -169,7 +224,6 @@ test_main() {
   CMD="${CMD} -l this_should_pass"
   CMD="${CMD} -n this_should_pass"
   CMD="${CMD} -p this_should_fail"
-  CMD="${CMD} -m install"
   CMD="${CMD} -c mesh_ca"
 
   RETVAL=0
@@ -192,7 +246,6 @@ test_main() {
   CMD="${CMD} -l this_should_pass"
   CMD="${CMD} -n this_should_fail"
   CMD="${CMD} -p this_should_pass"
-  CMD="${CMD} -m install"
   CMD="${CMD} -c mesh_ca"
 
   RETVAL=0
@@ -208,34 +261,13 @@ test_main() {
   echo "***"
 
   #################
-  # Should fail on bad CA or MODE
+  # Should fail on bad CA
   #################
 
   CMD="validate"
   CMD="${CMD} -l this_should_pass"
   CMD="${CMD} -n this_should_pass"
   CMD="${CMD} -p this_should_pass"
-  CMD="${CMD} -m this_should_fail"
-  CMD="${CMD} -c mesh_ca"
-
-  RETVAL=0
-  clear_variables
-  _="$(main ${CMD})" || RETVAL="${?}"
-
-  if [[ "${RETVAL}" -ne 0 ]]; then
-    echo "Fails on bad mode: PASS"
-  else
-    echo "Fails on bad mode: FAIL"
-    ((++FAILURES))
-  fi
-  echo "***"
-
-
-  CMD="validate"
-  CMD="${CMD} -l this_should_pass"
-  CMD="${CMD} -n this_should_pass"
-  CMD="${CMD} -p this_should_pass"
-  CMD="${CMD} -m migrate"
   CMD="${CMD} -c this_should_fail"
 
   RETVAL=0
@@ -258,7 +290,6 @@ test_main() {
   CMD="${CMD} -l this_should_pass"
   CMD="${CMD} -n this_should_pass"
   CMD="${CMD} -p this_should_pass"
-  CMD="${CMD} -m install"
   CMD="${CMD} -c mesh_ca"
   CMD="${CMD} -s service-account"
 
@@ -279,7 +310,6 @@ test_main() {
   CMD="${CMD} -l this_should_pass"
   CMD="${CMD} -n this_should_pass"
   CMD="${CMD} -p this_should_pass"
-  CMD="${CMD} -m install"
   CMD="${CMD} -c mesh_ca"
   CMD="${CMD} -k keyfile"
 
@@ -296,29 +326,6 @@ test_main() {
   echo "***"
 
   #################
-  # Should fail to do anything if it's in the wrong namespace
-  #################
-
-  CMD="validate"
-  CMD="${CMD} -l this_should_pass_has_istio_wrong_namespace"
-  CMD="${CMD} -n this_should_pass"
-  CMD="${CMD} -p this_should_pass"
-  CMD="${CMD} -m migrate"
-  CMD="${CMD} -c mesh_ca"
-
-  RETVAL=0
-  clear_variables
-  _="$(main ${CMD})" || RETVAL="${?}"
-
-  if [[ "${RETVAL}" -ne 0 ]]; then
-    echo "Fails on migrating with Istio outside of istio-system: PASS"
-  else
-    echo "Fails on migrating with Istio outside of istio-system: FAIL"
-    ((++FAILURES))
-  fi
-  echo "***"
-
-  #################
   # Should fail if enable* passed with only-validate
   #################
 
@@ -326,8 +333,8 @@ test_main() {
   CMD="${CMD} -l this_should_pass"
   CMD="${CMD} -n this_should_pass"
   CMD="${CMD} -p this_should_pass"
-  CMD="${CMD} -m migrate"
   CMD="${CMD} -c mesh_ca"
+  CMD="${CMD} -e"
 
   RETVAL=0
   clear_variables
@@ -349,7 +356,6 @@ test_main() {
   CMD="${CMD} -l this_should_pass"
   CMD="${CMD} -n this_should_pass"
   CMD="${CMD} -p this_should_pass"
-  CMD="${CMD} -m install"
   CMD="${CMD} --managed"
   CMD="${CMD} --custom-overlay foo.yaml"
   CMD="${CMD} -c mesh_ca"
@@ -373,7 +379,6 @@ test_main() {
   CMD="-l this_should_pass"
   CMD="${CMD} -n this_should_pass"
   CMD="${CMD} -p this_should_pass"
-  CMD="${CMD} -m install"
   CMD="${CMD} -c mesh_ca"
 
   clear_variables
