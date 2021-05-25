@@ -1,0 +1,268 @@
+#!/bin/bash
+
+set -ex
+#set -CeE
+set -o pipefail
+set +o noclobber
+set +o verbose
+
+main() {
+  echo "============================================= attach vm"
+  read_args "${@}"
+  write_config_context_vm
+  echo "Attach VM with Context: ${CONTEXT}"
+
+  echo "[Step 1] Mount Preparation Artifacts to VM ${VM_APP}@${VM_IP}"
+  prepare_vm
+
+  echo " "
+  echo "[Step 2] Register VM with WorkloadGroup at namespace: ${VM_NAMESPACE}"
+  create_workloadgroup
+  create_workloadentry
+
+  echo " "
+  #echo "============================================="
+  echo "[Step 3] istioctl x workload entry and copy to vm ${VM_APP}@${VM_IP}"
+  configure_vm_transfer_file
+
+  echo " "
+  echo "[Step 4] Install Istio Sidecar and Start Istio on VM"
+  runagent
+}
+
+read_args1() {
+  while [[ ${#} != 0 ]]; do
+    case "${1}" in
+    -addr | --address | --vm_ip | --vm-ip)
+      export VM_IP="${2}"
+      shift 2
+      ;;
+    -app | --app | --vm_app | --vm-app)
+      export VM_APP="${2}"
+      shift 2
+      ;;
+    -mesh | --mesh_id | --mesh-id)
+      export MESH_ID="${2}"
+      shift 2
+      ;;
+    -network | --network | --vm_network | --vm-network)
+      export VM_NETWORK="${2}"
+      shift 2
+      ;;
+    -k | --key_file | --ssh-key-file)
+      export KEY_FILE="${2}"
+      shift 2
+      ;;
+    -s | --service_account | --service-account)
+      export SERVICE_ACCOUNT="${2}"
+      shift 2
+      ;;
+    -l | --cluster_location | --cluster-location)
+      export CLUSTER_LOCATION="${2}"
+      shift 2
+      ;;
+    -n | --cluster | --cluster_name | --cluster-name)
+      export CLUSTER="${2}"
+      shift 2
+      ;;
+    -p | --project_id | --project-id)
+      export PROJECT_ID="${2}"
+      shift 2
+      ;;
+    -ns | --namespace)
+      export VM_NAMESPACE="${2}"
+      shift 2
+      ;;
+    *)
+      warn "Unknown option ${1}"
+      exit 2
+      ;;
+    esac
+  done
+}
+
+prepare_vm() {
+  cd ${WORK_DIR}
+
+  scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no runagent.sh root@${VM_IP}:~
+#  scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no istio-sidecar.rpm root@${VM_IP}:~
+#  scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no server root@${VM_IP}:~
+
+  cd ${OUTPUT_DIR}/vm-${VM_APP}
+}
+
+create_workloadgroup() {
+  # Register VM and create a service for the VM
+cat <<EOF > workloadgroup.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: WorkloadGroup
+metadata:
+  name: "${VM_APP}"
+  namespace: "${VM_NAMESPACE}"
+spec:
+  metadata:
+    labels:
+      app: "${VM_APP}"
+  template:
+    serviceAccount: "${SERVICE_ACCOUNT}"
+    network: "${VM_NETWORK}"
+EOF
+
+  kubectl --namespace "${VM_NAMESPACE}" apply -f workloadgroup.yaml
+}
+
+# create k8s service for demo purpose
+create_workloadentry() {
+  cat <<EOF >k8sservice.yaml
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: "${VM_APP}"
+    namespace: "${VM_NAMESPACE}"
+    labels:
+      asm_resource_type: VM
+  spec:
+    ports:
+    - port: 8080
+      name: http
+      targetPort: 8080
+    selector:
+      service.istio.io/canonical-name: "${VM_APP}"
+EOF
+
+  kubectl --namespace "${VM_NAMESPACE}" apply -f k8sservice.yaml
+}
+
+configure_vm_transfer_file() {
+  # Create files to transfer to VM
+  cd ${WORK_DIR}
+
+  ./istioctl x workload entry configure -f ${OUTPUT_DIR}/vm-${VM_APP}/workloadgroup.yaml -o ${OUTPUT_DIR}/vm-${VM_APP} --clusterID ${CLUSTER} --autoregister
+
+  cd ${OUTPUT_DIR}/vm-${VM_APP}
+
+  scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no cluster.env hosts istio-token mesh.yaml root-cert.pem root@${VM_IP}:"/tmp"
+}
+
+runagent() {
+
+  # SSH to VM and execute runagent.sh on VM
+  until ssh -i "${KEY_FILE}" -o StrictHostKeyChecking=no root@${VM_IP} 'chmod +x runagent.sh; ./runagent.sh'; do
+    sleep 1
+  done
+
+  echo " "
+  echo "============================================="
+  echo -e "\xE2\x9C\x94 Under the context of cluster:${CLUSTER} clusterNetwork:${CLUSTER_NETWORK} vmNetwork:${VM_NETWORK}"
+  echo -e "\xE2\x9C\x94 successfully add vm:${VM_APP} addr:${VM_IP} sa:${SERVICE_ACCOUNT}" ns:${VM_NAMESPACE}
+  echo " "
+}
+
+write_config_context_vm() {
+  if [[ -n "${SELECT_CONTEXT}" ]]; then
+    export CONTEXT="${SELECT_CONTEXT}"
+  else
+    currContext=`cat "./.currContext"`
+    CONTEXT=${currContext:10}
+  fi
+
+  source "./.${CONTEXT}"
+
+  alias kubectl="kubectl --kubeconfig ${KUBECONFIG}"
+  alias istioctl="istioctl --kubeconfig ${KUBECONFIG}"
+
+  if [[ -e ${OUTPUT_DIR}/vm-${VM_APP} ]]; then
+    rm -rf ${OUTPUT_DIR}/vm-${VM_APP}
+  fi
+
+  cd ${OUTPUT_DIR}
+  mkdir -p vm-${VM_APP}
+  cp ${WORK_DIR}/.${CONTEXT} ${OUTPUT_DIR}/vm-${VM_APP}/".context"
+
+  CONTEXT_FILE=${OUTPUT_DIR}/vm-${VM_APP}/".context"
+  chmod 777 ${OUTPUT_DIR}/vm-${VM_APP}/".context"
+
+  echo "export VM_APP=${VM_APP}" >>${CONTEXT_FILE}
+  echo "export VM_IP=${VM_IP}" >>${CONTEXT_FILE}
+
+  #source "${OUTPUT_DIR}/vm-${VM_APP}/.context"
+}
+
+read_args() {
+  while [[ ${#} != 0 ]]; do
+    echo "here1"
+    case "${1}" in
+    -addr | --address | --vm_ip | --vm-ip)
+      export VM_IP="${2}"
+      shift 2
+      ;;
+    -app | --app | --vm_app | --vm-app)
+      export VM_APP="${2}"
+      shift 2
+      ;;
+    -mesh | --mesh_id | --mesh-id)
+      export MESH_ID="${2}"
+      shift 2
+      ;;
+    -network | --network | --vm_network | --vm-network)
+      export VM_NETWORK="${2}"
+      shift 2
+      ;;
+    -k | --key_file | --ssh-key-file)
+      export KEY_FILE="${2}"
+      shift 2
+      ;;
+    -s | --service_account | --service-account)
+      export SERVICE_ACCOUNT="${2}"
+      shift 2
+      ;;
+    --cluster | --vm-cluster | --cluster_name | --cluster-name)
+      export CLUSTER="${2}"
+      shift 2
+      ;;
+    -p | --project_id | --project-id)
+      export PROJECT_ID="${2}"
+      shift 2
+      ;;
+    -ns | --namespace)
+      export VM_NAMESPACE="${2}"
+      shift 2
+      ;;
+    --kubeconfig)
+      export KUBECONFIG="${2}"
+      shift 2
+      ;;
+    --context)
+      export SELECT_CONTEXT="${2}"
+      shift 2
+      ;;
+    *)
+      warn "Unknown option ${1}"
+      exit 2
+      ;;
+    esac
+  done
+}
+
+function warn() {
+  info "[WARNING]: ${1}" >&2
+}
+
+function apath() {
+  "${APATH}" "${@}"
+}
+
+function fatal() {
+  error "${1}"
+  exit 2
+}
+
+function info() {
+  echo "${SCRIPT_NAME}: ${1}" >&2
+}
+
+function error() {
+  info "[ERROR]: ${1}" >&2
+}
+
+main "${@}"

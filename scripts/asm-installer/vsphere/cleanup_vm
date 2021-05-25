@@ -1,0 +1,28 @@
+#!/bin/bash
+
+set -CeE
+set -o pipefail
+set +o noclobber
+
+echo "============================================="
+echo "Cleanup and Detach VM ${1}"
+source "vm-${1}/.context"
+
+echo -e "\e[1m[NOTICE]\e[0m user should manually delete namespace: "${VM_NAMESPACE}" and service-account: "${SERVICE_ACCOUNT}" if no other resource is sharing it."
+
+echo "[Step 1] Delete VM Registration in Bare Metal Cluster ${CLUSTER}"
+kubectl delete workloadentry "${VM_APP}-${VM_IP}-${VM_NETWORK}" -n ${VM_NAMESPACE} --ignore-not-found
+kubectl delete workloadgroup ${VM_APP} -n ${VM_NAMESPACE} --ignore-not-found
+kubectl delete service ${VM_APP} -n ${VM_NAMESPACE} --ignore-not-found
+
+echo "[Step 2] Stop Istio on VM and Wipe out Mounted Artifacts"
+scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no stopagent.sh root@${VM_IP}:~
+until ssh -i "${KEY_FILE}" -o StrictHostKeyChecking=no root@${VM_IP} 'chmod +x stopagent.sh; ./stopagent.sh >/dev/null'; do
+    sleep 1
+done
+
+echo "[Step 3] Remove folder ${OUTPUT_DIR}/vm-${VM_APP}"
+rm -rf ${OUTPUT_DIR}/vm-${VM_APP}
+
+echo -e "\xE2\x9C\x94 Successfully Cleanup vm:${VM_APP} addr:${VM_IP}"
+echo " "
