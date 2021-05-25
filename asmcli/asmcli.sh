@@ -36,8 +36,8 @@ CONFIG_VER="${CONFIG_VER:="1-unstable"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
 ### File related constants ###
-VALIDATION_FIX_FILE_NAME="istiod-service.yaml"
-ASM_VERSION_FILE=".asm_version"
+VALIDATION_FIX_FILE_NAME=""
+ASM_VERSION_FILE=""
 ISTIO_FOLDER_NAME=""
 ISTIOCTL_REL_PATH=""
 BASE_REL_PATH=""
@@ -59,8 +59,6 @@ GCE_NETWORK_NAME=""
 GCLOUD_USER_OR_SA=""
 KPT_URL=""
 KUBECONFIG=""
-PLATFORM="gcp"
-CONTEXT=""
 APATH=""
 AKUBECTL=""
 AKPT=""
@@ -71,8 +69,9 @@ REVISION_LABEL=""
 RELEASE_LINE=""
 PREVIOUS_RELEASE_LINE=""
 KPT_BRANCH=""
+RAW_YAML=""
+EXPANDED_YAML=""
 NAMESPACE_EXISTS=0
-KUBECONFIG_SUPPLIED=0
 
 main() {
   init
@@ -86,8 +85,6 @@ main() {
   trap "$(shopt -p nocasematch)" RETURN
   shopt -s nocasematch
 
-  local OPTIONAL_OVERLAY; OPTIONAL_OVERLAY=""
-  local CUSTOM_OVERLAY; CUSTOM_OVERLAY=""
   case "${1}" in
     install)
       shift 1
@@ -138,6 +135,7 @@ init() {
     Darwin) APATH="stat";;
     *);;
   esac
+  readonly APATH
 
   if [[ "${POINT}" == "alpha" ]]; then
     RELEASE="${MAJOR}.${MINOR}-alpha.${REV}"
@@ -156,10 +154,13 @@ init() {
   PREVIOUS_RELEASE_LINE="${MAJOR}.$(( MINOR - 1 ))."
   readonly RELEASE; readonly RELEASE_LINE; readonly PREVIOUS_RELEASE_LINE; readonly KPT_BRANCH;
 
+  KPT_URL="https://github.com/GoogleCloudPlatform/anthos-service-mesh-packages"
+  KPT_URL="${KPT_URL}.git/asm@${KPT_BRANCH}"; readonly KPT_URL;
   ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
   ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
   BASE_REL_PATH="${ISTIO_FOLDER_NAME}/manifests/charts/base/files/gen-istio-cluster.yaml"; readonly BASE_REL_PATH;
   PACKAGE_DIRECTORY="asm/istio"; readonly PACKAGE_DIRECTORY;
+  VALIDATION_FIX_FILE_NAME="istiod-service.yaml"; readonly VALIDATION_FIX_FILE_NAME;
   VALIDATION_FIX_SERVICE="${PACKAGE_DIRECTORY}/${VALIDATION_FIX_FILE_NAME}"; readonly VALIDATION_FIX_SERVICE;
   OPTIONS_DIRECTORY="${PACKAGE_DIRECTORY}/options"; readonly OPTIONS_DIRECTORY;
   OPERATOR_MANIFEST="${PACKAGE_DIRECTORY}/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
@@ -168,10 +169,13 @@ init() {
   MANAGED_WEBHOOKS="${OPTIONS_DIRECTORY}/managed-control-plane-webhooks.yaml"; readonly MANAGED_WEBHOOKS;
   EXPOSE_ISTIOD_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_SERVICE;
   CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
+  ASM_VERSION_FILE=".asm_version"; readonly ASM_VERSION_FILE;
+  RAW_YAML="${REVISION_LABEL}-manifest-raw.yaml"; readonly RAW_YAML;
+  EXPANDED_YAML="${REVISION_LABEL}-manifest-expanded.yaml"; readonly EXPANDED_YAML;
 
-  AKUBECTL="$(which kubectl || true)"
-  AGCLOUD="$(which gcloud || true)"
-  AKPT="$(which kpt || true)"
+  AKUBECTL="$(which kubectl || true)"; readonly AKUBECTL;
+  AGCLOUD="$(which gcloud || true)"; readonly AGCLOUD;
+  AKPT="$(which kpt || true)"; readonly AKPT;
 }
 
 ### Convenience functions ###
@@ -283,6 +287,7 @@ configure_kubectl(){
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
 
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
     info "Fetching/writing GCP credentials to kubeconfig file..."
@@ -357,6 +362,7 @@ is_managed() {
 }
 
 is_gcp() {
+  local PLATFORM; PLATFORM="$(context_get-option "PLATFORM")"
   if [[ "${PLATFORM}" == "gcp" ]]; then
     true
   else
@@ -531,7 +537,7 @@ parse_args() {
       --kc | --kubeconfig)
         arg_required "${@}"
         context_set-option "KUBECONFIG" "${2}"
-        KUBECONFIG_SUPPLIED=1
+        context_set-option "KUBECONFIG_SUPPLIED" 1
         shift 2
         ;;
       --ctx | --context)
@@ -760,6 +766,7 @@ validate_args() {
   local WI_ENABLED; WI_ENABLED="$(context_get-option "WI_ENABLED")"
   local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
   local KUBECONFIG; KUBECONFIG="$(context_get-option "KUBECONFIG")"
+  local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
 
   if [[ -z "${CA}" ]]; then
     CA="mesh_ca"
@@ -794,6 +801,11 @@ validate_args() {
     if [[ -n "${CUSTOM_OVERLAY}" ]]; then
       fatal "Specifying a custom overlay file with managed control plane is not supported."
     fi
+  fi
+
+  if [[ -z "${PLATFORM}" ]]; then
+    PLATFORM="gcp"
+    context_set-option "PLATFORM" "gcp"
   fi
 
   case "${PLATFORM}" in
@@ -917,8 +929,7 @@ EOF
   CUSTOM_OVERLAY="${ABS_OVERLAYS}"
   context_set-option "CUSTOM_OVERLAY" "${CUSTOM_OVERLAY}"
 
-  set_kpt_package_url
-  WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"
+  WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"; readonly WORKLOAD_POOL
 
   validate_hub
   validate_ca
@@ -955,12 +966,6 @@ validate_hub() {
   fi
 }
 
-set_kpt_package_url() {
-  KPT_URL="https://github.com/GoogleCloudPlatform/anthos-service-mesh-packages"
-  KPT_URL="${KPT_URL}.git/asm@${KPT_BRANCH}"
-  readonly KPT_URL;
-}
-
 auth_service_account() {
   local SERVICE_ACCOUNT; SERVICE_ACCOUNT="$(context_get-option "SERVICE_ACCOUNT")"
   local KEY_FILE; KEY_FILE="$(context_get-option "KEY_FILE")"
@@ -979,6 +984,8 @@ auth_service_account() {
 #######
 set_up_local_workspace() {
   local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+  local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
+
   info "Setting up necessary files..."
   if [[ -z "${OUTPUT_DIR}" ]]; then
     info "Creating temp directory..."
@@ -1232,7 +1239,7 @@ get_project_number() {
 
   info "Checking for project ${PROJECT_ID}..."
 
-  PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format="value(projectNumber)")"
+  PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format="value(projectNumber)")"; readonly PROJECT_NUMBER
 
   if [[ -z "${PROJECT_NUMBER}" ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
@@ -1241,7 +1248,6 @@ again. To see a list of your projects, run:
   gcloud projects list --format='value(project_id)'
 EOF
   fi
-
 }
 
 validate_cluster() {
@@ -1265,7 +1271,7 @@ EOF
 }
 
 validate_k8s() {
-  K8S_MINOR="$(kubectl version -o json | jq .serverVersion.minor | sed 's/[^0-9]//g')"
+  K8S_MINOR="$(kubectl version -o json | jq .serverVersion.minor | sed 's/[^0-9]//g')"; readonly K8S_MINOR
   if [[ "${K8S_MINOR}" -lt 15 ]]; then
     fatal "ASM ${RELEASE} requires Kubernetes version 1.15+, found 1.${K8S_MINOR}"
   fi
@@ -1602,7 +1608,7 @@ local_iam_user() {
     ACCOUNT_TYPE="serviceAccount"
   fi
 
-  GCLOUD_USER_OR_SA="${ACCOUNT_TYPE}:${ACCOUNT_NAME}"
+  GCLOUD_USER_OR_SA="${ACCOUNT_TYPE}:${ACCOUNT_NAME}"; readonly GCLOUD_USER_OR_SA
 
   echo "${GCLOUD_USER_OR_SA}"
 }
@@ -2075,7 +2081,7 @@ istio_namespace_exists() {
   if [[ "$(retry 2 kubectl get ns | grep -c istio-system || true)" -eq 0 ]]; then
     false
   else
-    NAMESPACE_EXISTS=1
+    NAMESPACE_EXISTS=1; readonly NAMESPACE_EXISTS
   fi
 }
 
