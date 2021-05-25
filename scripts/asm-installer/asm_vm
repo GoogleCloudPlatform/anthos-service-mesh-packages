@@ -43,8 +43,8 @@ ISTIOD_NAME="istiod"
 readonly ISTIOD_NAME
 IDENTITY_PROVIDER_ANNOTATION_KEY="security.cloud.google.com/IdentityProvider"
 readonly IDENTITY_PROVIDER_ANNOTATION_KEY
-AUTOREGISTRATION_KEY="PILOT_ENABLE_WORKLOAD_ENTRY_AUTOREGISTRATION"
-readonly AUTOREGISTRATION_KEY
+CROSS_CLUSTER_WORKLOADENTRY_KEY="PILOT_ENABLE_CROSS_CLUSTER_WORKLOAD_ENTRY"
+readonly CROSS_CLUSTER_WORKLOADENTRY_KEY
 
 SCRIPT_NAME="${0##*/}"
 APATH=""
@@ -770,7 +770,7 @@ validate_asm_installation() {
   info "Verifying ASM installation..."
   local SUPPORTED_VERSION_INSTALLED=0
   local EXPANSION_GATEWAY_INSTALLED=0
-  local AUTOREGISTRATION_ENABLED=0
+  local CROSS_CLUSTER_WORKLOADENTRY_ENABLED=0
   local ENVIRON_WORKLOAD_IDENTITY_USED=0
   for deploy in $(kubectl get deployment -n istio-system --no-headers -o custom-columns=":metadata.name"); do
     if [[ "${deploy}" =~ ^$ISTIOD_NAME ]]; then
@@ -791,12 +791,12 @@ validate_asm_installation() {
         ASM_REVISIONS["${CURR_REVISION}"]="${CURR_VERSION}"
         SUPPORTED_VERSION_INSTALLED=1
 
-        # verify the auto-registration feature is enabled.
-        local AUTOREG_VAL
-        AUTOREG_VAL="$(retry 2 kubectl get deployment "${deploy}" -n istio-system \
-          -ojsonpath='{.spec.template.spec.containers[].env[?(@.name=="'"${AUTOREGISTRATION_KEY}"'")].value}')"
-        if [[ "${AUTOREG_VAL}" == "true" ]]; then
-          AUTOREGISTRATION_ENABLED=1
+        # verify the cross cluster workloadentry registration is enabled.
+        local CROSS_CLUSTER_WE_VAL
+        CROSS_CLUSTER_WE_VAL="$(retry 2 kubectl get deployment "${deploy}" -n istio-system \
+          -ojsonpath='{.spec.template.spec.containers[].env[?(@.name=="'"${CROSS_CLUSTER_WORKLOADENTRY_KEY}"'")].value}')"
+        if [[ "${CROSS_CLUSTER_WE_VAL}" == "true" ]]; then
+          CROSS_CLUSTER_WORKLOADENTRY_ENABLED=1
         fi
 
         # verify environ workload identity is being used.
@@ -814,11 +814,11 @@ validate_asm_installation() {
     fatal "ASM ${ASM_RELEASE} version is not found. Please install ASM ${ASM_RELEASE} and retry."
   fi
 
-  if [[ "${AUTOREGISTRATION_ENABLED}" -eq 0 ]]; then
+  if [[ "${CROSS_CLUSTER_WORKLOADENTRY_ENABLED}" -eq 0 ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-VM auto-registration is not enabled in any of your ASM ${ASM_RELEASE}
-installations in the cluster. Please install ASM and make sure none of the
-values set in your custom overlay override the default values.
+Multicluster WorkloadEntry registration is not enabled in any of your ASM
+${ASM_RELEASE} installations in the cluster. Please install ASM and make sure
+none of the values set in your custom overlay override the default values.
 EOF
   fi
 
