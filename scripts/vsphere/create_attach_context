@@ -1,0 +1,36 @@
+#!/bin/bash
+
+if [[ ! -z "${LOG_LEVEL}" ]]; then
+  set -ex
+else
+  set -CeE
+fi
+
+set -o pipefail
+set +o noclobber
+
+source vsphere/util.sh
+
+main() {
+  echo "============================================="
+  init
+  parse_validate_args "${@}"
+}
+
+function parse_validate_args() {
+  # shellcheck disable=SC2064
+  trap "$(shopt -p nocasematch)" RETURN
+  shopt -s nocasematch
+
+  CONTEXT_FILE=".${1}"
+  shift 1
+
+  read_args "${@}"
+  rm ".attachConfig"
+
+  fill_unspecified_context
+  write_config_context
+
+}
+
+main "${@}"
