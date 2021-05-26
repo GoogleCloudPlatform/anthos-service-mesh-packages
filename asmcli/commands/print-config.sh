@@ -5,7 +5,7 @@ print-config_subcommand() {
 
   ### Preparation ###
   context_init
-  context_set-option "PRINT_CONFIG" 1
+  context_set-option "PRINT_CONFIG" 1   # used by some validations
   parse_args "${@}"
   validate_args
   prepare_environment
@@ -13,7 +13,8 @@ print-config_subcommand() {
   ### Validate ###
   validate
 
-  if [[ "$(context_get-option "USE_VM")" -eq 1 ]]; then
+  local USE_VM; USE_VM="$(context_get-option "USE_VM")"
+  if [[ "${USE_VM}" -eq 1 ]]; then
     register_gce_identity_provider
   fi
 
@@ -21,9 +22,7 @@ print-config_subcommand() {
   configure_package
   post_process_istio_yamls
 
-  local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
   local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
-
   if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
     populate_environ_info
   fi

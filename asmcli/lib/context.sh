@@ -8,6 +8,7 @@ context_init() {
     "PLATFORM": "${PLATFORM:-}",
     "CA": "${CA:-}",
     "KUBECONFIG": "${KUBECONFIG_FILE:-}",
+    "KUBECONFIG_SUPPLIED": "${KUBECONFIG_SUPPLIED:-0}",
     "CONTEXT": "${CONTEXT:-}",
     "CUSTOM_OVERLAY": "${CUSTOM_OVERLAY:-}",
     "OPTIONAL_OVERLAY": "${OPTIONAL_OVERLAY:-}",

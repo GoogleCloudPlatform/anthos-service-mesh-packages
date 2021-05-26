@@ -8,7 +8,8 @@ install_subcommand() {
   ### Validate ###
   validate
 
-  if [[ "$(context_get-option "USE_VM")" -eq 1 ]]; then
+  local USE_VM; USE_VM="$(context_get-option "USE_VM")"
+  if [[ "${USE_VM}" -eq 1 ]]; then
     register_gce_identity_provider
   fi
 
@@ -20,11 +21,6 @@ install_subcommand() {
 }
 
 install() {
-  local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
-  local CA; CA="$(context_get-option "CA")"
-  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
-  local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
-
   ### Configure ###
   configure_ca
   configure_control_plane
@@ -97,15 +93,10 @@ install_in_cluster_control_plane() {
   sleep 1
   info "...done!"
 
-  local RAW_YAML; RAW_YAML="${REVISION_LABEL}-manifest-raw.yaml"
-  local EXPANDED_YAML; EXPANDED_YAML="${REVISION_LABEL}-manifest-expanded.yaml"
   print_config >| "${RAW_YAML}"
   istioctl manifest generate \
     <"${RAW_YAML}" \
     >|"${EXPANDED_YAML}"
-
-  context_set-option "RAW_YAML" "${RAW_YAML}"
-  context_set-option "EXPANDED_YAML" "${EXPANDED_YAML}"
 
   if [[ "${USE_VM}" -eq 1 ]]; then
     info "Exposing the control plane for VM workloads..."
@@ -138,9 +129,7 @@ install_private_ca() {
   # This sets up IAM privileges for the project to be able to access GCP CAS.
   # If modify_gcp_component permissions are not granted, it is assumed that the
   # user has taken care of this, else Istio setup will fail
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-
-  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="$PROJECT_ID.svc.id.goog[istio-system/istiod-service-account]"
+  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${WORKLOAD_POOL}[istio-system/istiod-service-account]"
   local NAME; NAME=$(echo "${CA_NAME}" | cut -f6 -d/)
   local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
   local CA_PROJECT; CA_PROJECT=$(echo "${CA_NAME}" | cut -f2 -d/)
@@ -206,8 +195,6 @@ outro() {
   info "A symlink to the istioctl binary can be found at:"
   info "${OUTPUT_DIR}/istioctl"
   if ! is_managed; then
-    local RAW_YAML; RAW_YAML="$(context_get-option "RAW_YAML")"
-    local EXPANDED_YAML; EXPANDED_YAML="$(context_get-option "EXPANDED_YAML")"
     info "The combined configuration generated for installation can be found at:"
     info "${OUTPUT_DIR}/${RAW_YAML}"
     info "The full, expanded set of kubernetes resources can be found at:"
@@ -230,6 +217,7 @@ configure_ca() {
 }
 
 configure_control_plane() {
+  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
   if [[ "${MANAGED}" -eq 1 ]]; then
     configure_managed_control_plane
   fi
@@ -245,6 +233,9 @@ install_ca() {
 }
 
 install_control_plane() {
+  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
+  local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
+
   if [[ "${MANAGED}" -eq 1 ]]; then
     install_managed_components
   else

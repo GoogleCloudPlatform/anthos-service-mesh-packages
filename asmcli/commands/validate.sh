@@ -11,10 +11,12 @@ validate_subcommand() {
 }
 
 validate() {
+  local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
+
   validate_dependencies
   validate_control_plane
 
-  if [[ "$(context_get-option "ONLY_VALIDATE")" -eq 1 ]]; then
+  if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
     info "Successfully validated all requirements to install ASM in this environment."
     exit 0
   fi
