@@ -214,10 +214,11 @@ gcloud() {
 kubectl() {
   local KCF
   KCF="$(context_get-option "KUBECONFIG")"
+  KCC="$(context_get-option "CONTEXT")"
   if [[ -z "${KCF}" ]]; then
     KCF="${KUBECONFIG}"
   fi
-  run_command "${AKUBECTL}" --kubeconfig "${KCF}" "${@}"
+  run_command "${AKUBECTL}" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
 }
 
 kpt() {
@@ -320,7 +321,8 @@ https://cloud.google.com/service-mesh/docs/gke-install-overview#requirements
 EOF
   fi
   info "kubeconfig set to ${KUBECONFIG}"
-  info "context set to $(kubectl config current-context)"
+  CONTEXT="$(context_get-option "CONTEXT")"
+  info "using context ${CONTEXT}"
 }
 
 warn() {
