@@ -4,6 +4,7 @@ validate_meshca() {
 
 configure_meshca() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local TRUST_DOMAIN_ALIASES
 
   if [[ -n "${_CI_TRUSTED_GCP_PROJECTS}" ]]; then
     # Gather the trust domain aliases from projects.

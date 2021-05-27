@@ -42,6 +42,16 @@ steps:
     entrypoint: 'yamllint'
     args:
       - '../asm'
+  
+  - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
+    dir: 'asmcli'
+    id: 'lint-variables'
+    entrypoint: '/bin/bash'
+    args:
+      - '-c'
+      - >
+        ./tests/lint_variables
+        ${_SCRIPT_NAME}
 
   - name: 'gcr.io/cloud-builders/gcloud'
     dir: 'asmcli'
