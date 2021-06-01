@@ -13,19 +13,19 @@ fi
 ### These are hooks for Cloud Build to be able to use debug/staging images
 ### when necessary. Don't set these environment variables unless you're testing
 ### in CI/CD.
-_CI_ASM_IMAGE_LOCATION="${_CI_ASM_IMAGE_LOCATION:=}"
-_CI_ASM_IMAGE_TAG="${_CI_ASM_IMAGE_TAG:=}"
-_CI_ASM_PKG_LOCATION="${_CI_ASM_PKG_LOCATION:=}"
-_CI_CLOUDRUN_IMAGE_HUB="${_CI_CLOUDRUN_IMAGE_HUB:=}"
-_CI_CLOUDRUN_IMAGE_TAG="${_CI_CLOUDRUN_IMAGE_TAG:=}"
-_CI_REVISION_PREFIX="${_CI_REVISION_PREFIX:=}"
-_CI_NO_VALIDATE="${_CI_NO_VALIDATE:=0}"
-_CI_NO_REVISION="${_CI_NO_REVISION:=0}"
-_CI_ISTIOCTL_REL_PATH="${_CI_ISTIOCTL_REL_PATH:=}"
-_CI_TRUSTED_GCP_PROJECTS="${_CI_TRUSTED_GCP_PROJECTS:=}"
-_CI_ENVIRON_PROJECT_NUMBER="${_CI_ENVIRON_PROJECT_NUMBER:=}"
-_CI_CRC_VERSION="${_CI_CRC_VERSION:=0}"
-_CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"
+_CI_ASM_IMAGE_LOCATION="${_CI_ASM_IMAGE_LOCATION:=}"; readonly _CI_ASM_IMAGE_LOCATION;
+_CI_ASM_IMAGE_TAG="${_CI_ASM_IMAGE_TAG:=}"; readonly _CI_ASM_IMAGE_TAG;
+_CI_ASM_PKG_LOCATION="${_CI_ASM_PKG_LOCATION:=}"; readonly _CI_ASM_PKG_LOCATION;
+_CI_CLOUDRUN_IMAGE_HUB="${_CI_CLOUDRUN_IMAGE_HUB:=}"; readonly _CI_CLOUDRUN_IMAGE_HUB;
+_CI_CLOUDRUN_IMAGE_TAG="${_CI_CLOUDRUN_IMAGE_TAG:=}"; readonly _CI_CLOUDRUN_IMAGE_TAG;
+_CI_REVISION_PREFIX="${_CI_REVISION_PREFIX:=}"; readonly _CI_REVISION_PREFIX;
+_CI_NO_VALIDATE="${_CI_NO_VALIDATE:=0}"; readonly _CI_NO_VALIDATE;
+_CI_NO_REVISION="${_CI_NO_REVISION:=0}"; readonly _CI_NO_REVISION;
+_CI_ISTIOCTL_REL_PATH="${_CI_ISTIOCTL_REL_PATH:=}"; readonly _CI_ISTIOCTL_REL_PATH;
+_CI_TRUSTED_GCP_PROJECTS="${_CI_TRUSTED_GCP_PROJECTS:=}"; readonly _CI_TRUSTED_GCP_PROJECTS;
+_CI_ENVIRON_PROJECT_NUMBER="${_CI_ENVIRON_PROJECT_NUMBER:=}"; readonly _CI_ENVIRON_PROJECT_NUMBER;
+_CI_CRC_VERSION="${_CI_CRC_VERSION:=0}"; readonly _CI_CRC_VERSION;
+_CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"; readonly _CI_I_AM_A_TEST_ROBOT;
 
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
@@ -51,7 +51,7 @@ MANAGED_WEBHOOKS=""
 EXPOSE_ISTIOD_SERVICE=""
 CANONICAL_CONTROLLER_MANIFEST=""
 
-SCRIPT_NAME="${0##*/}"
+SCRIPT_NAME="${0##*/}"; readonly SCRIPT_NAME
 
 PROJECT_NUMBER=""
 GKE_CLUSTER_URI=""
@@ -63,7 +63,6 @@ APATH=""
 AKUBECTL=""
 AKPT=""
 AGCLOUD=""
-ABS_OVERLAYS=""
 RELEASE=""
 REVISION_LABEL=""
 RELEASE_LINE=""
@@ -212,7 +211,7 @@ gcloud() {
 }
 
 kubectl() {
-  local KCF
+  local KCF KCC
   KCF="$(context_get-option "KUBECONFIG")"
   KCC="$(context_get-option "CONTEXT")"
   if [[ -z "${KCF}" ]]; then
@@ -919,6 +918,7 @@ EOF
     fatal "Couldn't find key file ${KEY_FILE}."
   fi
 
+  local ABS_OVERLAYS; ABS_OVERLAYS=""
   while read -d ',' -r yaml_file; do
     if [[ -f "${yaml_file}" ]]; then
       ABS_OVERLAYS="$(apath -f "${yaml_file}"),${ABS_OVERLAYS}"
@@ -1220,6 +1220,7 @@ populate_cluster_values() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local CLUSTER_DATA
 
   if [[ -z "${GKE_CLUSTER_URI}" && -z "${GCE_NETWORK_NAME}" ]]; then
     CLUSTER_DATA="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
