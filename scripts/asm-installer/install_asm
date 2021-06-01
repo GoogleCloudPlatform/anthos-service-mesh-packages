@@ -2591,9 +2591,13 @@ install_secrets() {
 }
 
 init_gcp_cas() {
-  local ISTIOD_SERVICE_ACCOUNT="istiod-${REVISION_LABEL}"
-  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${PROJECT_ID}.svc.id.goog[istio-system/${ISTIOD_SERVICE_ACCOUNT}]"
 
+  local ISTIOD_SERVICE_ACCOUNT; ISTIOD_SERVICE_ACCOUNT="istiod-${REVISION_LABEL}"
+  if [[ "${_CI_NO_REVISION}" -ne 0 ]]; then
+    ISTIOD_SERVICE_ACCOUNT="istiod"
+  fi
+
+  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${PROJECT_ID}.svc.id.goog[istio-system/${ISTIOD_SERVICE_ACCOUNT}]"
   local NAME; NAME=$(echo "${CA_NAME}" | cut -f6 -d/)
   local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
   local CA_PROJECT; CA_PROJECT=$(echo "${CA_NAME}" | cut -f2 -d/)
