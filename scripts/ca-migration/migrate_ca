@@ -4,6 +4,16 @@ MESHCA_SPIFFE_ENDPOINT=https://storage.googleapis.com/mesh-ca-resources/spiffe_b
 MESHCA_ROOT_CONFIG="    caCertificates:
     - pem: |-"
 
+if ! awk --help &> /dev/null; then
+  echo "awk could not be found, please make sure it is installed."
+  exit 1
+fi
+
+if ! grep --help &> /dev/null; then
+  echo "grep could not be found, please make sure it is installed."
+  exit 1
+fi
+
 if ! istioctl &> /dev/null; then
   echo "istioctl could not be found, please add istioctl into your PATH."
   exit 1
@@ -190,16 +200,19 @@ check-trustdomain
 
 case $1 in
   check-root-cert)
+    echo
     echo "Checking the root certificates loaded on each pod..."
     check "cert" "ROOTCA"
     ;;
 
   check-workload-cert)
+    echo
     echo "Checking the mTLS certificates loaded on each pod..."
     check "cert" "default"
     ;;
 
   check-trustdomain)
+    echo
     echo "Checking the trust domain configuration for each pod..."
     check "trustdomain"
     ;;
