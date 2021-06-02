@@ -109,3 +109,25 @@ kube-1.yaml
 kube-2.yaml
 EOF
 }
+
+@test "test missing values in non-interactive mode will fail fast" {
+  context_set-option "NON_INTERACTIVE" 1
+  run has_value "ENVIRON_PROJECT_ID"
+  assert_failure
+  context_set-option "NON_INTERACTIVE" 0
+}
+
+@test "test not-missing values in non-interactive mode will succeed" {
+  context_set-option "NON_INTERACTIVE" 1
+  run has_value "PROJECT_ID"
+  assert_success
+}
+
+@test "test missing values in interactive will read from stdin" {
+  local ENVIRON_PROJECT_ID; ENVIRON_PROJECT_ID="111111"
+  has_value "ENVIRON_PROJECT_ID" << EOF
+${ENVIRON_PROJECT_ID}
+EOF
+  assert_equal $(context_get-option "ENVIRON_PROJECT_ID") "${ENVIRON_PROJECT_ID}"
+  context_set-option "ENVIRON_PROJECT_ID" ""
+}

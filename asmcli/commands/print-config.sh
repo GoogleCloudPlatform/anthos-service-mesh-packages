@@ -4,7 +4,6 @@ print-config_subcommand() {
   exec 1>&2
 
   ### Preparation ###
-  context_init
   context_set-option "PRINT_CONFIG" 1   # used by some validations
   parse_args "${@}"
   validate_args
