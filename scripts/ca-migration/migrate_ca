@@ -71,18 +71,18 @@ get_issuer_ca() {
   else
     certchain=$(echo ${output} | jq '.dynamicActiveSecrets[1].secret.tlsCertificate.certificateChain.inlineBytes')
   fi
-  if [ -z ${certchain} ]; then
-    echo "Cannot find certchain for $1.$2"
-    exit 1
+  if [ -z ${certchain} ] || [ ${certchain} = "null" ]; then
+    echo " - [WARNING] $1.$2 cannot find certificate information"
+    return
   fi
   echo ${certchain} | sed 's/\"//g' | base64 -d > /tmp/certchain.pem
 
   local meshcaroot
   meshcaroot=$(openssl crl2pkcs7 -nocrl -certfile /tmp/certchain.pem | openssl pkcs7 -print_certs -text -noout | grep "istio_v1_cloud_workload_root-signer")
   if [[ -z ${meshcaroot} ]]; then
-    echo $1.$2 is using the mTLS certificate issued by [CITADEL]
+    echo " - $1.$2 is using the mTLS certificate issued by [CITADEL]"
   else
-    echo $1.$2 is using the mTLS certificate issued by [MESHCA]
+    echo " - $1.$2 is using the mTLS certificate issued by [MESHCA]"
   fi
 }
 
@@ -98,14 +98,17 @@ check_cert_in_pod() {
   # We use the serial number for the comparison.
   if [ "$3" = "ROOTCA" ]; then
     sn=$(istioctl pc secret "$1" -n "$2" | grep "ROOTCA" | awk '{print $5}')
+    if [[ -z ${sn} ]]; then
+      echo " - [WARNING] $1.$2 cannot find certificate information"
+      return
+    fi
     if [[ -z ${rootmap[${sn}]} ]]; then
       add_to_rootmap $1 $2 ${sn}
     fi
-    echo "$1.$2 trusts [${rootmap[${sn}]}]"
+    echo " - $1.$2 trusts [${rootmap[${sn}]}]"
   else
     get_issuer_ca $1 $2
   fi
-
 }
 
 # $1: pod
@@ -187,14 +190,17 @@ check-trustdomain
 
 case $1 in
   check-root-cert)
+    echo "Checking the root certificates loaded on each pod..."
     check "cert" "ROOTCA"
     ;;
 
   check-workload-cert)
+    echo "Checking the mTLS certificates loaded on each pod..."
     check "cert" "default"
     ;;
 
   check-trustdomain)
+    echo "Checking the trust domain configuration for each pod..."
     check "trustdomain"
     ;;
   *)
