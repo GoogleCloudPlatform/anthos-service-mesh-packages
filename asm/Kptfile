@@ -292,6 +292,14 @@ openAPI:
           values:
           - marker: ASM_REV
             ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.rev'
+    io.k8s.cli.substitutions.istio-egressgateway-deploy-name:
+      x-k8s-cli:
+        substitution:
+          name: istio-egressgateway-deploy-name
+          pattern: istio-egressgateway-ASM_REV
+          values:
+          - marker: ASM_REV
+            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.rev'
     io.k8s.cli.setters.anthos.servicemesh.custom-ingressgateway-name:
       type: string
       x-k8s-cli:
