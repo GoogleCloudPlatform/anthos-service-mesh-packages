@@ -1260,7 +1260,8 @@ retrieve_expansiongateway() {
 retrieve_cluster_network() {
   info "Retrieving the cluster's network name..."
 
-  NETWORK="$(retry 2 run gcloud container clusters describe "${CLUSTER_NAME}" \
+  # TODO possible to share code with scriptaro? or read from something in-cluster to make this more stable.
+  NETWORK="${PROJECT_ID}-$(retry 2 run gcloud container clusters describe "${CLUSTER_NAME}" \
     --zone="${CLUSTER_LOCATION}" \
     --project="${PROJECT_ID}" \
     --format="value(network)")"
