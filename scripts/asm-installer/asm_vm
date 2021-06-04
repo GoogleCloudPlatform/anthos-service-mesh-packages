@@ -1260,6 +1260,7 @@ retrieve_expansiongateway() {
 retrieve_cluster_network() {
   info "Retrieving the cluster's network name..."
 
+  # TODO possible to share code with scriptaro? or read from something in-cluster to make this more stable.
   NETWORK="$(retry 2 run gcloud container clusters describe "${CLUSTER_NAME}" \
     --zone="${CLUSTER_LOCATION}" \
     --project="${PROJECT_ID}" \
@@ -1332,7 +1333,7 @@ gen_gce_service_proxy() {
     "ISTIO_META_WORKLOAD_NAME": $workload_name,
     "ISTIO_META_MESH_ID": ("proj-"+$project_number),
     "ISTIO_META_CLUSTER_ID": $clusterID,
-    "ISTIO_META_NETWORK": $network,
+    "ISTIO_META_NETWORK": ($project_id+"-"+$network),
     "ISTIO_META_ISTIO_VERSION": $asm_meta_version,
     "POD_NAMESPACE": $workload_namespace,
     "CANONICAL_SERVICE": $canonical_service,
