@@ -51,7 +51,6 @@ OPERATOR_MANIFEST=""
 BETA_CRD_MANIFEST=""
 MANAGED_MANIFEST=""
 MANAGED_WEBHOOKS=""
-CONNECT_RBAC=""
 EXPOSE_ISTIOD_SERVICE=""
 CANONICAL_CONTROLLER_MANIFEST=""
 
@@ -115,7 +114,6 @@ ONLY_VALIDATE="${ONLY_VALIDATE:=0}"
 ONLY_ENABLE="${ONLY_ENABLE:=0}"
 VERBOSE="${VERBOSE:=0}"
 MANAGED="${MANAGED:=0}"
-MANAGED_SERVICE_ACCOUNT=""
 
 PRINT_HELP=0
 PRINT_VERSION=0
@@ -203,17 +201,13 @@ main() {
       bind_user_to_iam_policy "roles/meshconfig.admin" "$(local_iam_user)"
     fi
     if can_modify_at_all; then
-      MANAGED_SERVICE_JSON="$(init_meshconfig_managed)"
-      MANAGED_SERVICE_ACCOUNT="$(echo "${MANAGED_SERVICE_JSON}" | jq -r .serviceAccount)"
-      if [[ -z "${MANAGED_SERVICE_JSON}" || "${MANAGED_SERVICE_ACCOUNT}" == "null" ]]; then
+      if ! init_meshconfig_managed; then
         fatal "Couldn't initialize meshconfig, do you have the required permission resourcemanager.projects.setIamPolicy?"
       fi
-      unset MANAGED_SERVICE_JSON
-      bind_user_to_iam_policy "$(required_iam_roles_mcp_sa)" "$(iam_user)"
     fi
   else
     if can_modify_gcp_iam_roles; then
-      bind_user_to_iam_policy "$(required_iam_roles)" "$(iam_user)"
+      bind_user_to_iam_policy "$(required_iam_roles)" "$(local_iam_user)"
     elif should_validate; then
       exit_if_out_of_iam_policy
     fi
@@ -350,7 +344,6 @@ init() {
   MANAGED_MANIFEST="${OPTIONS_DIRECTORY}/managed-control-plane.yaml"; readonly MANAGED_MANIFEST;
   MANAGED_WEBHOOKS="${OPTIONS_DIRECTORY}/managed-control-plane-webhooks.yaml"; readonly MANAGED_WEBHOOKS;
   MANAGED_CNI="${OPTIONS_DIRECTORY}/cni-managed.yaml"; readonly MANAGED_CNI;
-  CONNECT_RBAC="asm/third-party/hub-connect-impersonate-rbac.yaml"; readonly CONNECT_RBAC;
   EXPOSE_ISTIOD_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_SERVICE;
   CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
 
@@ -1883,12 +1876,12 @@ EOF
 }
 
 exit_if_out_of_iam_policy() {
-  local GCLOUD_MEMBER; GCLOUD_MEMBER="$(iam_user)";
+  local GCLOUD_MEMBER; GCLOUD_MEMBER="$(local_iam_user)";
   local MEMBER_ROLES
   MEMBER_ROLES="$(gcloud projects \
     get-iam-policy "${PROJECT_ID}" \
     --flatten='bindings[].members' \
-    --filter="bindings.members:$(iam_user)" \
+    --filter="bindings.members:$(local_iam_user)" \
     --format='value(bindings.role)')"
 
   if [[ "${MEMBER_ROLES}" = *"roles/owner"* ]]; then
@@ -1911,15 +1904,6 @@ them on your behalf.
 $(enable_common_message)
 EOF
   fi
-}
-
-iam_user() {
-  if ! is_managed; then
-    local_iam_user
-    return
-  fi
-
-  echo "serviceAccount:${MANAGED_SERVICE_ACCOUNT}"
 }
 
 local_iam_user() {
@@ -2559,7 +2543,6 @@ EOF
       fatal "Failed to read configuration to install components for managed control plane!"
     fi
 
-    kpt cfg set asm anthos.servicemesh.managed-controlplane.service-account "${MANAGED_SERVICE_ACCOUNT}"
     kpt cfg set asm anthos.servicemesh.controlplane.validation-url "${VALIDATION_URL}"
     kpt cfg set asm anthos.servicemesh.managed-controlplane.cloudrun-addr "${CLOUDRUN_ADDR}"
   fi
@@ -2752,9 +2735,6 @@ install_managed_components() {
 
   info "Configuring ASM managed control plane validating webhook config..."
   kubectl apply -f "${MANAGED_WEBHOOKS}"
-
-  info "Configuring service account for GKE Connect..."
-  kubectl apply -f "${CONNECT_RBAC}"
 
   info "Configuring ASM managed control plane components..."
   print_config >| managed_control_plane_gateway.yaml
