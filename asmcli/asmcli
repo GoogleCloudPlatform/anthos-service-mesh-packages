@@ -284,6 +284,8 @@ retry() {
     warn "Failed, retrying...($((i+1)) of ${MAX_TRIES})"
     sleep 2
   done
+  local CMD="'$*'"
+  warn "Command $CMD failed."
   false
 }
 
