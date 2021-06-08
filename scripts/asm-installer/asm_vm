@@ -43,8 +43,6 @@ ISTIOD_NAME="istiod"
 readonly ISTIOD_NAME
 IDENTITY_PROVIDER_ANNOTATION_KEY="security.cloud.google.com/IdentityProvider"
 readonly IDENTITY_PROVIDER_ANNOTATION_KEY
-CROSS_CLUSTER_WORKLOADENTRY_KEY="PILOT_ENABLE_CROSS_CLUSTER_WORKLOAD_ENTRY"
-readonly CROSS_CLUSTER_WORKLOADENTRY_KEY
 
 SCRIPT_NAME="${0##*/}"
 APATH=""
@@ -687,6 +685,7 @@ validate_cli_dependencies() {
 $AGCLOUD
 curl
 jq
+ruby
 tr
 awk
 grep
@@ -770,7 +769,6 @@ validate_asm_installation() {
   info "Verifying ASM installation..."
   local SUPPORTED_VERSION_INSTALLED=0
   local EXPANSION_GATEWAY_INSTALLED=0
-  local CROSS_CLUSTER_WORKLOADENTRY_ENABLED=0
   local ENVIRON_WORKLOAD_IDENTITY_USED=0
   for deploy in $(kubectl get deployment -n istio-system --no-headers -o custom-columns=":metadata.name"); do
     if [[ "${deploy}" =~ ^$ISTIOD_NAME ]]; then
@@ -791,14 +789,6 @@ validate_asm_installation() {
         ASM_REVISIONS["${CURR_REVISION}"]="${CURR_VERSION}"
         SUPPORTED_VERSION_INSTALLED=1
 
-        # verify the cross cluster workloadentry registration is enabled.
-        local CROSS_CLUSTER_WE_VAL
-        CROSS_CLUSTER_WE_VAL="$(retry 2 kubectl get deployment "${deploy}" -n istio-system \
-          -ojsonpath='{.spec.template.spec.containers[].env[?(@.name=="'"${CROSS_CLUSTER_WORKLOADENTRY_KEY}"'")].value}')"
-        if [[ "${CROSS_CLUSTER_WE_VAL}" == "true" ]]; then
-          CROSS_CLUSTER_WORKLOADENTRY_ENABLED=1
-        fi
-
         # verify environ workload identity is being used.
         if uses_environ_workload_identity "${CURR_REVISION}"; then
           ENVIRON_WORKLOAD_IDENTITY_USED=1
@@ -812,14 +802,6 @@ validate_asm_installation() {
 
   if [[ "${SUPPORTED_VERSION_INSTALLED}" -eq 0 ]]; then
     fatal "ASM ${ASM_RELEASE} version is not found. Please install ASM ${ASM_RELEASE} and retry."
-  fi
-
-  if [[ "${CROSS_CLUSTER_WORKLOADENTRY_ENABLED}" -eq 0 ]]; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-Multicluster WorkloadEntry registration is not enabled in any of your ASM
-${ASM_RELEASE} installations in the cluster. Please install ASM and make sure
-none of the values set in your custom overlay override the default values.
-EOF
   fi
 
   if [[ "${ENVIRON_WORKLOAD_IDENTITY_USED}" -eq 0 ]]; then
@@ -1260,7 +1242,6 @@ retrieve_expansiongateway() {
 retrieve_cluster_network() {
   info "Retrieving the cluster's network name..."
 
-  # TODO possible to share code with scriptaro? or read from something in-cluster to make this more stable.
   NETWORK="$(retry 2 run gcloud container clusters describe "${CLUSTER_NAME}" \
     --zone="${CLUSTER_LOCATION}" \
     --project="${PROJECT_ID}" \
@@ -1294,68 +1275,81 @@ EOF
   CREDENTIAL_IDENTITY_PROVIDER="${MEMBERSHIP_UID}@${WORKLOAD_IDENTITY_PROVIDER}@${WORKLOAD_NAMESPACE}"
 }
 
+# A temporary solution to translate yaml to json in shell without relying on yq.
+yaml2json () {
+  ruby -r yaml -r json -e 'puts YAML.load($stdin.read).to_json'
+}
+
+gen_asm_config() {
+  local ASM_CONFIG
+  ASM_CONFIG=$(kubectl get cm istio-"${WORKLOAD_ASM_REVISION}" -n istio-system -ojsonpath='{.data.mesh}' | yaml2json | jq -r '.defaultConfig')
+
+  local TRUST_DOMAIN
+  TRUST_DOMAIN=$(kubectl get cm istio-"${WORKLOAD_ASM_REVISION}" -n istio-system -ojsonpath='{.data.mesh}' | yaml2json | jq -r '.trustDomain')
+
+  local LABELS
+  LABELS=$(jq -n --arg canonical_service "${CANONICAL_SERVICE}" \
+    --arg canonical_revision "${CANONICAL_REVISION}" '{
+  "service.istio.io/canonical-name": $canonical_service,
+  "service.istio.io/canonical-revision": $canonical_revision
+}')
+
+  for label in $(echo "${WORKLOAD_LABELS}" | jq -r '. as $k|keys[]|[., $k[.]]|map(tostring+"=")|add'); do
+    IFS='=' read -r -a pair <<< "${label}"
+    LABELS=$(jq --arg key "${pair[0]}" \
+    --arg value "${pair[1]}" \
+    '.[$key]=$value' <<< "${LABELS}")
+  done
+
+  local ASM_LABELS_STRING
+  ASM_LABELS_STRING=$(jq -sR '' <<< "${LABELS}" | tr -d ' ')
+
+  while read -r -a pair; do
+    ASM_CONFIG=$(jq --arg key "${pair[0]}" \
+    --arg value "${pair[1]}" \
+    '."proxyMetadata"[$key]=$value' <<< "${ASM_CONFIG}")
+  done <<EOF
+ISTIO_META_WORKLOAD_NAME $WORKLOAD_NAME
+ISTIO_META_MESH_ID proj-$PROJECT_NUMBER
+ISTIO_META_NETWORK $NETWORK
+ISTIO_META_ISTIO_VERSION $ASM_META_VERSION
+POD_NAMESPACE $WORKLOAD_NAMESPACE
+CANONICAL_SERVICE $CANONICAL_SERVICE
+CANONICAL_REVISION $CANONICAL_REVISION
+USE_TOKEN_FOR_CSR true
+ISTIO_META_DNS_CAPTURE true
+ISTIO_META_AUTO_REGISTER_GROUP $WORKLOAD_NAME
+SERVICE_ACCOUNT $WORKLOAD_SERVICE_ACCOUNT
+CREDENTIAL_IDENTITY_PROVIDER $CREDENTIAL_IDENTITY_PROVIDER
+ASM_REVISION $WORKLOAD_ASM_REVISION
+TRUST_DOMAIN $TRUST_DOMAIN
+EOF
+
+  ASM_CONFIG=$(jq --arg key "ISTIO_METAJSON_LABELS" \
+    --argjson value "${ASM_LABELS_STRING}" \
+    '."proxyMetadata"[$key]=$value' <<< "${ASM_CONFIG}")
+
+  echo "${ASM_CONFIG}"
+}
+
 # Generate GCE service proxy definition for the instance template
 gen_gce_service_proxy() {
+  local ASM_CONFIG
+  ASM_CONFIG=$(gen_asm_config)
+  
   local PROXY
-
-  local ASM_META_REVISION="${WORKLOAD_ASM_REVISION}"
-  if [ "${ASM_META_REVISION}" == "default" ]; then
-    ASM_META_REVISION=""
-  fi
-
   PROXY=$(jq -n --arg ingress_ip "${INGRESS_IP}" \
-    --arg project_id "${PROJECT_ID}" \
-    --arg workload_name "${WORKLOAD_NAME}" \
-    --arg canonical_service "${CANONICAL_SERVICE}" \
-    --arg canonical_revision "${CANONICAL_REVISION}" \
-    --arg project_number "${PROJECT_NUMBER}" \
-    --arg workload_namespace "${WORKLOAD_NAMESPACE}" \
-    --arg service_account "${WORKLOAD_SERVICE_ACCOUNT}" \
-    --arg asm_revision "${ASM_META_REVISION}"\
-    --arg credential_identity_provider "${CREDENTIAL_IDENTITY_PROVIDER}" \
     --arg network "${NETWORK}" \
-    --arg clusterID "${CLUSTER_ID}" \
-    --arg asm_meta_version "${ASM_META_VERSION}" '{
+    --argjson asm_config "${ASM_CONFIG}" '{
   "mode": "ON",
   "proxy-spec": {
     "network": $network,
     "api-server" : ($ingress_ip+":15012"),
     "log-level": "info"
   },
-  "labels": {
-    "workload-pool": ($project_id+".svc.id.goog")
-  },
-  "asm-labels": {
-    "service.istio.io/canonical-name": $canonical_service,
-    "service.istio.io/canonical-revision": $canonical_revision
-  },
-  "asm-env": {
-    "ISTIO_META_WORKLOAD_NAME": $workload_name,
-    "ISTIO_META_MESH_ID": ("proj-"+$project_number),
-    "ISTIO_META_CLUSTER_ID": $clusterID,
-    "ISTIO_META_NETWORK": ($project_id+"-"+$network),
-    "ISTIO_META_ISTIO_VERSION": $asm_meta_version,
-    "POD_NAMESPACE": $workload_namespace,
-    "CANONICAL_SERVICE": $canonical_service,
-    "CANONICAL_REVISION": $canonical_revision,
-    "USE_TOKEN_FOR_CSR": "true",
-    "ISTIO_META_DNS_CAPTURE": "true",
-    "ISTIO_META_AUTO_REGISTER_GROUP": $workload_name,
-    "SERVICE_ACCOUNT": $service_account,
-    "CREDENTIAL_IDENTITY_PROVIDER": $credential_identity_provider,
-    "ASM_REVISION": $asm_revision
-  },
+  "asm-config": $asm_config,
   "service": {}
 }')
-
-  # Append each workload label pair into asm_labels field of GCE_SERVICE_PROXY
-  # as a valid JSON object.
-  for label in $(echo "${WORKLOAD_LABELS}" | jq -r '. as $k|keys[]|[., $k[.]]|map(tostring+"=")|add'); do
-    IFS='=' read -r -a pair <<< "${label}"
-    PROXY=$(jq --arg key "${pair[0]}" \
-    --arg value "${pair[1]}" \
-    '."asm-labels"[$key]=$value' <<< "${PROXY}")
-  done
 
   echo "${PROXY}"
 }
