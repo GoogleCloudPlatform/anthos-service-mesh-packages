@@ -1,6 +1,5 @@
 validate_subcommand() {
   ### Preparation ###
-  context_init
   context_set-option "ONLY_VALIDATE" 1
   parse_args "${@}"
   validate_args

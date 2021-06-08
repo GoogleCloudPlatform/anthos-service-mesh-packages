@@ -84,9 +84,15 @@ main() {
   trap "$(shopt -p nocasematch)" RETURN
   shopt -s nocasematch
 
+  context_init
   case "${1}" in
     install)
       shift 1
+      install_subcommand "${@}"
+      ;;
+    apply)
+      shift 1
+      context_set-option "NON_INTERACTIVE" 1
       install_subcommand "${@}"
       ;;
     validate)
@@ -352,6 +358,30 @@ fatal_with_usage() {
   exit 2
 }
 
+prompt_user_for_value() {
+  read -r -p "Please provide a value for ${1}:" VALUE
+  if [[ -n "${VALUE}" ]]; then
+    echo "${VALUE}"
+  fi
+}
+
+has_value() {
+  local VALUE; VALUE="$(context_get-option "${1}")"
+
+  if [[ -n "${VALUE}" ]]; then return; fi
+
+  if is_interactive; then
+    VALUE="$(prompt_user_for_value "${1}")"
+    echo "$VALUE"
+  fi
+
+  if [[ -n "${VALUE}" ]]; then
+    context_set-option "${1}" "${VALUE}"
+    return
+  fi
+  false
+}
+
 starline() {
   echo "*****************************"
 }
@@ -360,6 +390,12 @@ is_managed() {
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
 
   if [[ "${MANAGED}" -ne 1 ]]; then false; fi
+}
+
+is_interactive() {
+  local NON_INTERACTIVE; NON_INTERACTIVE="$(context_get-option "NON_INTERACTIVE")"
+
+  if [[ "${NON_INTERACTIVE}" -eq 1 ]]; then false; fi
 }
 
 is_gcp() {
@@ -867,6 +903,11 @@ EOF
       context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
       context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
     fi
+  fi
+
+  if can_register_cluster && ! has_value "ENVIRON_PROJECT_ID"; then
+    MISSING_ARGS=1
+    warn "Missing ENVIRON_PROJECT_ID to register the cluster."
   fi
 
   if [[ "${MISSING_ARGS}" -ne 0 ]]; then

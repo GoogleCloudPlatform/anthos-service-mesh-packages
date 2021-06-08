@@ -1,6 +1,5 @@
 install_subcommand() {
   ### Preparation ###
-  context_init
   parse_args "${@}"
   validate_args
   prepare_environment
