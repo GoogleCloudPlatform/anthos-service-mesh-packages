@@ -16,7 +16,16 @@ steps:
     args: ['build', 'merge']
   
   - name: 'bash'
-    args: ['cp', '${_BAZEL_BIN}/${_SCRIPT_NAME}', asmcli/]
+    id: 'check-commit-artifacts'
+    args:
+    - '-eEuo'
+    - 'pipefail'
+    - '-c'
+    - |-
+      if ! diff ${_BAZEL_BIN}/${_SCRIPT_NAME} asmcli/${_SCRIPT_NAME}; then
+        echo "ERROR: please run 'scripts/release-asm/precommit' and commit the changes!"
+        exit 1
+      fi
 
   - name: node
     entrypoint: npm

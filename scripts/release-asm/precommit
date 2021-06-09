@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+bazel build merge && cp bazel-bin/asmcli asmcli/asmcli

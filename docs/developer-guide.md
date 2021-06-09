@@ -25,6 +25,17 @@ or to cleanup asynchronously:
 bazel clean --expunge_async
 ```
 
+To maintain the most up-to-date script at all times, we require the merged script to be committed to the repo.
+The merged script should either be moved or copied to the package root `asmcli/` and commit manually.
+We provide a simple script to perform the merge and copy for you, simply run:
+```shell
+./script/release-asm/precommit
+```
+and commit the changes. 
+
+**Note**: the merged/generated `asmcli` should not be manually modified ever. In case of merge conflicts,
+fix the individual files, re-generate the standalone script and add it to the git.
+
 ## During Development
 * **Important**: make sure all global variables and functions are `readonly` to prevent unexpected overwriting.
 * Don't add `#!/usr/bin/env bash` or equivalent lines to any modules/files. This line will be added during the compilation.
