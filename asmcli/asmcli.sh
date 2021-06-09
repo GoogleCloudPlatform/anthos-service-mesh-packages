@@ -910,7 +910,7 @@ EOF
   fi
 
   # GCP only: when no Fleet Id is provided, default to the cluster's project as the Fleet host.
-  if [[ -z "${FLEET_ID}" && is_gcp ]]; then
+  if [[ -z "${FLEET_ID}" ]] && is_gcp; then
     FLEET_ID="${PROJECT_ID}"
     context_set-option "FLEET_ID" "${FLEET_ID}"
   fi
