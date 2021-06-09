@@ -67,7 +67,9 @@ OPTIONS:
                                       --cluster_name, --project_id in order to locate
                                       and connect to the intended cluster.
   --ctx|--context        <CONTEXT>    The name of the kubeconfig context to use.
-  --fleet_id             <FLEET ID>   The ASM Fleet host project ID.
+  --fleet_id             <FLEET ID>   The ASM Fleet host project ID. Required for non-GCP
+                                      clusters. When not provided for GCP clusters, it
+                                      defaults to the cluster's project ID.
   -c|--ca                <CA>         The type of certificate authority to be
                                       used. Defaults to "mesh_ca" for install.
                                       Allowed values for <CA> are {citadel|mesh_ca|gcp_cas}.
