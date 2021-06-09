@@ -1297,6 +1297,7 @@ EOF
 
 # A temporary solution to translate yaml to json in shell without relying on yq.
 yaml2json () {
+  # shellcheck disable=SC2016
   ruby -r yaml -r json -e 'puts YAML.load($stdin.read).to_json'
 }
 
