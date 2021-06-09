@@ -2764,7 +2764,7 @@ outro() {
   if [[ "${MODE}" = "migrate" || "${MODE}" = "upgrade" ]]; then
     info "Please verify the new control plane and then: 1) migrate your workloads 2) remove old control plane."
     info "For more information, see:"
-    info "https://cloud.google.com/service-mesh/docs/upgrading-gke#redeploying_workloads"
+    info "https://cloud.google.com/service-mesh/docs/scripted-install/gke-upgrade#deploying_and_redeploying_workloads"
     info "Before removing the old control plane, update the service used by validation if necessary."
     info "If the 'istiod' service has a revision label different than ${REVISION_LABEL}, then apply"
     info "${OUTPUT_DIR}/${VALIDATION_FIX_FILE_NAME} using 'kubectl apply'"
