@@ -23,7 +23,6 @@ _CI_NO_VALIDATE="${_CI_NO_VALIDATE:=0}"; readonly _CI_NO_VALIDATE;
 _CI_NO_REVISION="${_CI_NO_REVISION:=0}"; readonly _CI_NO_REVISION;
 _CI_ISTIOCTL_REL_PATH="${_CI_ISTIOCTL_REL_PATH:=}"; readonly _CI_ISTIOCTL_REL_PATH;
 _CI_TRUSTED_GCP_PROJECTS="${_CI_TRUSTED_GCP_PROJECTS:=}"; readonly _CI_TRUSTED_GCP_PROJECTS;
-_CI_ENVIRON_PROJECT_NUMBER="${_CI_ENVIRON_PROJECT_NUMBER:=}"; readonly _CI_ENVIRON_PROJECT_NUMBER;
 _CI_CRC_VERSION="${_CI_CRC_VERSION:=0}"; readonly _CI_CRC_VERSION;
 _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"; readonly _CI_I_AM_A_TEST_ROBOT;
 
@@ -591,6 +590,11 @@ parse_args() {
         warn "As of version 1.10 the --mode flag is deprecated and will be ignored."
         shift 2
         ;;
+      --fleet_id | --fleet-id)
+        arg_required "${@}"
+        context_set-option "FLEET_ID" "${2}"
+        shift 2
+        ;;
       -c | --ca)
         arg_required "${@}"
         context_set-option "CA" "$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
@@ -766,6 +770,7 @@ validate_args() {
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local PLATFORM; PLATFORM="$(context_get-option "PLATFORM")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local CA; CA="$(context_get-option "CA")"
   local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
   local OPTIONAL_OVERLAY; OPTIONAL_OVERLAY="$(context_get-option "OPTIONAL_OVERLAY")"
@@ -797,7 +802,6 @@ validate_args() {
   local CUSTOM_CA; CUSTOM_CA="$(context_get-option "CUSTOM_CA")"
   local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
   local USE_VM; USE_VM="$(context_get-option "USE_VM")"
-  local ENVIRON_PROJECT_ID; ENVIRON_PROJECT_ID="$(context_get-option "ENVIRON_PROJECT_ID")"
   local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
   local CUSTOM_REVISION; CUSTOM_REVISION="$(context_get-option "CUSTOM_REVISION")"
   local WI_ENABLED; WI_ENABLED="$(context_get-option "WI_ENABLED")"
@@ -905,9 +909,15 @@ EOF
     fi
   fi
 
-  if can_register_cluster && ! has_value "ENVIRON_PROJECT_ID"; then
+  # GCP only: when no Fleet Id is provided, default to the cluster's project as the Fleet host.
+  if [[ -z "${FLEET_ID}" && is_gcp ]]; then
+    FLEET_ID="${PROJECT_ID}"
+    context_set-option "FLEET_ID" "${FLEET_ID}"
+  fi
+
+  if can_register_cluster && ! has_value "FLEET_ID"; then
     MISSING_ARGS=1
-    warn "Missing ENVIRON_PROJECT_ID to register the cluster."
+    warn "Missing FLEET_ID to register the cluster."
   fi
 
   if [[ "${MISSING_ARGS}" -ne 0 ]]; then
@@ -1277,17 +1287,19 @@ EOF
   fi
 }
 
+# For GCP: project number corresponds to the (optional) ASM Fleet project or the (default) cluster's project.
+# For non-GCP: project number corresponds to the (required) ASM Fleet project.
 get_project_number() {
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local RESULT; RESULT=""
 
-  info "Checking for project ${PROJECT_ID}..."
+  info "Checking for project ${FLEET_ID}..."
 
-  PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format="value(projectNumber)")"; readonly PROJECT_NUMBER
+  PROJECT_NUMBER="$(gcloud projects describe "${FLEET_ID}" --format="value(projectNumber)")"; readonly PROJECT_NUMBER
 
   if [[ -z "${PROJECT_NUMBER}" ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-Unable to find project ${PROJECT_ID}. Please verify the spelling and try
+Unable to find project ${FLEET_ID}. Please verify the spelling and try
 again. To see a list of your projects, run:
   gcloud projects list --format='value(project_id)'
 EOF
@@ -1867,38 +1879,42 @@ is_cluster_registered() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
-  local ENVIRON_PROJECT_ID; ENVIRON_PROJECT_ID="$(context_get-option "ENVIRON_PROJECT_ID")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   local WANT
   WANT="//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
   local LIST
-  LIST="$(gcloud container hub memberships list --project "${ENVIRON_PROJECT_ID}" \
+  LIST="$(gcloud container hub memberships list --project "${FLEET_ID}" \
     --format=json | grep "${WANT}")"
   if [[ -z "${LIST}" ]]; then
     { read -r -d '' MSG; warn "${MSG}"; } <<EOF || true
-Cluster is registered in the project ${ENVIRON_PROJECT_ID}, but the script is
+Cluster is registered in the project ${FLEET_ID}, but the script is
 unable to verify in the project. The script will continue to execute.
 EOF
   fi
 }
 
 generate_membership_name() {
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
-  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  if is_gcp; then
+    local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+    local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+    local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
 
-  local MEMBERSHIP_NAME
-  MEMBERSHIP_NAME="${CLUSTER_NAME}"
-  if [[ "$(retry 2 gcloud container hub memberships list --format='value(name)' \
-   --project "${PROJECT_ID}" | grep -c "^${MEMBERSHIP_NAME}$" || true)" -ne 0 ]]; then
-    MEMBERSHIP_NAME="${CLUSTER_NAME}-${PROJECT_ID}-${CLUSTER_LOCATION}"
-  fi
-  if [[ "${#MEMBERSHIP_NAME}" -gt 63 ]] || [[ "$(retry 2 gcloud container hub \
-   memberships list --format='value(name)' --project "${PROJECT_ID}" | grep -c \
-   "^${MEMBERSHIP_NAME}$" || true)" -ne 0 ]]; then
-    local RAND
-    RAND="$(tr -dc "a-z0-9" </dev/urandom | head -c8 || true)"
-    MEMBERSHIP_NAME="${CLUSTER_NAME:0:54}-${RAND}"
+    local MEMBERSHIP_NAME
+    MEMBERSHIP_NAME="${CLUSTER_NAME}"
+    if [[ "$(retry 2 gcloud container hub memberships list --format='value(name)' \
+    --project "${PROJECT_ID}" | grep -c "^${MEMBERSHIP_NAME}$" || true)" -ne 0 ]]; then
+      MEMBERSHIP_NAME="${CLUSTER_NAME}-${PROJECT_ID}-${CLUSTER_LOCATION}"
+    fi
+    if [[ "${#MEMBERSHIP_NAME}" -gt 63 ]] || [[ "$(retry 2 gcloud container hub \
+    memberships list --format='value(name)' --project "${PROJECT_ID}" | grep -c \
+    "^${MEMBERSHIP_NAME}$" || true)" -ne 0 ]]; then
+      local RAND
+      RAND="$(tr -dc "a-z0-9" </dev/urandom | head -c8 || true)"
+      MEMBERSHIP_NAME="${CLUSTER_NAME:0:54}-${RAND}"
+    fi
+  else
+    MEMBERSHIP_NAME="$(date +%s%N)"
   fi
   echo "${MEMBERSHIP_NAME}"
 }
@@ -1917,9 +1933,9 @@ register_cluster() {
   MEMBERSHIP_NAME="$(generate_membership_name)"
   info "Registering the cluster as ${MEMBERSHIP_NAME}..."
 
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   retry 2 gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
-    --project="${PROJECT_ID}" \
+    --project="${FLEET_ID}" \
     --gke-uri="${GKE_CLUSTER_URI}" \
     --enable-workload-identity
 }
@@ -1971,16 +1987,16 @@ is_membership_crd_installed() {
 }
 
 populate_environ_info() {
-  local ENVIRON_PROJECT_ID; ENVIRON_PROJECT_ID="$(context_get-option "ENVIRON_PROJECT_ID")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
 
-  if [[ -n "${ENVIRON_PROJECT_ID}" && -n "${HUB_MEMBERSHIP_ID}" ]]; then return; fi
+  if [[ -n "${FLEET_ID}" && -n "${HUB_MEMBERSHIP_ID}" ]]; then return; fi
   if ! is_membership_crd_installed; then return; fi
   HUB_MEMBERSHIP_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.owner.id | sed 's/^\"\/\/gkehub.googleapis.com\/projects\/\(.*\)\/locations\/global\/memberships\/\(.*\)\"$/\2/g')"
   context_set-option "HUB_MEMBERSHIP_ID" "${HUB_MEMBERSHIP_ID}"
 
-  ENVIRON_PROJECT_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.workload_identity_pool | sed 's/^\"\(.*\).\(svc\|hub\).id.goog\"$/\1/g')"
-  context_set-option "ENVIRON_PROJECT_ID" "${ENVIRON_PROJECT_ID}"
+  FLEET_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.workload_identity_pool | sed 's/^\"\(.*\).\(svc\|hub\).id.goog\"$/\1/g')"
+  context_set-option "FLEET_ID" "${FLEET_ID}"
 }
 
 enable_workload_identity(){
@@ -2186,7 +2202,7 @@ configure_package() {
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
-  local ENVIRON_PROJECT_ID; ENVIRON_PROJECT_ID="$(context_get-option "ENVIRON_PROJECT_ID")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
   local CA; CA="$(context_get-option "CA")"
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
@@ -2200,9 +2216,6 @@ configure_package() {
   kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
   kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
   kpt cfg set asm gcloud.project.environProjectNumber "${PROJECT_NUMBER}"
-  if [[ -n "${_CI_ENVIRON_PROJECT_NUMBER}" ]]; then
-    kpt cfg set asm gcloud.project.environProjectNumber "${_CI_ENVIRON_PROJECT_NUMBER}"
-  fi
   kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
   kpt cfg set asm gcloud.compute.network "${GCE_NETWORK_NAME}"
   kpt cfg set asm anthos.servicemesh.rev "${REVISION_LABEL}"
@@ -2215,7 +2228,7 @@ configure_package() {
   fi
 
   if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
-    kpt cfg set asm gcloud.project.environProjectID "${ENVIRON_PROJECT_ID}"
+    kpt cfg set asm gcloud.project.environProjectID "${FLEET_ID}"
     kpt cfg set asm anthos.servicemesh.hubMembershipID "${HUB_MEMBERSHIP_ID}"
   fi
 

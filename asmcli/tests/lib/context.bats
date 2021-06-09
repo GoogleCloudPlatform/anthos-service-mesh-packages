@@ -112,7 +112,7 @@ EOF
 
 @test "test missing values in non-interactive mode will fail fast" {
   context_set-option "NON_INTERACTIVE" 1
-  run has_value "ENVIRON_PROJECT_ID"
+  run has_value "FLEET_ID"
   assert_failure
   context_set-option "NON_INTERACTIVE" 0
 }
@@ -124,10 +124,10 @@ EOF
 }
 
 @test "test missing values in interactive will read from stdin" {
-  local ENVIRON_PROJECT_ID; ENVIRON_PROJECT_ID="111111"
-  has_value "ENVIRON_PROJECT_ID" << EOF
-${ENVIRON_PROJECT_ID}
+  local FLEET_ID; FLEET_ID="111111"
+  has_value "FLEET_ID" << EOF
+${FLEET_ID}
 EOF
-  assert_equal $(context_get-option "ENVIRON_PROJECT_ID") "${ENVIRON_PROJECT_ID}"
-  context_set-option "ENVIRON_PROJECT_ID" ""
+  assert_equal $(context_get-option "FLEET_ID") "${FLEET_ID}"
+  context_set-option "FLEET_ID" ""
 }
