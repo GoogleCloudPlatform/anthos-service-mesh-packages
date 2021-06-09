@@ -67,7 +67,7 @@ INGRESS_IP=""
 NETWORK=""
 MEMBERSHIP_UID=""
 GKE_URL=""
-ENVIRON_PROJECT_ID=""
+FLEET_ID=""
 CLUSTER_ID=""
 declare -A ASM_REVISIONS
 
@@ -904,7 +904,7 @@ is_cluster_registered() {
   populate_environ_info
 
   local LIST
-  LIST="$(gcloud container hub memberships list --project "${ENVIRON_PROJECT_ID}" \
+  LIST="$(gcloud container hub memberships list --project "${FLEET_ID}" \
     --format=json | grep "${GKE_URL}")"
   if [[ -z "${LIST}" ]]; then
     false
@@ -913,10 +913,10 @@ is_cluster_registered() {
 }
 
 populate_environ_info() {
-  if [[ -n "${ENVIRON_PROJECT_ID}" ]]; then return; fi
+  if [[ -n "${FLEET_ID}" ]]; then return; fi
   if ! is_membership_crd_installed; then return; fi
   configure_kubectl
-  ENVIRON_PROJECT_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.workload_identity_pool | sed 's/^\"\(.*\).\(svc\|hub\).id.goog\"$/\1/g')"
+  FLEET_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.workload_identity_pool | sed 's/^\"\(.*\).\(svc\|hub\).id.goog\"$/\1/g')"
 }
 
 is_membership_crd_installed() {
@@ -1272,17 +1272,17 @@ retrieve_identity_provider() {
   populate_environ_info
 
   local MEMBERSHIPS
-  MEMBERSHIPS="$(retry 2 gcloud container hub memberships list --project "${ENVIRON_PROJECT_ID}" \
+  MEMBERSHIPS="$(retry 2 gcloud container hub memberships list --project "${FLEET_ID}" \
    --format='value(name)')"
   while read -r MEMBERSHIP; do
     if [[ -n "${MEMBERSHIP}" ]]; then
       local CURR_CLUSTER_URL
       CURR_CLUSTER_URL="$(retry 2 gcloud container hub memberships describe \
-        "${MEMBERSHIP}" --project "${ENVIRON_PROJECT_ID}" \
+        "${MEMBERSHIP}" --project "${FLEET_ID}" \
         --format="value(endpoint.gkeCluster.resourceLink)")"
       if [[ "${CURR_CLUSTER_URL}" == "${GKE_URL}" ]]; then
         MEMBERSHIP_UID="$(retry 2 run gcloud container hub memberships describe \
-          "${MEMBERSHIP}" --project "${ENVIRON_PROJECT_ID}" --format="value(uniqueId)")"
+          "${MEMBERSHIP}" --project "${FLEET_ID}" --format="value(uniqueId)")"
         break
       fi
     fi
