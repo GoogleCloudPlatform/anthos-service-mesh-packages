@@ -1353,8 +1353,8 @@ gen_asm_config() {
   ASM_LABELS_STRING=$(jq -sR '' <<< "${LABELS}" | tr -d ' ')
 
   while read -r -a pair; do
-    ASM_CONFIG=$(jq --arg key "${pair[0]}" \
-    --arg value "${pair[1]}" \
+    ASM_CONFIG=$(jq --arg key "${pair[0]:-}" \
+    --arg value "${pair[1]:-}" \
     '."proxyMetadata"[$key]=$value' <<< "${ASM_CONFIG}")
   done <<EOF
 ISTIO_META_WORKLOAD_NAME $WORKLOAD_NAME
@@ -1369,8 +1369,8 @@ ISTIO_META_DNS_CAPTURE true
 ISTIO_META_AUTO_REGISTER_GROUP $WORKLOAD_NAME
 SERVICE_ACCOUNT $WORKLOAD_SERVICE_ACCOUNT
 CREDENTIAL_IDENTITY_PROVIDER $CREDENTIAL_IDENTITY_PROVIDER
-ASM_REVISION $ASM_META_REVISION
 TRUST_DOMAIN $TRUST_DOMAIN
+ASM_REVISION $ASM_META_REVISION
 EOF
 
   ASM_CONFIG=$(jq --arg key "ISTIO_METAJSON_LABELS" \
