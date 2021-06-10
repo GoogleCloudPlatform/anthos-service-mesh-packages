@@ -1875,7 +1875,7 @@ is_cluster_registered() {
     false
   fi
 
-  populate_environ_info
+  populate_fleet_info
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
@@ -1986,7 +1986,7 @@ is_membership_crd_installed() {
   fi
 }
 
-populate_environ_info() {
+populate_fleet_info() {
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
 
@@ -2212,7 +2212,7 @@ configure_package() {
   info "Configuring kpt package..."
 
   populate_cluster_values
-  populate_environ_info
+  populate_fleet_info
   kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
   kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
   kpt cfg set asm gcloud.project.environProjectNumber "${PROJECT_NUMBER}"

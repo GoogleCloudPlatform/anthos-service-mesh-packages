@@ -31,7 +31,7 @@ init_meshconfig() {
 
   info "Initializing meshconfig API..."
   if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
-    populate_environ_info
+    populate_fleet_info
     info "Cluster has Membership ID ${HUB_MEMBERSHIP_ID} in the Hub of project ${FLEET_ID}"
     if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
       info "Skip initializing meshconfig API as the Hub is not hosted in the project ${PROJECT_ID}"
