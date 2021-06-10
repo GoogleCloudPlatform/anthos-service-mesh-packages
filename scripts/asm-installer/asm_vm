@@ -70,6 +70,7 @@ GKE_URL=""
 ENVIRON_PROJECT_ID=""
 CLUSTER_ID=""
 declare -A ASM_REVISIONS
+MESH_CONFIG_NAME=""
 
 ### Workload variables ###
 WORKLOAD_LABELS=""
@@ -667,6 +668,7 @@ validate_dependencies() {
 
   if [[ "${CREATE_GCE_INSTANCE_TEMPLATE}" -eq 1 ]]; then
     validate_workloadgroup
+    validate_revision_mesh_config
     validate_gce_instance_template
     retrieve_cluster_id
   fi
@@ -1072,6 +1074,26 @@ EOF
   fi
 }
 
+validate_revision_mesh_config() {
+  info "Verifying the mesh config..."
+
+  if [[ "${WORKLOAD_ASM_REVISION}" == "default" ]]; then
+    MESH_CONFIG_NAME="istio"
+  else
+    MESH_CONFIG_NAME="istio-${WORKLOAD_ASM_REVISION}"
+  fi
+  readonly MESH_CONFIG_NAME
+
+  if [ "$(retry 2 kubectl get cm -n istio-system --no-headers \
+    -o custom-columns=":metadata.name" | grep -c "^${MESH_CONFIG_NAME}" \
+    || true)" -eq 0 ]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Unable to find Mesh Config ${MESH_CONFIG_NAME} in your cluster. Please make sure
+Anthos Service Mesh is installed successfully and try again.
+EOF
+  fi
+}
+
 validate_gce_instance_template() {
   local RESULT; RESULT=""
 
@@ -1303,10 +1325,10 @@ yaml2json () {
 
 gen_asm_config() {
   local ASM_CONFIG
-  ASM_CONFIG=$(kubectl get cm istio-"${WORKLOAD_ASM_REVISION}" -n istio-system -ojsonpath='{.data.mesh}' | yaml2json | jq -r '.defaultConfig')
+  ASM_CONFIG=$(kubectl get cm "${MESH_CONFIG_NAME}" -n istio-system -ojsonpath='{.data.mesh}' | yaml2json | jq -r '.defaultConfig')
 
   local TRUST_DOMAIN
-  TRUST_DOMAIN=$(kubectl get cm istio-"${WORKLOAD_ASM_REVISION}" -n istio-system -ojsonpath='{.data.mesh}' | yaml2json | jq -r '.trustDomain')
+  TRUST_DOMAIN=$(kubectl get cm "${MESH_CONFIG_NAME}" -n istio-system -ojsonpath='{.data.mesh}' | yaml2json | jq -r '.trustDomain')
 
   local LABELS
   LABELS=$(jq -n --arg canonical_service "${CANONICAL_SERVICE}" \
