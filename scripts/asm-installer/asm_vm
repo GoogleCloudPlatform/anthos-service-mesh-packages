@@ -1085,7 +1085,7 @@ validate_revision_mesh_config() {
   readonly MESH_CONFIG_NAME
 
   if [ "$(retry 2 kubectl get cm -n istio-system --no-headers \
-    -o custom-columns=":metadata.name" | grep -c "^${MESH_CONFIG_NAME}" \
+    -o custom-columns=":metadata.name" | grep -c "^${MESH_CONFIG_NAME}$" \
     || true)" -eq 0 ]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Unable to find Mesh Config ${MESH_CONFIG_NAME} in your cluster. Please make sure
