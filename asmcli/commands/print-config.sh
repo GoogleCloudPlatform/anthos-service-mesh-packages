@@ -23,7 +23,7 @@ print-config_subcommand() {
 
   local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
   if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
-    populate_environ_info
+    populate_fleet_info
   fi
   print_config >&3
 }

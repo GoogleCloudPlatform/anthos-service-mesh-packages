@@ -62,11 +62,14 @@ OPTIONS:
   -l|--cluster_location  <LOCATION>   The GCP location of the target cluster.
   -n|--cluster_name      <NAME>       The name of the target cluster.
   -p|--project_id        <ID>         The GCP project ID.
-  --kc|--kubeconfig      <KUBECONFIG> Path to the kubeconfig file to use for CLI requests.
+  --kc|--kubeconfig <KUBECONFIG_FILE> Path to the kubeconfig file to use for CLI requests.
                                       Required if not supplying --cluster_location,
                                       --cluster_name, --project_id in order to locate
                                       and connect to the intended cluster.
   --ctx|--context        <CONTEXT>    The name of the kubeconfig context to use.
+  --fleet_id             <FLEET ID>   The Fleet host project ID. Required for non-GCP
+                                      clusters. When not provided for GCP clusters, it
+                                      defaults to the cluster's project ID.
   -c|--ca                <CA>         The type of certificate authority to be
                                       used. Defaults to "mesh_ca" for install.
                                       Allowed values for <CA> are {citadel|mesh_ca|gcp_cas}.
@@ -205,6 +208,7 @@ OPTIONS:
   -p|--project_id        <ID>
   --kc|--kubeconfig      <KUBECONFIG_FILE>
   --ctx|--context        <CONTEXT>
+  --fleet_id             <FLEET ID>
   -c|--ca                <CA>
 
   -o|--option            <FILE NAME>
