@@ -1324,11 +1324,14 @@ yaml2json () {
 }
 
 gen_asm_config() {
+  local MESH_CONFIG
+  MESH_CONFIG=$(retry 2 kubectl get cm "${MESH_CONFIG_NAME}" -n istio-system -ojsonpath='{.data.mesh}' | yaml2json)
+  
   local ASM_CONFIG
-  ASM_CONFIG=$(kubectl get cm "${MESH_CONFIG_NAME}" -n istio-system -ojsonpath='{.data.mesh}' | yaml2json | jq -r '.defaultConfig')
+  ASM_CONFIG=$(echo "${MESH_CONFIG}" | jq -r '.defaultConfig')
 
   local TRUST_DOMAIN
-  TRUST_DOMAIN=$(kubectl get cm "${MESH_CONFIG_NAME}" -n istio-system -ojsonpath='{.data.mesh}' | yaml2json | jq -r '.trustDomain')
+  TRUST_DOMAIN=$(echo "${MESH_CONFIG}" | jq -r '.trustDomain')
 
   local ASM_META_REVISION="${WORKLOAD_ASM_REVISION}"
   if [ "${ASM_META_REVISION}" == "default" ]; then
