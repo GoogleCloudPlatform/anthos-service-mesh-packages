@@ -17,7 +17,6 @@ openAPI:
           value: "NETWORK_ID"
     io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases:
       items:
-        pattern: '[a-z0-9\-].(svc|hub).id.goog'
         type: string
       minItems: 1
       type: array
