@@ -421,6 +421,8 @@ retry() {
     warn "Failed, retrying...($((i+1)) of ${MAX_TRIES})"
     sleep $((2 * i + 2))
   done
+  local CMD="'$*'"
+  warn "Command $CMD failed."
   false
 }
 
@@ -2574,8 +2576,13 @@ install_secrets() {
 }
 
 init_gcp_cas() {
-  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="$PROJECT_ID.svc.id.goog[istio-system/istiod-service-account]"
 
+  local ISTIOD_SERVICE_ACCOUNT; ISTIOD_SERVICE_ACCOUNT="istiod-${REVISION_LABEL}"
+  if [[ "${_CI_NO_REVISION}" -ne 0 ]]; then
+    ISTIOD_SERVICE_ACCOUNT="istiod"
+  fi
+
+  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${PROJECT_ID}.svc.id.goog[istio-system/${ISTIOD_SERVICE_ACCOUNT}]"
   local NAME; NAME=$(echo "${CA_NAME}" | cut -f6 -d/)
   local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
   local CA_PROJECT; CA_PROJECT=$(echo "${CA_NAME}" | cut -f2 -d/)
@@ -2757,7 +2764,7 @@ outro() {
   if [[ "${MODE}" = "migrate" || "${MODE}" = "upgrade" ]]; then
     info "Please verify the new control plane and then: 1) migrate your workloads 2) remove old control plane."
     info "For more information, see:"
-    info "https://cloud.google.com/service-mesh/docs/upgrading-gke#redeploying_workloads"
+    info "https://cloud.google.com/service-mesh/docs/scripted-install/gke-upgrade#deploying_and_redeploying_workloads"
     info "Before removing the old control plane, update the service used by validation if necessary."
     info "If the 'istiod' service has a revision label different than ${REVISION_LABEL}, then apply"
     info "${OUTPUT_DIR}/${VALIDATION_FIX_FILE_NAME} using 'kubectl apply'"
