@@ -40,7 +40,6 @@ spec:
         GKE_CLUSTER_URL: "HUB_IDP_URL" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub-idp-url"}
     trustDomainAliases: # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases"}
       - "ENVIRON_PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain-hub"}
-      - "ENVIRON_PROJECT_ID.hub.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain-hub"}
   values:
     global:
       # Enable SDS
