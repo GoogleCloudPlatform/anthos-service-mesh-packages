@@ -86,7 +86,7 @@ EOF
   verify_template_instance_with_custom_image
 
   cleanup_workload_service_account
-
+  kubectl delete workloadgroup "${WORKLOAD_NAME}" -n "${LT_NAMESPACE}"
   cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"
   delete_service_mesh_feature
 }
