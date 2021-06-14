@@ -1,0 +1,222 @@
+#!/bin/bash
+
+MESHCA_SPIFFE_ENDPOINT=https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json
+MESHCA_ROOT_CONFIG="    caCertificates:
+    - pem: |-"
+
+if ! awk --help &> /dev/null; then
+  echo "awk could not be found, please make sure it is installed."
+  exit 1
+fi
+
+if ! grep --help &> /dev/null; then
+  echo "grep could not be found, please make sure it is installed."
+  exit 1
+fi
+
+if ! istioctl &> /dev/null; then
+  echo "istioctl could not be found, please add istioctl into your PATH."
+  exit 1
+fi
+
+if ! jq --version &> /dev/null; then
+  echo "jq could not be found, please make sure it is installed."
+  exit 1
+fi
+
+if ! kubectl version &> /dev/null; then
+  echo "kubectl could not be found, please make sure it is installed."
+  exit 1
+fi
+
+if ! openssl version &> /dev/null; then
+  echo "openssl could not be found, please make sure it is installed."
+  exit 1
+fi
+
+declare -A rootmap
+
+add_to_rootmap() {
+  local output
+  local roots
+
+  output=$(istioctl pc secret $1 -n $2 -o json)
+
+  if [ $(echo ${output} | jq '.dynamicActiveSecrets[0].name') = "\"ROOTCA\"" ]; then
+    roots=$(echo ${output} | jq '.dynamicActiveSecrets[0].secret.validationContext.trustedCa.inlineBytes')
+  else
+    roots=$(echo ${output} | jq '.dynamicActiveSecrets[1].secret.validationContext.trustedCa.inlineBytes')
+  fi
+  if [ -z ${roots} ]; then
+    echo "Cannot find roots for $1.$2"
+    exit 1
+  fi
+  echo ${roots} | sed 's/\"//g' | base64 -d > /tmp/$3.pem
+
+  local citadelroot
+  local meshcaroot
+  citadelroot=$(openssl crl2pkcs7 -nocrl -certfile /tmp/$3.pem | openssl pkcs7 -print_certs -text -noout | grep "Subject: " | grep -v "istio_v1_cloud_workload_root-signer")
+  meshcaroot=$(openssl crl2pkcs7 -nocrl -certfile /tmp/$3.pem | openssl pkcs7 -print_certs -text -noout | grep "istio_v1_cloud_workload_root-signer")
+
+  local canames
+  [[ -z ${citadelroot} ]] || canames="CITADEL"
+  if [ -z ${canames} ]; then
+    [[ -z ${meshcaroot} ]] || canames="MESHCA"
+  else
+    [[ -z ${meshcaroot} ]] || canames="CITADEL MESHCA"
+  fi
+  rootmap[$3]=${canames}
+}
+
+# $1: pod
+# $2: namespace
+get_issuer_ca() {
+  local output
+  local certchain
+
+  output=$(istioctl pc secret $1 -n $2 -o json)
+
+  if [ $(echo ${output} | jq '.dynamicActiveSecrets[0].name') = "\"default\"" ]; then
+    certchain=$(echo ${output} | jq '.dynamicActiveSecrets[0].secret.tlsCertificate.certificateChain.inlineBytes')
+  else
+    certchain=$(echo ${output} | jq '.dynamicActiveSecrets[1].secret.tlsCertificate.certificateChain.inlineBytes')
+  fi
+  if [ -z ${certchain} ] || [ ${certchain} = "null" ]; then
+    echo " - [WARNING] $1.$2 cannot find certificate information"
+    return
+  fi
+  echo ${certchain} | sed 's/\"//g' | base64 -d > /tmp/certchain.pem
+
+  local meshcaroot
+  meshcaroot=$(openssl crl2pkcs7 -nocrl -certfile /tmp/certchain.pem | openssl pkcs7 -print_certs -text -noout | grep "istio_v1_cloud_workload_root-signer")
+  if [[ -z ${meshcaroot} ]]; then
+    echo " - $1.$2 is using the mTLS certificate issued by [CITADEL]"
+  else
+    echo " - $1.$2 is using the mTLS certificate issued by [MESHCA]"
+  fi
+}
+
+# $1: pod
+# $2: namespace
+# $3: ROOTCA/default
+check_cert_in_pod() {
+  local sn
+
+  # Example format:
+  # RESOURCE NAME   TYPE   STATUS   VALID CERT  SERIAL NUMBER        NOT AFTER            NOT BEFORE
+  # ROOTCA          CA     ACTIVE   true        16289816804573236346 2117-12-31T19:15:51Z 2018-01-24T19:15:51Z
+  # We use the serial number for the comparison.
+  if [ "$3" = "ROOTCA" ]; then
+    sn=$(istioctl pc secret "$1" -n "$2" | grep "ROOTCA" | awk '{print $5}')
+    if [[ -z ${sn} ]]; then
+      echo " - [WARNING] $1.$2 cannot find certificate information"
+      return
+    fi
+    if [[ -z ${rootmap[${sn}]} ]]; then
+      add_to_rootmap $1 $2 ${sn}
+    fi
+    echo " - $1.$2 trusts [${rootmap[${sn}]}]"
+  else
+    get_issuer_ca $1 $2
+  fi
+}
+
+# $1: pod
+# $2: namespace
+check_trustdomain_in_pod() {
+  local meshca
+  local citadel
+
+  if [ "$1" = *"egress"* ]; then
+    meshca=$(istioctl pc cluster $1 -n $2 -o json | grep "spiffe" | grep "id.goog")
+    citadel=$(istioctl pc cluster $1 -n $2 -o json | grep "spiffe" | grep -v "id.goog")
+  else
+    meshca=$(istioctl pc cluster $1 -n $2 -o json | grep "spiffe" | grep "id.goog")
+    citadel=$(istioctl pc cluster $1 -n $2 -o json | grep "spiffe" | grep -v "id.goog")
+  fi
+  if [[ -z meshca ]]; then
+    echo "$1.$2 is MISSING trust domain for [MESHCA]"
+    return
+  fi
+  if [[ -z citadel ]]; then
+    echo "$1.$2 is MISSING trust domain for [CITADEL]"
+    return
+  fi
+  echo "$1.$2 trusts trust domains for [CITADEL MESHCA]"
+}
+
+# $1: namespace
+# $2: cert/trustdomain
+# $3: extra config
+check_in_namespace() {
+  local pods
+  local containers
+
+  pods=$(kubectl get pod -o jsonpath={.items..metadata.name} -n "$1")
+	for pod in ${pods}
+	do
+    containers=$(kubectl get pod ${pod} -n "$1" -o jsonpath=={.spec.containers.*.name})
+    if [[ "${containers}" == *"istio-proxy"* ]]; then
+      if [[ "$2" = "cert" ]]; then
+        check_cert_in_pod "${pod}" "$1" "$3"
+      else
+        check_trustdomain_in_pod "${pod}" "$1"
+      fi
+    fi
+	done
+}
+
+# $1: cert/trustdomain
+# $2: extra config
+check() {
+  local ns
+
+  ns=$(kubectl get ns -o jsonpath={.items..metadata.name})
+  for n in ${ns}
+  do
+    if [ "$n" != "kube-system" ] && [ "$n" != "kube-public" ] && [ "$n" != "kube-node-lease" ]; then
+      echo
+      echo "Namespace: $n"
+      check_in_namespace "$n" "$1" "$2"
+    fi
+  done
+}
+
+print_help_info() {
+  echo
+  echo "Usage: check-root-cert | check-workload-cert | check-trustdomain
+
+check-root-cert
+  Check the root certificates loaded on each Envoy proxy.
+
+check-workload-cert
+  Check the CA issuer for the workload certificates on each Envoy proxy.
+
+check-trustdomain
+  Check the trusted trust domains for the workloads.
+"
+
+}
+
+case $1 in
+  check-root-cert)
+    echo
+    echo "Checking the root certificates loaded on each pod..."
+    check "cert" "ROOTCA"
+    ;;
+
+  check-workload-cert)
+    echo
+    echo "Checking the mTLS certificates loaded on each pod..."
+    check "cert" "default"
+    ;;
+
+  check-trustdomain)
+    echo
+    echo "Checking the trust domain configuration for each pod..."
+    check "trustdomain"
+    ;;
+  *)
+  print_help_info
+
+esac
