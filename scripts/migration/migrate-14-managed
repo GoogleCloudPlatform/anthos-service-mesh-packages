@@ -1,0 +1,550 @@
+#!/bin/bash
+
+set -eu # Print out all commands, exit on failed commands
+set -o pipefail
+
+TMP_DIR="/tmp/gke-istio-addon-asm-migration"
+mkdir -p "${TMP_DIR}"
+
+SKIP_CONFIRM=""
+CONTEXT=""
+SUB_FUNCTION=""
+ZERO_DOWNTIME=""
+# Setup colors, only if its a terminal
+if [[ -t 1 ]]; then
+  blue='\x1B[0;34m'
+  red='\x1B[0;31m'
+  yellow='\x1B[0;33m'
+  green='\x1B[0;32m'
+  grey='\x1B[1;30m'
+  clr='\x1B[0m'
+else
+  blue=''
+  red=''
+  yellow=''
+  green=''
+  grey=''
+  clr=''
+fi
+
+CLEANUP_RESOURCES=(
+  "IstioOperator/istio-1-6-11-gke-0/istio-system"
+  "ServiceAccount/istio-operator.istio-operator"
+  "ServiceAccount/istio-citadel-service-account/istio-system"
+  "ServiceAccount/istio-galley-service-account/istio-system"
+  "ServiceAccount/istio-ingressgateway-service-account/istio-system"
+  "ServiceAccount/istio-mixer-service-account/istio-system"
+  "ServiceAccount/istio-multi/istio-system"
+  "ServiceAccount/istio-pilot-service-account/istio-system"
+  "ServiceAccount/istio-security-post-install-account/istio-system"
+  "ServiceAccount/istio-sidecar-injector-service-account/istio-system"
+  "ServiceAccount/promsd/istio-system"
+  "ClusterRole/istio-citadel-istio-system"
+  "ClusterRole/istio-galley-istio-system"
+  "ClusterRole/istio-mixer-istio-system"
+  "ClusterRole/istio-operator"
+  "ClusterRole/istio-pilot-istio-system"
+  "ClusterRole/istio-security-post-install-istio-system"
+  "ClusterRole/istio-sidecar-injector-istio-system"
+  "ClusterRole/promsd-istio-system"
+  "ClusterRoleBinding/istio-citadel-istio-system"
+  "ClusterRoleBinding/istio-galley-admin-role-binding-istio-system"
+  "ClusterRoleBinding/istio-mixer-admin-role-binding-istio-system"
+  "ClusterRoleBinding/istio-multi"
+  "ClusterRoleBinding/istio-operator"
+  "ClusterRoleBinding/istio-pilot-istio-system"
+  "ClusterRoleBinding/istio-security-post-install-role-binding-istio-system"
+  "ClusterRoleBinding/istio-sidecar-injector-admin-role-binding-istio-system"
+  "ClusterRoleBinding/promsd-istio-system"
+  "ConfigMap/istio/istio-system"
+  "ConfigMap/istio-galley-configuration/istio-system"
+  "ConfigMap/istio-security-custom-resources/istio-system"
+  "ConfigMap/istio-sidecar-injector/istio-system"
+  "ConfigMap/promsd/istio-system"
+  "ConfigMap/promsd-rules/istio-system"
+  "ConfigMap/promsd-sidecar/istio-system"
+  "Service/istio-operator.istio-operator"
+  "Service/istio-citadel/istio-system"
+  "Service/istio-galley/istio-system"
+  "Service/istio-pilot/istio-system"
+  "Service/istio-policy/istio-system"
+  "Service/istio-sidecar-injector/istio-system"
+  "Service/istio-telemetry/istio-system"
+  "Service/promsd/istio-system"
+  "Deployment/istio-operator/istio-operator"
+  "Deployment/istio-citadel/istio-system"
+  "Deployment/istio-galley/istio-system"
+  "Deployment/istio-ingressgateway/istio-system"
+  "Deployment/istio-pilot/istio-system"
+  "Deployment/istio-policy/istio-system"
+  "Deployment/istio-sidecar-injector/istio-system"
+  "Deployment/istio-telemetry/istio-system"
+  "Deployment/promsd/istio-system"
+  "HorizontalPodAutoscaler/istio-ingressgateway/istio-system"
+  "HorizontalPodAutoscaler/istio-pilot/istio-system"
+  "HorizontalPodAutoscaler/istio-policy/istio-system"
+  "HorizontalPodAutoscaler/istio-telemetry/istio-system"
+  "attributemanifest/istioproxy/istio-system"
+  "attributemanifest/kubernetes/istio-system"
+  "handler/kubernetesenv/istio-system"
+  "handler/stackdriver-mixer/istio-system"
+  "instance/attributes/istio-system"
+  "instance/mixer-request-count/istio-system"
+  "instance/mixer-request-latency/istio-system"
+  "rule/kubeattrgenrulerule/istio-system"
+  "rule/stackdriver-mixer/istio-system"
+  "rule/tcpkubeattrgenrulerule/istio-system"
+  "DestinationRule/istio-policy/istio-system"
+  "DestinationRule/istio-telemetry/istio-system"
+  "Secret/cacerts/istio-system"
+  "Secret/istio-ca-secret/istio-system"
+)
+
+usage() {
+    echo "Usage:"
+    echo "  $0 [OPTIONS]"
+    echo
+    echo "  --skip-confirm, -y    select 'yes' for any prompts"
+    echo "  --cleanup             cleanup the old Istio addon control plane (after complete migration)"
+    echo "  --context             context to use for kubectl"
+    echo
+}
+
+die() {
+    echo -e "${red}$*${clr}" >&2 ; exit 1;
+}
+
+kube() {
+  echo -e "${grey}Running: kubectl $*${clr}"  >&2
+  kubectl --context="${CONTEXT}" "$@"
+}
+
+heading() {
+  echo -e "\n${blue}${1} ${clr}"
+}
+
+prompt() {
+  if [[ -n "${SKIP_CONFIRM}" ]]; then
+    heading "${1}"
+    return
+  fi
+  echo -en "\n${blue}${1} ${clr}"
+  read -r -p "Continue? [Y/n] " response
+  case "$response" in
+      "") return ;;
+      [yY][eE][sS]|[yY]) return ;;
+  esac
+  exit 1
+}
+
+prompt_unsupported() {
+  echo -e "${yellow}${1}${clr}\n${2}"
+  if [[ -n "${SKIP_CONFIRM}" ]]; then
+    die "--skip-confirm set but an unsupported configuration was detected"
+  fi
+  read -r -p "Continue anyways? [y/N] " response
+  case "$response" in
+      [yY][eE][sS]|[yY]) return ;;
+  esac
+  exit 1
+}
+
+print_intro() {
+  if [[ -z "${SKIP_CONFIRM}" ]]; then
+    echo
+    echo "This tool automatically upgrades the Istio addon in the current cluster from 1.4 to Anthos Service Mesh."
+    echo "Selected cluster: '$(kubectl config current-context 2> /dev/null)'"
+    echo
+    prompt "Starting migration..."
+  fi
+}
+
+check_prerequisites() {
+  echo -e "${blue}Checking prerequisites...${clr}"
+  command -v kubectl >| /dev/null 2>&1 || die "kubectl must be installed, aborting."
+  command -v istioctl >| /dev/null 2>&1 || die "istioctl must be installed, aborting."
+  echo -e "${green}OK${clr}"
+}
+
+configure_mesh_ca() {
+  prompt "Configuring Istio Addon to trust Anthos Service Mesh..."
+  pushd "${TMP_DIR}" > /dev/null
+  HUB_WIP="$(kube get cm -n istio-system istio-asm-managed -oyaml | grep 'trustDomain: .*' | cut -d':' -f2 | xargs)"
+  if [[ "${HUB_WIP}" == "" ]]; then
+    popd > /dev/null
+    die "Could not determine trust domain for Anthos Service Mesh"
+  fi
+  kube -n istio-system apply -f - << EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: meshca-root
+data:
+  meshca-root.pem: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUdsRENDQkh5Z0F3SUJBZ0lRRVcyNUFQYTdTOVNqL05qNlY2R3hRVEFOQmdrcWhraUc5dzBCQVFzRkFEQ0IKd1RFTE1Ba0dBMVVFQmhNQ1ZWTXhFekFSQmdOVkJBZ1RDa05oYkdsbWIzSnVhV0V4RmpBVUJnTlZCQWNURFUxdgpkVzUwWVdsdUlGWnBaWGN4RXpBUkJnTlZCQW9UQ2tkdmIyZHNaU0JNVEVNeERqQU1CZ05WQkFzVEJVTnNiM1ZrCk1XQXdYZ1lEVlFRRERGZHBjM1JwYjE5Mk1WOWpiRzkxWkY5M2IzSnJiRzloWkY5eWIyOTBMWE5wWjI1bGNpMHcKTFRJd01UZ3RNRFF0TWpWVU1UUTZNVEU2TXpNdE1EYzZNREFnU3pveExDQXhPa2cxTW5abmQwVnRNM1JqT2pBNgpNVGd3SUJjTk1UZ3dOREkxTWpFeE1UTXpXaGdQTWpFeE9EQTBNalV5TWpFeE16TmFNSUhCTVFzd0NRWURWUVFHCkV3SlZVekVUTUJFR0ExVUVDQk1LUTJGc2FXWnZjbTVwWVRFV01CUUdBMVVFQnhNTlRXOTFiblJoYVc0Z1ZtbGwKZHpFVE1CRUdBMVVFQ2hNS1IyOXZaMnhsSUV4TVF6RU9NQXdHQTFVRUN4TUZRMnh2ZFdReFlEQmVCZ05WQkFNTQpWMmx6ZEdsdlgzWXhYMk5zYjNWa1gzZHZjbXRzYjJGa1gzSnZiM1F0YzJsbmJtVnlMVEF0TWpBeE9DMHdOQzB5Ck5WUXhORG94TVRvek15MHdOem93TUNCTE9qRXNJREU2U0RVeWRtZDNSVzB6ZEdNNk1Eb3hPRENDQWlJd0RRWUoKS29aSWh2Y05BUUVCQlFBRGdnSVBBRENDQWdvQ2dnSUJBSzlkRnRpSEkwL3I3MGs2V2hiRXVEZ0hEemwvTzVNUApzeW1iaVlGNGNRNFpEa01nWFQyYVZIeXVCL01tZHF0ZUMyc3B1RzVvakM2SENIaGorOUpGRjNLZlUrRWovajlBCjVnVXo4ZDRWWUQ5MkxYaDgyaXJJMnRPZWxiUTdQWkFMbjVoUm5wazBnbnB6TGUya3BhOGxHeTBUdEIvdi8zMDMKalpBbDBlN2lLS2tYMU9veTlKemVCQVlkTnF1OXVJaHJsK25hU1hFR3B1V3hDWTZ1aXArRWN1S3A5Y1IxNmtGegpPS05uK3NRMDlkN0tlRk45ckxhWmlvZEJ6bmRWbGlxOUZrV0p3SWVCcDA2Q3E5dFVNa21ZdlVGazNtdDg2bmhaCnJZdmlMSTR0WFNtWklHUU5rdlBRWFUxa2kzdWt2L1pWZEpyWFY3dzJrL0VabWlGKzlveFB3RzRaMjFHRmZPS1QKV0wvazlpN1NDcUl1VDQxcE5LMm1tS0hzUUk3UWxvcnR6NTRzOFkyRHB6Y0tjNEVEZlVJZjYyTm83KytISU14dQpkUHhiZFFlMTFJbXBEUmNRSWc5Wk9xVGJvcnVMYUdOQkxPNnJkY25xbWd0czNDTHJsZXgxTDlRR3hRWkNIUmVhCnJpUjFiV2VRQk5UQW9kWXFTejZ2cFNJNWhYVUNra1hXN0xGY1BNcXZSYlJWY2xhazgvUnAwTGFITFFpRHhrS3AKaVExcHJmQk80SXhZY0hsRUtQbnhvQnJrNVdVWmZYNGowT3Biajhoa05WaStzQisvUnZYcnVGTFpvRkF6Y0t1NQpLV0t0UHpVT2I4UDlWa0VtTnk3RDNKWHlzNUdmaThOa1ZYbi9raFZWYjFCVEhIZjl3QzNuaEo1MG51QmttUHU3CjNiajFBQk9hakIrekFnTUJBQUdqZ1lNd2dZQXdEZ1lEVlIwUEFRSC9CQVFEQWdFR01CMEdBMVVkSlFRV01CUUcKQ0NzR0FRVUZCd01CQmdnckJnRUZCUWNEQWpBUEJnTlZIUk1CQWY4RUJUQURBUUgvTUIwR0ExVWREZ1FXQkJRLwpWc3V5amdSREFFbWNaanlKNzc2MTlKczlpakFmQmdOVkhTTUVHREFXZ0JRL1ZzdXlqZ1JEQUVtY1pqeUo3NzYxCjlKczlpakFOQmdrcWhraUc5dzBCQVFzRkFBT0NBZ0VBVWM1UUpPcXhtTUpZMEUycmNIRVdRWVJhaDF2YXQzd3UKSUh0RVozU2tTdW15ait5OWV5SUhiOVhUVHljNFN5R3lYMW44UmFyeThvU2dRVjRjYnlKVEZYRUVRT0dMSEI5Lwo5OEVLVGhnSnRmUHNvczJXS2UvNTlTOHlOMDVvbnB4Y2FMOXk0UzI5NUt2OWtjU1F4TG01VWZqbHFzS2VISlp5Cm12eGlZem1Cb3g3TEExenFjTFladnNsSk5rSnhLQWs1SkE2Nml5RFNRcU9LN2pJaXhuOHBpMzA1ZEZHQ1pnbFUKRlN0d1dxWTZSYzlyUjhFeWNWaFN4MkFocnZUN09RVFZkS0xmb0tBODREOEpaSlBCN2hyeHFLZjdKSkZzODdLagp0N2MvNWJYUEZKMm9zbWpvTlluYkhqaXE2NGJoMjBzU0NkNjMwcXZoaGVQTHdqak9sQlBpRnlLMzZvL2hRTjg3CjFBRW0xU0NIeSthUWNmSnFGNUtUZ1BuWlF5NUQrRC9DR2F1K0Jma08rV0NHRFZ4UmxlWUJKNGcyTmJBVG9seWcKQjJLV1hyajA3VS9XYVdxVjJoRVJia214WEZoNmNVZGxrWDJNZW9HNHY2WkQyT0tBUHg1RHBKQ2ZwMFRFcTZQegpuUCtaMW1MZC9aakdzT0Y4UjJXR1FKRXVVOEhSenZzcjB3c1g5VXlMTXFmNVhWaURLMTFWL1crZGNJdmpIQ2F5CkJwWDJzZTNkZmV4NWpGaHQrSmNRYytpd0I4Y2FTWGtSNnRHU2lhcmdFdFNKT0RPUmFjTzlJQjhiNlc4U20vL0oKV2YvOHp5aUNjTW0xaTJ5VlZwaHdFMWtjekZ3dW5BaDBKQjg5NlZhWEdWeFhlS0VBTVFvWEhqZ0RkQ1lwOC9FdAp4amI4VWtDbXlqVT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+EOF
+  kube get cm istio -n istio-system -o yaml > cm_istio.yaml
+  kube get cm istio -n istio-system -o yaml | sed "s/trustDomainAliases\:.*$/trustDomainAliases\: [\"${HUB_WIP}\"]/g" | kube replace -f -
+
+  kube get deploy istio-pilot -n istio-system -o yaml > deploy_istio_pilot.yaml
+  kube patch deploy istio-pilot -n istio-system -p='{"spec":{"template":{"spec":{"containers":[{
+    "name":"discovery",
+    "image":"gcr.io/gke-release/istio/pilot:1.4.10-gke.12",
+    "env":[{"name":"PILOT_SKIP_VALIDATE_TRUST_DOMAIN","value":"true"}]
+  }]}}}}'
+
+  kube get deploy istio-citadel -n istio-system  -o yaml > deploy_istio_citadel.yaml
+  kube patch deploy istio-citadel -n istio-system  -p='{"spec":{"template":{"spec":{
+    "containers":[{
+      "name":"citadel",
+      "args": ["--append-dns-names=true", "--grpc-port=8060", "--citadel-storage-namespace=istio-system", "--custom-dns-names=istio-pilot-service-account.istio-system:istio-pilot.istio-system", "--monitoring-port=15014", "--self-signed-ca=true", "--workload-cert-ttl=2160h", "--root-cert=/var/run/root-certs/meshca-root.pem"],
+      "volumeMounts": [{"mountPath": "/var/run/root-certs", "name": "meshca-root", "readOnly": true}]
+    }],
+    "volumes": [{"name": "meshca-root", "secret":{"secretName": "meshca-root"}}]
+  }}}}'
+  echo -e "${green}OK${clr}"
+
+  # Wait for Citadel to distribute the cert everywhere. Note: this always takes at least one minute
+  # due to a bug/feature in Citadel causing it to delay provisioning at startup.
+  heading "Waiting for root certificate to distribute to all pods. This will take a few minutes..."
+  for namespace in $(kubectl get namespaces -oname | cut -d/ -f2); do
+    # Check against a portion of the root to see if its been distributed.
+    # Note: this doesn't ensure the workloads have actually hot-restarted to pickup the change.
+    ROOT_CERT="$(kubectl get secret -n "${namespace}" istio.default -ojsonpath='{.data.root-cert\.pem}')"
+    LAST_ERR=$?
+    if [[ "${LAST_ERR}" != 0 ]]; then
+      # Likely namespace was deleted while in progress
+      continue
+    fi
+    while ! echo "${ROOT_CERT}" | base64 -d | grep -q 8zyiCcMm1i2yVVphwE1kczFwunAh0JB896VaXGVxXeKEAMQoXHjgDdCYp8; do
+      echo "ASM root certificate not distributed to ${namespace}, trying again later"
+      sleep 3
+      ROOT_CERT="$(kubectl get secret -n "${namespace}" istio.default -ojsonpath='{.data.root-cert\.pem}')"
+      LAST_ERR=$?
+      if [[ "${LAST_ERR}" != 0 ]]; then
+        # Likely namespace was deleted while in progress
+        continue
+      fi
+    done
+    echo -e "${green}ASM root certificate distributed to namespace ${namespace}${clr}"
+  done
+  # Wait 75 seconds. Kubelet runs a sync loop on a 1 minute interval, so its unlikely to take more than 75s
+  # ideally we have a better wait here, but its hard to do. We can exec in and read the file or hit /certs,
+  # but both would be slow and require a lot of code to write.
+  if [[ "${SKIP_WAIT_FOR_ROOT:-}" == "" ]]; then
+    echo "Waiting for proxies to pick up the new root certificate..."; sleep 15
+    echo "Waiting for proxies to pick up the new root certificate..."; sleep 15
+    echo "Waiting for proxies to pick up the new root certificate..."; sleep 15
+    echo "Waiting for proxies to pick up the new root certificate..."; sleep 15
+    echo "Waiting for proxies to pick up the new root certificate..."; sleep 15
+  fi
+  echo -e "${green}OK${clr}"
+}
+
+rollback_mesh_ca() {
+  heading "Rolling back the changes for Istio addon to trust Anthos Service Mesh"
+  pushd "${TMP_DIR}" > /dev/null
+
+  if [[ -f "deploy_istio_citadel.yaml" ]]; then
+    prompt "Applying contents of deploy_istio_citadel.yaml on cluster"
+    kube apply -f deploy_istio_citadel.yaml
+  fi
+  
+  if [[ -f "deploy_istio_pilot.yaml" ]]; then
+    prompt "Applying contents of deploy_istio_pilot.yaml on cluster"
+    kube apply -f deploy_istio_pilot.yaml
+  fi
+
+  if [[ -f "cm_istio.yaml" ]]; then
+    prompt "Applying content of cm_istio.yaml on cluster"
+    kube apply -f deploy_cm_istio.yaml
+  fi
+
+  kube delete secret meschca-root -n istio-system --ignore-not-found
+  popd > /dev/null
+}
+
+disable_galley_webhook() {
+  prompt "Replacing the Istio validation webhook with an Anthos Service Mesh validation webhook..."
+  kube patch clusterrole -n istio-system istio-galley-istio-system --type='json' -p='[{"op": "replace", "path": "/rules/2/verbs/0", "value": "get"}]'
+  kube delete ValidatingWebhookConfiguration istio-galley --ignore-not-found
+  echo -e "${green}OK${clr}"
+}
+
+enable_galley_webhook() {
+  prompt "Re-enabling the Istio validating webhook:"
+  kubectl patch clusterrole -n istio-system istio-galley-istio-system --type='json' -p='[{"op": "replace", "path": "/rules/2/verbs/0", "value": '\''*'\''}]'
+  # ValidatingWebhookConfiguration not re-installed
+  echo "OK"
+}
+
+replace_gateway() {
+  prompt "Replacing the ingress gateway with an Anthos Service Mesh gateway..."
+  kube label namespace istio-system istio-injection- istio.io/rev- --overwrite
+  cat <<EOF | kube apply -f -
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: asm-ingressgateway
+  namespace: istio-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: asm-ingressgateway
+  namespace: istio-system
+spec:
+  selector:
+    matchLabels:
+      app: istio-ingressgateway
+      istio: ingressgateway
+  template:
+    metadata:
+      annotations:
+        inject.istio.io/templates: gateway
+      labels:
+        # Labels must match the istio-system Service
+        istio: ingressgateway
+        app: istio-ingressgateway
+        release: istio
+        istio.io/rev: asm-managed
+    spec:
+      serviceAccountName: asm-ingressgateway
+      containers:
+      - name: istio-proxy
+        image: auto
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: asm-ingressgateway
+  namespace: istio-system
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: asm-ingressgateway
+  namespace: istio-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: asm-ingressgateway
+subjects:
+- kind: ServiceAccount
+  name: asm-ingressgateway
+EOF
+  kube wait --for=condition=available --timeout=600s deployment/asm-ingressgateway -n istio-system
+  kube -n istio-system patch hpa istio-ingressgateway --patch '{"spec":{"minReplicas":1}}'
+  kube -n istio-system scale deployment istio-ingressgateway --replicas=0
+  echo -e "${green}OK${clr}"
+}
+
+rollback_gateway() {
+  # pending
+  true
+}
+
+replace_webhook() {
+  prompt "Configuring sidecar injection to use Anthos Service Mesh by default..."
+  kube patch mutatingwebhookconfigurations istio-sidecar-injector --type=json -p='[{"op": "replace", "path": "/webhooks"}]'
+  istioctl x revision tag set default --revision=asm-managed --overwrite
+  echo -e "${green}OK${clr}"
+}
+
+write_marker() {
+  heading "Current migration state: ${1}"
+  cat <<EOF | kube apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: asm-addon-migration-state
+  namespace: istio-system
+data:
+  migrationStatus: ${1}
+EOF
+}
+
+download_and_install_migration_tool () {
+  if [[ ! -f "${TMP_DIR}/convert" ]]; then
+    heading "Installing the authentication CR migration tool..."
+    pushd "${TMP_DIR}" > /dev/null
+    curl -L -s https://github.com/istio-ecosystem/security-policy-migrate/releases/latest/download/convert.tar.gz | tar xz
+    chmod +x convert
+    popd > /dev/null
+    echo -e "${green}OK${clr}"
+  fi
+}
+
+migrate_configs() {
+  download_and_install_migration_tool
+
+  heading "Converting authentication CRs..."
+  pushd "${TMP_DIR}" > /dev/null
+  ./convert >| beta-policy.yaml
+  kube apply --dry-run=client -f beta-policy.yaml
+  prompt "Applying converted security policies in ${TMP_DIR}/beta-policy.yaml..."
+  kube apply  -f beta-policy.yaml
+  popd > /dev/null
+  echo -e "${green}OK${clr}"
+
+  # Migration of other configs if needed
+}
+
+incompatible_check() {
+
+  download_and_install_migration_tool
+
+  local LAST_ERR;
+  heading "Checking for incompatible configurations..."
+
+  # EnvoyFilter
+  local FILTERS
+  FILTERS=$(kube get envoyfilter -A -l 'operator.istio.io/component!=Pilot')
+  if [[ "${FILTERS}" != "" ]]; then
+    prompt_unsupported "Detected unsupported EnvoyFilters. These will not work with Anthos Service Mesh:" "${FILTERS}"
+  fi
+
+  # Plugin Cert
+  local PLUGINCERT
+  PLUGINCERT=$(kube get secret cacerts -n istio-system --ignore-not-found)
+  if [[ "${PLUGINCERT}" != "" ]]; then
+    prompt_unsupported "Detected custom plugin cert" "The plugin certs will not be migrated to ASM.."
+  fi
+
+  # Security Policies
+  set +e
+  pushd "${TMP_DIR}" > /dev/null
+  local MIGRATION_ERR; MIGRATION_ERR=$(./convert 2>&1)
+  LAST_ERR=$?
+  if [[ "${LAST_ERR}" != "0" ]]; then
+    popd > /dev/null
+    prompt_unsupported "Detected security policies that could not be migrated" "encountered error ${MIGRATION_ERR}"
+  fi
+  popd > /dev/null
+  set -e
+
+  # Incompatible networking policies
+  local VIRTUALSERVICES
+  VIRTUALSERVICES="$(kube get virtualservices --all-namespaces -o json)"
+  if grep -q "appendHeaders" <<< "${VIRTUALSERVICES}" ; then
+    prompt_unsupported "Detected possibly incompatible virtualService config" "appendHeader attribute is no longer supported"
+  fi
+  if grep -q "websocketUpgrade" <<< "${VIRTUALSERVICES}" ; then
+    prompt_unsupported "Detected possibly incompatible virtualservice config" "websocketUpgrade attribute is no longer supported"
+  fi
+  if grep -q "abort\.percent" <<< "${VIRTUALSERVICES}" ; then
+    prompt_unsupported "Detected possibly incompatible virtualservice config" "abort.percent attribute is no longer supported"
+  fi
+
+  # Incompatible gateway policies Pending
+
+  # Incompatible mixer policies
+
+}
+
+print_restart_instructions() {
+  echo
+  echo "The migration completed successfully. Now, please perform the following steps:"
+  echo
+  echo "1. Restart all workloads in Istio-enabled namespaces to update the sidecar proxies to the new version."
+  echo
+  echo "2. Any manually injected proxies must also be re-injected manually at this point."
+}
+
+cleanup() {
+  # TODO: ensure migration is complete, nothing is using addon, and the addon is not installed before proceeding
+  heading "Cleaning up old resources..."
+  STATE="$(kube get cm -n istio-system asm-addon-migration-state -ojsonpath='{.data.migrationStatus}' || true)"
+  if [[ "${STATE}" != "COMPLETE" ]]; then
+    die "Migration must be completed before --cleanup can run"
+  fi
+  found=()
+  for rs in "${CLEANUP_RESOURCES[@]}"; do
+    kind="$(echo "${rs}" | cut -d/ -f1)"
+    name="$(echo "${rs}" | cut -d/ -f2)"
+    ns="$(echo "${rs}" | cut -d/ -f3)"
+    if [[ "${ns}" == "" ]]; then
+      RESP="$(kubectl --context="${CONTEXT}" get "${kind}" "${name}" --ignore-not-found -oname)"
+    else
+      RESP="$(kubectl --context="${CONTEXT}" get "${kind}" "${name}" -n "${ns}" --ignore-not-found -oname)"
+    fi
+    if [[ "${RESP}" != "" ]]; then
+      echo "Will delete ${kind}/${name}.${ns}"
+      found+=("${rs}")
+    fi
+  done
+  prompt "Deleting resources listed above..."
+  for rs in "${found[@]}"; do
+    kind="$(echo "${rs}" | cut -d/ -f1)"
+    name="$(echo "${rs}" | cut -d/ -f2)"
+    ns="$(echo "${rs}" | cut -d/ -f3)"
+    if [[ "${ns}" == "" ]]; then
+      kube delete "${kind}" "${name}" --ignore-not-found
+    else
+      kube delete "${kind}" "${name}" -n "${ns}" --ignore-not-found
+    fi
+  done
+  kube delete -n istio-system jobs -lk8s-app=istio,app=security
+}
+
+fn_exists() { declare -F "$1" > /dev/null; }
+
+main_run() {
+  check_prerequisites
+  print_intro
+  incompatible_check
+  disable_galley_webhook
+  migrate_configs
+  if [[ -n $ZERO_DOWNTIME ]]; then
+    configure_mesh_ca
+  fi
+  replace_gateway
+  write_marker "COMPLETE"
+  print_restart_instructions
+}
+
+while (( "$#" )); do
+    PARAM="$1"
+    case "${PARAM}" in
+        -h | --help)
+            usage
+            exit
+            ;;
+        --context)
+            CONTEXT=${2?"--context requires a parameter"}
+            readonly CONTEXT
+            shift
+            ;;
+        -y | --skip-confirm)
+            SKIP_CONFIRM=true
+            readonly SKIP_CONFIRM
+            ;;
+        --command)
+            SUB_FUNCTION=true
+            readonly SUB_FUNCTION
+            if fn_exists "$2" ; then
+              $2 "${@:3}"
+            else
+              echo "Invalid command"
+            fi
+            exit 0
+            ;;
+        -z | --zero_downtime)
+            ZERO_DOWNTIME=true
+            readonly ZERO_DOWNTIME
+            ;;
+        *)
+            echo "ERROR: unknown parameter \"$PARAM\""
+            usage
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+if [[ -z $SUB_FUNCTION ]]; then
+  main_run
+fi
