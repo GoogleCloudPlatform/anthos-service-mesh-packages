@@ -2692,10 +2692,6 @@ install_managed_components() {
   info "Configuring ASM managed control plane validating webhook config..."
   kubectl apply -f "${MANAGED_WEBHOOKS}"
 
-  info "Configuring ASM managed control plane components..."
-  print_config >| managed_control_plane_gateway.yaml
-
-
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
     install_canonical_controller
   fi
@@ -2738,9 +2734,6 @@ outro() {
     info "${OUTPUT_DIR}/${RAW_YAML}"
     info "The full, expanded set of kubernetes resources can be found at:"
     info "${OUTPUT_DIR}/${EXPANDED_YAML}"
-  else
-    info "You can find the gateway config to install with istioctl here:"
-    info "${OUTPUT_DIR}/managed_control_plane_gateway.yaml"
   fi
 
   info "$(starline)"
