@@ -1361,6 +1361,7 @@ auth_service_account() {
 #######
 # set_up_local_workspace does everything that the script needs to avoid
 # polluting the environment or current working directory
+# just a test
 #######
 set_up_local_workspace() {
   info "Setting up necessary files..."
