@@ -126,7 +126,6 @@ HUB_IDP_URL=""
 HUB_MEMBERSHIP_ID=""
 CUSTOM_REVISION=0
 WI_ENABLED=0
-NETWORK_POLICY_ENABLED=0
 HAS_TS=0
 
 main() {
@@ -187,15 +186,9 @@ main() {
     if can_modify_gcp_components; then
       enable_workload_identity
       enable_stackdriver_kubernetes
-      if is_mcp_cni; then
-        enable_network_policy
-      fi
     else
       exit_if_no_workload_identity
       exit_if_stackdriver_not_enabled
-      if is_mcp_cni; then
-        exit_if_no_network_policy
-      fi
     fi
     if can_modify_gcp_iam_roles; then
       bind_user_to_iam_policy "roles/meshconfig.admin" "$(local_iam_user)"
@@ -531,10 +524,6 @@ starline() {
 
 is_managed() {
   if [[ "${MANAGED}" -ne 1 ]]; then false; fi
-}
-
-is_mcp_cni() {
-  if [[ "${USE_MCP_CNI}" -ne 1 ]]; then false; fi
 }
 
 is_sa() {
@@ -2242,20 +2231,6 @@ is_workload_identity_enabled() {
   if [[ "${ENABLED}" = 'null' ]]; then false; else WI_ENABLED=1; fi
 }
 
-is_network_policy_enabled() {
-  if [[ "${NETWORK_POLICY_ENABLED}" -eq 1 ]]; then return; fi
-
-  local ENABLED
-  ENABLED="$(gcloud container clusters describe \
-    --project="${PROJECT_ID}" \
-    --region "${CLUSTER_LOCATION}" \
-    "${CLUSTER_NAME}" \
-    --format=json | \
-    jq .networkPolicy.enabled)"
-
-  if [[ "${ENABLED}" = 'false' ]]; then false; else NETWORK_POLICY_ENABLED=1; fi
-}
-
 is_membership_crd_installed() {
   if ! kubectl api-resources --api-group=hub.gke.io | grep -q memberships; then
     false
@@ -2276,22 +2251,6 @@ populate_environ_info() {
   HUB_IDP_URL="$(kubectl get memberships.hub.gke.io membership -o=jsonpath='{.spec.identity_provider}')"
 }
 
-enable_network_policy(){
-  if is_network_policy_enabled; then return; fi
-  info "Enabling Network Policy on ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
-  info "(This could take awhile, up to 10 minutes)"
-  retry 2 gcloud container clusters update "${CLUSTER_NAME}" \
-    --project="${PROJECT_ID}" \
-    --zone="${CLUSTER_LOCATION}" \
-    --update-addons=NetworkPolicy=ENABLED
-
-  retry 2 gcloud container clusters update "${CLUSTER_NAME}" \
-    --project="${PROJECT_ID}" \
-    --zone="${CLUSTER_LOCATION}" \
-    --quiet \
-    --enable-network-policy
-}
-
 enable_workload_identity(){
   if is_workload_identity_enabled; then return; fi
   info "Enabling Workload Identity on ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
@@ -2306,17 +2265,6 @@ exit_if_no_workload_identity() {
   if ! is_workload_identity_enabled; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Workload identity is not enabled on ${CLUSTER_NAME}. Please enable it and
-retry, or run the script with the '--enable_gcp_components' flag to allow
-the script to enable it on your behalf.
-$(enable_common_message)
-EOF
-  fi
-}
-
-exit_if_no_network_policy() {
-  if ! is_network_policy_enabled; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-Network Policy is not enabled on ${CLUSTER_NAME}. Please enable it and
 retry, or run the script with the '--enable_gcp_components' flag to allow
 the script to enable it on your behalf.
 $(enable_common_message)
