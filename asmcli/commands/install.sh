@@ -35,14 +35,19 @@ install() {
 }
 
 install_managed_components() {
+  info "Configuring ASM managed control plane revision CRD..."
+  context_append-kube-yaml "${CRD_CONTROL_PLANE_REVISION}"
+
   info "Configuring base installation for managed control plane..."
   context_append-kube-yaml "${BASE_REL_PATH}"
 
   info "Configuring ASM managed control plane validating webhook config..."
   context_append-kube-yaml "${MANAGED_WEBHOOKS}"
 
-  info "Configuring ASM managed control plane components..."
-  print_config >| managed_control_plane_gateway.yaml
+  info "Configuring ASM managed control plane revision CR for channels..."
+  context_append-kube-yaml "${CR_CONTROL_PLANE_REVISION_REGULAR}"
+  context_append-kube-yaml "${CR_CONTROL_PLANE_REVISION_RAPID}"
+  context_append-kube-yaml "${CR_CONTROL_PLANE_REVISION_STABLE}"
 }
 
 scrape_managed_urls() {
@@ -153,6 +158,7 @@ apply_kube_yamls() {
   for yaml_file in $(context_list-kube-yamls); do
     info "Applying ${yaml_file}..."
     retry 3 kubectl apply --overwrite=true -f "${yaml_file}"
+    sleep 2
   done
 }
 
@@ -198,9 +204,6 @@ outro() {
     info "${OUTPUT_DIR}/${RAW_YAML}"
     info "The full, expanded set of kubernetes resources can be found at:"
     info "${OUTPUT_DIR}/${EXPANDED_YAML}"
-  else
-    info "You can find the gateway config to install with istioctl here:"
-    info "${OUTPUT_DIR}/managed_control_plane_gateway.yaml"
   fi
 
   info "$(starline)"

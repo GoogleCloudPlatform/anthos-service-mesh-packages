@@ -1,0 +1,23 @@
+---
+apiVersion: mesh.cloud.google.com/v1alpha1
+kind: ControlPlaneRevision
+metadata:
+  name: asm-managed-rapid
+  namespace: istio-system
+spec:
+  type: managed_service
+  channel: rapid
+status:
+  conditions:
+    - message: The provisioning process has completed successfully
+      reason: Provisioned
+      status: true
+      type: Reconciled
+    - message: Provisioning has finished
+      reason: ProvisioningFinished
+      status: true
+      type: ProvisioningFinished
+    - message: Provisioning has not stalled
+      reason: NotStalled
+      status: false
+      type: Stalled

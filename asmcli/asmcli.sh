@@ -50,6 +50,11 @@ MANAGED_WEBHOOKS=""
 EXPOSE_ISTIOD_SERVICE=""
 CANONICAL_CONTROLLER_MANIFEST=""
 
+CRD_CONTROL_PLANE_REVISION=""
+CR_CONTROL_PLANE_REVISION_REGULAR=""
+CR_CONTROL_PLANE_REVISION_RAPID=""
+CR_CONTROL_PLANE_REVISION_STABLE=""
+
 SCRIPT_NAME="${0##*/}"; readonly SCRIPT_NAME
 
 PROJECT_NUMBER=""
@@ -175,6 +180,11 @@ init() {
   ASM_VERSION_FILE=".asm_version"; readonly ASM_VERSION_FILE;
   RAW_YAML="${REVISION_LABEL}-manifest-raw.yaml"; readonly RAW_YAML;
   EXPANDED_YAML="${REVISION_LABEL}-manifest-expanded.yaml"; readonly EXPANDED_YAML;
+
+  CRD_CONTROL_PLANE_REVISION="asm/control-plane-revision/crd.yaml"; readonly CRD_CONTROL_PLANE_REVISION;
+  CR_CONTROL_PLANE_REVISION_REGULAR="asm/control-plane-revision/cr_regular.yaml"; readonly CR_CONTROL_PLANE_REVISION_REGULAR;
+  CR_CONTROL_PLANE_REVISION_RAPID="asm/control-plane-revision/cr_rapid.yaml"; readonly CR_CONTROL_PLANE_REVISION_RAPID;
+  CR_CONTROL_PLANE_REVISION_STABLE="asm/control-plane-revision/cr_stable.yaml"; readonly CR_CONTROL_PLANE_REVISION_STABLE;
 
   AKUBECTL="$(which kubectl || true)"; readonly AKUBECTL;
   AGCLOUD="$(which gcloud || true)"; readonly AGCLOUD;
