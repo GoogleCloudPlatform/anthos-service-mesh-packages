@@ -2460,9 +2460,15 @@ configure_package() {
   fi
 
   if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
-    kpt cfg set asm gcloud.project.environProjectID "${ENVIRON_PROJECT_ID}"
-    kpt cfg set asm anthos.servicemesh.hubMembershipID "${HUB_MEMBERSHIP_ID}"
-    kpt cfg set asm anthos.servicemesh.hub-idp-url "${HUB_IDP_URL}"
+    # VM installation uses the latest Hub WIP format
+    if [[ "${USE_VM}" -eq 1 ]]; then
+      kpt cfg set asm anthos.servicemesh.hubTrustDomain "${ENVIRON_PROJECT_ID}.svc.id.goog"
+      kpt cfg set asm anthos.servicemesh.hub-idp-url "${HUB_IDP_URL}"
+    # GKE-on-GCP installation uses legacy Hub WIP format to be consistent with GCP Hub public preview feature
+    else
+      kpt cfg set asm anthos.servicemesh.hubTrustDomain "${ENVIRON_PROJECT_ID}.hub.id.goog"
+      kpt cfg set asm anthos.servicemesh.hub-idp-url "https://gkehub.googleapis.com/projects/${ENVIRON_PROJECT_ID}/locations/global/memberships/${HUB_MEMBERSHIP_ID}"
+    fi
   fi
   if [[ -n "${CA_NAME}" && "${CA}" = "gcp_cas" ]]; then
     kpt cfg set asm anthos.servicemesh.external_ca.ca_name "${CA_NAME}"
