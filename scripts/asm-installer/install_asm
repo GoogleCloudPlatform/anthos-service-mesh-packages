@@ -2468,6 +2468,12 @@ configure_package() {
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${REVISION_LABEL}"
   fi
 
+  if [[ "${CA}" == "mesh_ca" ]]; then
+    # set the trust domain aliases to include both new Hub WIP and old Hub WIP to achieve no downtime upgrade.
+    TRUST_DOMAIN_ALIASES="${PROJECT_ID}.svc.id.goog ${PROJECT_ID}.hub.id.goog"
+    run eval kpt cfg set asm anthos.servicemesh.trustDomainAliases "${TRUST_DOMAIN_ALIASES}"
+  fi
+
   if [[ "${CA}" == "mesh_ca" && -n "${_CI_TRUSTED_GCP_PROJECTS}" ]]; then
     # Gather the trust domain aliases from projects.
     TRUST_DOMAIN_ALIASES="${PROJECT_ID}.svc.id.goog"
