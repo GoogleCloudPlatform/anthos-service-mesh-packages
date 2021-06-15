@@ -905,25 +905,25 @@ verify_instance_template() {
     --project "${PROJECT_ID}" --format=json | \
     jq -r '.properties.metadata.items[] | select(.key == "gce-service-proxy").value')"
 
-  if [[ "$(echo "${SERVICE_PROXY_CONFIG}" | jq -r '."asm-config".proxyMetadata."POD_NAMESPACE"')" \
+  if [[ "$(echo "${SERVICE_PROXY_CONFIG}" | jq -r '."asm-env"."POD_NAMESPACE"')" \
     != "${LT_NAMESPACE}" ]]; then
     fail "Instance template created does not set the workload namespace to ${LT_NAMESPACE}."
     return 1
   fi
 
-  if [[ "$(echo "${SERVICE_PROXY_CONFIG}" | jq -r '."asm-config".proxyMetadata."ISTIO_META_WORKLOAD_NAME"')" \
+  if [[ "$(echo "${SERVICE_PROXY_CONFIG}" | jq -r '."asm-env"."ISTIO_META_WORKLOAD_NAME"')" \
     != "${WORKLOAD_NAME}" ]]; then
     fail "Instance template created does not set the workload name to ${WORKLOAD_NAME}."
     return 1
   fi
 
-  if [[ "$(echo "${SERVICE_PROXY_CONFIG}" | jq -r '."asm-config".proxyMetadata."CANONICAL_SERVICE"')" \
+  if [[ "$(echo "${SERVICE_PROXY_CONFIG}" | jq -r '."asm-env"."CANONICAL_SERVICE"')" \
     != "${WORKLOAD_NAME}" ]]; then
     fail "Instance template created does not set the canonical service name to ${WORKLOAD_NAME}."
     return 1
   fi
 
-  if [[ "$(echo "${SERVICE_PROXY_CONFIG}" | jq -r '."asm-config".proxyMetadata."SERVICE_ACCOUNT"')" \
+  if [[ "$(echo "${SERVICE_PROXY_CONFIG}" | jq -r '."asm-env"."SERVICE_ACCOUNT"')" \
     != "${WORKLOAD_SERVICE_ACCOUNT}" ]]; then
     fail "Instance template created does not set workload service account to ${WORKLOAD_SERVICE_ACCOUNT}."
     return 1

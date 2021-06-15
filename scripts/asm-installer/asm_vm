@@ -70,7 +70,6 @@ GKE_URL=""
 ENVIRON_PROJECT_ID=""
 CLUSTER_ID=""
 declare -A ASM_REVISIONS
-MESH_CONFIG_NAME=""
 
 ### Workload variables ###
 WORKLOAD_LABELS=""
@@ -668,7 +667,6 @@ validate_dependencies() {
 
   if [[ "${CREATE_GCE_INSTANCE_TEMPLATE}" -eq 1 ]]; then
     validate_workloadgroup
-    validate_revision_mesh_config
     validate_gce_instance_template
     retrieve_cluster_id
   fi
@@ -689,7 +687,6 @@ validate_cli_dependencies() {
 $AGCLOUD
 curl
 jq
-ruby
 tr
 awk
 grep
@@ -1074,26 +1071,6 @@ EOF
   fi
 }
 
-validate_revision_mesh_config() {
-  info "Verifying the mesh config..."
-
-  if [[ "${WORKLOAD_ASM_REVISION}" == "default" ]]; then
-    MESH_CONFIG_NAME="istio"
-  else
-    MESH_CONFIG_NAME="istio-${WORKLOAD_ASM_REVISION}"
-  fi
-  readonly MESH_CONFIG_NAME
-
-  if [ "$(retry 2 kubectl get cm -n istio-system --no-headers \
-    -o custom-columns=":metadata.name" | grep -c "^${MESH_CONFIG_NAME}$" \
-    || true)" -eq 0 ]; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-Unable to find Mesh Config ${MESH_CONFIG_NAME} in your cluster. Please make sure
-Anthos Service Mesh is installed successfully and try again.
-EOF
-  fi
-}
-
 validate_gce_instance_template() {
   local RESULT; RESULT=""
 
@@ -1317,90 +1294,68 @@ EOF
   CREDENTIAL_IDENTITY_PROVIDER="${MEMBERSHIP_UID}@${WORKLOAD_IDENTITY_PROVIDER}@${WORKLOAD_NAMESPACE}"
 }
 
-# A temporary solution to translate yaml to json in shell without relying on yq.
-yaml2json () {
-  # shellcheck disable=SC2016
-  ruby -r yaml -r json -e 'puts YAML.load($stdin.read).to_json'
-}
-
-gen_asm_config() {
-  local MESH_CONFIG
-  MESH_CONFIG=$(retry 2 kubectl get cm "${MESH_CONFIG_NAME}" -n istio-system -ojsonpath='{.data.mesh}' | yaml2json)
-  
-  local ASM_CONFIG
-  ASM_CONFIG=$(echo "${MESH_CONFIG}" | jq -r '.defaultConfig')
-
-  local TRUST_DOMAIN
-  TRUST_DOMAIN=$(echo "${MESH_CONFIG}" | jq -r '.trustDomain')
+# Generate GCE service proxy definition for the instance template
+gen_gce_service_proxy() {
+  local PROXY
 
   local ASM_META_REVISION="${WORKLOAD_ASM_REVISION}"
   if [ "${ASM_META_REVISION}" == "default" ]; then
     ASM_META_REVISION=""
   fi
 
-  local LABELS
-  LABELS=$(jq -n --arg canonical_service "${CANONICAL_SERVICE}" \
-    --arg canonical_revision "${CANONICAL_REVISION}" '{
-  "service.istio.io/canonical-name": $canonical_service,
-  "service.istio.io/canonical-revision": $canonical_revision
-}')
-
-  for label in $(echo "${WORKLOAD_LABELS}" | jq -r '. as $k|keys[]|[., $k[.]]|map(tostring+"=")|add'); do
-    IFS='=' read -r -a pair <<< "${label}"
-    LABELS=$(jq --arg key "${pair[0]}" \
-    --arg value "${pair[1]}" \
-    '.[$key]=$value' <<< "${LABELS}")
-  done
-
-  local ASM_LABELS_STRING
-  ASM_LABELS_STRING=$(jq -sR '' <<< "${LABELS}" | tr -d ' ')
-
-  while read -r -a pair; do
-    ASM_CONFIG=$(jq --arg key "${pair[0]:-}" \
-    --arg value "${pair[1]:-}" \
-    '."proxyMetadata"[$key]=$value' <<< "${ASM_CONFIG}")
-  done <<EOF
-ISTIO_META_WORKLOAD_NAME $WORKLOAD_NAME
-ISTIO_META_MESH_ID proj-$PROJECT_NUMBER
-ISTIO_META_NETWORK $PROJECT_ID-$NETWORK
-ISTIO_META_ISTIO_VERSION $ASM_META_VERSION
-POD_NAMESPACE $WORKLOAD_NAMESPACE
-CANONICAL_SERVICE $CANONICAL_SERVICE
-CANONICAL_REVISION $CANONICAL_REVISION
-USE_TOKEN_FOR_CSR true
-ISTIO_META_DNS_CAPTURE true
-ISTIO_META_AUTO_REGISTER_GROUP $WORKLOAD_NAME
-SERVICE_ACCOUNT $WORKLOAD_SERVICE_ACCOUNT
-CREDENTIAL_IDENTITY_PROVIDER $CREDENTIAL_IDENTITY_PROVIDER
-TRUST_DOMAIN $TRUST_DOMAIN
-ASM_REVISION $ASM_META_REVISION
-EOF
-
-  ASM_CONFIG=$(jq --arg key "ISTIO_METAJSON_LABELS" \
-    --argjson value "${ASM_LABELS_STRING}" \
-    '."proxyMetadata"[$key]=$value' <<< "${ASM_CONFIG}")
-
-  echo "${ASM_CONFIG}"
-}
-
-# Generate GCE service proxy definition for the instance template
-gen_gce_service_proxy() {
-  local ASM_CONFIG
-  ASM_CONFIG=$(gen_asm_config)
-  
-  local PROXY
   PROXY=$(jq -n --arg ingress_ip "${INGRESS_IP}" \
+    --arg project_id "${PROJECT_ID}" \
+    --arg workload_name "${WORKLOAD_NAME}" \
+    --arg canonical_service "${CANONICAL_SERVICE}" \
+    --arg canonical_revision "${CANONICAL_REVISION}" \
+    --arg project_number "${PROJECT_NUMBER}" \
+    --arg workload_namespace "${WORKLOAD_NAMESPACE}" \
+    --arg service_account "${WORKLOAD_SERVICE_ACCOUNT}" \
+    --arg asm_revision "${ASM_META_REVISION}"\
+    --arg credential_identity_provider "${CREDENTIAL_IDENTITY_PROVIDER}" \
     --arg network "${NETWORK}" \
-    --argjson asm_config "${ASM_CONFIG}" '{
+    --arg clusterID "${CLUSTER_ID}" \
+    --arg asm_meta_version "${ASM_META_VERSION}" '{
   "mode": "ON",
   "proxy-spec": {
     "network": $network,
     "api-server" : ($ingress_ip+":15012"),
     "log-level": "info"
   },
-  "asm-config": $asm_config,
+  "labels": {
+    "workload-pool": ($project_id+".svc.id.goog")
+  },
+  "asm-labels": {
+    "service.istio.io/canonical-name": $canonical_service,
+    "service.istio.io/canonical-revision": $canonical_revision
+  },
+  "asm-env": {
+    "ISTIO_META_WORKLOAD_NAME": $workload_name,
+    "ISTIO_META_MESH_ID": ("proj-"+$project_number),
+    "ISTIO_META_CLUSTER_ID": $clusterID,
+    "ISTIO_META_NETWORK": ($project_id+"-"+$network),
+    "ISTIO_META_ISTIO_VERSION": $asm_meta_version,
+    "POD_NAMESPACE": $workload_namespace,
+    "CANONICAL_SERVICE": $canonical_service,
+    "CANONICAL_REVISION": $canonical_revision,
+    "USE_TOKEN_FOR_CSR": "true",
+    "ISTIO_META_DNS_CAPTURE": "true",
+    "ISTIO_META_AUTO_REGISTER_GROUP": $workload_name,
+    "SERVICE_ACCOUNT": $service_account,
+    "CREDENTIAL_IDENTITY_PROVIDER": $credential_identity_provider,
+    "ASM_REVISION": $asm_revision
+  },
   "service": {}
 }')
+
+  # Append each workload label pair into asm_labels field of GCE_SERVICE_PROXY
+  # as a valid JSON object.
+  for label in $(echo "${WORKLOAD_LABELS}" | jq -r '. as $k|keys[]|[., $k[.]]|map(tostring+"=")|add'); do
+    IFS='=' read -r -a pair <<< "${label}"
+    PROXY=$(jq --arg key "${pair[0]}" \
+    --arg value "${pair[1]}" \
+    '."asm-labels"[$key]=$value' <<< "${PROXY}")
+  done
 
   echo "${PROXY}"
 }
