@@ -102,6 +102,10 @@ main() {
       shift 1
       print-config_subcommand "${@}"
       ;;
+    add-to-mesh)
+      shift 1
+      add-to-mesh_subcommand "${@}"
+      ;;
     *)
       help_subcommand "${@}"
       ;;

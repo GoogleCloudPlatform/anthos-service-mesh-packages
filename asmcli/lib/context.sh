@@ -49,7 +49,9 @@ context_init() {
     "WI_ENABLED": ${WI_ENABLED:-0}
   },
   "istioctlFiles": [],
-  "kubectlFiles": []
+  "kubectlFiles": [],
+  "clustersInfo": [],
+  "clusterRegistrations": []
 }
 EOF
 )
@@ -100,4 +102,28 @@ context_append-kube-yaml() {
 
 context_list-kube-yamls() {
   jq -S -r '.kubectlFiles[]' "${context_FILE_LOCATION}"
+}
+
+context_append-clusters-info() {
+  local CLUSTER; CLUSTER="${1}"
+  local TEMP_FILE; TEMP_FILE="$(mktemp)"
+
+  jq -S --arg CLUSTER "${CLUSTER}" '.clustersInfo += [$CLUSTER]' "${context_FILE_LOCATION}" >| "${TEMP_FILE}" \
+  && mv "${TEMP_FILE}" "${context_FILE_LOCATION}"
+}
+
+context_list-clusters-info() {
+  jq -S -r '.clustersInfo[]' "${context_FILE_LOCATION}"
+}
+
+context_append-cluster-registrations() {
+  local CLUSTER; CLUSTER="${1}"
+  local TEMP_FILE; TEMP_FILE="$(mktemp)"
+
+  jq -S --arg CLUSTER "${CLUSTER}" '.clusterRegistrations += [$CLUSTER]' "${context_FILE_LOCATION}" >| "${TEMP_FILE}" \
+  && mv "${TEMP_FILE}" "${context_FILE_LOCATION}"
+}
+
+context_list-cluster-registrations() {
+  jq -S -r '.clusterRegistrations[]' "${context_FILE_LOCATION}"
 }

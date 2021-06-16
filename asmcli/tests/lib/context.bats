@@ -70,6 +70,39 @@ teardown() {
   assert_output "kube-1.yaml"
 }
 
+@test "CONTEXT: test context_FILE_LOCATION append a cluster info" {
+  run context_list-clusters-info
+  assert_output ""
+
+  run context_append-clusters-info "my-project us-central1-c my-cluster"
+  assert_success
+
+  local PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME
+  read -r PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
+$(context_list-clusters-info)
+EOF
+  assert_equal "${PROJECT_ID}" "my-project"
+  assert_equal "${CLUSTER_LOCATION}" "us-central1-c"
+  assert_equal "${CLUSTER_NAME}" "my-cluster"
+}
+
+@test "CONTEXT: test context_FILE_LOCATION append a cluster registration" {
+  run context_list-cluster-registrations
+  assert_output ""
+
+  run context_append-cluster-registrations "my-project us-central1-c my-cluster https://container.googleapis.com/v1/projects/my-project/locations/us-central1-c/clusters/my-cluster"
+  assert_success
+
+  local PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME GKE_CLUSTER_URI
+  read -r PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME GKE_CLUSTER_URI <<EOF
+$(context_list-cluster-registrations)
+EOF
+  assert_equal "${PROJECT_ID}" "my-project"
+  assert_equal "${CLUSTER_LOCATION}" "us-central1-c"
+  assert_equal "${CLUSTER_NAME}" "my-cluster"
+  assert_equal "${GKE_CLUSTER_URI}" "https://container.googleapis.com/v1/projects/my-project/locations/us-central1-c/clusters/my-cluster"
+}
+
 @test "CONTEXT: test context_FILE_LOCATION append multiple istioctl files" {
   run context_list-istio-yamls
   assert_output ""
@@ -90,7 +123,7 @@ istio-2.yaml
 EOF
 }
 
-@test "CONTEXT: test context_FILE_LOCATION append kubectl files" {
+@test "CONTEXT: test context_FILE_LOCATION append multiple kubectl files" {
   run context_list-kube-yamls
   assert_output ""
 
@@ -107,6 +140,62 @@ EOF
   assert_output --stdin <<EOF
 kube-1.yaml
 kube-2.yaml
+EOF
+}
+
+@test "CONTEXT: test context_FILE_LOCATION append multiple clusters info" {
+  run context_list-clusters-info
+  assert_output ""
+
+  run context_append-clusters-info "my-project us-central1-c my-cluster"
+  assert_success
+  
+  local PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME
+  read -r PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
+$(context_list-clusters-info)
+EOF
+  assert_equal "${PROJECT_ID}" "my-project"
+  assert_equal "${CLUSTER_LOCATION}" "us-central1-c"
+  assert_equal "${CLUSTER_NAME}" "my-cluster"
+
+  run context_append-clusters-info "my-project us-central1-c my-cluster"
+  assert_success
+
+  while read -r PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME; do
+    assert_equal "${PROJECT_ID}" "my-project"
+    assert_equal "${CLUSTER_LOCATION}" "us-central1-c"
+    assert_equal "${CLUSTER_NAME}" "my-cluster"
+  done <<EOF
+$(context_list-clusters-info)
+EOF
+}
+
+@test "CONTEXT: test context_FILE_LOCATION append multiple cluster registrations" {
+  run context_list-cluster-registrations
+  assert_output ""
+
+  run context_append-cluster-registrations "my-project us-central1-c my-cluster https://container.googleapis.com/v1/projects/my-project/locations/us-central1-c/clusters/my-cluster"
+  assert_success
+
+  local PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME GKE_CLUSTER_URI
+  read -r PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME GKE_CLUSTER_URI <<EOF
+$(context_list-cluster-registrations)
+EOF
+  assert_equal "${PROJECT_ID}" "my-project"
+  assert_equal "${CLUSTER_LOCATION}" "us-central1-c"
+  assert_equal "${CLUSTER_NAME}" "my-cluster"
+  assert_equal "${GKE_CLUSTER_URI}" "https://container.googleapis.com/v1/projects/my-project/locations/us-central1-c/clusters/my-cluster"
+
+  run context_append-cluster-registrations "my-project us-central1-c my-cluster https://container.googleapis.com/v1/projects/my-project/locations/us-central1-c/clusters/my-cluster"
+  assert_success
+
+  while read -r PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME GKE_CLUSTER_URI; do
+    assert_equal "${PROJECT_ID}" "my-project"
+    assert_equal "${CLUSTER_LOCATION}" "us-central1-c"
+    assert_equal "${CLUSTER_NAME}" "my-cluster"
+    assert_equal "${GKE_CLUSTER_URI}" "https://container.googleapis.com/v1/projects/my-project/locations/us-central1-c/clusters/my-cluster"
+  done <<EOF
+$(context_list-cluster-registrations)
 EOF
 }
 

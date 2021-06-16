@@ -1,0 +1,45 @@
+#!/bin/bash
+set -CeEu
+set -o pipefail
+
+SPATH="$(readlink -f "$0")"
+SDIR="$(dirname "${SPATH}")"; export SDIR;
+SCRIPT_NAME="${0##*/}"
+
+# shellcheck source=common.sh
+. "${SDIR}/common.sh"
+
+cd "${SDIR}"
+
+main() {
+  # CLI setup
+  parse_args "$@"
+
+  local COUNT; COUNT=1
+  trap 'clean_up_clusters "${COUNT}"' ERR
+
+  set_up_clusters "${COUNT}"
+
+  local ARGS; ARGS="add-to-mesh ${PROJECT_ID}"
+  for (( i=1; i<=$COUNT; i++ )); do
+    ARGS="${ARGS} ${PROJECT_ID}/${CLUSTER_LOCATION}/add-to-mesh-cluster-${i}"
+  done
+  run_add_to_mesh_test ${ARGS}
+  clean_up_clusters "${COUNT}"
+}
+
+set_up_clusters() {
+  local COUNT; COUNT="${1}"
+  for (( i=1; i<=$COUNT; i++ )); do
+    gcloud container clusters create add-to-mesh-cluster-"${i}" --project "${PROJECT_ID}" --zone "${CLUSTER_LOCATION}" --workload-pool="${PROJECT_ID}".svc.id.goog
+  done
+}
+
+clean_up_clusters() {
+  local COUNT; COUNT="${1}"
+  for (( i=1; i<=$COUNT; i++ )); do
+    gcloud container clusters delete add-to-mesh-cluster-"${i}" --project "${PROJECT_ID}" --zone "${CLUSTER_LOCATION}"
+  done
+}
+
+main "$@"
