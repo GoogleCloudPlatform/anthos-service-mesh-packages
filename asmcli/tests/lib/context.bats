@@ -15,7 +15,7 @@ teardown() {
   echo "Cleaned up"
 }
 
-@test "test context_FILE_LOCATION initialized with environment variables" {
+@test "CONTEXT: test context_FILE_LOCATION initialized with environment variables" {
   run context_get-option "PROJECT_ID"
   assert_output "${PROJECT_ID}"
 
@@ -26,7 +26,7 @@ teardown() {
   assert_output "${CLUSTER_LOCATION}"
 }
 
-@test "test context_FILE_LOCATION getter and setter on numeric values" {
+@test "CONTEXT: test context_FILE_LOCATION getter and setter on numeric values" {
   run context_get-option "ENABLE_ALL"
   assert_output 0
 
@@ -37,7 +37,7 @@ teardown() {
   assert_output 1
 }
 
-@test "test context_FILE_LOCATION getter and setter on string values" {
+@test "CONTEXT: test context_FILE_LOCATION getter and setter on string values" {
   run context_get-option "CA"
   assert_output ""
 
@@ -48,7 +48,7 @@ teardown() {
   assert_output "meshca"
 }
 
-@test "test context_FILE_LOCATION append a istioctl file" {
+@test "CONTEXT: test context_FILE_LOCATION append a istioctl file" {
   run context_list-istio-yamls
   assert_output ""
 
@@ -59,7 +59,7 @@ teardown() {
   assert_output "istio-1.yaml"
 }
 
-@test "test context_FILE_LOCATION append a kubectl file" {
+@test "CONTEXT: test context_FILE_LOCATION append a kubectl file" {
   run context_list-kube-yamls
   assert_output ""
 
@@ -70,7 +70,7 @@ teardown() {
   assert_output "kube-1.yaml"
 }
 
-@test "test context_FILE_LOCATION append multiple istioctl files" {
+@test "CONTEXT: test context_FILE_LOCATION append multiple istioctl files" {
   run context_list-istio-yamls
   assert_output ""
 
@@ -90,7 +90,7 @@ istio-2.yaml
 EOF
 }
 
-@test "test context_FILE_LOCATION append kubectl files" {
+@test "CONTEXT: test context_FILE_LOCATION append kubectl files" {
   run context_list-kube-yamls
   assert_output ""
 
@@ -110,14 +110,14 @@ kube-2.yaml
 EOF
 }
 
-@test "test missing values in non-interactive mode will fail fast" {
+@test "CONTEXT: test missing values in non-interactive mode will fail fast" {
   context_set-option "NON_INTERACTIVE" 1
   run has_value "FLEET_ID"
   assert_failure
   context_set-option "NON_INTERACTIVE" 0
 }
 
-@test "test not-missing values in non-interactive mode will succeed" {
+@test "CONTEXT: test not-missing values in non-interactive mode will succeed" {
   context_set-option "NON_INTERACTIVE" 1
   run has_value "PROJECT_ID"
   assert_success
