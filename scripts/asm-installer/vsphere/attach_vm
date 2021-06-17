@@ -18,7 +18,6 @@ main() {
   echo " "
   echo "[Step 2] Register VM with WorkloadGroup at namespace: ${VM_NAMESPACE}"
   create_workloadgroup
-  create_workloadentry
 
   echo " "
   #echo "============================================="
@@ -85,8 +84,6 @@ prepare_vm() {
   cd ${WORK_DIR}
 
   scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no runagent.sh root@${VM_IP}:~
-#  scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no istio-sidecar.rpm root@${VM_IP}:~
-#  scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no server root@${VM_IP}:~
 
   cd ${OUTPUT_DIR}/vm-${VM_APP}
 }
@@ -109,28 +106,6 @@ spec:
 EOF
 
   kubectl --namespace "${VM_NAMESPACE}" apply -f workloadgroup.yaml
-}
-
-# create k8s service for demo purpose
-create_workloadentry() {
-  cat <<EOF >k8sservice.yaml
-  apiVersion: v1
-  kind: Service
-  metadata:
-    name: "${VM_APP}"
-    namespace: "${VM_NAMESPACE}"
-    labels:
-      asm_resource_type: VM
-  spec:
-    ports:
-    - port: 8080
-      name: http
-      targetPort: 8080
-    selector:
-      service.istio.io/canonical-name: "${VM_APP}"
-EOF
-
-  kubectl --namespace "${VM_NAMESPACE}" apply -f k8sservice.yaml
 }
 
 configure_vm_transfer_file() {

@@ -27,10 +27,4 @@ sudo chown -R istio-proxy /var/lib/istio /etc/certs /etc/istio/proxy /etc/istio/
 
 sudo systemctl start istio
 
-# Start echo server
-if ! pidof echo > /dev/null; then
-  mv server echo
-  nohup ./echo &> /dev/null &
-fi
-
 exit
