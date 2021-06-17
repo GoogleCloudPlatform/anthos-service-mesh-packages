@@ -7,8 +7,6 @@ metadata:
 spec:
   type: managed_service
   channel: regular
-  managedDataPlane:
-    enabled: false
 status:
   conditions:
     - message: The provisioning process has completed successfully

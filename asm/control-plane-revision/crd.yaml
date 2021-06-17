@@ -43,14 +43,6 @@ spec:
                 - rapid
                 - stable
               type: string
-            managedDataPlane:
-              description: ManagedDataPlane describes how the dataplane is managed
-                for this revision.
-              properties:
-                enabled:
-                  description: Enabled turns on dataplane management for the revision.
-                  type: boolean
-              type: object
             type:
               description: ControlPlaneRevisionType determines how the revision should
                 be managed.
