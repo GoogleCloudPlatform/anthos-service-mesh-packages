@@ -16,6 +16,7 @@ fi
 ### These are hooks for Cloud Build to be able to use debug/staging images
 ### when necessary. Don't set these environment variables unless you're testing
 ### in CI/CD.
+_CI_ASM_IMAGE_LOCATION="${_CI_ASM_IMAGE_LOCATION:=}"
 _CI_ASM_IMAGE_TAG="${_CI_ASM_IMAGE_TAG:=}"
 _CI_ASM_PKG_LOCATION="${_CI_ASM_PKG_LOCATION:=}"
 _CI_ISTIOCTL_REL_PATH="${_CI_ISTIOCTL_REL_PATH:=}"
@@ -1689,8 +1690,16 @@ EOF
 }
 
 install_expansion_gateway() {
+  
+  if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then
+    kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
+  fi
+  if [[ -n "${_CI_ASM_IMAGE_TAG}" ]]; then
+    kpt cfg set asm anthos.servicemesh.tag "${_CI_ASM_IMAGE_TAG}"
+  fi
+
   info "Installing the expansion gateway..."
-  retry 5 istioctl install -f "${EXPANSION_GATEWAY_FILE}"
+  retry 5 istioctl install -f "${EXPANSION_GATEWAY_FILE}" --skip-confirmation
 
   # Prevent the stderr buffer from ^ messing up the terminal output below
   sleep 1
