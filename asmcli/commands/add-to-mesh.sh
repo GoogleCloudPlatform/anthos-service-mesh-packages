@@ -14,7 +14,7 @@ parse_cluster_args() {
 
   while [[ $# != 0 ]]; do
     local CLUSTER; CLUSTER="${1}"
-    context_append-clusters-info "${CLUSTER//\// }"
+    context_append "clustersInfo" "${CLUSTER//\// }"
     shift 1
   done
 }
@@ -43,7 +43,7 @@ validate_cluster_args() {
       exit_if_cluster_registered_to_another_fleet
     fi
   done <<EOF
-$(context_list-clusters-info)
+$(context_list "clustersInfo")
 EOF
 }
 
@@ -82,6 +82,6 @@ add_all_to_mesh() {
       --gke-uri="${GKE_CLUSTER_URI}" \
       --enable-workload-identity
   done <<EOF
-$(context_list-cluster-registrations)
+$(context_list "clusterRegistrations")
 EOF
 }

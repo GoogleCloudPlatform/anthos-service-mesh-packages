@@ -36,10 +36,10 @@ install() {
 
 install_managed_components() {
   info "Configuring base installation for managed control plane..."
-  context_append-kube-yaml "${BASE_REL_PATH}"
+  context_append "kubectlFiles" "${BASE_REL_PATH}"
 
   info "Configuring ASM managed control plane validating webhook config..."
-  context_append-kube-yaml "${MANAGED_WEBHOOKS}"
+  context_append "kubectlFiles" "${MANAGED_WEBHOOKS}"
 
   info "Configuring ASM managed control plane components..."
   print_config >| managed_control_plane_gateway.yaml
@@ -65,12 +65,12 @@ install_in_cluster_control_plane() {
 
   if ! does_istiod_exist && [[ "${_CI_NO_REVISION}" -ne 1 ]]; then
     info "Installing validation webhook fix..."
-    context_append-kube-yaml "${VALIDATION_FIX_SERVICE}"
+    context_append "kubectlFiles" "${VALIDATION_FIX_SERVICE}"
   fi
 
   local PARAMS
   PARAMS="-f ${OPERATOR_MANIFEST}"
-  for yaml_file in $(context_list-istio-yamls); do
+  for yaml_file in $(context_list "istioctlFiles"); do
     PARAMS="${PARAMS} -f ${yaml_file}"
   done
 
@@ -150,7 +150,7 @@ does_istiod_exist(){
 }
 
 apply_kube_yamls() {
-  for yaml_file in $(context_list-kube-yamls); do
+  for yaml_file in $(context_list "kubectlFiles"); do
     info "Applying ${yaml_file}..."
     retry 3 kubectl apply --overwrite=true -f "${yaml_file}"
   done
@@ -166,7 +166,7 @@ install_canonical_controller() {
 }
 
 expose_istiod() {
-  context_append-kube-yaml "${EXPOSE_ISTIOD_SERVICE}"
+  context_append "kubectlFiles" "${EXPOSE_ISTIOD_SERVICE}"
 }
 
 outro() {

@@ -1141,7 +1141,7 @@ post_process_istio_yamls() {
   handle_multi_yaml_bug
 
   while read -d ',' -r yaml_file; do
-    context_append-istio-yaml "${yaml_file}"
+    context_append "istioctlFiles" "${yaml_file}"
   done <<EOF
 $(context_get-option "CUSTOM_OVERLAY")
 EOF
@@ -2155,8 +2155,8 @@ istio_namespace_exists() {
 
 register_gce_identity_provider() {
   info "Registering GCE Identity Provider in the cluster..."
-  context_append-kube-yaml "asm/identity-provider/identityprovider-crd.yaml"
-  context_append-kube-yaml "asm/identity-provider/googleidp.yaml"
+  context_append "kubectlFiles" "asm/identity-provider/identityprovider-crd.yaml"
+  context_append "kubectlFiles" "asm/identity-provider/googleidp.yaml"
 }
 
 should_enable_service_mesh_feature() {
