@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -ex
-#set -CeE
 set -o pipefail
 set +o noclobber
 set +o verbose
@@ -20,7 +19,6 @@ main() {
   create_workloadgroup
 
   echo " "
-  #echo "============================================="
   echo "[Step 3] istioctl x workload entry and copy to vm ${VM_APP}@${VM_IP}"
   configure_vm_transfer_file
 
@@ -84,6 +82,7 @@ prepare_vm() {
   cd ${WORK_DIR}
 
   scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no runagent.sh root@${VM_IP}:~
+  scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no istio-sidecar.rpm root@${VM_IP}:~
 
   cd ${OUTPUT_DIR}/vm-${VM_APP}
 }
@@ -116,7 +115,8 @@ configure_vm_transfer_file() {
 
   cd ${OUTPUT_DIR}/vm-${VM_APP}
 
-  scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no cluster.env hosts istio-token mesh.yaml root-cert.pem root@${VM_IP}:"/tmp"
+  ssh -i "${KEY_FILE}" -o StrictHostKeyChecking=no root@${VM_IP} mkdir "${VM_DIR}"
+  scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no cluster.env hosts istio-token mesh.yaml root-cert.pem root@${VM_IP}:"${VM_DIR}"
 }
 
 runagent() {
@@ -142,6 +142,7 @@ write_config_context_vm() {
   fi
 
   source "./.${CONTEXT}"
+  source "${WORK_DIR}/.attachConfig"
 
   alias kubectl="kubectl --kubeconfig ${KUBECONFIG}"
   alias istioctl="istioctl --kubeconfig ${KUBECONFIG}"
@@ -159,56 +160,73 @@ write_config_context_vm() {
 
   echo "export VM_APP=${VM_APP}" >>${CONTEXT_FILE}
   echo "export VM_IP=${VM_IP}" >>${CONTEXT_FILE}
-
-  #source "${OUTPUT_DIR}/vm-${VM_APP}/.context"
+  cat "${WORK_DIR}/.attachConfig" >>${CONTEXT_FILE}
 }
 
 read_args() {
+  >".attachConfig"
+  chmod 777 ".attachConfig"
   while [[ ${#} != 0 ]]; do
     echo "here1"
     case "${1}" in
     -addr | --address | --vm_ip | --vm-ip)
       export VM_IP="${2}"
+      echo "export VM_IP=${VM_IP}" >>".attachConfig"
       shift 2
       ;;
     -app | --app | --vm_app | --vm-app)
       export VM_APP="${2}"
+      echo "export VM_APP=${VM_APP}" >>".attachConfig"
       shift 2
       ;;
     -mesh | --mesh_id | --mesh-id)
       export MESH_ID="${2}"
+      echo "export MESH_ID=${MESH_ID}" >>".attachConfig"
       shift 2
       ;;
     -network | --network | --vm_network | --vm-network)
       export VM_NETWORK="${2}"
+      echo "export VM_NETWORK=${VM_NETWORK}" >>".attachConfig"
       shift 2
       ;;
     -k | --key_file | --ssh-key-file)
       export KEY_FILE="${2}"
+      echo "export KEY_FILE=${KEY_FILE}" >>".attachConfig"
       shift 2
       ;;
     -s | --service_account | --service-account)
       export SERVICE_ACCOUNT="${2}"
+      echo "export SERVICE_ACCOUNT=${SERVICE_ACCOUNT}" >>".attachConfig"
       shift 2
       ;;
     --cluster | --vm-cluster | --cluster_name | --cluster-name)
       export CLUSTER="${2}"
+      echo "export CLUSTER=${CLUSTER}" >>".attachConfig"
       shift 2
       ;;
     -p | --project_id | --project-id)
       export PROJECT_ID="${2}"
+      echo "export PROJECT_ID=${PROJECT_ID}" >>".attachConfig"
       shift 2
       ;;
     -ns | --namespace)
       export VM_NAMESPACE="${2}"
+      echo "export VM_NAMESPACE=${VM_NAMESPACE}" >>".attachConfig"
       shift 2
       ;;
     --kubeconfig)
       export KUBECONFIG="${2}"
+      echo "export KUBECONFIG=${KUBECONFIG}" >>".attachConfig"
       shift 2
       ;;
     --context)
       export SELECT_CONTEXT="${2}"
+      echo "export SELECT_CONTEXT=${SELECT_CONTEXT}" >>".attachConfig"
+      shift 2
+      ;;
+    --vm-config-dir)
+      export VM_DIR="${2}"
+      echo "export VM_DIR=${VM_DIR}" >>".attachConfig"
       shift 2
       ;;
     *)

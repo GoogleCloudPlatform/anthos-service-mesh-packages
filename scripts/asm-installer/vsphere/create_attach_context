@@ -85,7 +85,6 @@ function fill_unspecified_context() {
   if [[ -z "${WORK_DIR}" ]]; then
     WORK_DIR="$(pwd)"
     echo "Working Dir     is not specified. Set Working Dir as ${WORK_DIR}"
-    echo "WORK_DIR=${WORK_DIR}" >>${CONTEXT_FILE}
   fi
 
   if [[ -z "${OUTPUT_DIR}" ]]; then
@@ -94,7 +93,11 @@ function fill_unspecified_context() {
   else
     echo "Set Output Directory for each VM as ${OUTPUT_DIR}/vm-vm_name"
   fi
-  echo "OUTPUT_DIR=${OUTPUT_DIR}" >>${CONTEXT_FILE}
+
+  if [[ -z "${VM_DIR}" ]]; then
+    WORK_DIR="/tmp"
+    echo "VM config Dir   is not specified. Set VM config Dir as /tmp in VM"
+  fi
 
   if [[ -z "${VM_NAMESPACE}" ]]; then
     VM_NAMESPACE="default"
@@ -131,7 +134,7 @@ function  write_config_context() {
   echo "export VM_NETWORK=${VM_NETWORK}" >>${CONTEXT_FILE}
   echo "export VM_NAMESPACE=${VM_NAMESPACE}" >>${CONTEXT_FILE}
   echo "export SERVICE_ACCOUNT=${SERVICE_ACCOUNT}" >>${CONTEXT_FILE}
-
+  echo "export VM_DIR=${VM_DIR}" >>${CONTEXT_FILE}
 }
 
 function read_args() {
@@ -180,6 +183,10 @@ function read_args() {
       ;;
     --context)
       export SELECT_CONTEXT="${2}"
+      shift 2
+      ;;
+    --vm-config-dir)
+      export VM_DIR="${2}"
       shift 2
       ;;
     *)
