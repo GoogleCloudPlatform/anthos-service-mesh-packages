@@ -47,3 +47,8 @@ spec:
               - name: tls-webhook
                 port: 15017
                 targetPort: 15017
+  values:
+    gateways:
+      istio-ingressgateway:
+        # Enable gateway injection
+        injectionTemplate: gateway
