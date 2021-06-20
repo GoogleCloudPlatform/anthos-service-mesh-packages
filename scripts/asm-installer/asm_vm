@@ -20,6 +20,7 @@ _CI_ASM_IMAGE_LOCATION="${_CI_ASM_IMAGE_LOCATION:=}"
 _CI_ASM_IMAGE_TAG="${_CI_ASM_IMAGE_TAG:=}"
 _CI_ASM_PKG_LOCATION="${_CI_ASM_PKG_LOCATION:=}"
 _CI_ISTIOCTL_REL_PATH="${_CI_ISTIOCTL_REL_PATH:=}"
+_CI_REVISION_PREFIX="${_CI_REVISION_PREFIX:=}"
 
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
@@ -57,6 +58,7 @@ ISTIOCTL_REL_PATH=""
 PACKAGE_DIRECTORY=""
 KPT_BRANCH=""
 KPT_URL=""
+REVISION_LABEL=""
 EXPOSE_ISTIOD_SERVICE=""
 EXPANSION_GATEWAY_FILE=""
 
@@ -118,11 +120,13 @@ init() {
   if [[ "${POINT}" == "alpha" ]]; then
     RELEASE="${MAJOR}.${MINOR}-alpha.${REV}"
     KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=master}"
+    REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}"
   else
     RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
     KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=release-${MAJOR}.${MINOR}-asm}"
+    REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}-${REV}"
   fi
-  readonly RELEASE; readonly KPT_BRANCH;
+  readonly RELEASE; readonly KPT_BRANCH; readonly REVISION_LABEL;
 
   PACKAGE_DIRECTORY="asm/istio"; readonly PACKAGE_DIRECTORY;
   ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
@@ -1699,7 +1703,8 @@ install_expansion_gateway() {
   fi
 
   info "Installing the expansion gateway..."
-  retry 5 istioctl install -f "${EXPANSION_GATEWAY_FILE}" --skip-confirmation
+  retry 5 istioctl install -f "${EXPANSION_GATEWAY_FILE}" \
+    --set revision="${REVISION_LABEL}" --skip-confirmation
 
   # Prevent the stderr buffer from ^ messing up the terminal output below
   sleep 1
