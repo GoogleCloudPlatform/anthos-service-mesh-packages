@@ -19,7 +19,7 @@ spec:
   revision: "asm-managed"
   profile: asm-gcp
   hub: gcr.io/gke-release/asm # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}
-  tag: 1.10.2-asm.0 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
+  tag: 1.10.2-asm.1 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
   components:
     base:
       enabled: false
