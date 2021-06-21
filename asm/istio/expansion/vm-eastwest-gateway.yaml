@@ -19,6 +19,8 @@ metadata:
   name: eastwest
 spec:
   profile: empty
+  hub: gcr.io/gke-release/asm # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}
+  tag: 1.10.0-asm.1 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
   components:
     ingressGateways:
       - name: istio-eastwestgateway
@@ -45,3 +47,8 @@ spec:
               - name: tls-webhook
                 port: 15017
                 targetPort: 15017
+  values:
+    gateways:
+      istio-ingressgateway:
+        # Enable gateway injection
+        injectionTemplate: gateway
