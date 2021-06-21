@@ -18,7 +18,7 @@ kind: IstioOperator
 spec:
   profile: empty
   hub: gcr.io/gke-release/asm # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}
-  tag: 1.9.6-asm.0 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
+  tag: 1.9.6-asm.1 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
   meshConfig:
     trustDomainAliases: # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases"}
       - PROJECT_ID.svc.id.goog # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
