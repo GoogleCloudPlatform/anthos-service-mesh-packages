@@ -46,7 +46,7 @@ version_message() {
 usage() {
   cat << EOF
 ${SCRIPT_NAME} $(version_message)
-usage: ${SCRIPT_NAME} [OPTION]...
+usage: ${SCRIPT_NAME} [SUBCOMMAND] [OPTION]...
 
 Set up, validate, and install ASM in a Google Cloud environment.
 Single argument options can also be passed via environment variables by using
@@ -57,6 +57,7 @@ SUBCOMMANDS:
   install                             Install will attempt a new ASM installation
   validate                            Validate will attempt a new ASM validation
   print-config                        Print Config will attempt to print the configurations used
+  add-to-mesh                         Add multiple clusters to the mesh
 
 OPTIONS:
   -l|--cluster_location  <LOCATION>   The GCP location of the target cluster.
@@ -192,7 +193,7 @@ EOF
 usage_short() {
   cat << EOF
 ${SCRIPT_NAME} $(version_message)
-usage: ${SCRIPT_NAME} [OPTION]...
+usage: ${SCRIPT_NAME} [SUBCOMMAND] [OPTION]...
 
 Set up, validate, and install ASM in a Google Cloud environment.
 Use -h|--help with -v|--verbose to show detailed descriptions.
@@ -201,6 +202,7 @@ SUBCOMMANDS:
   install
   validate
   print-config
+  add-to-mesh
 
 OPTIONS:
   -l|--cluster_location  <LOCATION>

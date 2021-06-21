@@ -11,35 +11,153 @@ SCRIPT_NAME="${0##*/}"
 
 cd "${SDIR}"
 
+get_test_clusters() {
+  cat <<EOF
+long-term-test-cluster-add-to-mesh-1
+long-term-test-cluster-add-to-mesh-2
+EOF
+}
+
 main() {
   # CLI setup
   parse_args "$@"
+  trap 'clean_up_clusters' ERR
 
-  local COUNT; COUNT=1
-  trap 'clean_up_clusters "${COUNT}"' ERR
+  set_up_clusters
+  run_add_to_mesh_test
+  clean_up_clusters
+}
 
-  set_up_clusters "${COUNT}"
+run_add_to_mesh_test() {
+  date +"%T"
 
   local ARGS; ARGS="add-to-mesh ${PROJECT_ID}"
-  for (( i=1; i<=$COUNT; i++ )); do
-    ARGS="${ARGS} ${PROJECT_ID}/${CLUSTER_LOCATION}/add-to-mesh-cluster-${i}"
-  done
-  run_add_to_mesh_test ${ARGS}
-  clean_up_clusters "${COUNT}"
+  while read -r CLUSTER_NAME; do
+    ARGS="${ARGS} ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME}"
+  done <<EOF
+$(get_test_clusters)
+EOF
+
+  # Test starts here
+  echo "Validating the clusters are unregistered..."
+  while read -r CLUSTER_NAME; do
+    configure_kubectl "${CLUSTER_NAME}" "${PROJECT_ID}" "${CLUSTER_LOCATION}"
+    if is_cluster_registered "${CLUSTER_NAME}"; then
+      echo "Cluster ${CLUSTER_NAME} is already registered before the test to ${PROJECT_ID}".
+      exit 2
+    fi
+  done <<EOF
+$(get_test_clusters)
+EOF
+
+  echo "Adding clusters to fleet..."
+  echo "../asmcli ${ARGS}"
+  # shellcheck disable=SC2086
+  ../asmcli ${ARGS}
+
+  date +"%T"
+
+  # Verify the clusters are registered
+  while read -r CLUSTER_NAME; do
+    if ! is_cluster_registered "${CLUSTER_NAME}"; then
+      echo "Cluster ${CLUSTER_NAME} is not registered to ${PROJECT_ID}".
+      exit 2
+    fi
+  done <<EOF
+$(get_test_clusters)
+EOF
 }
 
 set_up_clusters() {
-  local COUNT; COUNT="${1}"
-  for (( i=1; i<=$COUNT; i++ )); do
-    gcloud container clusters create add-to-mesh-cluster-"${i}" --project "${PROJECT_ID}" --zone "${CLUSTER_LOCATION}" --workload-pool="${PROJECT_ID}".svc.id.goog
-  done
+  if [[ -n "${SERVICE_ACCOUNT}" ]]; then
+    echo "Authorizing service acount..."
+    auth_service_account
+  fi
+
+  LT_NAMESPACE="$(uniq_name "${SCRIPT_NAME}" "${BUILD_ID}")"
+  OUTPUT_DIR="$(mktemp -d)"
+  REVISION_LABEL="$(uniq_name "${SCRIPT_NAME}" "${BUILD_ID}")"
+  if [[ -n "${KEY_FILE}" && -n "${SERVICE_ACCOUNT}" ]]; then
+    KEY_FILE="-k ${KEY_FILE}"
+    SERVICE_ACCOUNT="-s ${SERVICE_ACCOUNT}"
+  fi
+
+  local CLUSTER_NAME
+  while read -r CLUSTER_NAME; do
+    configure_kubectl "${CLUSTER_NAME}" "${PROJECT_ID}" "${CLUSTER_LOCATION}"
+
+    create_ns "${ISTIO_NAMESPACE}"
+
+    echo "Installing ASM with MeshCA..."
+    echo "_CI_REVISION_PREFIX=${LT_NAMESPACE} \
+    ../asmcli install ${KEY_FILE} ${SERVICE_ACCOUNT} \
+      --kc ${KUBECONFIG} -v \
+      --output-dir ${OUTPUT_DIR} \
+      --revision_name ${REVISION_LABEL}"
+    # shellcheck disable=SC2086
+    CLUSTER_LOCATION="" \
+    CLUSTER_NAME="" \
+    PROJECT_ID="" \
+    _CI_REVISION_PREFIX="${LT_NAMESPACE}" \
+      ../asmcli install ${KEY_FILE} ${SERVICE_ACCOUNT} \
+      --kc "${KUBECONFIG}" -v \
+      --output-dir "${OUTPUT_DIR}" \
+      --revision_name ${REVISION_LABEL}
+
+    unregister_cluster_if_possible "${CLUSTER_NAME}" "${PROJECT_ID}" "${CLUSTER_LOCATION}"
+  done <<EOF
+$(get_test_clusters)
+EOF
+
 }
 
 clean_up_clusters() {
-  local COUNT; COUNT="${1}"
-  for (( i=1; i<=$COUNT; i++ )); do
-    gcloud container clusters delete add-to-mesh-cluster-"${i}" --project "${PROJECT_ID}" --zone "${CLUSTER_LOCATION}"
-  done
+  local CLUSTER_NAME
+  while read -r CLUSTER_NAME; do
+    configure_kubectl "${CLUSTER_NAME}" "${PROJECT_ID}" "${CLUSTER_LOCATION}"
+    unregister_cluster_if_possible "${CLUSTER_NAME}" "${PROJECT_ID}" "${CLUSTER_LOCATION}"
+    cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}"
+  done <<EOF
+$(get_test_clusters)
+EOF
+}
+
+unregister_cluster_if_possible() {
+  local MEMBERSHIP_NAME
+  MEMBERSHIP_NAME=$(gcloud container hub memberships list --filter="external_id=$(kubectl get namespace kube-system -o jsonpath='{.metadata.uid}')" --format='value(name)')
+
+  if [[ -n ${MEMBERSHIP_NAME} ]]; then
+    echo "Unregistering ${MEMBERSHIP_NAME}..."
+    local GKE_URL
+    GKE_URL="$(gcloud container hub memberships describe "${MEMBERSHIP_NAME}" \
+      --project "${PROJECT_ID}" --format="value(endpoint.gkeCluster.resourceLink)")"
+    gcloud container hub memberships unregister "${MEMBERSHIP_NAME}" --quiet \
+        --project "${PROJECT_ID}" --gke-uri "${GKE_URL}"
+  fi
+}
+
+is_membership_crd_installed() {
+  if ! kubectl api-resources --api-group=hub.gke.io | grep -q memberships; then
+    false
+    return
+  fi
+
+  if [[ "$(retry 2 kubectl get memberships.hub.gke.io -ojsonpath="{..metadata.name}" \
+    | grep -w -c membership || true)" -eq 0 ]]; then
+    false
+  fi
+}
+
+is_cluster_registered() {
+  local CLUSTER_NAME; CLUSTER_NAME="${1}"
+  local WANT
+  WANT="//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
+  local LIST
+  LIST="$(gcloud container hub memberships list --project "${PROJECT_ID}" \
+    --format=json | grep "${WANT}")"
+  if [[ ! is_membership_crd_installed || -z "${LIST}" ]]; then
+    false
+  fi
 }
 
 main "$@"

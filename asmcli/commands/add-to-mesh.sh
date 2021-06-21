@@ -12,6 +12,11 @@ parse_cluster_args() {
     shift 1
   fi
 
+  if [[ "${*}" = '' ]]; then
+    usage_short >&2
+    exit 2
+  fi
+
   while [[ $# != 0 ]]; do
     local CLUSTER; CLUSTER="${1}"
     context_append "clustersInfo" "${CLUSTER//\// }"
@@ -38,9 +43,10 @@ validate_cluster_args() {
       --zone="${CLUSTER_LOCATION}" \
       --project="${PROJECT_ID}" \
       --format='value(selfLink)')"
-      context_append-cluster-registrations "${PROJECT_ID} ${CLUSTER_LOCATION} ${CLUSTER_NAME} ${GKE_CLUSTER_URI}"
+      context_append "clusterRegistrations" "${PROJECT_ID} ${CLUSTER_LOCATION} ${CLUSTER_NAME} ${GKE_CLUSTER_URI}"
     else
       exit_if_cluster_registered_to_another_fleet
+      info "Cluster ${CLUSTER_NAME} is already registered with project ${PROJECT_ID}. Skipping."
     fi
   done <<EOF
 $(context_list "clustersInfo")
@@ -67,20 +73,29 @@ EOF
 add_all_to_mesh() {
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME GKE_CLUSTER_URI
-  local MEMBERSHIP_NAME; MEMBERSHIP_NAME=""
+  local MEMBERSHIP_NAME
   while read -r PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME GKE_CLUSTER_URI; do
-    context_set-option "PROJECT_ID" "${PROJECT_ID}"
-    context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
-    context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
-    
-    MEMBERSHIP_NAME="$(generate_membership_name)"
-    info "Registering the cluster ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME} as ${MEMBERSHIP_NAME}..."
+    if [[ -n "${PROJECT_ID}" && -n "${CLUSTER_LOCATION}" && -n "${CLUSTER_NAME}" && -n "${GKE_CLUSTER_URI}" ]]; then
+      context_set-option "PROJECT_ID" "${PROJECT_ID}"
+      context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
+      context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
+      
+      MEMBERSHIP_NAME="$(generate_membership_name)"
+      info "Registering the cluster ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME} as ${MEMBERSHIP_NAME}..."
 
-    local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-    retry 2 run_command gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
-      --project="${PROJECT_ID}" \
-      --gke-uri="${GKE_CLUSTER_URI}" \
-      --enable-workload-identity
+      local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+      retry 2 run_command gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
+        --project="${PROJECT_ID}" \
+        --gke-uri="${GKE_CLUSTER_URI}" \
+        --enable-workload-identity
+    else
+      { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Unable to register the cluster due to unexpected cluster information:
+  Project ID: ${PROJECT_ID}
+  Cluster Location: ${CLUSTER_LOCATION}
+  Cluster Name: ${CLUSTER_NAME}
+EOF
+    fi
   done <<EOF
 $(context_list "clusterRegistrations")
 EOF

@@ -776,34 +776,6 @@ run_basic_test() {
   return "$SUCCESS"
 }
 
-run_add_to_mesh_test() {
-  local SUBCOMMAND; SUBCOMMAND="${1}"
-  shift 1 # increment this if more arguments are added
-  local EXTRA_FLAGS; EXTRA_FLAGS="${*}"
-
-  date +"%T"
-
-  if [[ -n "${SERVICE_ACCOUNT}" ]]; then
-    echo "Authorizing service acount..."
-    auth_service_account
-  fi
-
-  if [[ -n "${KEY_FILE}" && -n "${SERVICE_ACCOUNT}" ]]; then
-    KEY_FILE="-k ${KEY_FILE}"
-    SERVICE_ACCOUNT="-s ${SERVICE_ACCOUNT}"
-  fi
-
-  # Test starts here
-  echo "Adding clusters to fleet..."
-  echo "../asmcli ${SUBCOMMAND} ${KEY_FILE} ${SERVICE_ACCOUNT} \
-    ${EXTRA_FLAGS}"
-  # shellcheck disable=SC2086
-  ../asmcli ${SUBCOMMAND} ${KEY_FILE} ${SERVICE_ACCOUNT} \
-    ${EXTRA_FLAGS} ${_EXTRA_FLAGS} 2>&1
-
-  date +"%T"
-}
-
 # pass in the NAME of the service account
 create_service_account() {
   local SVC_ACCT_NAME; SVC_ACCT_NAME="$1"

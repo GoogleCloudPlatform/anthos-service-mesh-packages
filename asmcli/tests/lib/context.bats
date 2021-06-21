@@ -220,14 +220,3 @@ EOF
   assert_equal $(context_get-option "FLEET_ID") "${FLEET_ID}"
   context_set-option "FLEET_ID" ""
 }
-
-@test "CONTEXT: test kube yamls append" {
-  run context_list "kubectlFiles"
-  assert_output ""
-
-  run context_append "kubectlFiles" "kube-1.yaml"
-  assert_success
-
-  run context_list "kubectlFiles"
-  assert_output "kube-1.yaml"
-}
