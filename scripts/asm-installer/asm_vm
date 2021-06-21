@@ -25,7 +25,7 @@ _CI_REVISION_PREFIX="${_CI_REVISION_PREFIX:=}"
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=10}"; readonly MINOR;
-POINT="${POINT:=0}"; readonly POINT;
+POINT="${POINT:=2}"; readonly POINT;
 REV="${REV:=1}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1-unstable"}"; readonly CONFIG_VER;
 ASM_RELEASE="${MAJOR}.${MINOR}"
