@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -eu # Print out all commands, exit on failed commands
 set -o pipefail
@@ -30,7 +30,7 @@ set -o pipefail
 # After all workloads have been migrated to the the newer ASM control plane, the Istio on GKE addon
 # can be cleaned up using the cleanup() routine
 
-TMP_DIR=$(mktemp -d)
+TMP_DIR="$(mktemp -d)"
 
 SKIP_CONFIRM=""
 CONTEXT=""
@@ -187,7 +187,6 @@ configure_mesh_ca() {
   pushd "${TMP_DIR}" > /dev/null
   HUB_WIP="$(kube get cm -n istio-system istio-asm-managed -oyaml | grep 'trustDomain: .*' | cut -d':' -f2 | xargs)"
   if [[ "${HUB_WIP}" == "" ]]; then
-    popd > /dev/null
     die "Could not determine trust domain for Anthos Service Mesh"
   fi
   kube -n istio-system apply -f - << EOF
@@ -198,14 +197,17 @@ metadata:
 data:
   meshca-root.pem: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUdsRENDQkh5Z0F3SUJBZ0lRRVcyNUFQYTdTOVNqL05qNlY2R3hRVEFOQmdrcWhraUc5dzBCQVFzRkFEQ0IKd1RFTE1Ba0dBMVVFQmhNQ1ZWTXhFekFSQmdOVkJBZ1RDa05oYkdsbWIzSnVhV0V4RmpBVUJnTlZCQWNURFUxdgpkVzUwWVdsdUlGWnBaWGN4RXpBUkJnTlZCQW9UQ2tkdmIyZHNaU0JNVEVNeERqQU1CZ05WQkFzVEJVTnNiM1ZrCk1XQXdYZ1lEVlFRRERGZHBjM1JwYjE5Mk1WOWpiRzkxWkY5M2IzSnJiRzloWkY5eWIyOTBMWE5wWjI1bGNpMHcKTFRJd01UZ3RNRFF0TWpWVU1UUTZNVEU2TXpNdE1EYzZNREFnU3pveExDQXhPa2cxTW5abmQwVnRNM1JqT2pBNgpNVGd3SUJjTk1UZ3dOREkxTWpFeE1UTXpXaGdQTWpFeE9EQTBNalV5TWpFeE16TmFNSUhCTVFzd0NRWURWUVFHCkV3SlZVekVUTUJFR0ExVUVDQk1LUTJGc2FXWnZjbTVwWVRFV01CUUdBMVVFQnhNTlRXOTFiblJoYVc0Z1ZtbGwKZHpFVE1CRUdBMVVFQ2hNS1IyOXZaMnhsSUV4TVF6RU9NQXdHQTFVRUN4TUZRMnh2ZFdReFlEQmVCZ05WQkFNTQpWMmx6ZEdsdlgzWXhYMk5zYjNWa1gzZHZjbXRzYjJGa1gzSnZiM1F0YzJsbmJtVnlMVEF0TWpBeE9DMHdOQzB5Ck5WUXhORG94TVRvek15MHdOem93TUNCTE9qRXNJREU2U0RVeWRtZDNSVzB6ZEdNNk1Eb3hPRENDQWlJd0RRWUoKS29aSWh2Y05BUUVCQlFBRGdnSVBBRENDQWdvQ2dnSUJBSzlkRnRpSEkwL3I3MGs2V2hiRXVEZ0hEemwvTzVNUApzeW1iaVlGNGNRNFpEa01nWFQyYVZIeXVCL01tZHF0ZUMyc3B1RzVvakM2SENIaGorOUpGRjNLZlUrRWovajlBCjVnVXo4ZDRWWUQ5MkxYaDgyaXJJMnRPZWxiUTdQWkFMbjVoUm5wazBnbnB6TGUya3BhOGxHeTBUdEIvdi8zMDMKalpBbDBlN2lLS2tYMU9veTlKemVCQVlkTnF1OXVJaHJsK25hU1hFR3B1V3hDWTZ1aXArRWN1S3A5Y1IxNmtGegpPS05uK3NRMDlkN0tlRk45ckxhWmlvZEJ6bmRWbGlxOUZrV0p3SWVCcDA2Q3E5dFVNa21ZdlVGazNtdDg2bmhaCnJZdmlMSTR0WFNtWklHUU5rdlBRWFUxa2kzdWt2L1pWZEpyWFY3dzJrL0VabWlGKzlveFB3RzRaMjFHRmZPS1QKV0wvazlpN1NDcUl1VDQxcE5LMm1tS0hzUUk3UWxvcnR6NTRzOFkyRHB6Y0tjNEVEZlVJZjYyTm83KytISU14dQpkUHhiZFFlMTFJbXBEUmNRSWc5Wk9xVGJvcnVMYUdOQkxPNnJkY25xbWd0czNDTHJsZXgxTDlRR3hRWkNIUmVhCnJpUjFiV2VRQk5UQW9kWXFTejZ2cFNJNWhYVUNra1hXN0xGY1BNcXZSYlJWY2xhazgvUnAwTGFITFFpRHhrS3AKaVExcHJmQk80SXhZY0hsRUtQbnhvQnJrNVdVWmZYNGowT3Biajhoa05WaStzQisvUnZYcnVGTFpvRkF6Y0t1NQpLV0t0UHpVT2I4UDlWa0VtTnk3RDNKWHlzNUdmaThOa1ZYbi9raFZWYjFCVEhIZjl3QzNuaEo1MG51QmttUHU3CjNiajFBQk9hakIrekFnTUJBQUdqZ1lNd2dZQXdEZ1lEVlIwUEFRSC9CQVFEQWdFR01CMEdBMVVkSlFRV01CUUcKQ0NzR0FRVUZCd01CQmdnckJnRUZCUWNEQWpBUEJnTlZIUk1CQWY4RUJUQURBUUgvTUIwR0ExVWREZ1FXQkJRLwpWc3V5amdSREFFbWNaanlKNzc2MTlKczlpakFmQmdOVkhTTUVHREFXZ0JRL1ZzdXlqZ1JEQUVtY1pqeUo3NzYxCjlKczlpakFOQmdrcWhraUc5dzBCQVFzRkFBT0NBZ0VBVWM1UUpPcXhtTUpZMEUycmNIRVdRWVJhaDF2YXQzd3UKSUh0RVozU2tTdW15ait5OWV5SUhiOVhUVHljNFN5R3lYMW44UmFyeThvU2dRVjRjYnlKVEZYRUVRT0dMSEI5Lwo5OEVLVGhnSnRmUHNvczJXS2UvNTlTOHlOMDVvbnB4Y2FMOXk0UzI5NUt2OWtjU1F4TG01VWZqbHFzS2VISlp5Cm12eGlZem1Cb3g3TEExenFjTFladnNsSk5rSnhLQWs1SkE2Nml5RFNRcU9LN2pJaXhuOHBpMzA1ZEZHQ1pnbFUKRlN0d1dxWTZSYzlyUjhFeWNWaFN4MkFocnZUN09RVFZkS0xmb0tBODREOEpaSlBCN2hyeHFLZjdKSkZzODdLagp0N2MvNWJYUEZKMm9zbWpvTlluYkhqaXE2NGJoMjBzU0NkNjMwcXZoaGVQTHdqak9sQlBpRnlLMzZvL2hRTjg3CjFBRW0xU0NIeSthUWNmSnFGNUtUZ1BuWlF5NUQrRC9DR2F1K0Jma08rV0NHRFZ4UmxlWUJKNGcyTmJBVG9seWcKQjJLV1hyajA3VS9XYVdxVjJoRVJia214WEZoNmNVZGxrWDJNZW9HNHY2WkQyT0tBUHg1RHBKQ2ZwMFRFcTZQegpuUCtaMW1MZC9aakdzT0Y4UjJXR1FKRXVVOEhSenZzcjB3c1g5VXlMTXFmNVhWaURLMTFWL1crZGNJdmpIQ2F5CkJwWDJzZTNkZmV4NWpGaHQrSmNRYytpd0I4Y2FTWGtSNnRHU2lhcmdFdFNKT0RPUmFjTzlJQjhiNlc4U20vL0oKV2YvOHp5aUNjTW0xaTJ5VlZwaHdFMWtjekZ3dW5BaDBKQjg5NlZhWEdWeFhlS0VBTVFvWEhqZ0RkQ1lwOC9FdAp4amI4VWtDbXlqVT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
 EOF
+  kube get cm istio -n istio-system -o yaml > configure_mesh_ca_istio_cm.yaml
   kube get cm istio -n istio-system -o yaml | sed "s/trustDomainAliases\:.*$/trustDomainAliases\: [\"${HUB_WIP}\"]/g" | kube replace -f -
 
+  kube get deploy istio-pilot -n istio-system -o yaml > configure_mesh_ca_istio_pilot_deploy.yaml
   kube patch deploy istio-pilot -n istio-system -p='{"spec":{"template":{"spec":{"containers":[{
     "name":"discovery",
     "image":"gcr.io/gke-release/istio/pilot:1.4.10-gke.12",
     "env":[{"name":"PILOT_SKIP_VALIDATE_TRUST_DOMAIN","value":"true"}]
   }]}}}}'
 
+  kube get deploy istio-citadel -n istio-system -o yaml > configure_mesh_ca_istio_citadel_deploy.yaml
   kube patch deploy istio-citadel -n istio-system  -p='{"spec":{"template":{"spec":{
     "containers":[{
       "name":"citadel",
@@ -254,10 +256,16 @@ EOF
 }
 
 disable_galley_webhook() {
-  prompt "Replacing the Istio validation webhook with an Anthos Service Mesh validation webhook..."
+  pushd "${TMP_DIR}" > /dev/null
+  prompt "Disabling the Istio validation webhook..."
+
+  kube get clusterrole istio-galley-istio-system -n istio-system -o yaml > disable_galley_webhook_cluster_role.yaml
   kube patch clusterrole -n istio-system istio-galley-istio-system --type='json' -p='[{"op": "replace", "path": "/rules/2/verbs/0", "value": "get"}]'
+
+  kube get ValidatingWebhookConfiguration istio-galley --ignore-not-found > disable_galley_webhook_webhook_config.yaml
   kube delete ValidatingWebhookConfiguration istio-galley --ignore-not-found
   echo -e "${green}OK${clr}"
+  popd > /dev/null
 }
 
 enable_galley_webhook() {
@@ -334,7 +342,7 @@ EOF
 }
 
 rollback_gateway() {
-  # pending
+  # TODO
   true
 }
 
@@ -356,8 +364,9 @@ metadata:
   name: asm-addon-migration-state
   namespace: istio-system
 data:
-  migrationStatus: ${1}
+  migrationStatus: ${STATUS}
 EOF
+  echo -e "${green}OK${clr}"
 }
 
 download_and_install_migration_tool () {
@@ -376,7 +385,7 @@ migrate_configs() {
 
   heading "Converting authentication CRs..."
   pushd "${TMP_DIR}" > /dev/null
-  ./convert >| beta-policy.yaml
+  ./convert --ignore-error > beta-policy.yaml
   kube apply --dry-run=client -f beta-policy.yaml
   prompt "Applying converted security policies in ${TMP_DIR}/beta-policy.yaml..."
   kube apply  -f beta-policy.yaml
@@ -454,7 +463,7 @@ facc7fd2599994a7c92a4cc66bac9061b64d71be106e2bb639066969273d4fb8"
     done
   done
   if [[ "${CUSTOM_MIXER}" == "true" ]];then
-    return 1;
+    return 1
   fi
 }
 
@@ -476,7 +485,7 @@ config_check() {
   local PLUGINCERT
   PLUGINCERT=$(kubectl get secret cacerts -n istio-system --ignore-not-found)
   if [[ "${PLUGINCERT}" != "" ]]; then
-    prompt_unsupported "Detected custom plugin cert" "The plugin certs will not be migrated to ASM.."
+    prompt_unsupported "Detected custom plugin cert." "The plugin certs will not be migrated to ASM."
   fi
 
   # Security Policies
@@ -485,8 +494,7 @@ config_check() {
   local MIGRATION_ERR; MIGRATION_ERR=$(./convert 2>&1)
   LAST_ERR=$?
   if [[ "${LAST_ERR}" != "0" ]]; then
-    popd > /dev/null
-    prompt_unsupported "Detected security policies that could not be migrated" "encountered error ${MIGRATION_ERR}"
+    prompt_unsupported "Detected security policies that could not be migrated" "Encountered error ${MIGRATION_ERR}"
   fi
   popd > /dev/null
   set -e
@@ -505,12 +513,13 @@ config_check() {
   fi
 
   # Custom gateway
+  # TODO
 
   # Check custom mixer policies
   check_custom_mixer
   LAST_ERR=$?
   if [[ "${LAST_ERR}" != "0" ]]; then
-    prompt_unsupported "Detected custom mixer resources that could not be migrated" "requries manual migration to telemetryv2"
+    prompt_unsupported "Detected custom mixer resources that could not be migrated." "Requires manual migration to telemetryv2"
   fi
 }
 
@@ -567,7 +576,7 @@ arg_required() {
   fi
 }
 
-main_run() {
+run_all() {
   check_prerequisites
   print_intro
   config_check
@@ -584,7 +593,7 @@ main_run() {
 
 usage() {
     echo "Usage:"
-    echo "  $0 [OPTIONS] [--command] [command-name]"
+    echo "  $0 [OPTIONS] --command [command-name]"
     echo
     echo "  --skip-confirm, -y                select 'yes' for any prompts"
     echo "  --context                         context to use for kubectl"
@@ -636,6 +645,10 @@ while (( "$#" )); do
         -d | --dir)
             arg_required "${@}"
             TMP_DIR=${2}
+            if [[ ! -d "${TMP_DIR}" ]]; then
+              prompt "${TMP_DIR} directory not present. Create directory?"
+              mkdir -p "${TMP_DIR}" > /dev/null
+            fi
             readonly TMP_DIR
             shift
             ;;
@@ -648,6 +661,3 @@ while (( "$#" )); do
     shift
 done
 
-if [[ -z ${SUB_COMMAND} ]]; then
-  main_run
-fi
