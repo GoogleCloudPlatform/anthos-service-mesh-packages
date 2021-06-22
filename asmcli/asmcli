@@ -54,6 +54,11 @@ MANAGED_WEBHOOKS=""
 EXPOSE_ISTIOD_SERVICE=""
 CANONICAL_CONTROLLER_MANIFEST=""
 
+CRD_CONTROL_PLANE_REVISION=""
+CR_CONTROL_PLANE_REVISION_REGULAR=""
+CR_CONTROL_PLANE_REVISION_RAPID=""
+CR_CONTROL_PLANE_REVISION_STABLE=""
+
 SCRIPT_NAME="${0##*/}"; readonly SCRIPT_NAME
 
 PROJECT_NUMBER=""
@@ -179,6 +184,11 @@ init() {
   ASM_VERSION_FILE=".asm_version"; readonly ASM_VERSION_FILE;
   RAW_YAML="${REVISION_LABEL}-manifest-raw.yaml"; readonly RAW_YAML;
   EXPANDED_YAML="${REVISION_LABEL}-manifest-expanded.yaml"; readonly EXPANDED_YAML;
+
+  CRD_CONTROL_PLANE_REVISION="asm/control-plane-revision/crd.yaml"; readonly CRD_CONTROL_PLANE_REVISION;
+  CR_CONTROL_PLANE_REVISION_REGULAR="asm/control-plane-revision/cr_regular.yaml"; readonly CR_CONTROL_PLANE_REVISION_REGULAR;
+  CR_CONTROL_PLANE_REVISION_RAPID="asm/control-plane-revision/cr_rapid.yaml"; readonly CR_CONTROL_PLANE_REVISION_RAPID;
+  CR_CONTROL_PLANE_REVISION_STABLE="asm/control-plane-revision/cr_stable.yaml"; readonly CR_CONTROL_PLANE_REVISION_STABLE;
 
   AKUBECTL="$(which kubectl || true)"; readonly AKUBECTL;
   AGCLOUD="$(which gcloud || true)"; readonly AGCLOUD;
@@ -2534,14 +2544,19 @@ install() {
 }
 
 install_managed_components() {
+  info "Configuring ASM managed control plane revision CRD..."
+  context_append-kube-yaml "${CRD_CONTROL_PLANE_REVISION}"
+
   info "Configuring base installation for managed control plane..."
   context_append-kube-yaml "${BASE_REL_PATH}"
 
   info "Configuring ASM managed control plane validating webhook config..."
   context_append-kube-yaml "${MANAGED_WEBHOOKS}"
 
-  info "Configuring ASM managed control plane components..."
-  print_config >| managed_control_plane_gateway.yaml
+  info "Configuring ASM managed control plane revision CR for channels..."
+  context_append-kube-yaml "${CR_CONTROL_PLANE_REVISION_REGULAR}"
+  context_append-kube-yaml "${CR_CONTROL_PLANE_REVISION_RAPID}"
+  context_append-kube-yaml "${CR_CONTROL_PLANE_REVISION_STABLE}"
 }
 
 scrape_managed_urls() {
@@ -2652,6 +2667,7 @@ apply_kube_yamls() {
   for yaml_file in $(context_list-kube-yamls); do
     info "Applying ${yaml_file}..."
     retry 3 kubectl apply --overwrite=true -f "${yaml_file}"
+    sleep 2
   done
 }
 
@@ -2697,9 +2713,6 @@ outro() {
     info "${OUTPUT_DIR}/${RAW_YAML}"
     info "The full, expanded set of kubernetes resources can be found at:"
     info "${OUTPUT_DIR}/${EXPANDED_YAML}"
-  else
-    info "You can find the gateway config to install with istioctl here:"
-    info "${OUTPUT_DIR}/managed_control_plane_gateway.yaml"
   fi
 
   info "$(starline)"
