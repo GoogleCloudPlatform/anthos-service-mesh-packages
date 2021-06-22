@@ -111,6 +111,10 @@ main() {
       shift 1
       print-config_subcommand "${@}"
       ;;
+    add-to-mesh)
+      shift 1
+      add-to-mesh_subcommand "${@}"
+      ;;
     *)
       help_subcommand "${@}"
       ;;
@@ -1151,7 +1155,7 @@ post_process_istio_yamls() {
   handle_multi_yaml_bug
 
   while read -d ',' -r yaml_file; do
-    context_append-istio-yaml "${yaml_file}"
+    context_append "istioctlFiles" "${yaml_file}"
   done <<EOF
 $(context_get-option "CUSTOM_OVERLAY")
 EOF
@@ -2165,8 +2169,8 @@ istio_namespace_exists() {
 
 register_gce_identity_provider() {
   info "Registering GCE Identity Provider in the cluster..."
-  context_append-kube-yaml "asm/identity-provider/identityprovider-crd.yaml"
-  context_append-kube-yaml "asm/identity-provider/googleidp.yaml"
+  context_append "kubectlFiles" "asm/identity-provider/identityprovider-crd.yaml"
+  context_append "kubectlFiles" "asm/identity-provider/googleidp.yaml"
 }
 
 should_enable_service_mesh_feature() {
@@ -2258,6 +2262,108 @@ configure_package() {
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${REVISION_LABEL}"
   fi
 }
+add-to-mesh_subcommand() {
+  ### Preparation ###
+  parse_cluster_args "$@"
+  validate_cluster_args
+  add_all_to_mesh
+}
+
+parse_cluster_args() {
+  if [[ $# != 0 ]]; then
+    local FLEET_ID; FLEET_ID="${1}"
+    context_set-option "FLEET_ID" "${FLEET_ID}"
+    shift 1
+  fi
+
+  if [[ "${*}" = '' ]]; then
+    usage_short >&2
+    exit 2
+  fi
+
+  while [[ $# != 0 ]]; do
+    local CLUSTER; CLUSTER="${1}"
+    context_append "clustersInfo" "${CLUSTER//\// }"
+    shift 1
+  done
+}
+
+validate_cluster_args() {
+  # validate fleet id is valid
+  get_project_number
+
+  # validate clusters are valid
+  local PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME GKE_CLUSTER_URI
+  while read -r PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME; do
+    context_set-option "PROJECT_ID" "${PROJECT_ID}"
+    context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
+    context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
+
+    validate_cluster
+    configure_kubectl
+
+    if ! is_membership_crd_installed; then
+      GKE_CLUSTER_URI="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
+      --zone="${CLUSTER_LOCATION}" \
+      --project="${PROJECT_ID}" \
+      --format='value(selfLink)')"
+      context_append "clusterRegistrations" "${PROJECT_ID} ${CLUSTER_LOCATION} ${CLUSTER_NAME} ${GKE_CLUSTER_URI}"
+    else
+      exit_if_cluster_registered_to_another_fleet
+      info "Cluster ${CLUSTER_NAME} is already registered with project ${PROJECT_ID}. Skipping."
+    fi
+  done <<EOF
+$(context_list "clustersInfo")
+EOF
+}
+
+exit_if_cluster_registered_to_another_fleet() {
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+
+  WANT="//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
+  local LIST
+  LIST="$(gcloud container hub memberships list --project "${FLEET_ID}" \
+    --format=json | grep "${WANT}")"
+  if [[ -z "${LIST}" ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Cluster is already registered but not in the project ${FLEET_ID}.
+EOF
+  fi
+}
+
+add_all_to_mesh() {
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  local PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME GKE_CLUSTER_URI
+  local MEMBERSHIP_NAME
+  while read -r PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME GKE_CLUSTER_URI; do
+    if [[ -n "${PROJECT_ID}" && -n "${CLUSTER_LOCATION}" && -n "${CLUSTER_NAME}" && -n "${GKE_CLUSTER_URI}" ]]; then
+      context_set-option "PROJECT_ID" "${PROJECT_ID}"
+      context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
+      context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
+      
+      MEMBERSHIP_NAME="$(generate_membership_name)"
+      info "Registering the cluster ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME} as ${MEMBERSHIP_NAME}..."
+
+      local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+      retry 2 run_command gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
+        --project="${PROJECT_ID}" \
+        --gke-uri="${GKE_CLUSTER_URI}" \
+        --enable-workload-identity
+    else
+      { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Unable to register the cluster due to unexpected cluster information:
+  Project ID: ${PROJECT_ID}
+  Cluster Location: ${CLUSTER_LOCATION}
+  Cluster Name: ${CLUSTER_NAME}
+EOF
+    fi
+  done <<EOF
+$(context_list "clusterRegistrations")
+EOF
+}
 help_subcommand() {
   local PRINT_HELP; PRINT_HELP=0
   local PRINT_VERSION; PRINT_VERSION=0
@@ -2306,7 +2412,7 @@ version_message() {
 usage() {
   cat << EOF
 ${SCRIPT_NAME} $(version_message)
-usage: ${SCRIPT_NAME} [OPTION]...
+usage: ${SCRIPT_NAME} [SUBCOMMAND] [OPTION]...
 
 Set up, validate, and install ASM in a Google Cloud environment.
 Single argument options can also be passed via environment variables by using
@@ -2317,6 +2423,7 @@ SUBCOMMANDS:
   install                             Install will attempt a new ASM installation
   validate                            Validate will attempt a new ASM validation
   print-config                        Print Config will attempt to print the configurations used
+  add-to-mesh                         Add multiple clusters to the mesh
 
 OPTIONS:
   -l|--cluster_location  <LOCATION>   The GCP location of the target cluster.
@@ -2452,7 +2559,7 @@ EOF
 usage_short() {
   cat << EOF
 ${SCRIPT_NAME} $(version_message)
-usage: ${SCRIPT_NAME} [OPTION]...
+usage: ${SCRIPT_NAME} [SUBCOMMAND] [OPTION]...
 
 Set up, validate, and install ASM in a Google Cloud environment.
 Use -h|--help with -v|--verbose to show detailed descriptions.
@@ -2461,6 +2568,7 @@ SUBCOMMANDS:
   install
   validate
   print-config
+  add-to-mesh
 
 OPTIONS:
   -l|--cluster_location  <LOCATION>
@@ -2548,10 +2656,10 @@ install_managed_components() {
   context_append-kube-yaml "${CRD_CONTROL_PLANE_REVISION}"
 
   info "Configuring base installation for managed control plane..."
-  context_append-kube-yaml "${BASE_REL_PATH}"
+  context_append "kubectlFiles" "${BASE_REL_PATH}"
 
   info "Configuring ASM managed control plane validating webhook config..."
-  context_append-kube-yaml "${MANAGED_WEBHOOKS}"
+  context_append "kubectlFiles" "${MANAGED_WEBHOOKS}"
 
   info "Configuring ASM managed control plane revision CR for channels..."
   context_append-kube-yaml "${CR_CONTROL_PLANE_REVISION_REGULAR}"
@@ -2579,12 +2687,12 @@ install_in_cluster_control_plane() {
 
   if ! does_istiod_exist && [[ "${_CI_NO_REVISION}" -ne 1 ]]; then
     info "Installing validation webhook fix..."
-    context_append-kube-yaml "${VALIDATION_FIX_SERVICE}"
+    context_append "kubectlFiles" "${VALIDATION_FIX_SERVICE}"
   fi
 
   local PARAMS
   PARAMS="-f ${OPERATOR_MANIFEST}"
-  for yaml_file in $(context_list-istio-yamls); do
+  for yaml_file in $(context_list "istioctlFiles"); do
     PARAMS="${PARAMS} -f ${yaml_file}"
   done
 
@@ -2664,7 +2772,7 @@ does_istiod_exist(){
 }
 
 apply_kube_yamls() {
-  for yaml_file in $(context_list-kube-yamls); do
+  for yaml_file in $(context_list "kubectlFiles"); do
     info "Applying ${yaml_file}..."
     retry 3 kubectl apply --overwrite=true -f "${yaml_file}"
     sleep 2
@@ -2681,7 +2789,7 @@ install_canonical_controller() {
 }
 
 expose_istiod() {
-  context_append-kube-yaml "${EXPOSE_ISTIOD_SERVICE}"
+  context_append "kubectlFiles" "${EXPOSE_ISTIOD_SERVICE}"
 }
 
 outro() {
@@ -2798,7 +2906,7 @@ print_config() {
   fi
 
   PARAMS="-f ${OPERATOR_MANIFEST}"
-  for yaml_file in $(context_list-istio-yamls); do
+  for yaml_file in $(context_list "istioctlFiles"); do
     PARAMS="${PARAMS} -f ${yaml_file} "
   done
   # shellcheck disable=SC2086
@@ -3155,7 +3263,9 @@ context_init() {
     "WI_ENABLED": ${WI_ENABLED:-0}
   },
   "istioctlFiles": [],
-  "kubectlFiles": []
+  "kubectlFiles": [],
+  "clustersInfo": [],
+  "clusterRegistrations": []
 }
 EOF
 )
@@ -3182,30 +3292,18 @@ context_set-option() {
   && mv "${TEMP_FILE}" "${context_FILE_LOCATION}"
 }
 
-# TODO: support appending multiple files at once
-context_append-istio-yaml() {
-  local YAML; YAML="${1}"
+context_append() {
+  local KEY; KEY="${1}"
+  local VALUE; VALUE="${2}"
   local TEMP_FILE; TEMP_FILE="$(mktemp)"
 
-  jq -S --arg YAML "${YAML}" '.istioctlFiles += [$YAML]' "${context_FILE_LOCATION}" >| "${TEMP_FILE}" \
+  jq -S --arg KEY "${KEY}" --arg VALUE "${VALUE}" '.[$KEY] += [$VALUE]' "${context_FILE_LOCATION}" >| "${TEMP_FILE}" \
   && mv "${TEMP_FILE}" "${context_FILE_LOCATION}"
 }
 
-context_list-istio-yamls() {
-  jq -S -r '.istioctlFiles[]' "${context_FILE_LOCATION}"
-}
-
-# TODO: support appending multiple files at once
-context_append-kube-yaml() {
-  local YAML; YAML="${1}"
-  local TEMP_FILE; TEMP_FILE="$(mktemp)"
-
-  jq -S --arg YAML "${YAML}" '.kubectlFiles += [$YAML]' "${context_FILE_LOCATION}" >| "${TEMP_FILE}" \
-  && mv "${TEMP_FILE}" "${context_FILE_LOCATION}"
-}
-
-context_list-kube-yamls() {
-  jq -S -r '.kubectlFiles[]' "${context_FILE_LOCATION}"
+context_list() {
+  local KEY; KEY="${1}"
+  jq -S -r --arg KEY "${KEY}" '.[$KEY][]' "${context_FILE_LOCATION}"
 }
 
 main "${@}"

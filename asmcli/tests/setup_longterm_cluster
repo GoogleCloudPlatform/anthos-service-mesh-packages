@@ -82,3 +82,5 @@ setup_cluster() {
 
 setup_cluster "${LT_CLUSTER_NAME}"
 setup_cluster "long-term-test-cluster-environ"
+setup_cluster "long-term-test-cluster-add-to-mesh-1"
+setup_cluster "long-term-test-cluster-add-to-mesh-2"

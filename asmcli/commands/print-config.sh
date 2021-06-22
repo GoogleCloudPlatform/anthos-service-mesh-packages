@@ -37,7 +37,7 @@ print_config() {
   fi
 
   PARAMS="-f ${OPERATOR_MANIFEST}"
-  for yaml_file in $(context_list-istio-yamls); do
+  for yaml_file in $(context_list "istioctlFiles"); do
     PARAMS="${PARAMS} -f ${yaml_file} "
   done
   # shellcheck disable=SC2086

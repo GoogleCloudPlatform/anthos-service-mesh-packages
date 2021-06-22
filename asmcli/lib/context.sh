@@ -49,7 +49,9 @@ context_init() {
     "WI_ENABLED": ${WI_ENABLED:-0}
   },
   "istioctlFiles": [],
-  "kubectlFiles": []
+  "kubectlFiles": [],
+  "clustersInfo": [],
+  "clusterRegistrations": []
 }
 EOF
 )
@@ -76,28 +78,16 @@ context_set-option() {
   && mv "${TEMP_FILE}" "${context_FILE_LOCATION}"
 }
 
-# TODO: support appending multiple files at once
-context_append-istio-yaml() {
-  local YAML; YAML="${1}"
+context_append() {
+  local KEY; KEY="${1}"
+  local VALUE; VALUE="${2}"
   local TEMP_FILE; TEMP_FILE="$(mktemp)"
 
-  jq -S --arg YAML "${YAML}" '.istioctlFiles += [$YAML]' "${context_FILE_LOCATION}" >| "${TEMP_FILE}" \
+  jq -S --arg KEY "${KEY}" --arg VALUE "${VALUE}" '.[$KEY] += [$VALUE]' "${context_FILE_LOCATION}" >| "${TEMP_FILE}" \
   && mv "${TEMP_FILE}" "${context_FILE_LOCATION}"
 }
 
-context_list-istio-yamls() {
-  jq -S -r '.istioctlFiles[]' "${context_FILE_LOCATION}"
-}
-
-# TODO: support appending multiple files at once
-context_append-kube-yaml() {
-  local YAML; YAML="${1}"
-  local TEMP_FILE; TEMP_FILE="$(mktemp)"
-
-  jq -S --arg YAML "${YAML}" '.kubectlFiles += [$YAML]' "${context_FILE_LOCATION}" >| "${TEMP_FILE}" \
-  && mv "${TEMP_FILE}" "${context_FILE_LOCATION}"
-}
-
-context_list-kube-yamls() {
-  jq -S -r '.kubectlFiles[]' "${context_FILE_LOCATION}"
+context_list() {
+  local KEY; KEY="${1}"
+  jq -S -r --arg KEY "${KEY}" '.[$KEY][]' "${context_FILE_LOCATION}"
 }
