@@ -1,10 +1,12 @@
 #!/bin/bash
 
-set -CeE
+set -ex
 set -o pipefail
 set +o noclobber
 
 echo "============================================="
+source ".currContext"
+cd ${OUTPUT_DIR}
 echo "Cleanup and Detach VM ${1}"
 source "vm-${1}/.context"
 
@@ -16,13 +18,18 @@ kubectl delete workloadgroup ${VM_APP} -n ${VM_NAMESPACE} --ignore-not-found
 kubectl delete service ${VM_APP} -n ${VM_NAMESPACE} --ignore-not-found
 
 echo "[Step 2] Stop Istio on VM and Wipe out Mounted Artifacts"
-scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no stopagent.sh root@${VM_IP}:~
-until ssh -i "${KEY_FILE}" -o StrictHostKeyChecking=no root@${VM_IP} 'chmod +x stopagent.sh; ./stopagent.sh >/dev/null'; do
-    sleep 1
+cd ${WORK_DIR}
+if [[ ! -e "stopagent.sh" ]]; then
+  fatal "file stopagent.sh does not exists in working dir ${WORK_DIR}"
+fi
+
+scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no stopagent.sh root@${VM_IP}:"${VM_DIR}"
+stopagentcmd="chmod +x ${VM_DIR}/stopagent.sh; ${VM_DIR}/stopagent.sh ${VM_DIR} >/dev/null"
+until ssh -i "${KEY_FILE}" -o StrictHostKeyChecking=no root@${VM_IP} ${stopagentcmd}; do
+  sleep 1
 done
 
 echo "[Step 3] Remove folder ${OUTPUT_DIR}/vm-${VM_APP}"
 rm -rf ${OUTPUT_DIR}/vm-${VM_APP}
 
 echo -e "\xE2\x9C\x94 Successfully Cleanup vm:${VM_APP} addr:${VM_IP}"
-echo " "

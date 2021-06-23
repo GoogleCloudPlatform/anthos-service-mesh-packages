@@ -2,9 +2,7 @@
 
 set -CeE
 
-if pidof echo; then
-  kill $(eval pidof echo)
-fi
+DIR="${1}"
 
 sudo systemctl stop istio
 
@@ -15,6 +13,7 @@ fi
 rm -rf /etc/certs/*
 rm -rf /var/log/istio
 
-rm -f cluster.env echo hosts istio-token mesh.yaml root-cert.pem runagent.sh
+cd ${DIR}
+rm -f cluster.env hosts istio-token mesh.yaml root-cert.pem runagent.sh
 
 exit

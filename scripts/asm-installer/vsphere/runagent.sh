@@ -1,26 +1,29 @@
 #!/bin/bash
 
-set -CeE
+set -ex
 
 echo "Installing ASM agent"
 
+DIR="${1}"
+cd ${DIR}
+
 # Copy root cert and bootstrap token
 sudo mkdir -p /etc/certs
-sudo cp /tmp/root-cert.pem /etc/certs/root-cert.pem
+sudo cp root-cert.pem /etc/certs/root-cert.pem
 
 sudo mkdir -p /var/run/secrets/tokens
-sudo cp /tmp/istio-token /var/run/secrets/tokens/istio-token
+sudo cp istio-token /var/run/secrets/tokens/istio-token
 
 # Installing ASM agent.
 sudo rpm -ivh --force istio-sidecar.rpm
 
-sudo cp /tmp/cluster.env /var/lib/istio/envoy/cluster.env
+sudo cp cluster.env /var/lib/istio/envoy/cluster.env
 
-sudo cp /tmp/mesh.yaml /etc/istio/config/mesh
+sudo cp mesh.yaml /etc/istio/config/mesh
 
 echo -e "\xE2\x9C\x94 systemctl start istio"
 
-sudo sh -c 'cat /tmp/hosts >> /etc/hosts'
+sudo sh -c 'cat hosts >> /etc/hosts'
 
 sudo mkdir -p /etc/istio/proxy
 sudo chown -R istio-proxy /var/lib/istio /etc/certs /etc/istio/proxy /etc/istio/config /var/run/secrets /etc/certs/root-cert.pem

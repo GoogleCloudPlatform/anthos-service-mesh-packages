@@ -6,7 +6,7 @@ set -o pipefail
 set +o noclobber
 
 main() {
-  echo "============================================= create attach context"
+  echo "============================================="
   init
   parse_validate_args "${@}"
 }
@@ -71,6 +71,11 @@ function fill_unspecified_context() {
     echo "Using Multi-Network Scenario. Cluster Network: ${CLUSTER_NETWORK}, VM Network: ${VM_NETWORK}"
   fi
 
+  if [[ -z "${VM_NAMESPACE}" ]]; then
+    VM_NAMESPACE="default"
+    echo "VM NAMESPACE    is not specified. Set VM NAMESPACE as namespace default."
+  fi
+
   if [[ -z "${MESH_ID}" ]]; then
     MESH_ID="proj-${PROJECT_NUMBER}"
     echo "Mesh ID         is not specified. Set Mesh ID as proj-PROJECT_NUMBER: ${MESH_ID}."
@@ -95,7 +100,7 @@ function fill_unspecified_context() {
   fi
 
   if [[ -z "${VM_DIR}" ]]; then
-    WORK_DIR="/tmp"
+    VM_DIR="/tmp"
     echo "VM config Dir   is not specified. Set VM config Dir as /tmp in VM"
   fi
 
@@ -117,6 +122,9 @@ function fill_unspecified_context() {
     kubectl create serviceaccount "${SERVICE_ACCOUNT}" -n "${VM_NAMESPACE}"
   fi
 
+  if [[ ! -z "${LABELS}" ]]; then
+    echo "LABELS is set as ${LABELS}"
+  fi
 }
 
 function  write_config_context() {
@@ -135,41 +143,38 @@ function  write_config_context() {
   echo "export VM_NAMESPACE=${VM_NAMESPACE}" >>${CONTEXT_FILE}
   echo "export SERVICE_ACCOUNT=${SERVICE_ACCOUNT}" >>${CONTEXT_FILE}
   echo "export VM_DIR=${VM_DIR}" >>${CONTEXT_FILE}
+  echo "export LABELS=${LABELS}" >>${CONTEXT_FILE}
 }
 
 function read_args() {
+  # shellcheck disable=SC2064
+  trap "$(shopt -p nocasematch)" RETURN
+  shopt -s nocasematch
+
   shift 1
   while [[ ${#} != 0 ]]; do
     case "${1}" in
-    -addr | --address | --vm_ip | --vm-ip)
-      export VM_IP="${2}"
-      shift 2
-      ;;
-    -app | --app | --vm_app | --vm-app)
-      export VM_APP="${2}"
-      shift 2
-      ;;
     -mesh | --mesh_id | --mesh-id)
       export MESH_ID="${2}"
       shift 2
       ;;
-    -network | --network | --vm_network | --vm-network)
+    -net | --network | --vm_network | --vm-network)
       export VM_NETWORK="${2}"
       shift 2
       ;;
-    -k | --key_file | --ssh-key-file)
+    -key | --key_file | --ssh-key-file)
       export KEY_FILE="${2}"
       shift 2
       ;;
-    -s | --service_account | --service-account)
+    -sa | --service_account | --service-account)
       export SERVICE_ACCOUNT="${2}"
       shift 2
       ;;
-    --cluster | --vm-cluster | --cluster_name | --cluster-name)
+    -cluster | --cluster | --cluster_name | --cluster-name)
       export CLUSTER="${2}"
       shift 2
       ;;
-    -p | --project_id | --project-id)
+    -project | --project | --project_id | --project-id)
       export PROJECT_ID="${2}"
       shift 2
       ;;
@@ -177,16 +182,30 @@ function read_args() {
       export VM_NAMESPACE="${2}"
       shift 2
       ;;
-    --kubeconfig)
+    -kubeconfig | --kubeconfig)
       export KUBECONFIG="${2}"
       shift 2
       ;;
-    --context)
+    -context | --context)
       export SELECT_CONTEXT="${2}"
       shift 2
       ;;
-    --vm-config-dir)
+    -vmdir | --vm-config-dir)
       export VM_DIR="${2}"
+      shift 2
+      ;;
+    -work | --workdir | --work-dir)
+      export WORK_DIR="${2}"
+      shift 2
+      ;;
+    -out | -output | --output-dir)
+      export OUTPUT_DIR="${2}"
+      shift 2
+      ;;
+    -labels | --labels)
+      LABELS="${2}"
+      printf -v LABELS '%s' ${LABELS}
+      export LABELS="\"${LABELS}\""
       shift 2
       ;;
     *)
