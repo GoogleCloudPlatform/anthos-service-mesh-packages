@@ -17,6 +17,7 @@ setup_cluster() {
     --filter="name = ${cluster} and location = ${LT_CLUSTER_LOCATION}" \
     --format="value(name)" || true)"
 
+  set +e
   OUTPUT_DIR=$(mktemp -d)
   ../install_asm \
     -l "${LT_CLUSTER_LOCATION}" \
@@ -25,6 +26,7 @@ setup_cluster() {
     -m install \
     --print-config \
     -D "${OUTPUT_DIR}" > /dev/null
+  set -e
 
   cleanup_old_instance_templates
   cleanup_old_instances
