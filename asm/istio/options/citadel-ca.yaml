@@ -24,8 +24,6 @@ spec:
             value: ""
           - name: TOKEN_AUDIENCES
             value: "istio-ca,PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.token-audiences"}
-          - name: ENABLE_STACKDRIVER_MONITORING
-            value: "false" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.controlplane.monitoring.enabled"}
   meshConfig:
     trustDomain: "cluster.local"
     defaultConfig:
