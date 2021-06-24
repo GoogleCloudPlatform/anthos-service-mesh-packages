@@ -28,6 +28,7 @@ print-config_subcommand() {
   print_config >&3
 }
 
+#TODO gzip
 print_config() {
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
 
@@ -36,6 +37,7 @@ print_config() {
     return
   fi
 
+  local PARAMS
   PARAMS="-f ${OPERATOR_MANIFEST}"
   for yaml_file in $(context_list "istioctlFiles"); do
     PARAMS="${PARAMS} -f ${yaml_file} "

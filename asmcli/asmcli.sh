@@ -29,7 +29,7 @@ _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"; readonly _CI_I_AM_A_TEST_RO
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=9}"; readonly MINOR;
-POINT="${POINT:=3}"; readonly POINT;
+POINT="${POINT:=5}"; readonly POINT;
 REV="${REV:=2}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1-unstable"}"; readonly CONFIG_VER;
 K8S_MINOR=0
@@ -129,7 +129,9 @@ prepare_environment() {
 
   if should_validate || can_modify_at_all; then
     local_iam_user > /dev/null
-    validate_gcp_resources
+    if is_gcp; then
+      validate_gcp_resources
+    fi
   fi
 
   if needs_asm; then
@@ -243,7 +245,9 @@ kpt() {
 }
 
 istioctl() {
-  run_command "$(istioctl_path)" "${@}"
+  local KCF; KCF="$(context_get-option "KUBECONFIG")"
+  local KCC; KCC="$(context_get-option "CONTEXT")"
+  run_command "$(istioctl_path)" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
 }
 
 istioctl_path() {
@@ -327,9 +331,12 @@ configure_kubectl(){
   local ADDR
   ADDR="$(kubectl config view --minify=true -ojson | \
     jq .clusters[0].cluster.server -r)"
+  local DEST
+  DEST="${ADDR:8:${#ADDR}}"
+  DEST="${DEST%:*}"
 
   local RETVAL; RETVAL=0;
-  run_command nc -zvw 10 "${ADDR:8:${#ADDR}}" 443 || RETVAL=$?
+  run_command nc -zvw 10 "${DEST}" 443 || RETVAL=$?
   if [[ "${RETVAL}" -ne 0 ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Couldn't connect to ${CLUSTER_NAME}.
@@ -922,10 +929,19 @@ EOF
     fi
   fi
 
-  # GCP only: when no Fleet Id is provided, default to the cluster's project as the Fleet host.
-  if [[ -z "${FLEET_ID}" ]] && is_gcp; then
-    FLEET_ID="${PROJECT_ID}"
-    context_set-option "FLEET_ID" "${FLEET_ID}"
+  if is_gcp; then
+    # GCP only: when no Fleet Id is provided, default to the cluster's project as the Fleet host.
+    if [[ -z "${FLEET_ID}" ]]; then
+      FLEET_ID="${PROJECT_ID}"
+      context_set-option "FLEET_ID" "${FLEET_ID}"
+    fi
+  else
+    # non-GCP only: set Project Id to same as Fleet Id.
+    # Project Id will be used to enable APIs if applicable.
+    if [[ -n "${FLEET_ID}" ]]; then
+      PROJECT_ID="${FLEET_ID}"
+      context_set-option "PROJECT_ID" "${PROJECT_ID}"
+    fi
   fi
 
   if can_register_cluster && ! has_value "FLEET_ID"; then
@@ -1093,9 +1109,13 @@ set_up_local_workspace() {
 
 ### Environment validation functions ###
 validate_environment() {
-  validate_node_pool
+  if is_gcp; then
+    validate_node_pool
+  fi
   validate_k8s
-  validate_expected_control_plane
+  if is_gcp; then
+    validate_expected_control_plane
+  fi
 }
 
 organize_kpt_files() {
@@ -1935,22 +1955,29 @@ generate_membership_name() {
 register_cluster() {
   if is_cluster_registered; then return; fi
 
-  if can_modify_gcp_components; then
-    enable_workload_identity
-  else
-    exit_if_no_workload_identity
+  if is_gcp; then
+    if can_modify_gcp_components; then
+      enable_workload_identity
+    else
+      exit_if_no_workload_identity
+    fi
+    populate_cluster_values
   fi
 
-  populate_cluster_values
   local MEMBERSHIP_NAME
   MEMBERSHIP_NAME="$(generate_membership_name)"
   info "Registering the cluster as ${MEMBERSHIP_NAME}..."
 
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
-  retry 2 gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
-    --project="${FLEET_ID}" \
-    --gke-uri="${GKE_CLUSTER_URI}" \
-    --enable-workload-identity
+  if is_gcp; then
+    retry 2 gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
+      --project="${FLEET_ID}" \
+      --gke-uri="${GKE_CLUSTER_URI}" \
+      --enable-workload-identity
+  else
+    # TODO gzip
+    :
+  fi
 }
 
 exit_if_cluster_unregistered() {
@@ -2230,13 +2257,22 @@ configure_package() {
 
   info "Configuring kpt package..."
 
-  populate_cluster_values
+  if is_gcp; then
+    populate_cluster_values
+  fi
+
   populate_fleet_info
-  kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
-  kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
+
+  if is_gcp; then
+    kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
+    kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
+    kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
+    kpt cfg set asm gcloud.compute.network "${GCE_NETWORK_NAME}"
+  else
+    kpt cfg set asm gcloud.core.project "${FLEET_ID}"
+  fi
+
   kpt cfg set asm gcloud.project.environProjectNumber "${PROJECT_NUMBER}"
-  kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
-  kpt cfg set asm gcloud.compute.network "${GCE_NETWORK_NAME}"
   kpt cfg set asm anthos.servicemesh.rev "${REVISION_LABEL}"
   kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
   if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then
