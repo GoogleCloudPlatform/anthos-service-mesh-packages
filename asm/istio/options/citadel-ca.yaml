@@ -25,13 +25,17 @@ spec:
           - name: TOKEN_AUDIENCES
             value: "istio-ca,PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.token-audiences"}
           - name: ENABLE_STACKDRIVER_MONITORING
-            value: "true" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.controlplane.monitoring.enabled"}
+            value: "false" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.controlplane.monitoring.enabled"}
   meshConfig:
     trustDomain: "cluster.local"
     defaultConfig:
       proxyMetadata:
+        GKE_CLUSTER_URL: "" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cluster-url"}
+        GCP_METADATA: "" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-metadata"}
         CA_PROVIDER: "Citadel"
         PLUGINS: ""
+        USE_TOKEN_FOR_CSR: "false"
+        GCE_METADATA_HOST: ""
   values:
     global:
       caAddress: ""
