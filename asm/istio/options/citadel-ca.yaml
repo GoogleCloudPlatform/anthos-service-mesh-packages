@@ -28,8 +28,8 @@ spec:
     trustDomain: "cluster.local"
     defaultConfig:
       proxyMetadata:
-        GKE_CLUSTER_URL: "" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cluster-url"}
-        GCP_METADATA: "" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-metadata"}
+        GKE_CLUSTER_URL: ""
+        GCP_METADATA: ""
         CA_PROVIDER: "Citadel"
         PLUGINS: ""
         USE_TOKEN_FOR_CSR: "false"

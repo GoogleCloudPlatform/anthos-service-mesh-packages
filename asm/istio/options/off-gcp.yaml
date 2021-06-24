@@ -21,4 +21,4 @@ spec:
       k8s:
         env:
           - name: ENABLE_STACKDRIVER_MONITORING
-            value: "false" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.controlplane.monitoring.enabled"}
+            value: "false"
