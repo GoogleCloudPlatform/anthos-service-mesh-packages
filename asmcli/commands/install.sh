@@ -67,6 +67,7 @@ scrape_managed_urls() {
 
 install_in_cluster_control_plane() {
   local USE_VM; USE_VM="$(context_get-option "USE_VM")"
+  local CA; CA="$(context_get-option "CA")"
 
   if ! does_istiod_exist && [[ "${_CI_NO_REVISION}" -ne 1 ]]; then
     info "Installing validation webhook fix..."
@@ -85,6 +86,14 @@ install_in_cluster_control_plane() {
 
   if [[ "${K8S_MINOR}" -eq 15 ]]; then
     PARAMS="${PARAMS} -f ${BETA_CRD_MANIFEST}"
+  fi
+
+  if [[ "${CA}" == "citadel" ]]; then
+    PARAMS="${PARAMS} -f ${CITADEL_MANIFEST}"
+  fi
+
+  if ! is_gcp; then
+    PARAMS="${PARAMS} -f ${OFF_GCP_MANIFEST}"
   fi
 
   PARAMS="${PARAMS} --skip-confirmation"

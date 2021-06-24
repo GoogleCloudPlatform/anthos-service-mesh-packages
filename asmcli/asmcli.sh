@@ -45,6 +45,8 @@ VALIDATION_FIX_SERVICE=""
 OPTIONS_DIRECTORY=""
 OPERATOR_MANIFEST=""
 BETA_CRD_MANIFEST=""
+CITADEL_MANIFEST=""
+OFF_GCP_MANIFEST=""
 MANAGED_MANIFEST=""
 MANAGED_WEBHOOKS=""
 EXPOSE_ISTIOD_SERVICE=""
@@ -154,7 +156,7 @@ init() {
   if [[ "${POINT}" == "alpha" ]]; then
     RELEASE="${MAJOR}.${MINOR}-alpha.${REV}"
     REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}"
-    KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=v2}"
+    KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=master}"
   elif [[ "$(version_message)" =~ ^[0-9]+\.[0-9]+\.[0-9]+-asm\.[0-9]+\+config[0-9]+$ ]]; then
     RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
     REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}-${REV}"
@@ -169,7 +171,7 @@ init() {
   readonly RELEASE; readonly RELEASE_LINE; readonly PREVIOUS_RELEASE_LINE; readonly KPT_BRANCH;
 
   KPT_URL="https://github.com/GoogleCloudPlatform/anthos-service-mesh-packages"
-  KPT_URL="${KPT_URL}.git/asm@${KPT_BRANCH}"; readonly KPT_URL;
+  KPT_URL="${KPT_URL}.git/asm@v2"; readonly KPT_URL;
   ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
   ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
   BASE_REL_PATH="${ISTIO_FOLDER_NAME}/manifests/charts/base/files/gen-istio-cluster.yaml"; readonly BASE_REL_PATH;
@@ -179,6 +181,8 @@ init() {
   OPTIONS_DIRECTORY="${PACKAGE_DIRECTORY}/options"; readonly OPTIONS_DIRECTORY;
   OPERATOR_MANIFEST="${PACKAGE_DIRECTORY}/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
   BETA_CRD_MANIFEST="${OPTIONS_DIRECTORY}/v1beta1-crds.yaml"; readonly BETA_CRD_MANIFEST;
+  CITADEL_MANIFEST="${OPTIONS_DIRECTORY}/citadel-ca.yaml"; readonly CITADEL_MANIFEST;
+  OFF_GCP_MANIFEST="${OPTIONS_DIRECTORY}/off-gcp.yaml"; readonly OFF_GCP_MANIFEST;
   MANAGED_MANIFEST="${OPTIONS_DIRECTORY}/managed-control-plane.yaml"; readonly MANAGED_MANIFEST;
   MANAGED_WEBHOOKS="${OPTIONS_DIRECTORY}/managed-control-plane-webhooks.yaml"; readonly MANAGED_WEBHOOKS;
   EXPOSE_ISTIOD_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_SERVICE;
