@@ -170,8 +170,8 @@ init() {
   PREVIOUS_RELEASE_LINE="${MAJOR}.$(( MINOR - 1 ))."
   readonly RELEASE; readonly RELEASE_LINE; readonly PREVIOUS_RELEASE_LINE; readonly KPT_BRANCH;
 
-  KPT_URL="https://github.com/GoogleCloudPlatform/anthos-service-mesh-packages"
-  KPT_URL="${KPT_URL}.git/asm@v2"; readonly KPT_URL;
+  KPT_URL="https://github.com/backward-compatible/anthos-service-mesh-packages"
+  KPT_URL="${KPT_URL}.git/asm@myconfigs"; readonly KPT_URL;
   ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
   ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
   BASE_REL_PATH="${ISTIO_FOLDER_NAME}/manifests/charts/base/files/gen-istio-cluster.yaml"; readonly BASE_REL_PATH;
