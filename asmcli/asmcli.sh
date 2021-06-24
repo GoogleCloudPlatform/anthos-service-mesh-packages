@@ -154,7 +154,7 @@ init() {
   if [[ "${POINT}" == "alpha" ]]; then
     RELEASE="${MAJOR}.${MINOR}-alpha.${REV}"
     REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}"
-    KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=master}"
+    KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=v2}"
   elif [[ "$(version_message)" =~ ^[0-9]+\.[0-9]+\.[0-9]+-asm\.[0-9]+\+config[0-9]+$ ]]; then
     RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
     REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}-${REV}"
