@@ -156,7 +156,7 @@ init() {
   if [[ "${POINT}" == "alpha" ]]; then
     RELEASE="${MAJOR}.${MINOR}-alpha.${REV}"
     REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}"
-    KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=master}"
+    KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=v2}"
   elif [[ "$(version_message)" =~ ^[0-9]+\.[0-9]+\.[0-9]+-asm\.[0-9]+\+config[0-9]+$ ]]; then
     RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
     REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}-${REV}"
@@ -170,8 +170,9 @@ init() {
   PREVIOUS_RELEASE_LINE="${MAJOR}.$(( MINOR - 1 ))."
   readonly RELEASE; readonly RELEASE_LINE; readonly PREVIOUS_RELEASE_LINE; readonly KPT_BRANCH;
 
-  KPT_URL="https://github.com/backward-compatible/anthos-service-mesh-packages"
-  KPT_URL="${KPT_URL}.git/asm@myconfigs"; readonly KPT_URL;
+  KPT_URL="https://github.com/GoogleCloudPlatform/anthos-service-mesh-packages"
+  # KPT_URL="${KPT_URL}.git/asm@${KPT_BRANCH}"; readonly KPT_URL;
+  KPT_URL="${KPT_URL}.git/asm@v2"; readonly KPT_URL;
   ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
   ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
   BASE_REL_PATH="${ISTIO_FOLDER_NAME}/manifests/charts/base/files/gen-istio-cluster.yaml"; readonly BASE_REL_PATH;
