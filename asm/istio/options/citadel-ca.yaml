@@ -23,7 +23,7 @@ spec:
           - name: SPIFFE_BUNDLE_ENDPOINTS
             value: ""
           - name: TOKEN_AUDIENCES
-            value: "istio-ca"
+            value: "istio-ca,PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.token-audiences"}
   meshConfig:
     trustDomain: "cluster.local"
     defaultConfig:
