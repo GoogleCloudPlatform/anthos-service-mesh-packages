@@ -1969,19 +1969,24 @@ register_cluster() {
     populate_cluster_values
   fi
 
-  local MEMBERSHIP_NAME
-  MEMBERSHIP_NAME="$(generate_membership_name)"
+  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name)"
   info "Registering the cluster as ${MEMBERSHIP_NAME}..."
-
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+
   if is_gcp; then
     retry 2 gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
       --project="${FLEET_ID}" \
       --gke-uri="${GKE_CLUSTER_URI}" \
       --enable-workload-identity
   else
-    # TODO gzip
-    :
+    local KCF; KCF="$(context_get-option "KUBECONFIG")"
+    local KCC; KCC="$(context_get-option "CONTEXT")"
+
+    retry 2 gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
+      --project="${FLEET_ID}" \
+      --kubeconfig="${KCF}" \
+      --context="${KCC}" \
+      --enable-workload-identity
   fi
 }
 
