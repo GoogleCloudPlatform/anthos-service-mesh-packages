@@ -36,7 +36,7 @@ install() {
 
 install_managed_components() {
   info "Configuring ASM managed control plane revision CRD..."
-  context_append-kube-yaml "${CRD_CONTROL_PLANE_REVISION}"
+  context_append "kubectlFiles" "${CRD_CONTROL_PLANE_REVISION}"
 
   info "Configuring base installation for managed control plane..."
   context_append "kubectlFiles" "${BASE_REL_PATH}"
@@ -45,9 +45,9 @@ install_managed_components() {
   context_append "kubectlFiles" "${MANAGED_WEBHOOKS}"
 
   info "Configuring ASM managed control plane revision CR for channels..."
-  context_append-kube-yaml "${CR_CONTROL_PLANE_REVISION_REGULAR}"
-  context_append-kube-yaml "${CR_CONTROL_PLANE_REVISION_RAPID}"
-  context_append-kube-yaml "${CR_CONTROL_PLANE_REVISION_STABLE}"
+  context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_REGULAR}"
+  context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_RAPID}"
+  context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_STABLE}"
 }
 
 scrape_managed_urls() {
