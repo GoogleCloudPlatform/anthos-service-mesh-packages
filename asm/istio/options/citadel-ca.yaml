@@ -28,12 +28,9 @@ spec:
     trustDomain: "cluster.local"
     defaultConfig:
       proxyMetadata:
-        GKE_CLUSTER_URL: ""
-        GCP_METADATA: ""
         CA_PROVIDER: "Citadel"
         PLUGINS: ""
         USE_TOKEN_FOR_CSR: "false"
-        GCE_METADATA_HOST: ""
   values:
     global:
       caAddress: ""

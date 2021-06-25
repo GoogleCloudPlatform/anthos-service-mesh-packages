@@ -22,3 +22,9 @@ spec:
         env:
           - name: ENABLE_STACKDRIVER_MONITORING
             value: "false"
+  meshConfig:
+    defaultConfig:
+      proxyMetadata:
+        GKE_CLUSTER_URL: ""
+        GCP_METADATA: ""
+        GCE_METADATA_HOST: ""
