@@ -14,7 +14,7 @@ EOF
 # This function helps setup the command line tests by intercepting and mocking CLI tools that
 # either requires real querying/networking or are unnecessary
 #
-# Command intercepted: gcloud, kubectl, nc, fatal, warn_parse, warn, list_valid_pools, sleep, curl, tar, kpt
+# Command intercepted: gcloud, kubectl, istioctl, nc, fatal, warn_parse, warn, list_valid_pools, sleep, curl, tar, kpt
 #
 _intercept_setup() {
     ### Test Helper Functions ###
@@ -30,6 +30,13 @@ _intercept_setup() {
         echo "Intercepted gcloud ${*}" >&2
         gcloud_intercept ${@} || RETVAL="${?}"
         return "${RETVAL}"
+    }
+
+    istioctl() {
+      local RETVAL; RETVAL=0;
+      echo "Intercepted istioctl ${*}" >&2
+      istioctl_intercept ${@} || RETVAL="${?}"
+      return "${RETVAL}"
     }
 
     nc() {
@@ -190,6 +197,15 @@ EOF
 kubectl_intercept() {
   FAKE_CONFIG="$(cat "${KUBECONFIG}" 2>/dev/null)"
 
+  if [[ "${*}" == *"config"*"current-context"* ]]; then
+    if [[ "${FAKE_CONFIG}" == *"get-credentials"*"this_should_pass"* ]]; then
+      echo "gke_this-should-pass_this-should-pass_this-should-pass"
+      return 0
+    elif [[ "${FAKE_CONFIG}" == *"get-credentials"*"this_should_fail"* ]]; then
+      echo "gke_this-should-fail_this-should-fail_this-should-fail"
+      return 0
+    fi
+  fi
   if [[ "${*}" == *"config"* ]]; then
     cat <<-EOF
 {
@@ -261,4 +277,12 @@ EOF
     echo "istiod"
     return 0
   fi
+}
+
+istioctl_intercept() {
+  if [[ "${*}" == "create-remote-secret"*"this-should-pass" ]]; then
+    return 0
+  fi
+
+  return 1
 }

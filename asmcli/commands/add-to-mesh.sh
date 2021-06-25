@@ -3,8 +3,10 @@ add-to-mesh_subcommand() {
   parse_cluster_args "$@"
   prepare_add_to_mesh_environment
   validate_cluster_args
+
+  ### Registration ###
   add_all_to_mesh
-  install_all_secrets
+  install_all_remote_secrets
 }
 
 parse_cluster_args() {
@@ -40,8 +42,8 @@ validate_cluster_args() {
     validate_cluster
     configure_kubectl
 
+    CTX_CLUSTER="$(kubectl config current-context)"
     if ! is_membership_crd_installed; then
-      CTX_CLUSTER="$(kubectl config current-context)"
       GKE_CLUSTER_URI="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
       --zone="${CLUSTER_LOCATION}" \
       --project="${PROJECT_ID}" \
@@ -49,8 +51,9 @@ validate_cluster_args() {
       context_append "clusterRegistrations" "${CTX_CLUSTER} ${GKE_CLUSTER_URI}"
     else
       exit_if_cluster_registered_to_another_fleet
-      info "Cluster ${CLUSTER_NAME} is already registered with project ${PROJECT_ID}. Skipping."
+      warn "Cluster ${CLUSTER_NAME} is already registered with project ${PROJECT_ID}. Skipping."
     fi
+    context_append "clusterContexts" "${CTX_CLUSTER}"
   done <<EOF
 $(context_list "clustersInfo")
 EOF
@@ -74,61 +77,62 @@ EOF
 }
 
 add_all_to_mesh() {
-  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
-  local PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME CTX_CLUSTER GKE_CLUSTER_URI GCE_NETWORK_NAME
-  local MEMBERSHIP_NAME
+  local CTX_CLUSTER GKE_CLUSTER_URI
 
-  IFS=$'\n'
-  for line in $(context_list "clusterRegistrations"); do
-    read -r A B C D < <(echo $line)
-    echo "$A $B $C $D"
-  done
-
-
+  # for-loop does not read lines but words, so setting IFS to explicitly split with line breaks
+  # Also context_list might return an empty list so we use for-loop to bypass that scenario
   while read -r CTX_CLUSTER GKE_CLUSTER_URI; do
-    IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
-${CTX_CLUSTER}
-EOF
-    if [[ -n "${PROJECT_ID}" && -n "${CLUSTER_LOCATION}" && -n "${CLUSTER_NAME}" && -n "${GKE_CLUSTER_URI}" ]]; then
-      context_set-option "PROJECT_ID" "${PROJECT_ID}"
-      context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
-      context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
-      MEMBERSHIP_NAME="$(generate_membership_name)"
+    add_one_to_mesh "${CTX_CLUSTER}" "${GKE_CLUSTER_URI}"
+  done < <(context_list "clusterRegistrations")
+}
 
-      info "Registering the cluster ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME} as ${MEMBERSHIP_NAME}..."
+add_one_to_mesh() {
+  local CTX_CLUSTER; CTX_CLUSTER="${1}"
+  local GKE_CLUSTER_URI; GKE_CLUSTER_URI="${2}"
+  local PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME
+  IFS='_' read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME < <(echo "$CTX_CLUSTER")
 
-      local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-      retry 2 run_command gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
-        --project="${PROJECT_ID}" \
-        --gke-uri="${GKE_CLUSTER_URI}" \
-        --enable-workload-identity
-    else
-      { read -r -d '' MSG; warn "${MSG}"; } <<EOF || true
-Unable to register the cluster due to unexpected cluster information:
-  Project ID: ${PROJECT_ID}
-  Cluster Location: ${CLUSTER_LOCATION}
-  Cluster Name: ${CLUSTER_NAME}
+  context_set-option "PROJECT_ID" "${PROJECT_ID}"
+  context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
+  context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
+  MEMBERSHIP_NAME="$(generate_membership_name)"
+
+  info "Registering the cluster ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME} as ${MEMBERSHIP_NAME}..."
+
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  retry 2 run_command gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
+    --project="${PROJECT_ID}" \
+    --gke-uri="${GKE_CLUSTER_URI}" \
+    --enable-workload-identity
+}
+
+install_all_remote_secrets() {
+  local CTX_CLUSTER1 CTX_CLUSTER2
+
+  while read -r CTX_CLUSTER1; do
+    while read -r CTX_CLUSTER2; do
+      if [[ "${CTX_CLUSTER1}" != "${CTX_CLUSTER2}" ]]; then
+        install_one_remote_secret "${CTX_CLUSTER1}" "${CTX_CLUSTER2}"
+      fi
+    done <<EOF
+$(context_list "clusterContexts")
 EOF
-    fi
   done <<EOF
-$(context_list "clusterRegistrations")
+$(context_list "clusterContexts")
 EOF
 }
 
-install_all_secrets() {
-  local CTX_CLUSTER1 CTX_CLUSTER2
+install_one_remote_secret() {
+  local CTX_CLUSTER1; CTX_CLUSTER1="${1}"
+  local CTX_CLUSTER2; CTX_CLUSTER2="${2}"
+  local SECRET_NAME; SECRET_NAME="${CTX_CLUSTER1//_/-}"
 
-  while read -r CTX_CLUSTER1 _; do
-    while read -r CTX_CLUSTER2 _; do
-      if [[ "${CTX_CLUSTER1}" != "${CTX_CLUSTER2}" ]]; then
-        install_remote_secret "${CTX_CLUSTER1}" "${CTX_CLUSTER2}"
-      fi
-    done <<EOF
-$(context_list "clusterRegistrations")
-EOF
-  done <<EOF
-$(context_list "clusterRegistrations")
-EOF
+  info "Installing remote secret ${SECRET_NAME} on ${CTX_CLUSTER2}..."
+
+  retry 2 run_command istioctl x create-remote-secret \
+    --context="${CTX_CLUSTER1}" \
+    --name="${SECRET_NAME}" | \
+    kubectl apply --context="${CTX_CLUSTER2}" -f -
 }
 
 # Need to prepare differently under multicluster environment
@@ -150,17 +154,3 @@ prepare_add_to_mesh_environment() {
     organize_kpt_files
   fi
 }
-
-install_remote_secret() {
-  local CTX_CLUSTER1; CTX_CLUSTER1="${1}"
-  local CTX_CLUSTER2; CTX_CLUSTER2="${2}"
-  local SECRET_NAME; SECRET_NAME="${CTX_CLUSTER1//_/-}"
-
-  info "Installing remote secret ${SECRET_NAME} on ${CTX_CLUSTER2}..."
-
-  run_command istioctl x create-remote-secret \
-    --context="${CTX_CLUSTER1}" \
-    --name="${SECRET_NAME}" | \
-    kubectl apply --context="${CTX_CLUSTER2}" -f -
-}
-
