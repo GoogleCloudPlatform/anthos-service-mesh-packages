@@ -65,24 +65,15 @@ scrape_managed_urls() {
   echo "${VALIDATION_URL} ${CLOUDRUN_ADDR}"
 }
 
-install_in_cluster_control_plane() {
-  local USE_VM; USE_VM="$(context_get-option "USE_VM")"
+# expects var PARAM already defined and populates it with the
+# appropriate manifest overlays
+init_install_params() {
   local CA; CA="$(context_get-option "CA")"
 
-  if ! does_istiod_exist && [[ "${_CI_NO_REVISION}" -ne 1 ]]; then
-    info "Installing validation webhook fix..."
-    context_append "kubectlFiles" "${VALIDATION_FIX_SERVICE}"
-  fi
-
-  local PARAMS
   PARAMS="-f ${OPERATOR_MANIFEST}"
   for yaml_file in $(context_list "istioctlFiles"); do
     PARAMS="${PARAMS} -f ${yaml_file}"
   done
-
-  if [[ "${_CI_NO_REVISION}" -ne 1 ]]; then
-    PARAMS="${PARAMS} --set revision=${REVISION_LABEL}"
-  fi
 
   if [[ "${K8S_MINOR}" -eq 15 ]]; then
     PARAMS="${PARAMS} -f ${BETA_CRD_MANIFEST}"
@@ -94,6 +85,22 @@ install_in_cluster_control_plane() {
 
   if ! is_gcp; then
     PARAMS="${PARAMS} -f ${OFF_GCP_MANIFEST}"
+  fi
+}
+
+install_in_cluster_control_plane() {
+  local USE_VM; USE_VM="$(context_get-option "USE_VM")"
+
+  if ! does_istiod_exist && [[ "${_CI_NO_REVISION}" -ne 1 ]]; then
+    info "Installing validation webhook fix..."
+    context_append "kubectlFiles" "${VALIDATION_FIX_SERVICE}"
+  fi
+
+  local PARAMS
+  init_install_params
+
+  if [[ "${_CI_NO_REVISION}" -ne 1 ]]; then
+    PARAMS="${PARAMS} --set revision=${REVISION_LABEL}"
   fi
 
   PARAMS="${PARAMS} --skip-confirmation"
