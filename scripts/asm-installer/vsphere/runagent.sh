@@ -7,6 +7,9 @@ echo "Installing ASM agent"
 DIR="${1}"
 cd ${DIR}
 
+echo ${DIR}
+echo $(pwd)
+
 # Copy root cert and bootstrap token
 sudo mkdir -p /etc/certs
 sudo cp root-cert.pem /etc/certs/root-cert.pem
