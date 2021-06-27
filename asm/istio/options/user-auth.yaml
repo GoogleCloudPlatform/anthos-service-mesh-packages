@@ -1,0 +1,9 @@
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+spec:
+  meshConfig:
+    extensionProviders:
+      - name: "asm-userauth-grpc"
+        envoyExtAuthzGrpc:
+          service: "authservice.asm-user-auth.svc.cluster.local"
+          port: "10003"
