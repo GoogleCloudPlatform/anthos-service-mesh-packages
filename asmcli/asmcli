@@ -2729,8 +2729,7 @@ install_in_cluster_control_plane() {
     context_append "kubectlFiles" "${VALIDATION_FIX_SERVICE}"
   fi
 
-  local PARAMS
-  init_install_params
+  local PARAMS; PARAMS="$(gen_install_params)"
 
   if [[ "${_CI_NO_REVISION}" -ne 1 ]]; then
     PARAMS="${PARAMS} --set revision=${REVISION_LABEL}"
@@ -2937,8 +2936,7 @@ print_config() {
     return
   fi
 
-  local PARAMS
-  init_install_params
+  local PARAMS; PARAMS="$(gen_install_params)"
   
   # shellcheck disable=SC2086
   istioctl profile dump ${PARAMS}
@@ -3340,27 +3338,27 @@ context_list() {
   local KEY; KEY="${1}"
   jq -S -r --arg KEY "${KEY}" '.[$KEY][]' "${context_FILE_LOCATION}"
 }
-# expects var PARAM already defined and populates it with the
-# appropriate manifest overlays
-init_install_params() {
+gen_install_params() {
   local CA; CA="$(context_get-option "CA")"
 
-  PARAMS="-f ${OPERATOR_MANIFEST}"
+  local PARAM_BUILDER="-f ${OPERATOR_MANIFEST}"
   for yaml_file in $(context_list "istioctlFiles"); do
-    PARAMS="${PARAMS} -f ${yaml_file}"
+    PARAM_BUILDER="${PARAM_BUILDER} -f ${yaml_file}"
   done
 
   if [[ "${K8S_MINOR}" -eq 15 ]]; then
-    PARAMS="${PARAMS} -f ${BETA_CRD_MANIFEST}"
+    PARAM_BUILDER="${PARAM_BUILDER} -f ${BETA_CRD_MANIFEST}"
   fi
 
   if [[ "${CA}" == "citadel" ]]; then
-    PARAMS="${PARAMS} -f ${CITADEL_MANIFEST}"
+    PARAM_BUILDER="${PARAM_BUILDER} -f ${CITADEL_MANIFEST}"
   fi
 
   if ! is_gcp; then
-    PARAMS="${PARAMS} -f ${OFF_GCP_MANIFEST}"
+    PARAM_BUILDER="${PARAM_BUILDER} -f ${OFF_GCP_MANIFEST}"
   fi
+
+  echo "${PARAM_BUILDER}"
 }
 
 main "${@}"

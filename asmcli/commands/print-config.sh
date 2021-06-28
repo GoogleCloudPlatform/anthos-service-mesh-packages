@@ -36,8 +36,7 @@ print_config() {
     return
   fi
 
-  local PARAMS
-  init_install_params
+  local PARAMS; PARAMS="$(gen_install_params)"
   
   # shellcheck disable=SC2086
   istioctl profile dump ${PARAMS}
