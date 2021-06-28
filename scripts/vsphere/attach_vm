@@ -64,18 +64,18 @@ EOF
 configure_vm_transfer_file() {
   # Create files to transfer to VM
   cd ${WORK_DIR}
-  ./istioctl x workload entry configure -f ${OUTPUT_DIR}/vm-${VM_APP}/workloadgroup.yaml -o ${OUTPUT_DIR}/vm-${VM_APP} --clusterID ${CLUSTER} --autoregister
+  istioctl x workload entry configure --revision ${REVISION} -f ${OUTPUT_DIR}/vm-${VM_APP}/workloadgroup.yaml -o ${OUTPUT_DIR}/vm-${VM_APP} --clusterID ${CLUSTER} --autoregister
 
   cd ${OUTPUT_DIR}/vm-${VM_APP}
   ssh -i "${KEY_FILE}" -o StrictHostKeyChecking=no root@${VM_IP} mkdir "${VM_DIR}" || true
   scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no cluster.env hosts istio-token mesh.yaml root-cert.pem root@${VM_IP}:"${VM_DIR}"
 
   cd ${WORK_DIR}
-  if [[ ! -e "runagent.sh" ]]; then
-    fatal "file runagent.sh does not exists in working dir ${WORK_DIR}"
+  if [[ ! -e "vsphere/runagent.sh" ]]; then
+    fatal "file vsphere/runagent.sh does not exists in working dir ${WORK_DIR}"
   fi
 
-  scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no runagent.sh root@${VM_IP}:"${VM_DIR}"
+  scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no vsphere/runagent.sh root@${VM_IP}:"${VM_DIR}"
 
   if [[ ! -e "istio-sidecar.rpm" ]]; then
     fatal "file istio-sidecar.rpm does not exists in working dir ${WORK_DIR}"
@@ -130,78 +130,6 @@ write_config_context_vm() {
 
   rm -f ".attachConfig"
   cat ${OUTPUT_DIR}/vm-${VM_APP}/".context"
-}
-
-read_args_vm() {
-  # shellcheck disable=SC2064
-  trap "$(shopt -p nocasematch)" RETURN
-  shopt -s nocasematch
-
-  >".attachConfig"
-  chmod +x ".attachConfig"
-  while [[ ${#} != 0 ]]; do
-    case "${1}" in
-    -addr | --address | --vm_ip | --vm-ip)
-      export VM_IP="${2}"
-      shift 2
-      ;;
-    -app | --app | --vm_app | --vm-app)
-      export VM_APP="${2}"
-      shift 2
-      ;;
-    -context | --context)
-      export SELECT_CONTEXT="${2}"
-      echo "export SELECT_CONTEXT=${SELECT_CONTEXT}" >>".attachConfig"
-      shift 2
-      ;;
-    -key | --key_file | --ssh-key-file)
-      export KEY_FILE="${2}"
-      echo "export KEY_FILE=${KEY_FILE}" >>".attachConfig"
-      shift 2
-      ;;
-    -sa | --service_account | --service-account)
-      export SERVICE_ACCOUNT="${2}"
-      echo "export SERVICE_ACCOUNT=${SERVICE_ACCOUNT}" >>".attachConfig"
-      shift 2
-      ;;
-    -ns | --namespace)
-      export VM_NAMESPACE="${2}"
-      echo "export VM_NAMESPACE=${VM_NAMESPACE}" >>".attachConfig"
-      shift 2
-      ;;
-    -labels | --labels)
-      LABELS="${2}"
-      printf -v LABELS '%s' ${LABELS}
-      export LABELS="\"${LABELS}\""
-      echo "export LABELS=${LABELS}" >>".attachConfig"
-      shift 2
-      ;;
-    -mesh | --mesh_id | --mesh-id)
-      export MESH_ID="${2}"
-      shift 2
-      ;;
-    -net | --network | --vm_network | --vm-network)
-      export VM_NETWORK="${2}"
-      shift 2
-      ;;
-    -cluster | --cluster | --cluster_name | --cluster-name)
-      export CLUSTER="${2}"
-      shift 2
-      ;;
-    -project | --project | --project_id | --project-id)
-      export PROJECT_ID="${2}"
-      shift 2
-      ;;
-    -kubeconfig | --kubeconfig)
-      export KUBECONFIG="${2}"
-      shift 2
-      ;;
-    *)
-      warn "Unknown option ${1}"
-      exit 2
-      ;;
-    esac
-  done
 }
 
 main "${@}"

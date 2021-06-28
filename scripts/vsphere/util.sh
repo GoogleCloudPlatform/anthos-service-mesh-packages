@@ -26,7 +26,8 @@ function fill_unspecified_context() {
     fatal "Couldn't find key file ${KEY_FILE}. "
   fi
 
-  CLUSTER_NAME=$(kubectl -n istio-system get IstioOperator installed-state --output=json | jq -r '.spec.values.global.multiCluster.clusterName')
+  INSTALL_STATE=$(kubectl -n istio-system get IstioOperator -o jsonpath={.items[0]..metadata.name})
+  CLUSTER_NAME=$(kubectl -n istio-system get IstioOperator ${INSTALL_STATE} --output=json | jq -r '.spec.values.global.multiCluster.clusterName')
   if [[ -z "${CLUSTER}" ]]; then
     CLUSTER=${CLUSTER_NAME}
     echo "Using CLUSTER ${CLUSTER}"
@@ -34,7 +35,7 @@ function fill_unspecified_context() {
     fatal "Current kubeconfig points to cluster: ${CLUSTER_NAME}, cannot connect to input cluster ${CLUSTER}"
   fi
 
-  CLUSTER_NETWORK=$(kubectl -n istio-system get IstioOperator installed-state --output=json | jq -r '.spec.values.global.network')
+  CLUSTER_NETWORK=$(kubectl -n istio-system get IstioOperator ${INSTALL_STATE} --output=json | jq -r '.spec.values.global.network')
   if [[ ${CLUSTER_NETWORK} == ${VM_NETWORK} ]]; then
     echo "Using Single-Network Scenario. Cluster and VM are Running in Network: ${VM_NETWORK}"
   elif [[ -z ${VM_NETWORK} ]]; then
@@ -42,6 +43,11 @@ function fill_unspecified_context() {
     VM_NETWORK=${CLUSTER_NETWORK}
   else
     echo "Using Multi-Network Scenario. Cluster Network: ${CLUSTER_NETWORK}, VM Network: ${VM_NETWORK}"
+  fi
+
+  if [[ -z "${REVISION}" ]]; then
+    REVISION=""
+    echo "REVISION        is not specified. Set VM NAMESPACE as \"\" ."
   fi
 
   if [[ -z "${VM_NAMESPACE}" ]]; then
@@ -175,6 +181,11 @@ function read_args() {
       echo "export LABELS=${LABELS}" >>".attachConfig"
       shift 2
       ;;
+    -rev | --revision)
+      export REVISION="${2}"
+      echo "export REVISION=${REVISION}" >>".attachConfig"
+      shift 2
+      ;;
     *)
       warn "Unknown option ${1}"
       exit 2
@@ -200,6 +211,7 @@ function  write_config_context() {
   echo "export SERVICE_ACCOUNT=${SERVICE_ACCOUNT}" >>${CONTEXT_FILE}
   echo "export VM_DIR=${VM_DIR}" >>${CONTEXT_FILE}
   echo "export LABELS=${LABELS}" >>${CONTEXT_FILE}
+  echo "export REVISION=${REVISION}" >>${CONTEXT_FILE}
 }
 
 init() {

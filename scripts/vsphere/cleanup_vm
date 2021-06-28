@@ -19,11 +19,11 @@ kubectl delete service ${VM_APP} -n ${VM_NAMESPACE} --ignore-not-found
 
 echo "[Step 2] Stop Istio on VM and Wipe out Mounted Artifacts"
 cd ${WORK_DIR}
-if [[ ! -e "stopagent.sh" ]]; then
-  fatal "file stopagent.sh does not exists in working dir ${WORK_DIR}"
+if [[ ! -e "vsphere/stopagent.sh" ]]; then
+  fatal "file vsphere/stopagent.sh does not exists in working dir ${WORK_DIR}"
 fi
 
-scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no stopagent.sh root@${VM_IP}:"${VM_DIR}"
+scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no vsphere/stopagent.sh root@${VM_IP}:"${VM_DIR}"
 stopagentcmd="chmod +x ${VM_DIR}/stopagent.sh; ${VM_DIR}/stopagent.sh ${VM_DIR} >/dev/null"
 until ssh -i "${KEY_FILE}" -o StrictHostKeyChecking=no root@${VM_IP} ${stopagentcmd}; do
   sleep 1
