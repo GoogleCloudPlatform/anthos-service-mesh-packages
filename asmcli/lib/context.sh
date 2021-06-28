@@ -51,7 +51,8 @@ context_init() {
   "istioctlFiles": [],
   "kubectlFiles": [],
   "clustersInfo": [],
-  "clusterRegistrations": []
+  "clusterRegistrations": [],
+  "clusterContexts": []
 }
 EOF
 )

@@ -27,7 +27,7 @@ sh_library(
 
 sh_test(
     name = "test",
-    size = "small",
+    size = "large",
     srcs = ["node_modules/bats/bin/bats"],
     deps = [
             ":asmcli_modules",

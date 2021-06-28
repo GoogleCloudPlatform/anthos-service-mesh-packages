@@ -78,6 +78,20 @@ teardown() {
   [ "${RETVAL}" -eq 0 ]
 }
 
+
+@test "MAIN: add-to-mesh should register" {
+  local CMD
+  CMD="add-to-mesh"
+  CMD="${CMD} this_should_pass"
+  CMD="${CMD} this_should_pass/this_should_pass/this_should_pass"
+  CMD="${CMD} this_should_pass/this_should_pass/this_should_pass"
+
+  local RETVAL=0
+  _="$(main ${CMD})" || RETVAL="${?}"
+
+  [ "${RETVAL}" -eq 0 ]
+}
+
 @test "MAIN: invalid subcommand should fail" {
   local CMD
   CMD="this_is_an_invalid_subcommand"
