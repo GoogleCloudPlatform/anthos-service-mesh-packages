@@ -113,9 +113,9 @@ main() {
       shift 1
       print-config_subcommand "${@}"
       ;;
-    add-to-mesh)
+    create-mesh)
       shift 1
-      add-to-mesh_subcommand "${@}"
+      create-mesh_subcommand "${@}"
       ;;
     *)
       help_subcommand "${@}"
@@ -2301,7 +2301,7 @@ configure_package() {
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${REVISION_LABEL}"
   fi
 }
-add-to-mesh_subcommand() {
+create-mesh_subcommand() {
   ### Preparation ###
   parse_cluster_args "$@"
   prepare_add_to_mesh_environment
@@ -2430,6 +2430,12 @@ install_one_remote_secret() {
   local CTX_CLUSTER2; CTX_CLUSTER2="${2}"
   local SECRET_NAME; SECRET_NAME="${CTX_CLUSTER1//_/-}"
 
+  if [[ "${#SECRET_NAME}" -gt 63 ]]; then
+    local RAND
+    RAND="$(tr -dc "a-z0-9" </dev/urandom | head -c8 || true)"
+    SECRET_NAME="${SECRET_NAME:0:54}-${RAND}"
+  fi
+
   info "Installing remote secret ${SECRET_NAME} on ${CTX_CLUSTER2}..."
 
   retry 2 run_command istioctl x create-remote-secret \
@@ -2516,7 +2522,7 @@ SUBCOMMANDS:
   install                             Install will attempt a new ASM installation
   validate                            Validate will attempt a new ASM validation
   print-config                        Print Config will attempt to print the configurations used
-  add-to-mesh                         Add multiple clusters to the mesh
+  create-mesh                         Add multiple clusters to the mesh
 
 OPTIONS:
   -l|--cluster_location  <LOCATION>   The GCP location of the target cluster.
@@ -2661,7 +2667,7 @@ SUBCOMMANDS:
   install
   validate
   print-config
-  add-to-mesh
+  create-mesh
 
 OPTIONS:
   -l|--cluster_location  <LOCATION>

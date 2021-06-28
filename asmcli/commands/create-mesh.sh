@@ -1,4 +1,4 @@
-add-to-mesh_subcommand() {
+create-mesh_subcommand() {
   ### Preparation ###
   parse_cluster_args "$@"
   prepare_add_to_mesh_environment
@@ -126,6 +126,12 @@ install_one_remote_secret() {
   local CTX_CLUSTER1; CTX_CLUSTER1="${1}"
   local CTX_CLUSTER2; CTX_CLUSTER2="${2}"
   local SECRET_NAME; SECRET_NAME="${CTX_CLUSTER1//_/-}"
+
+  if [[ "${#SECRET_NAME}" -gt 63 ]]; then
+    local RAND
+    RAND="$(tr -dc "a-z0-9" </dev/urandom | head -c8 || true)"
+    SECRET_NAME="${SECRET_NAME:0:54}-${RAND}"
+  fi
 
   info "Installing remote secret ${SECRET_NAME} on ${CTX_CLUSTER2}..."
 

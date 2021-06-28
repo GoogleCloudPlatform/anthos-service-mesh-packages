@@ -57,7 +57,7 @@ SUBCOMMANDS:
   install                             Install will attempt a new ASM installation
   validate                            Validate will attempt a new ASM validation
   print-config                        Print Config will attempt to print the configurations used
-  add-to-mesh                         Add multiple clusters to the mesh
+  create-mesh                         Add multiple clusters to the mesh
 
 OPTIONS:
   -l|--cluster_location  <LOCATION>   The GCP location of the target cluster.
@@ -202,7 +202,7 @@ SUBCOMMANDS:
   install
   validate
   print-config
-  add-to-mesh
+  create-mesh
 
 OPTIONS:
   -l|--cluster_location  <LOCATION>
