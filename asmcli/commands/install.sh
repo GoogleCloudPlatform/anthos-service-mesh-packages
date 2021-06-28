@@ -82,11 +82,6 @@ install_in_cluster_control_plane() {
 
   PARAMS="${PARAMS} --skip-confirmation"
 
-  print_config >| "${RAW_YAML}"
-  istioctl manifest generate \
-    <"${RAW_YAML}" \
-    >|"${EXPANDED_YAML}"
-
   info "Installing ASM control plane..."
   # shellcheck disable=SC2086
   retry 5 istioctl install $PARAMS
@@ -94,6 +89,11 @@ install_in_cluster_control_plane() {
   # Prevent the stderr buffer from ^ messing up the terminal output below
   sleep 1
   info "...done!"
+
+  print_config >| "${RAW_YAML}"
+  istioctl manifest generate \
+    <"${RAW_YAML}" \
+    >|"${EXPANDED_YAML}"
 
   if [[ "${USE_VM}" -eq 1 ]]; then
     info "Exposing the control plane for VM workloads..."

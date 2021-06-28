@@ -171,8 +171,7 @@ init() {
   readonly RELEASE; readonly RELEASE_LINE; readonly PREVIOUS_RELEASE_LINE; readonly KPT_BRANCH;
 
   KPT_URL="https://github.com/GoogleCloudPlatform/anthos-service-mesh-packages"
-  # KPT_URL="${KPT_URL}.git/asm@${KPT_BRANCH}"; readonly KPT_URL;
-  KPT_URL="${KPT_URL}.git/asm@v2"; readonly KPT_URL;
+  KPT_URL="${KPT_URL}.git/asm@${KPT_BRANCH}"; readonly KPT_URL;
   ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
   ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
   BASE_REL_PATH="${ISTIO_FOLDER_NAME}/manifests/charts/base/files/gen-istio-cluster.yaml"; readonly BASE_REL_PATH;
@@ -336,12 +335,11 @@ configure_kubectl(){
   local ADDR
   ADDR="$(kubectl config view --minify=true -ojson | \
     jq .clusters[0].cluster.server -r)"
-  local DEST
-  DEST="${ADDR:8:${#ADDR}}"
-  DEST="${DEST%:*}"
+  ADDR="${ADDR:8:${#ADDR}}"
+  ADDR="${ADDR%:*}"
 
   local RETVAL; RETVAL=0;
-  run_command nc -zvw 10 "${DEST}" 443 || RETVAL=$?
+  run_command nc -zvw 10 "${ADDR}" 443 || RETVAL=$?
   if [[ "${RETVAL}" -ne 0 ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Couldn't connect to ${CLUSTER_NAME}.
