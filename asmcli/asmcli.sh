@@ -1971,21 +1971,16 @@ register_cluster() {
   info "Registering the cluster as ${MEMBERSHIP_NAME}..."
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
+  local CMD
+  CMD="gcloud beta container hub memberships register ${MEMBERSHIP_NAME}"
+  CMD="${CMD} --project=${FLEET_ID}"
+  CMD="${CMD} --enable-workload-identity"
   if is_gcp; then
-    retry 2 gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
-      --project="${FLEET_ID}" \
-      --gke-uri="${GKE_CLUSTER_URI}" \
-      --enable-workload-identity
+    CMD="${CMD} --gke-uri=${GKE_CLUSTER_URI}"
   else
-    local KCF; KCF="$(context_get-option "KUBECONFIG")"
-    local KCC; KCC="$(context_get-option "CONTEXT")"
-
-    retry 2 gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
-      --project="${FLEET_ID}" \
-      --kubeconfig="${KCF}" \
-      --context="${KCC}" \
-      --enable-workload-identity
+    CMD="${CMD} --kubeconfig=${KCF} --context=${KCC}"
   fi
+  retry 2 run "${CMD}"
 }
 
 exit_if_cluster_unregistered() {
