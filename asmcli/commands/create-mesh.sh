@@ -65,6 +65,7 @@ exit_if_cluster_registered_to_another_fleet() {
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
+  local WANT
   WANT="//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
   local LIST
   LIST="$(gcloud container hub memberships list --project "${FLEET_ID}" \
@@ -89,7 +90,7 @@ add_all_to_mesh() {
 add_one_to_mesh() {
   local CTX_CLUSTER; CTX_CLUSTER="${1}"
   local GKE_CLUSTER_URI; GKE_CLUSTER_URI="${2}"
-  local PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME
+  local PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME MEMBERSHIP_NAME
   IFS='_' read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME < <(echo "$CTX_CLUSTER")
 
   context_set-option "PROJECT_ID" "${PROJECT_ID}"

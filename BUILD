@@ -37,3 +37,12 @@ sh_test(
     env = {"SOURCE_FILES": '\n'.join(ASMCLI_SOURCES)},
     args = TESTS + ["--jobs", BATS_JOBS, "--no-parallelize-across-files"],
 )
+
+sh_test(
+    name = "lint_variables",
+    srcs = ["asmcli/tests/lint_variables"],
+    deps = [
+        ":asmcli_modules",
+    ],
+    args = ["asmcli/asmcli"] + ASMCLI_SOURCES
+)
