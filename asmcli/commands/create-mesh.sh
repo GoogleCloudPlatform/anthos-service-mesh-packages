@@ -125,13 +125,7 @@ EOF
 install_one_remote_secret() {
   local CTX_CLUSTER1; CTX_CLUSTER1="${1}"
   local CTX_CLUSTER2; CTX_CLUSTER2="${2}"
-  local SECRET_NAME; SECRET_NAME="${CTX_CLUSTER1//_/-}"
-
-  if [[ "${#SECRET_NAME}" -gt 63 ]]; then
-    local RAND
-    RAND="$(tr -dc "a-z0-9" </dev/urandom | head -c8 || true)"
-    SECRET_NAME="${SECRET_NAME:0:54}-${RAND}"
-  fi
+  local SECRET_NAME; SECRET_NAME="$(generate_secret_name "${CTX_CLUSTER1//_/-}")"
 
   info "Installing remote secret ${SECRET_NAME} on ${CTX_CLUSTER2}..."
 
@@ -159,4 +153,16 @@ prepare_add_to_mesh_environment() {
     fi
     organize_kpt_files
   fi
+}
+
+generate_secret_name() {
+  local SECRET_NAME; SECRET_NAME="${1}"
+
+  if [[ "${#SECRET_NAME}" -gt 63 ]]; then
+    local HASH
+    HASH="$(echo "${SECRET_NAME}" | sha256sum | head -c20 || true)"
+    SECRET_NAME="${SECRET_NAME:0:42}-${HASH}"
+  fi
+
+  echo "${SECRET_NAME}"
 }
