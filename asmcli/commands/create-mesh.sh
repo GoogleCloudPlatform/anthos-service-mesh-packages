@@ -158,10 +158,10 @@ prepare_add_to_mesh_environment() {
 generate_secret_name() {
   local SECRET_NAME; SECRET_NAME="${1}"
 
-  if [[ "${#SECRET_NAME}" -gt 63 ]]; then
-    local HASH
-    HASH="$(echo "${SECRET_NAME}" | sha256sum | head -c20 || true)"
-    SECRET_NAME="${SECRET_NAME:0:42}-${HASH}"
+  if [[ "${#SECRET_NAME}" -gt "${KUBE_TAG_MAX_LEN}" ]]; then
+    local DIGEST
+    DIGEST="$(echo "${SECRET_NAME}" | sha256sum | head -c20 || true)"
+    SECRET_NAME="${SECRET_NAME:0:42}-${DIGEST}"
   fi
 
   echo "${SECRET_NAME}"

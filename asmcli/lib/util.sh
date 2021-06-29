@@ -1,3 +1,5 @@
+KUBE_TAG_MAX_LEN=63; readonly KUBE_TAG_MAX_LEN
+
 gen_install_params() {
   local CA; CA="$(context_get-option "CA")"
 

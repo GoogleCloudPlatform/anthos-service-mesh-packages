@@ -1942,7 +1942,7 @@ generate_membership_name() {
     --project "${PROJECT_ID}" | grep -c "^${MEMBERSHIP_NAME}$" || true)" -ne 0 ]]; then
       MEMBERSHIP_NAME="${CLUSTER_NAME}-${PROJECT_ID}-${CLUSTER_LOCATION}"
     fi
-    if [[ "${#MEMBERSHIP_NAME}" -gt 63 ]] || [[ "$(retry 2 gcloud container hub \
+    if [[ "${#MEMBERSHIP_NAME}" -gt "${KUBE_TAG_MAX_LEN}" ]] || [[ "$(retry 2 gcloud container hub \
     memberships list --format='value(name)' --project "${PROJECT_ID}" | grep -c \
     "^${MEMBERSHIP_NAME}$" || true)" -ne 0 ]]; then
       local RAND

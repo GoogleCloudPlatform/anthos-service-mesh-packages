@@ -1946,7 +1946,7 @@ generate_membership_name() {
     --project "${PROJECT_ID}" | grep -c "^${MEMBERSHIP_NAME}$" || true)" -ne 0 ]]; then
       MEMBERSHIP_NAME="${CLUSTER_NAME}-${PROJECT_ID}-${CLUSTER_LOCATION}"
     fi
-    if [[ "${#MEMBERSHIP_NAME}" -gt 63 ]] || [[ "$(retry 2 gcloud container hub \
+    if [[ "${#MEMBERSHIP_NAME}" -gt "${KUBE_TAG_MAX_LEN}" ]] || [[ "$(retry 2 gcloud container hub \
     memberships list --format='value(name)' --project "${PROJECT_ID}" | grep -c \
     "^${MEMBERSHIP_NAME}$" || true)" -ne 0 ]]; then
       local RAND
@@ -2461,10 +2461,10 @@ prepare_add_to_mesh_environment() {
 generate_secret_name() {
   local SECRET_NAME; SECRET_NAME="${1}"
 
-  if [[ "${#SECRET_NAME}" -gt 63 ]]; then
-    local HASH
-    HASH="$(echo "${SECRET_NAME}" | sha256sum | head -c20 || true)"
-    SECRET_NAME="${SECRET_NAME:0:42}-${HASH}"
+  if [[ "${#SECRET_NAME}" -gt "${KUBE_TAG_MAX_LEN}" ]]; then
+    local DIGEST
+    DIGEST="$(echo "${SECRET_NAME}" | sha256sum | head -c20 || true)"
+    SECRET_NAME="${SECRET_NAME:0:42}-${DIGEST}"
   fi
 
   echo "${SECRET_NAME}"
@@ -3405,6 +3405,8 @@ context_list() {
   local KEY; KEY="${1}"
   jq -S -r --arg KEY "${KEY}" '.[$KEY][]' "${context_FILE_LOCATION}"
 }
+KUBE_TAG_MAX_LEN=63; readonly KUBE_TAG_MAX_LEN
+
 gen_install_params() {
   local CA; CA="$(context_get-option "CA")"
 
