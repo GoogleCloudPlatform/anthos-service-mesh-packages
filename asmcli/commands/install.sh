@@ -73,20 +73,12 @@ install_in_cluster_control_plane() {
     context_append "kubectlFiles" "${VALIDATION_FIX_SERVICE}"
   fi
 
-  local PARAMS
-  PARAMS="-f ${OPERATOR_MANIFEST}"
-  for yaml_file in $(context_list "istioctlFiles"); do
-    PARAMS="${PARAMS} -f ${yaml_file}"
-  done
+  local PARAMS; PARAMS="$(gen_install_params)"
 
   if [[ "${_CI_NO_REVISION}" -ne 1 ]]; then
     PARAMS="${PARAMS} --set revision=${REVISION_LABEL}"
   fi
 
-  if [[ "${K8S_MINOR}" -eq 15 ]]; then
-    PARAMS="${PARAMS} -f ${BETA_CRD_MANIFEST}"
-  fi
-  PARAMS="${PARAMS} -c ${KUBECONFIG}"
   PARAMS="${PARAMS} --skip-confirmation"
 
   info "Installing ASM control plane..."

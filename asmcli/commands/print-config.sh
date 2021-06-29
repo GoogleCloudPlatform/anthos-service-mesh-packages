@@ -36,10 +36,8 @@ print_config() {
     return
   fi
 
-  PARAMS="-f ${OPERATOR_MANIFEST}"
-  for yaml_file in $(context_list "istioctlFiles"); do
-    PARAMS="${PARAMS} -f ${yaml_file} "
-  done
+  local PARAMS; PARAMS="$(gen_install_params)"
+  
   # shellcheck disable=SC2086
   istioctl profile dump ${PARAMS}
 }

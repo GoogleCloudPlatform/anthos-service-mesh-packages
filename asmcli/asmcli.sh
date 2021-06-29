@@ -45,6 +45,8 @@ VALIDATION_FIX_SERVICE=""
 OPTIONS_DIRECTORY=""
 OPERATOR_MANIFEST=""
 BETA_CRD_MANIFEST=""
+CITADEL_MANIFEST=""
+OFF_GCP_MANIFEST=""
 MANAGED_MANIFEST=""
 MANAGED_WEBHOOKS=""
 EXPOSE_ISTIOD_SERVICE=""
@@ -129,7 +131,9 @@ prepare_environment() {
 
   if should_validate || can_modify_at_all; then
     local_iam_user > /dev/null
-    validate_gcp_resources
+    if is_gcp; then
+      validate_gcp_resources
+    fi
   fi
 
   if needs_asm; then
@@ -152,7 +156,7 @@ init() {
   if [[ "${POINT}" == "alpha" ]]; then
     RELEASE="${MAJOR}.${MINOR}-alpha.${REV}"
     REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}"
-    KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=master}"
+    KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=v2}"
   elif [[ "$(version_message)" =~ ^[0-9]+\.[0-9]+\.[0-9]+-asm\.[0-9]+\+config[0-9]+$ ]]; then
     RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
     REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}-${REV}"
@@ -177,6 +181,8 @@ init() {
   OPTIONS_DIRECTORY="${PACKAGE_DIRECTORY}/options"; readonly OPTIONS_DIRECTORY;
   OPERATOR_MANIFEST="${PACKAGE_DIRECTORY}/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
   BETA_CRD_MANIFEST="${OPTIONS_DIRECTORY}/v1beta1-crds.yaml"; readonly BETA_CRD_MANIFEST;
+  CITADEL_MANIFEST="${OPTIONS_DIRECTORY}/citadel-ca.yaml"; readonly CITADEL_MANIFEST;
+  OFF_GCP_MANIFEST="${OPTIONS_DIRECTORY}/off-gcp.yaml"; readonly OFF_GCP_MANIFEST;
   MANAGED_MANIFEST="${OPTIONS_DIRECTORY}/managed-control-plane.yaml"; readonly MANAGED_MANIFEST;
   MANAGED_WEBHOOKS="${OPTIONS_DIRECTORY}/managed-control-plane-webhooks.yaml"; readonly MANAGED_WEBHOOKS;
   EXPOSE_ISTIOD_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_SERVICE;
@@ -243,7 +249,9 @@ kpt() {
 }
 
 istioctl() {
-  run_command "$(istioctl_path)" "${@}"
+  local KCF; KCF="$(context_get-option "KUBECONFIG")"
+  local KCC; KCC="$(context_get-option "CONTEXT")"
+  run_command "$(istioctl_path)" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
 }
 
 istioctl_path() {
@@ -327,9 +335,11 @@ configure_kubectl(){
   local ADDR
   ADDR="$(kubectl config view --minify=true -ojson | \
     jq .clusters[0].cluster.server -r)"
+  ADDR="${ADDR:8:${#ADDR}}"
+  ADDR="${ADDR%:*}"
 
   local RETVAL; RETVAL=0;
-  run_command nc -zvw 10 "${ADDR:8:${#ADDR}}" 443 || RETVAL=$?
+  run_command nc -zvw 10 "${ADDR}" 443 || RETVAL=$?
   if [[ "${RETVAL}" -ne 0 ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Couldn't connect to ${CLUSTER_NAME}.
@@ -922,10 +932,19 @@ EOF
     fi
   fi
 
-  # GCP only: when no Fleet Id is provided, default to the cluster's project as the Fleet host.
-  if [[ -z "${FLEET_ID}" ]] && is_gcp; then
-    FLEET_ID="${PROJECT_ID}"
-    context_set-option "FLEET_ID" "${FLEET_ID}"
+  if is_gcp; then
+    # when no Fleet Id is provided, default to the cluster's project as the Fleet host.
+    if [[ -z "${FLEET_ID}" ]]; then
+      FLEET_ID="${PROJECT_ID}"
+      context_set-option "FLEET_ID" "${FLEET_ID}"
+    fi
+  else
+    # set Project Id to same as Fleet Id.
+    # Project Id will be used to enable APIs if applicable.
+    if [[ -n "${FLEET_ID}" ]]; then
+      PROJECT_ID="${FLEET_ID}"
+      context_set-option "PROJECT_ID" "${PROJECT_ID}"
+    fi
   fi
 
   if can_register_cluster && ! has_value "FLEET_ID"; then
@@ -1093,9 +1112,13 @@ set_up_local_workspace() {
 
 ### Environment validation functions ###
 validate_environment() {
-  validate_node_pool
+  if is_gcp; then
+    validate_node_pool
+  fi
   validate_k8s
-  validate_expected_control_plane
+  if is_gcp; then
+    validate_expected_control_plane
+  fi
 }
 
 organize_kpt_files() {
@@ -1935,22 +1958,29 @@ generate_membership_name() {
 register_cluster() {
   if is_cluster_registered; then return; fi
 
-  if can_modify_gcp_components; then
-    enable_workload_identity
-  else
-    exit_if_no_workload_identity
+  if is_gcp; then
+    if can_modify_gcp_components; then
+      enable_workload_identity
+    else
+      exit_if_no_workload_identity
+    fi
+    populate_cluster_values
   fi
 
-  populate_cluster_values
-  local MEMBERSHIP_NAME
-  MEMBERSHIP_NAME="$(generate_membership_name)"
+  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name)"
   info "Registering the cluster as ${MEMBERSHIP_NAME}..."
-
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
-  retry 2 gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
-    --project="${FLEET_ID}" \
-    --gke-uri="${GKE_CLUSTER_URI}" \
-    --enable-workload-identity
+
+  local CMD
+  CMD="gcloud beta container hub memberships register ${MEMBERSHIP_NAME}"
+  CMD="${CMD} --project=${FLEET_ID}"
+  CMD="${CMD} --enable-workload-identity"
+  if is_gcp; then
+    CMD="${CMD} --gke-uri=${GKE_CLUSTER_URI}"
+  else
+    CMD="${CMD} --kubeconfig=${KCF} --context=${KCC}"
+  fi
+  retry 2 run "${CMD}"
 }
 
 exit_if_cluster_unregistered() {
@@ -2230,13 +2260,22 @@ configure_package() {
 
   info "Configuring kpt package..."
 
-  populate_cluster_values
+  if is_gcp; then
+    populate_cluster_values
+  fi
+
   populate_fleet_info
-  kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
-  kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
+
+  if is_gcp; then
+    kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
+    kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
+    kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
+    kpt cfg set asm gcloud.compute.network "${GCE_NETWORK_NAME}"
+  else
+    kpt cfg set asm gcloud.core.project "${FLEET_ID}"
+  fi
+
   kpt cfg set asm gcloud.project.environProjectNumber "${PROJECT_NUMBER}"
-  kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
-  kpt cfg set asm gcloud.compute.network "${GCE_NETWORK_NAME}"
   kpt cfg set asm anthos.servicemesh.rev "${REVISION_LABEL}"
   kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
   if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then

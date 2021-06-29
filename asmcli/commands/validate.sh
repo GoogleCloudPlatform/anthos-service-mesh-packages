@@ -41,19 +41,23 @@ validate_dependencies() {
     exit_if_cluster_unregistered
   fi
 
-  if can_modify_gcp_components; then
-    enable_workload_identity
-    enable_stackdriver_kubernetes
-  else
-    exit_if_no_workload_identity
-    exit_if_stackdriver_not_enabled
+  if is_gcp; then
+    if can_modify_gcp_components; then
+      enable_workload_identity
+      enable_stackdriver_kubernetes
+    else
+      exit_if_no_workload_identity
+      exit_if_stackdriver_not_enabled
+    fi
   fi
 
   get_project_number
-  if can_modify_cluster_labels; then
-    add_cluster_labels
-  elif should_validate; then
-    exit_if_cluster_unlabeled
+  if is_gcp; then
+    if can_modify_cluster_labels; then
+      add_cluster_labels
+    elif should_validate; then
+      exit_if_cluster_unlabeled
+    fi
   fi
 
   if can_modify_cluster_roles; then
