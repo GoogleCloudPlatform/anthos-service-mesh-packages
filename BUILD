@@ -5,6 +5,7 @@ NODE_MODULES = glob(["node_modules/**"])
 ASMCLI_SOURCES = glob(["asmcli/**/*.sh"], exclude = ["**/test*/**"],)
 TESTS = glob(["asmcli/tests/**/*.bats"])
 MERGE_OUT = ["asmcli"]
+BATS_JOBS = "7" # determined emperically
 
 genrule(
     name = "merge",
@@ -34,5 +35,5 @@ sh_test(
             ":node_modules",
             ],
     env = {"SOURCE_FILES": '\n'.join(ASMCLI_SOURCES)},
-    args = TESTS,
+    args = TESTS + ["--jobs", BATS_JOBS, "--no-parallelize-across-files"],
 )
