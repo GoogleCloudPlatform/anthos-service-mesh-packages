@@ -698,50 +698,6 @@ get_cluster_labels() {
   echo "${LABELS}"
 }
 
-is_cluster_registered() {
-  if ! is_membership_crd_installed; then
-    false
-    return
-  fi
-
-  local IDENTITY_PROVIDER
-  IDENTITY_PROVIDER="$(retry 2 kubectl get memberships.hub.gke.io \
-    membership -ojson 2>/dev/null | jq .spec.identity_provider)"
-
-  if [[ -z "${IDENTITY_PROVIDER}" ]] || [[ "${IDENTITY_PROVIDER}" == 'null' ]]; then
-    false
-  fi
-
-  local WANT
-  WANT="//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
-  local LIST
-  LIST="$(gcloud container hub memberships list --project "${FLEET_PROJECT_ID}" \
-    --format=json | grep "${WANT}")"
-  if [[ -z "${LIST}" ]]; then
-    { read -r -d '' MSG; warn "${MSG}"; } <<EOF || true
-Cluster is registered in the project ${FLEET_PROJECT_ID}, but the script is
-unable to verify in the project. The script will continue to execute.
-EOF
-  fi
-}
-
-generate_membership_name() {
-  local MEMBERSHIP_NAME
-  MEMBERSHIP_NAME="${CLUSTER_NAME}"
-  if [[ "$(retry 2 gcloud container hub memberships list --format='value(name)' \
-   --project "${PROJECT_ID}" | grep -c "^${MEMBERSHIP_NAME}$" || true)" -ne 0 ]]; then
-    MEMBERSHIP_NAME="${CLUSTER_NAME}-${PROJECT_ID}-${CLUSTER_LOCATION}"
-  fi
-  if [[ "${#MEMBERSHIP_NAME}" -gt 63 ]] || [[ "$(retry 2 gcloud container hub \
-   memberships list --format='value(name)' --project "${PROJECT_ID}" | grep -c \
-   "^${MEMBERSHIP_NAME}$" || true)" -ne 0 ]]; then
-    local RAND
-    RAND="$(tr -dc "a-z0-9" </dev/urandom | head -c8 || true)"
-    MEMBERSHIP_NAME="${CLUSTER_NAME:0:54}-${RAND}"
-  fi
-  echo "${MEMBERSHIP_NAME}"
-}
-
 generate_membership_name() {
   local MEMBERSHIP_NAME
   MEMBERSHIP_NAME="${CLUSTER_NAME}"
@@ -940,18 +896,6 @@ Please add the cluster role binding and retry, or run the script with the
 '--enable-dependencies' flag to allow the script to enable it on your behalf.
 $(enable_common_message)
 EOF
-  fi
-}
-
-is_membership_crd_installed() {
-  if ! kubectl api-resources --api-group=hub.gke.io | grep -q memberships; then
-    false
-    return
-  fi
-
-  if [[ "$(retry 2 kubectl get memberships.hub.gke.io -ojsonpath="{..metadata.name}" \
-    | grep -w -c membership || true)" -eq 0 ]]; then
-    false
   fi
 }
 
