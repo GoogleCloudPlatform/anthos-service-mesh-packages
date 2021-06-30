@@ -13,8 +13,8 @@ cd "${SDIR}"
 
 get_test_clusters() {
   cat <<EOF
-long-term-test-cluster-add-to-mesh-1
-long-term-test-cluster-add-to-mesh-2
+long-term-test-cluster-create-mesh-1
+long-term-test-cluster-create-mesh-2
 EOF
 }
 
@@ -31,7 +31,7 @@ main() {
 run_add_to_mesh_test() {
   date +"%T"
 
-  local ARGS; ARGS="add-to-mesh ${PROJECT_ID}"
+  local ARGS; ARGS="create-mesh ${PROJECT_ID}"
   while read -r CLUSTER_NAME; do
     ARGS="${ARGS} ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME}"
   done <<EOF
@@ -51,9 +51,9 @@ $(get_test_clusters)
 EOF
 
   echo "Adding clusters to fleet..."
-  echo "../asmcli ${ARGS}"
+  echo "VERBOSE=1 ../asmcli ${ARGS}"
   # shellcheck disable=SC2086
-  ../asmcli ${ARGS}
+  VERBOSE=1 ../asmcli ${ARGS}
 
   date +"%T"
 
@@ -77,10 +77,6 @@ set_up_clusters() {
   LT_NAMESPACE="$(uniq_name "${SCRIPT_NAME}" "${BUILD_ID}")"
   OUTPUT_DIR="$(mktemp -d)"
   REVISION_LABEL="$(uniq_name "${SCRIPT_NAME}" "${BUILD_ID}")"
-  if [[ -n "${KEY_FILE}" && -n "${SERVICE_ACCOUNT}" ]]; then
-    KEY_FILE="-k ${KEY_FILE}"
-    SERVICE_ACCOUNT="-s ${SERVICE_ACCOUNT}"
-  fi
 
   local CLUSTER_NAME
   while read -r CLUSTER_NAME; do
@@ -90,8 +86,7 @@ set_up_clusters() {
 
     echo "Installing ASM with MeshCA..."
     echo "_CI_REVISION_PREFIX=${LT_NAMESPACE} \
-    ../asmcli install ${KEY_FILE} ${SERVICE_ACCOUNT} \
-      --kc ${KUBECONFIG} -v \
+    ../asmcli install --kc ${KUBECONFIG} -v \
       --output-dir ${OUTPUT_DIR} \
       --revision_name ${REVISION_LABEL}"
     # shellcheck disable=SC2086
@@ -99,8 +94,7 @@ set_up_clusters() {
     CLUSTER_NAME="" \
     PROJECT_ID="" \
     _CI_REVISION_PREFIX="${LT_NAMESPACE}" \
-      ../asmcli install ${KEY_FILE} ${SERVICE_ACCOUNT} \
-      --kc "${KUBECONFIG}" -v \
+      ../asmcli install --kc "${KUBECONFIG}" -v \
       --output-dir "${OUTPUT_DIR}" \
       --revision_name ${REVISION_LABEL}
 

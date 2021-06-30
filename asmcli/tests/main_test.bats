@@ -79,9 +79,9 @@ teardown() {
 }
 
 
-@test "MAIN: add-to-mesh should register" {
+@test "MAIN: create-mesh should register" {
   local CMD
-  CMD="add-to-mesh"
+  CMD="create-mesh"
   CMD="${CMD} this_should_pass"
   CMD="${CMD} this_should_pass/this_should_pass/this_should_pass"
   CMD="${CMD} this_should_pass/this_should_pass/this_should_pass"
