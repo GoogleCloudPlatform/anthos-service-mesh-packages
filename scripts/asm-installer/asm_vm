@@ -26,7 +26,7 @@ _CI_REVISION_PREFIX="${_CI_REVISION_PREFIX:=}"
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=10}"; readonly MINOR;
 POINT="${POINT:=2}"; readonly POINT;
-REV="${REV:=2}"; readonly REV;
+REV="${REV:=3}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1-unstable"}"; readonly CONFIG_VER;
 ASM_RELEASE="${MAJOR}.${MINOR}"
 ASM_META_VERSION="${ASM_RELEASE}.0"
