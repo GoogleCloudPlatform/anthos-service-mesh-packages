@@ -1,23 +1,11 @@
 #!/usr/bin/env bash
 main() {
-  local FILE; FILE="${1}"
   local FAILED; FAILED=0
 
-  if [[ ! -f "${FILE}" ]]; then
-    echo "FAILED: ${FILE}: No such file or directory"
-    exit 1
-  fi
-
-  while read -r VARIABLE; do
-    VARIABLE=${VARIABLE%=}
-    if ! grep -Eq "local([[:space:]A-Za-z0-9_\-]+)?${VARIABLE}(;|$|=|[[:space:]])" "${FILE}" \
-    && ! grep -Eq "readonly ${VARIABLE}(;|$)" "${FILE}" && ! should_skip "${VARIABLE}"; then
-      echo "FAILED: ${VARIABLE} is not marked as local or readonly!"
-      FAILED=1
-    fi
-  done <<EOF
-$(get_all_variables "${FILE}")
-EOF
+  while [[ $# != 0 ]]; do
+    lint_file "${1}"
+    shift 1
+  done
 
   if [[ "${FAILED}" -eq 1 ]]; then
     false
@@ -37,6 +25,26 @@ should_skip() {
     return
   fi
   false
+}
+
+lint_file() {
+  local FILE; FILE="${1}"
+
+  if [[ ! -f "${FILE}" ]]; then
+    echo "FAILED: ${FILE}: No such file or directory"
+    exit 1
+  fi
+
+  while read -r VARIABLE; do
+    VARIABLE=${VARIABLE%=}
+    if ! grep -Eq "local([[:space:]A-Za-z0-9_\-]+)?${VARIABLE}(;|$|=|[[:space:]])" "${FILE}" \
+    && ! grep -Eq "readonly ${VARIABLE}(;|$)" "${FILE}" && ! should_skip "${VARIABLE}"; then
+      echo "FAILED: ${VARIABLE} in ${FILE} is not marked as local or readonly!"
+      FAILED=1
+    fi
+  done <<EOF
+$(get_all_variables "${FILE}")
+EOF
 }
 
 main "$@"
