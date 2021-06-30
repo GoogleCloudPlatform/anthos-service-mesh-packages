@@ -50,6 +50,7 @@ PROJECT_NUMBER=""
 KPT_URL=""
 KUBECONFIG=""
 APATH=""
+AKPT="$(which kpt || true)"
 ABS_OVERLAYS=""
 
 ### Option variables ###
@@ -126,6 +127,10 @@ init() {
 
 apath() {
   "${APATH}" "${@}"
+}
+
+kpt() {
+  "${AKPT}" "${@}"
 }
 
 ### Convenience functions ###
@@ -227,6 +232,13 @@ is_sa() {
 
 needs_asm() {
   if [[ "${PRINT_CONFIG}" -eq 0 ]] && ! can_modify && ! should_validate; then false; fi
+}
+
+needs_kpt() {
+  if [[ -z "${AKPT}" ]]; then return; fi
+  KPT_VER="$(kpt version)"
+  if [[ "${KPT_VER:0:1}" != "0" ]]; then return; fi
+  false
 }
 
 version_message() {
@@ -689,6 +701,9 @@ set_up_local_workspace() {
   else
     OUTPUT_DIR="$(apath -f "${OUTPUT_DIR}")"
   fi
+
+  if [[ -x "${OUTPUT_DIR}/kpt" ]]; then AKPT="$(apath -f "${OUTPUT_DIR}/kpt")"; fi
+
   pushd "$OUTPUT_DIR" > /dev/null
 
   info "Generating a new kubeconfig..."
@@ -766,7 +781,6 @@ awk
 gcloud
 grep
 jq
-kpt
 kubectl
 sed
 tr
@@ -810,6 +824,9 @@ EOF
   if ! necessary_files_exist; then
     info "Downloading ASM.."
     download_asm "${OS}"
+    if needs_kpt; then
+      download_kpt
+    fi
 
     info "Downloading ASM kpt package..."
     retry 3 run kpt pkg get --auto-set=false "${KPT_URL}" asm
@@ -829,6 +846,23 @@ EOF
 ${OPTIONAL_OVERLAY}
 EOF
   unset OPTIONAL_OVERLAY
+}
+
+download_kpt() {
+  local OS
+
+  case "$(uname)" in
+    Linux ) OS="linux_amd64";;
+    Darwin) OS="darwin_arm64";;
+    *     ) fatal "$(uname) is not a supported OS.";;
+  esac
+
+  local KPT_TGZ
+  KPT_TGZ="https://github.com/GoogleContainerTools/kpt/releases/download/v0.39.3/kpt_${OS}-0.39.3.tar.gz"
+
+  info "Downloading kpt.."
+  curl -L "${KPT_TGZ}" | tar xz
+  AKPT="$(apath -f kpt)"
 }
 
 download_asm() {
