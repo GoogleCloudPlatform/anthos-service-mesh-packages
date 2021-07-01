@@ -1972,7 +1972,7 @@ register_cluster() {
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   local CMD
-  CMD="gcloud beta container hub memberships register ${MEMBERSHIP_NAME}"
+  CMD="gcloud container hub memberships register ${MEMBERSHIP_NAME}"
   CMD="${CMD} --project=${FLEET_ID}"
   CMD="${CMD} --enable-workload-identity"
   if is_gcp; then
