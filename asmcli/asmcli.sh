@@ -1980,7 +1980,7 @@ register_cluster() {
   else
     CMD="${CMD} --kubeconfig=${KCF} --context=${KCC}"
   fi
-  retry 2 run "${CMD}"
+  retry 2 "${CMD}"
 }
 
 exit_if_cluster_unregistered() {
