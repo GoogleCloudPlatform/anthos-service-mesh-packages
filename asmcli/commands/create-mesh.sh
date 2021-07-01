@@ -101,7 +101,7 @@ add_one_to_mesh() {
   info "Registering the cluster ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME} as ${MEMBERSHIP_NAME}..."
 
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  retry 2 run_command gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
+  retry 2 gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
     --project="${PROJECT_ID}" \
     --gke-uri="${GKE_CLUSTER_URI}" \
     --enable-workload-identity
@@ -130,7 +130,7 @@ install_one_remote_secret() {
 
   info "Installing remote secret ${SECRET_NAME} on ${CTX_CLUSTER2}..."
 
-  retry 2 run_command istioctl x create-remote-secret \
+  retry 2 istioctl x create-remote-secret \
     --context="${CTX_CLUSTER1}" \
     --name="${SECRET_NAME}" | \
     kubectl apply --context="${CTX_CLUSTER2}" -f -
