@@ -270,6 +270,11 @@ parse_args() {
         usage
         exit
         ;;
+      *)
+        warn "Unknown option: ${1}"
+        usage
+        exit 2
+        ;;
     esac
   done
 
