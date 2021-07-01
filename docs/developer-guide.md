@@ -64,10 +64,9 @@ npm install
 in the pacakge root directory. You might need to install [`npm`](https://nodejs.org/en/knowledge/getting-started/npm/what-is-npm/) first.
 To run tests,
 ```shell
-bazel test $TEST_TARGET
+bazel test $TEST_TARGET --test_output=all
 ```
-
-Since we use `bazel`, the complete `bats` logs are not streamed to the
-terminal. The terminal will show basic information about whether
-the tests passed, but the entire log could be found in
-`bazel-testlogs/test.log`.
+or to have the tests streamed
+```shell
+bazel test $TEST_TARGET --test_output=streamed
+```
