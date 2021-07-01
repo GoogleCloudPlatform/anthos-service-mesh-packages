@@ -563,12 +563,15 @@ pre_migrate() {
 
 backup_config() {
   if [[ -d ./configuration_backup ]]; then
-    rm -r ./configuration_backup.old
+    if [[ -d ./configuration_backup.old ]]; then rm -r ./configuration_backup.old; fi
+
     mv ./configuration_backup configuration_backup.old
   fi
   mkdir configuration_backup
   current_label > configuration_backup/label
-  kubectl get ns -l "$(current_label)" -oname > configuration_backup/labeled_namespaces
+  for label in $(current_label); do
+    kubectl get ns -l "${label}" -oname >> configuration_backup/labeled_namespaces
+  done
   kubectl apply view-last-applied deployments \
     -n istio-system -l app=istiod > configuration_backup/istiod_deployment
   kubectl apply view-last-applied services \
