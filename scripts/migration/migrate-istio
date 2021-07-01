@@ -35,7 +35,7 @@ OPERATOR_MANIFEST="${PACKAGE_DIRECTORY}/istio-operator.yaml"; readonly OPERATOR_
 CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
 
 KUBECONFIG="$(mktemp)"
-AKUBECTL=""
+AKUBECTL="$(which kubectl || true)"
 
 GKE_CLUSTER_URI=""
 GCE_NETWORK_NAME=""
@@ -47,7 +47,7 @@ istioctl() {
 }
 
 kubectl() {
-  "${AKUBECTL}" --kubeconfig="${KUBECONFIG}" "${@}"
+  "${AKUBECTL}" --kubeconfig "${KUBECONFIG}" "${@}"
 }
 
 run() {
@@ -114,7 +114,7 @@ configure_kubectl(){
   fi
 
   info "Fetching/writing GCP credentials to kubeconfig file..."
-  retry 2 run gcloud container clusters get-credentials "${CLUSTER_NAME}" \
+  KUBECONFIG="${KUBECONFIG}" retry 2 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
     --project="${PROJECT_ID}" \
     --zone="${CLUSTER_LOCATION}"
 
@@ -344,11 +344,6 @@ EOF
     done
     fatal "One or more dependencies were not found. Please install them and retry."
   fi
-
-  case "$(uname)" in
-    Linux ) AKUBECTL="$(readlink -f kubectl)";;
-    Darwin) AKUBECTL="$(stat -f kubectl)";;
-  esac
 
   # shellcheck disable=SC2064
   trap "$(shopt -p nocasematch)" RETURN
@@ -1277,6 +1272,7 @@ remove_asm() {
 main() {
   parse_args "${@}"
   validate_args
+
   validate_dependencies
 
   if [[ "${MIGRATE}" -eq 1 ]]; then
