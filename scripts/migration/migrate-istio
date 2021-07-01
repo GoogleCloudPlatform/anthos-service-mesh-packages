@@ -35,6 +35,7 @@ OPERATOR_MANIFEST="${PACKAGE_DIRECTORY}/istio-operator.yaml"; readonly OPERATOR_
 CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
 
 KUBECONFIG="$(mktemp)"
+AKUBECTL=""
 
 GKE_CLUSTER_URI=""
 GCE_NETWORK_NAME=""
@@ -43,6 +44,10 @@ GCLOUD_USER_OR_SA=""
 
 istioctl() {
   "${ISTIOCTL_REL_PATH}" "${@}"
+}
+
+kubectl() {
+  "${AKUBECTL}" --kubeconfig="${KUBECONFIG}" "${@}"
 }
 
 run() {
@@ -112,7 +117,6 @@ configure_kubectl(){
   retry 2 run gcloud container clusters get-credentials "${CLUSTER_NAME}" \
     --project="${PROJECT_ID}" \
     --zone="${CLUSTER_LOCATION}"
-  export KUBECONFIG
 
   info "Verifying connectivity (20s)..."
   local RETVAL; RETVAL=0;
@@ -340,6 +344,11 @@ EOF
     done
     fatal "One or more dependencies were not found. Please install them and retry."
   fi
+
+  case "$(uname)" in
+    Linux ) AKUBECTL="$(readlink -f kubectl)";;
+    Darwin) AKUBECTL="$(stat -f kubectl)";;
+  esac
 
   # shellcheck disable=SC2064
   trap "$(shopt -p nocasematch)" RETURN
