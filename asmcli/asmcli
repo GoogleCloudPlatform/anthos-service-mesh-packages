@@ -858,10 +858,6 @@ validate_args() {
       fatal "Specifying a custom CA with managed control plane is not supported."
     fi
 
-    if [[ "${USE_VM}" -eq 1 ]]; then
-      fatal "Adding VM workloads with managed control plane is not supported."
-    fi
-
     if [[ "${CUSTOM_REVISION}" -eq 1 ]]; then
       fatal "Specifying a revision label with managed control plane is not supported."
     fi
@@ -1050,7 +1046,7 @@ validate_hub() {
     fatal "Hub Workload Identity Pool is only supported for Mesh CA"
   fi
 
-  if [[ "${USE_VM}" -eq 1 && "${USE_HUB_WIP}" -eq 0 ]]; then
+  if [[ ! is_managed && "${USE_VM}" -eq 1 && "${USE_HUB_WIP}" -eq 0 ]]; then
     fatal "Hub Workload Identity Pool is required to add VM workloads. Run the script with the -o hub-meshca option."
   fi
 }
@@ -1990,9 +1986,9 @@ register_cluster() {
 exit_if_cluster_unregistered() {
   if ! is_cluster_registered; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-Cluster is not registered to an environ. Please register the cluster and
+Cluster is not registered to a fleet. Please register the cluster and
 retry, or run the script with the '--enable_registration' flag to allow
-the script to register to the current project's environ on your behalf.
+the script to register to the current project's fleet on your behalf.
 EOF
   fi
 }
@@ -2604,7 +2600,7 @@ FLAGS:
   are incompatible with --only_validate.
 
   -e|--enable_all                     Allow the script to perform all of the
-                                      individual enable actions below. (Environ
+                                      individual enable actions below. (Fleet
                                       registration won't happen unless necessary
                                       for a selected option.)
      --enable_cluster_roles           Allow the script to attempt to set
@@ -2618,7 +2614,7 @@ FLAGS:
      --enable_gcp_components          Allow the script to enable required GCP
                                       managed services and components
      --enable_registration            Allow the script to register the cluster
-                                      to an environ
+                                      to a fleet
      --enable_namespace_creation      Allow the script to create the istio-system
                                       namespace for the user
 
@@ -3038,6 +3034,7 @@ validate() {
 
 validate_dependencies() {
   local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
+  local USE_VM; USE_VM="$(context_get-option "USE_VM")"
 
   if can_modify_gcp_apis; then
     enable_gcloud_apis
@@ -3047,7 +3044,7 @@ validate_dependencies() {
 
   if can_register_cluster && is_gcp; then
     register_cluster
-  elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 ]]; then
+  elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 || "${USE_VM}" -eq 1 ]]; then
     exit_if_cluster_unregistered
   fi
 
@@ -3055,9 +3052,15 @@ validate_dependencies() {
     if can_modify_gcp_components; then
       enable_workload_identity
       enable_stackdriver_kubernetes
+      if should_enable_service_mesh_feature; then
+        enable_service_mesh_feature
+      fi
     else
       exit_if_no_workload_identity
       exit_if_stackdriver_not_enabled
+      if should_enable_service_mesh_feature; then
+        exit_if_service_mesh_feature_not_enabled
+      fi
     fi
   fi
 
@@ -3215,13 +3218,6 @@ validate_in_cluster_control_plane() {
   fi
   if can_modify_gcp_components; then
     init_meshconfig
-    if should_enable_service_mesh_feature; then
-      enable_service_mesh_feature
-    fi
-  elif should_validate; then
-    if should_enable_service_mesh_feature; then
-      exit_if_service_mesh_feature_not_enabled
-    fi
   fi
   if can_modify_gcp_iam_roles; then
     bind_user_to_iam_policy "$(required_iam_roles)" "$(iam_user)"

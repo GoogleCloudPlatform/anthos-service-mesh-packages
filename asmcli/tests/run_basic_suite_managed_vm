@@ -15,12 +15,8 @@ main() {
   # CLI setup
   parse_args "$@"
 
-  run_basic_test "install" "mesh_ca" "-o vm -o hub-meshca --enable_gcp_components"
+  run_basic_test "install" "mesh_ca" "--managed -o vm --enable_gcp_components"
   trap 'cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"' ERR
-
-  echo "Verifying east-west gateway is installed and running..."
-  kubectl wait --for=condition=available --timeout=600s \
-        deployment/istio-eastwestgateway -n istio-system
 
   echo "Verifying cluster is registered..."
   if ! is_cluster_registered; then

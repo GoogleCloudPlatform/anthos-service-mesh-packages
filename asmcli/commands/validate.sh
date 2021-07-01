@@ -28,6 +28,7 @@ validate() {
 
 validate_dependencies() {
   local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
+  local USE_VM; USE_VM="$(context_get-option "USE_VM")"
 
   if can_modify_gcp_apis; then
     enable_gcloud_apis
@@ -37,7 +38,7 @@ validate_dependencies() {
 
   if can_register_cluster && is_gcp; then
     register_cluster
-  elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 ]]; then
+  elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 || "${USE_VM}" -eq 1 ]]; then
     exit_if_cluster_unregistered
   fi
 
@@ -45,9 +46,15 @@ validate_dependencies() {
     if can_modify_gcp_components; then
       enable_workload_identity
       enable_stackdriver_kubernetes
+      if should_enable_service_mesh_feature; then
+        enable_service_mesh_feature
+      fi
     else
       exit_if_no_workload_identity
       exit_if_stackdriver_not_enabled
+      if should_enable_service_mesh_feature; then
+        exit_if_service_mesh_feature_not_enabled
+      fi
     fi
   fi
 

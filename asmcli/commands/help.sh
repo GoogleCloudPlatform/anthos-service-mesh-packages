@@ -132,7 +132,7 @@ FLAGS:
   are incompatible with --only_validate.
 
   -e|--enable_all                     Allow the script to perform all of the
-                                      individual enable actions below. (Environ
+                                      individual enable actions below. (Fleet
                                       registration won't happen unless necessary
                                       for a selected option.)
      --enable_cluster_roles           Allow the script to attempt to set
@@ -146,7 +146,7 @@ FLAGS:
      --enable_gcp_components          Allow the script to enable required GCP
                                       managed services and components
      --enable_registration            Allow the script to register the cluster
-                                      to an environ
+                                      to a fleet
      --enable_namespace_creation      Allow the script to create the istio-system
                                       namespace for the user
 
