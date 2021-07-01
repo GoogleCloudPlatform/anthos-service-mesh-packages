@@ -34,7 +34,7 @@ _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=10}"; readonly MINOR;
 POINT="${POINT:=2}"; readonly POINT;
-REV="${REV:=2}"; readonly REV;
+REV="${REV:=3}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
@@ -119,6 +119,7 @@ PRINT_HELP=0
 PRINT_VERSION=0
 CUSTOM_CA=0
 USE_HUB_WIP=0
+TRUST_DOMAIN_ALIASES=""
 USE_MCP_CNI=0
 USE_VM=0
 ENVIRON_PROJECT_ID=""
@@ -154,6 +155,10 @@ main() {
   if should_validate || can_modify_at_all; then
     local_iam_user > /dev/null
     validate_gcp_resources
+  fi
+
+  if needs_asm && needs_kpt; then
+    download_kpt
   fi
 
   if needs_asm && ! necessary_files_exist; then
@@ -628,6 +633,20 @@ needs_asm() {
   fi
 }
 
+needs_kpt() {
+  if [[ -z "${AKPT}" ]]; then return; fi
+  KPT_VER="$(kpt version)"
+  if [[ "${KPT_VER:0:1}" != "0" ]]; then return; fi
+  false
+}
+
+add_trust_domain_alias() {
+  if [[ "${TRUST_DOMAIN_ALIASES}" == *${1}* ]]; then
+    return
+  fi
+  TRUST_DOMAIN_ALIASES="${TRUST_DOMAIN_ALIASES} ${1}"
+}
+
 enable_common_message() {
   echo "Alternatively, use --enable_all|-e to allow this tool to handle all dependencies."
 }
@@ -912,6 +931,9 @@ parse_args() {
         fi
         if [[ "${2}" == "vm" ]]; then
           USE_VM=1
+        fi
+        if [[ "${2}" == "ca-migration-meshca" ]]; then
+          add_trust_domain_alias "cluster.local"
         fi
         shift 2
         ;;
@@ -1386,7 +1408,11 @@ set_up_local_workspace() {
       fatal "${OUTPUT_DIR} exists and is not a directory, please specify another directory."
     fi
   fi
+
+  if [[ -x "${OUTPUT_DIR}/kpt" ]]; then AKPT="$(apath -f "${OUTPUT_DIR}/kpt")"; fi
+
   pushd "$OUTPUT_DIR" > /dev/null
+
 
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
     KUBECONFIG="asm_kubeconfig"
@@ -1468,7 +1494,6 @@ $AGCLOUD
 grep
 jq
 $AKUBECTL
-$AKPT
 sed
 tr
 head
@@ -1482,7 +1507,6 @@ EOF
   done <<EOF
 AKUBECTL
 AGCLOUD
-AKPT
 EOF
 
   if [[ "${CUSTOM_CA}" -eq 1 ]]; then
@@ -1508,6 +1532,23 @@ EOF
   if [[ "$(uname -m)" != "x86_64" ]]; then
     fatal "Installation is only supported on x86_64."
   fi
+}
+
+download_kpt() {
+  local OS
+
+  case "$(uname)" in
+    Linux ) OS="linux_amd64";;
+    Darwin) OS="darwin_arm64";;
+    *     ) fatal "$(uname) is not a supported OS.";;
+  esac
+
+  local KPT_TGZ
+  KPT_TGZ="https://github.com/GoogleContainerTools/kpt/releases/download/v0.39.3/kpt_${OS}-0.39.3.tar.gz"
+
+  info "Downloading kpt.."
+  curl -L "${KPT_TGZ}" | tar xz
+  AKPT="$(apath -f kpt)"
 }
 
 download_asm() {
@@ -2476,18 +2517,16 @@ configure_package() {
 
   if [[ "${CA}" == "mesh_ca" ]]; then
     # set the trust domain aliases to include both new Hub WIP and old Hub WIP to achieve no downtime upgrade.
-    TRUST_DOMAIN_ALIASES="${PROJECT_ID}.svc.id.goog ${PROJECT_ID}.hub.id.goog"
-    run eval kpt cfg set asm anthos.servicemesh.trustDomainAliases "${TRUST_DOMAIN_ALIASES}"
-  fi
-
-  if [[ "${CA}" == "mesh_ca" && -n "${_CI_TRUSTED_GCP_PROJECTS}" ]]; then
-    # Gather the trust domain aliases from projects.
-    TRUST_DOMAIN_ALIASES="${PROJECT_ID}.svc.id.goog"
-    while IFS=',' read -r trusted_gcp_project; do
-      TRUST_DOMAIN_ALIASES="${TRUST_DOMAIN_ALIASES} ${trusted_gcp_project}.svc.id.goog"
-    done <<EOF
+    add_trust_domain_alias "${PROJECT_ID}.svc.id.goog"
+    add_trust_domain_alias "${PROJECT_ID}.hub.id.goog"
+    if [[ -n "${_CI_TRUSTED_GCP_PROJECTS}" ]]; then
+      # Gather the trust domain aliases from projects.
+      while IFS=',' read -r trusted_gcp_project; do
+        add_trust_domain_alias "${trusted_gcp_project}.svc.id.goog"
+      done <<EOF
 ${_CI_TRUSTED_GCP_PROJECTS}
 EOF
+    fi
     # kpt treats words in quotes as a single param, while kpt need ${TRUST_DOMAIN_ALIASES} to be splitting params for a list. If we remove quotes, the lint will complain.
     # eval will translate the quoted TRUST_DOMAIN_ALIASES into params to workaround both.
     run eval kpt cfg set asm anthos.servicemesh.trustDomainAliases "${TRUST_DOMAIN_ALIASES}"
