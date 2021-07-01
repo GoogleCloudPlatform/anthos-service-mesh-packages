@@ -31,7 +31,7 @@ set -o pipefail
 # can be cleaned up using the cleanup() routine
 
 TMP_DIR="$(mktemp -d)"
-
+ISTIOCTL_BIN="istioctl"
 SKIP_CONFIRM=""
 CONTEXT=""
 SUB_COMMAND=""
@@ -178,7 +178,7 @@ print_intro() {
 check_prerequisites() {
   echo -e "${blue}Checking prerequisites...${clr}"
   command -v kubectl >| /dev/null 2>&1 || die "kubectl must be installed, aborting."
-  command -v istioctl >| /dev/null 2>&1 || die "istioctl must be installed, aborting."
+  command -v "${ISTIOCTL_BIN}" >| /dev/null 2>&1 || die "istioctl must be installed in the working directory, aborting."
   echo -e "${green}OK${clr}"
 }
 
@@ -355,7 +355,7 @@ rollback_gateway() {
 replace_webhook() {
   prompt "Configuring sidecar injection to use Anthos Service Mesh by default..."
   kube patch mutatingwebhookconfigurations istio-sidecar-injector --type=json -p='[{"op": "replace", "path": "/webhooks"}]'
-  istioctl x revision tag set default --revision=asm-managed-rapid --overwrite
+  ${ISTIOCTL_BIN} x revision tag set default --revision=asm-managed-rapid --overwrite
   echo -e "${green}OK${clr}"
 }
 
@@ -656,6 +656,8 @@ while (( "$#" )); do
               mkdir -p "${TMP_DIR}" > /dev/null
             fi
             readonly TMP_DIR
+            ISTIOCTL_BIN="${PWD}/istioctl"
+            readonly ISTIOCTL_BIN
             shift
             ;;
         *)
