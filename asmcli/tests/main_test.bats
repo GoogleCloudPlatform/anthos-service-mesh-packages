@@ -92,22 +92,6 @@ teardown() {
   [ "${RETVAL}" -eq 0 ]
 }
 
-@test "MAIN: VM and --managed should pass" {
-  local CMD
-  CMD="validate"
-  CMD="${CMD} -l this_should_pass"
-  CMD="${CMD} -n this_should_pass"
-  CMD="${CMD} -p this_should_pass"
-  CMD="${CMD} --managed"
-  CMD="${CMD} -o vm"
-  CMD="${CMD} -c mesh_ca"
-
-  local RETVAL=0
-  _="$(main ${CMD})" || RETVAL="${?}"
-
-  [ "${RETVAL}" -eq 0 ]
-}
-
 @test "MAIN: invalid subcommand should fail" {
   local CMD
   CMD="this_is_an_invalid_subcommand"
@@ -439,6 +423,25 @@ teardown() {
   if ! can_register_cluster; then
     exit 1
   fi
+}
+
+@test "MAIN: VM and --managed should pass" {
+  context_init
+
+  local CMD
+  CMD="-l this_should_pass"
+  CMD="${CMD} -n this_should_pass"
+  CMD="${CMD} -p this_should_pass"
+  CMD="${CMD} --managed"
+  CMD="${CMD} --option vm"
+  CMD="${CMD} -c mesh_ca"
+
+  parse_args ${CMD}
+
+  local RETVAL=0
+  _="$(validate_args ${CMD})" || RETVAL="${?}"
+
+  [ "${RETVAL}" -eq 0 ]
 }
 
 @test "MAIN: VM and --managed should grant the permission to register the cluster" {
