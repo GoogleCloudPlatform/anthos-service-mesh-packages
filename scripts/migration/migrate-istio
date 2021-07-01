@@ -1283,6 +1283,7 @@ main() {
   fi
   if [[ "${PRE_MIGRATE}" -eq 1 ]]; then
     download_asm
+    configure_kubectl
     pre_migrate
   fi
   if [[ "${INSTALL_ASM}" -eq 1 ]]; then
