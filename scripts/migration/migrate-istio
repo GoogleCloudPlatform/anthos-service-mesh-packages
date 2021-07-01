@@ -1105,21 +1105,26 @@ relabel_for_asm() {
 $(cat configuration_backup/labeled_namespaces)
 EOF
 
-  info ""
-  local response
-  read -rp "Continue with migration? (Y/n)" response
+  if [[ "${DRY_RUN}" -eq 0 ]]; then
+    info ""
+    local response
+    read -rp "Continue with migration? (Y/n)" response
 
-  case "$response" in
-    Y | y | "" )
-      true
+    case "$response" in
+      Y | y | "" )
+        true
+        ;;
+      *     )
+        info "Migration canceled. You can re-run migration via this tool at any time."
+        info "Migration can also be completed manually by labeling namespaces with"
+        info "${REVISION_LABEL} and restarting workloads, then using this tool to finalize."
+        exit 2
       ;;
-    *     )
-      info "Migration canceled. You can re-run migration via this tool at any time."
-      info "Migration can also be completed manually by labeling namespaces with"
-      info "${REVISION_LABEL} and restarting workloads, then using this tool to finalize."
-      exit 2
-    ;;
-  esac
+    esac
+  else
+    info "Would have paused here to confirm before relabelling."
+    info "For --dry-run, continuing automatically."
+  fi
 
   relabel_namespaces_restart_workloads "istio.io/rev=${REVISION_LABEL}"
 }
@@ -1183,7 +1188,12 @@ EOF
 }
 
 finalize() {
-  check_proxies
+  if [[ "${DRY_RUN}" -eq 0 ]]; then
+    check_proxies
+  else
+    info "Would have checked to see if all sidecars are using ASM."
+    info "For --dry-run, continuing as if all sidecars were updated correctly."
+  fi
 
   local response
   read -rp "Remove previous control plane resources? (Y/n)" response
