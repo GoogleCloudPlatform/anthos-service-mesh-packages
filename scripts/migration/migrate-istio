@@ -443,7 +443,6 @@ exit_if_service_mesh_feature_not_enabled() {
 The service mesh feature is not enabled on Fleet ${FLEET_PROJECT_ID}.
 Please run the script with the '--enable-dependencies' flag to allow the
 script to enable it on your behalf.
-$(enable_common_message)
 EOF
   fi
 }
@@ -689,7 +688,6 @@ exit_if_cluster_unlabeled() {
 One or more required cluster labels were not found. Please label them and retry,
 or run the script with the '--enable-dependencies' flag to allow the script
 to enable them on your behalf.
-$(enable_common_message)
 EOF
   fi
 }
@@ -780,7 +778,6 @@ exit_if_no_workload_identity() {
 Workload identity is not enabled on ${CLUSTER_NAME}. Please enable it and
 retry, or run the script with the '--enable-dependencies' flag to allow
 the script to enable it on your behalf.
-$(enable_common_message)
 EOF
   fi
 }
@@ -817,7 +814,6 @@ exit_if_stackdriver_not_enabled() {
 Cloud Operations (Stackdriver)  is not enabled on ${CLUSTER_NAME}.
 Please enable it and retry, or run the script with the
 '--enable-dependencies' flag to allow the script to enable it on your behalf.
-$(enable_common_message)
 EOF
   fi
 }
@@ -903,7 +899,6 @@ exit_if_not_cluster_admin() {
 Current user must have the cluster-admin role on ${CLUSTER_NAME}.
 Please add the cluster role binding and retry, or run the script with the
 '--enable-dependencies' flag to allow the script to enable it on your behalf.
-$(enable_common_message)
 EOF
   fi
 }
@@ -934,7 +929,6 @@ exit_if_apis_not_enabled() {
 One or more APIs are not enabled. Please enable them and retry, or run the
 script with the '--enable-dependencies' flag to allow the script to enable them on
 your behalf.
-$(enable_common_message)
 EOF
   fi
 }
