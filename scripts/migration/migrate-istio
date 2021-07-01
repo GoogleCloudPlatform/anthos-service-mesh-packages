@@ -112,6 +112,7 @@ configure_kubectl(){
   retry 2 run gcloud container clusters get-credentials "${CLUSTER_NAME}" \
     --project="${PROJECT_ID}" \
     --zone="${CLUSTER_LOCATION}"
+  export KUBECONFIG
 
   info "Verifying connectivity (20s)..."
   local RETVAL; RETVAL=0;
