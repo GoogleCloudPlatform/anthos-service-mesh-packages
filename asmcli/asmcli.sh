@@ -28,9 +28,9 @@ _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"; readonly _CI_I_AM_A_TEST_RO
 
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
-MINOR="${MINOR:=9}"; readonly MINOR;
-POINT="${POINT:=3}"; readonly POINT;
-REV="${REV:=2}"; readonly REV;
+MINOR="${MINOR:=10}"; readonly MINOR;
+POINT="${POINT:=2}"; readonly POINT;
+REV="${REV:=3}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1-unstable"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
