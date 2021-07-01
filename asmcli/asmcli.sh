@@ -2195,7 +2195,7 @@ register_gce_identity_provider() {
   context_append "kubectlFiles" "asm/identity-provider/googleidp.yaml"
 }
 
-should_enable_service_mesh_feature() {
+needs_service_mesh_feature() {
   local USE_VM; USE_VM="$(context_get-option "USE_VM")"
 
   if [[ "${USE_VM}" -eq 0 ]]; then
