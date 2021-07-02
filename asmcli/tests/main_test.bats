@@ -425,6 +425,62 @@ teardown() {
   fi
 }
 
+@test "MAIN: VM and --managed should pass" {
+  context_init
+
+  local CMD
+  CMD="-l this_should_pass"
+  CMD="${CMD} -n this_should_pass"
+  CMD="${CMD} -p this_should_pass"
+  CMD="${CMD} --managed"
+  CMD="${CMD} --option vm"
+  CMD="${CMD} -c mesh_ca"
+
+  parse_args ${CMD}
+
+  local RETVAL=0
+  _="$(validate_args ${CMD})" || RETVAL="${?}"
+
+  [ "${RETVAL}" -eq 0 ]
+}
+
+@test "MAIN: VM and --managed should grant the permission to register the cluster" {
+  context_init
+
+  local CMD
+  CMD="-l this_should_pass"
+  CMD="${CMD} -n this_should_pass"
+  CMD="${CMD} -p this_should_pass"
+  CMD="${CMD} -c mesh_ca"
+  CMD="${CMD} -e"
+  CMD="${CMD} --option vm"
+  CMD="${CMD} --managed"
+
+  parse_args ${CMD}
+
+  if ! can_register_cluster; then
+    exit 1
+  fi
+}
+
+@test "MAIN: VM requires service mesh feature to be enabled" {
+  context_init
+
+  local CMD
+  CMD="-l this_should_pass"
+  CMD="${CMD} -n this_should_pass"
+  CMD="${CMD} -p this_should_pass"
+  CMD="${CMD} -c mesh_ca"
+  CMD="${CMD} -e"
+  CMD="${CMD} --option vm"
+
+  parse_args ${CMD}
+
+  if ! needs_service_mesh_feature; then
+    exit 1
+  fi
+}
+
 @test "MAIN: find_missing_strings shouldn't return anything with a trailing comma" {
   read -r HAYSTACK <<EOF
 one

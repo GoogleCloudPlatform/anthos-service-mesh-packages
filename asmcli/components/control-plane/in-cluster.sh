@@ -4,13 +4,6 @@ validate_in_cluster_control_plane() {
   fi
   if can_modify_gcp_components; then
     init_meshconfig
-    if should_enable_service_mesh_feature; then
-      enable_service_mesh_feature
-    fi
-  elif should_validate; then
-    if should_enable_service_mesh_feature; then
-      exit_if_service_mesh_feature_not_enabled
-    fi
   fi
   if can_modify_gcp_iam_roles; then
     bind_user_to_iam_policy "$(required_iam_roles)" "$(iam_user)"

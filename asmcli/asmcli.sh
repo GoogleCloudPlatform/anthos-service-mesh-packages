@@ -854,10 +854,6 @@ validate_args() {
       fatal "Specifying a custom CA with managed control plane is not supported."
     fi
 
-    if [[ "${USE_VM}" -eq 1 ]]; then
-      fatal "Adding VM workloads with managed control plane is not supported."
-    fi
-
     if [[ "${CUSTOM_REVISION}" -eq 1 ]]; then
       fatal "Specifying a revision label with managed control plane is not supported."
     fi
@@ -1046,7 +1042,7 @@ validate_hub() {
     fatal "Hub Workload Identity Pool is only supported for Mesh CA"
   fi
 
-  if [[ "${USE_VM}" -eq 1 && "${USE_HUB_WIP}" -eq 0 ]]; then
+  if ! is_managed && [[ "${USE_VM}" -eq 1 && "${USE_HUB_WIP}" -eq 0 ]]; then
     fatal "Hub Workload Identity Pool is required to add VM workloads. Run the script with the -o hub-meshca option."
   fi
 }
@@ -1986,9 +1982,9 @@ register_cluster() {
 exit_if_cluster_unregistered() {
   if ! is_cluster_registered; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-Cluster is not registered to an environ. Please register the cluster and
+Cluster is not registered to a fleet. Please register the cluster and
 retry, or run the script with the '--enable_registration' flag to allow
-the script to register to the current project's environ on your behalf.
+the script to register to the current project's fleet on your behalf.
 EOF
   fi
 }
@@ -2199,7 +2195,7 @@ register_gce_identity_provider() {
   context_append "kubectlFiles" "asm/identity-provider/googleidp.yaml"
 }
 
-should_enable_service_mesh_feature() {
+needs_service_mesh_feature() {
   local USE_VM; USE_VM="$(context_get-option "USE_VM")"
 
   if [[ "${USE_VM}" -eq 0 ]]; then
