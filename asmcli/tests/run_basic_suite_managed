@@ -15,7 +15,7 @@ main() {
   # CLI setup
   parse_args "$@"
 
-  run_basic_test "install" "mesh_ca" "--managed"; RETVAL=$?;
+  run_basic_test "install" "mesh_ca" "--managed -o cni-managed"; RETVAL=$?;
   cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"
 
   exit "${RETVAL}"

@@ -48,6 +48,37 @@ install_managed_components() {
   context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_REGULAR}"
   context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_RAPID}"
   context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_STABLE}"
+
+  local ASM_OPTS
+  ASM_OPTS="$(kubectl -n istio-system \
+    get --ignore-not-found cm asm-options \
+    -o jsonpath='{.data.ASM_OPTS}' || true)"
+
+  local USE_MCP_CNI; USE_MCP_CNI="$(context_get-option "USE_MCP_CNI")"
+  local CNI; CNI="no"
+  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then
+    info "Configuring CNI..."
+    CNI="yes"
+  fi
+
+  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=${CNI}"* ]]; then
+    cat >mcp_configmap.yaml <<EOF
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: asm-options
+  namespace: istio-system
+data:
+  ASM_OPTS: "CNI=${CNI}"
+EOF
+
+    context_append "kubectlFiles" "mcp_configmap.yaml"
+  fi
+
+  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then
+    context_append "kubectlFiles" "${MANAGED_CNI}"
+  fi
 }
 
 scrape_managed_urls() {

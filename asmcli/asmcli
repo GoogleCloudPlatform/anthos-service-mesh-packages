@@ -639,6 +639,13 @@ parse_args() {
         ;;
       -o | --option)
         arg_required "${@}"
+
+        if [[ "${2}" == "cni-managed" ]]; then
+          context_set-option "USE_MCP_CNI" 1
+          shift 2
+          continue
+        fi
+
         OPTIONAL_OVERLAY="${2},${OPTIONAL_OVERLAY}"
         context_set-option "OPTIONAL_OVERLAY" "${OPTIONAL_OVERLAY}"
         if [[ "${2}" == "hub-meshca" ]]; then
@@ -2772,6 +2779,37 @@ install_managed_components() {
   context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_REGULAR}"
   context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_RAPID}"
   context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_STABLE}"
+
+  local ASM_OPTS
+  ASM_OPTS="$(kubectl -n istio-system \
+    get --ignore-not-found cm asm-options \
+    -o jsonpath='{.data.ASM_OPTS}' || true)"
+
+  local USE_MCP_CNI; USE_MCP_CNI="$(context_get-option "USE_MCP_CNI")"
+  local CNI; CNI="no"
+  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then
+    info "Configuring CNI..."
+    CNI="yes"
+  fi
+
+  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=${CNI}"* ]]; then
+    cat >mcp_configmap.yaml <<EOF
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: asm-options
+  namespace: istio-system
+data:
+  ASM_OPTS: "CNI=${CNI}"
+EOF
+
+    context_append "kubectlFiles" "mcp_configmap.yaml"
+  fi
+
+  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then
+    context_append "kubectlFiles" "${MANAGED_CNI}"
+  fi
 }
 
 scrape_managed_urls() {
@@ -3367,6 +3405,7 @@ context_init() {
     "CUSTOM_CA": ${CUSTOM_CA:-0},
     "USE_HUB_WIP": ${USE_HUB_WIP:-0},
     "USE_VM": ${USE_VM:-0},
+    "USE_MCP_CNI": ${USE_MCP_CNI:-0},
     "FLEET_ID": "${FLEET_ID:-}",
     "HUB_MEMBERSHIP_ID": "${HUB_MEMBERSHIP_ID:-}",
     "CUSTOM_REVISION": ${CUSTOM_REVISION:-0},
