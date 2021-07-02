@@ -24,17 +24,15 @@ spec:
             value: ""
           - name: TOKEN_AUDIENCES
             value: "istio-ca,PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.token-audiences"}
+          - name: ENABLE_STACKDRIVER_MONITORING
+            value: "true" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.controlplane.monitoring.enabled"}
   meshConfig:
     trustDomain: "cluster.local"
     defaultConfig:
       proxyMetadata:
         CA_PROVIDER: "Citadel"
         PLUGINS: ""
-        USE_TOKEN_FOR_CSR: "false"
   values:
     global:
       caAddress: ""
       pilotCertProvider: "istiod"
-      sds:
-        token:
-          aud: "istio-ca"

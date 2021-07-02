@@ -18,7 +18,7 @@ kind: IstioOperator
 spec:
   profile: empty
   hub: gcr.io/gke-release/asm # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}
-  tag: 1.9.0-asm.3 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
+  tag: 1.10.2-asm.1 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
   meshConfig:
     trustDomainAliases: # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases"}
       - PROJECT_ID.svc.id.goog # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
@@ -73,7 +73,7 @@ spec:
             value: "true" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.controlplane.monitoring.enabled"}
           - name: TOKEN_AUDIENCES
             value: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.token-audiences"}
-          - name: PILOT_ENABLE_WORKLOAD_ENTRY_AUTOREGISTRATION
+          - name: PILOT_ENABLE_CROSS_CLUSTER_WORKLOAD_ENTRY
             value: "true"
   values:
     # Enable telemetry v2 backend by Stackdriver.
