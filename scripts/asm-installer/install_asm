@@ -34,7 +34,7 @@ _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=9}"; readonly MINOR;
 POINT="${POINT:=6}"; readonly POINT;
-REV="${REV:=1}"; readonly REV;
+REV="${REV:=2}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
@@ -151,6 +151,10 @@ main() {
   if should_validate || can_modify_at_all; then
     local_iam_user > /dev/null
     validate_gcp_resources
+  fi
+
+  if needs_asm && needs_kpt; then
+    download_kpt
   fi
 
   if needs_asm && ! necessary_files_exist; then
@@ -604,6 +608,20 @@ needs_asm() {
   else
     false
   fi
+}
+
+needs_kpt() {
+  if [[ -z "${AKPT}" ]]; then return; fi
+  KPT_VER="$(kpt version)"
+  if [[ "${KPT_VER:0:1}" != "0" ]]; then return; fi
+  false
+}
+
+add_trust_domain_alias() {
+  if [[ "${TRUST_DOMAIN_ALIASES}" == *${1}* ]]; then
+    return
+  fi
+  TRUST_DOMAIN_ALIASES="${TRUST_DOMAIN_ALIASES} ${1}"
 }
 
 enable_common_message() {
@@ -1357,7 +1375,11 @@ set_up_local_workspace() {
       fatal "${OUTPUT_DIR} exists and is not a directory, please specify another directory."
     fi
   fi
+
+  if [[ -x "${OUTPUT_DIR}/kpt" ]]; then AKPT="$(apath -f "${OUTPUT_DIR}/kpt")"; fi
+
   pushd "$OUTPUT_DIR" > /dev/null
+
 
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
     KUBECONFIG="asm_kubeconfig"
@@ -1439,7 +1461,6 @@ $AGCLOUD
 grep
 jq
 $AKUBECTL
-$AKPT
 sed
 tr
 head
@@ -1453,7 +1474,6 @@ EOF
   done <<EOF
 AKUBECTL
 AGCLOUD
-AKPT
 EOF
 
   if [[ "${CUSTOM_CA}" -eq 1 ]]; then
@@ -1479,6 +1499,23 @@ EOF
   if [[ "$(uname -m)" != "x86_64" ]]; then
     fatal "Installation is only supported on x86_64."
   fi
+}
+
+download_kpt() {
+  local OS
+
+  case "$(uname)" in
+    Linux ) OS="linux_amd64";;
+    Darwin) OS="darwin_arm64";;
+    *     ) fatal "$(uname) is not a supported OS.";;
+  esac
+
+  local KPT_TGZ
+  KPT_TGZ="https://github.com/GoogleContainerTools/kpt/releases/download/v0.39.3/kpt_${OS}-0.39.3.tar.gz"
+
+  info "Downloading kpt.."
+  curl -L "${KPT_TGZ}" | tar xz
+  AKPT="$(apath -f kpt)"
 }
 
 download_asm() {
