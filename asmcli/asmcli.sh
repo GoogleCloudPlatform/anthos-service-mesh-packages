@@ -136,6 +136,10 @@ prepare_environment() {
     fi
   fi
 
+  if needs_asm && needs_kpt; then
+    download_kpt
+  fi
+
   if needs_asm; then
     if ! necessary_files_exist; then
       download_asm
@@ -198,7 +202,7 @@ init() {
 
   AKUBECTL="$(which kubectl || true)"; readonly AKUBECTL;
   AGCLOUD="$(which gcloud || true)"; readonly AGCLOUD;
-  AKPT="$(which kpt || true)"; readonly AKPT;
+  AKPT="$(which kpt || true)"
 }
 
 ### Convenience functions ###
@@ -557,6 +561,13 @@ can_create_namespace() {
   else
     false
   fi
+}
+
+needs_kpt() {
+  if [[ -z "${AKPT}" ]]; then return; fi
+  KPT_VER="$(kpt version)"
+  if [[ "${KPT_VER:0:1}" != "0" ]]; then return; fi
+  false
 }
 
 needs_asm() {
@@ -1111,6 +1122,9 @@ set_up_local_workspace() {
       fatal "${OUTPUT_DIR} exists and is not a directory, please specify another directory."
     fi
   fi
+
+  if [[ -x "${OUTPUT_DIR}/kpt" ]]; then AKPT="$(apath -f "${OUTPUT_DIR}/kpt")"; fi
+
   pushd "$OUTPUT_DIR" > /dev/null
   context_set-option "OUTPUT_DIR" "${OUTPUT_DIR}"
 
@@ -1213,7 +1227,6 @@ $AGCLOUD
 grep
 jq
 $AKUBECTL
-$AKPT
 sed
 tr
 head
@@ -1227,7 +1240,6 @@ EOF
   done <<EOF
 AKUBECTL
 AGCLOUD
-AKPT
 EOF
 
   if [[ "${CUSTOM_CA}" -eq 1 ]]; then
@@ -1253,6 +1265,23 @@ EOF
   if [[ "$(uname -m)" != "x86_64" ]]; then
     fatal "Installation is only supported on x86_64."
   fi
+}
+
+download_kpt() {
+  local OS
+
+  case "$(uname)" in
+    Linux ) OS="linux_amd64";;
+    Darwin) OS="darwin_arm64";;
+    *     ) fatal "$(uname) is not a supported OS.";;
+  esac
+
+  local KPT_TGZ
+  KPT_TGZ="https://github.com/GoogleContainerTools/kpt/releases/download/v0.39.3/kpt_${OS}-0.39.3.tar.gz"
+
+  info "Downloading kpt.."
+  curl -L "${KPT_TGZ}" | tar xz
+  AKPT="$(apath -f kpt)"
 }
 
 download_asm() {
