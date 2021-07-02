@@ -18,20 +18,21 @@ setup_cluster() {
     --format="value(name)" || true)"
 
   OUTPUT_DIR=$(mktemp -d)
-  ../asmcli \
-    print-config \
-    -l "${LT_CLUSTER_LOCATION}" \
-    -n "${LT_CLUSTER_NAME}" \
-    -p "${LT_PROJECT_ID}" \
-    -D "${OUTPUT_DIR}" > /dev/null
-
-  cleanup_old_instance_templates
-  cleanup_old_instances
-  cleanup_old_images
-  cleanup_old_workload_service_accounts
-
   if [[ -n "${RESULT}" ]]; then
     echo "Long term test cluster ${cluster} exists already."
+
+    ../asmcli \
+      print-config \
+      -l "${LT_CLUSTER_LOCATION}" \
+      -n "${cluster}" \
+      -p "${LT_PROJECT_ID}" \
+      -D "${OUTPUT_DIR}" > /dev/null
+
+    cleanup_old_instance_templates
+    cleanup_old_instances
+    cleanup_old_images
+    cleanup_old_workload_service_accounts
+
     configure_kubectl "${cluster}" "${LT_PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
     kubectl delete validatingwebhookconfiguration istiod-istio-system || true
     cleanup_old_test_namespaces "${OUTPUT_DIR}"
@@ -82,5 +83,3 @@ setup_cluster() {
 
 setup_cluster "${LT_CLUSTER_NAME}"
 setup_cluster "long-term-test-cluster-environ"
-setup_cluster "long-term-test-cluster-create-mesh-1"
-setup_cluster "long-term-test-cluster-create-mesh-2"
