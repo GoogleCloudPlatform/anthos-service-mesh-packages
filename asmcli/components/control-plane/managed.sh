@@ -3,13 +3,9 @@ validate_managed_control_plane() {
     bind_user_to_iam_policy "roles/meshconfig.admin" "$(local_iam_user)"
   fi
   if can_modify_at_all; then
-    local MANAGED_SERVICE_JSON; MANAGED_SERVICE_JSON="$(init_meshconfig_managed)"
-    local MANAGED_SERVICE_ACCOUNT; MANAGED_SERVICE_ACCOUNT="$(echo "${MANAGED_SERVICE_JSON}" | jq -r .serviceAccount)"
-    if [[ -z "${MANAGED_SERVICE_JSON}" || "${MANAGED_SERVICE_ACCOUNT}" == "null" ]]; then
+    if ! init_meshconfig_managed; then
       fatal "Couldn't initialize meshconfig, do you have the required permission resourcemanager.projects.setIamPolicy?"
     fi
-    context_set-option "MANAGED_SERVICE_ACCOUNT" "${MANAGED_SERVICE_ACCOUNT}"
-    bind_user_to_iam_policy "$(required_iam_roles_mcp_sa)" "$(iam_user)"
   fi
 }
 

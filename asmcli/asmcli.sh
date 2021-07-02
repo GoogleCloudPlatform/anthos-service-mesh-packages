@@ -1652,12 +1652,11 @@ EOF
 
 exit_if_out_of_iam_policy() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local GCLOUD_MEMBER; GCLOUD_MEMBER="$(iam_user)";
   local MEMBER_ROLES
   MEMBER_ROLES="$(gcloud projects \
     get-iam-policy "${PROJECT_ID}" \
     --flatten='bindings[].members' \
-    --filter="bindings.members:$(iam_user)" \
+    --filter="bindings.members:$(local_iam_user)" \
     --format='value(bindings.role)')"
 
   if [[ "${MEMBER_ROLES}" = *"roles/owner"* ]]; then
@@ -1680,16 +1679,6 @@ them on your behalf.
 $(enable_common_message)
 EOF
   fi
-}
-
-iam_user() {
-  local MANAGED_SERVICE_ACCOUNT; MANAGED_SERVICE_ACCOUNT="$(context_get-option "MANAGED_SERVICE_ACCOUNT")"
-  if ! is_managed; then
-    local_iam_user
-    return
-  fi
-
-  echo "serviceAccount:${MANAGED_SERVICE_ACCOUNT}"
 }
 
 local_iam_user() {
