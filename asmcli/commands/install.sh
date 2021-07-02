@@ -55,10 +55,10 @@ install_managed_components() {
     -o jsonpath='{.data.ASM_OPTS}' || true)"
 
   local USE_MCP_CNI; USE_MCP_CNI="$(context_get-option "USE_MCP_CNI")"
-  local CNI; CNI="no"
+  local CNI; CNI="off"
   if [[ "${USE_MCP_CNI}" -eq 1 ]]; then
     info "Configuring CNI..."
-    CNI="yes"
+    CNI="on"
   fi
 
   if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=${CNI}"* ]]; then
