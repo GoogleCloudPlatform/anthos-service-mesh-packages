@@ -7,7 +7,7 @@ validate_in_cluster_control_plane() {
   fi
   if can_modify_gcp_components; then
     init_meshconfig
-  elif [[ "${FLEET_ID}" == "${PROJECT_ID}" ]]; then
+  elif should_validate && [[ "${FLEET_ID}" == "${PROJECT_ID}" ]]; then
     warn "There is no way to validate that the meshconfig API has been initialized."
     warn "This needs to happen once per GCP project. If the API has not been initialized"
     warn "for ${PROJECT_ID}, please re-run this tool with the --enable_gcp_components"

@@ -47,6 +47,7 @@ context_init() {
     "FLEET_ID": "${FLEET_ID:-}",
     "HUB_MEMBERSHIP_ID": "${HUB_MEMBERSHIP_ID:-}",
     "CUSTOM_REVISION": ${CUSTOM_REVISION:-0},
+    "TRUST_DOMAIN_ALIASES": "${TRUST_DOMAIN_ALIASES:-}",
     "WI_ENABLED": ${WI_ENABLED:-0}
   },
   "istioctlFiles": [],

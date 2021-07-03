@@ -447,7 +447,7 @@ is_sa() {
 }
 
 is_sa_impersonation() {
-  local IMPERSONATE_USER; IMPERSONATE_USER="$(gcloud config get-value auth/impersonate_service_account)"
+  local IMPERSONATE_USER; IMPERSONATE_USER="$(gcloud config get-option auth/impersonate_service_account)"
   if [[ -z "${IMPERSONATE_USER}" ]]; then false; fi
 }
 
@@ -568,6 +568,16 @@ needs_kpt() {
   KPT_VER="$(kpt version)"
   if [[ "${KPT_VER:0:1}" != "0" ]]; then return; fi
   false
+}
+
+add_trust_domain_alias() {
+  local TRUST_DOMAIN_ALIASES
+  TRUST_DOMAIN_ALIASES="$(context_get-option "TRUST_DOMAIN_ALIASES")"
+  if [[ "${TRUST_DOMAIN_ALIASES}" == *${1}* ]]; then
+    return
+  fi
+  TRUST_DOMAIN_ALIASES="${TRUST_DOMAIN_ALIASES} ${1}"
+  context_set-option "TRUST_DOMAIN_ALIASES" "${TRUST_DOMAIN_ALIASES}"
 }
 
 needs_asm() {
@@ -1734,7 +1744,7 @@ local_iam_user() {
   fi
 
   if is_sa_impersonation; then
-    ACCOUNT_NAME="$(gcloud config get-value auth/impersonate_service_account)"
+    ACCOUNT_NAME="$(gcloud config get-option auth/impersonate_service_account)"
     ACCOUNT_TYPE="serviceAccount"
     warn "Service account impersonation currently configured to impersonate '${ACCOUNT_NAME}'."
   fi
@@ -2157,7 +2167,7 @@ EOF
 
 is_user_cluster_admin() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local GCLOUD_USER; GCLOUD_USER="$(gcloud config get-value core/account)"
+  local GCLOUD_USER; GCLOUD_USER="$(gcloud config get-option core/account)"
   local IAM_USER; IAM_USER="$(local_iam_user)"
   local ROLES
   ROLES="$(\
@@ -2179,7 +2189,7 @@ is_user_cluster_admin() {
 
 bind_user_to_cluster_admin(){
   info "Querying for core/account..."
-  local GCLOUD_USER; GCLOUD_USER="$(gcloud config get-value core/account)"
+  local GCLOUD_USER; GCLOUD_USER="$(gcloud config get-option core/account)"
   info "Binding ${GCLOUD_USER} to cluster admin role..."
   local PREFIX; PREFIX="$(echo "${GCLOUD_USER}" | cut -f 1 -d @)"
   local YAML; YAML="$(retry 5 kubectl create \
@@ -2325,14 +2335,39 @@ configure_package() {
   fi
 
   if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
-    kpt cfg set asm gcloud.project.environProjectID "${FLEET_ID}"
-    kpt cfg set asm anthos.servicemesh.hubMembershipID "${HUB_MEMBERSHIP_ID}"
-    kpt cfg set asm anthos.servicemesh.hub-idp-url "${HUB_IDP_URL}"
+    # VM installation uses the latest Hub WIP format
+    if [[ "${USE_VM}" -eq 1 ]]; then
+      kpt cfg set asm anthos.servicemesh.hubTrustDomain "${FLEET_ID}.svc.id.goog"
+      kpt cfg set asm anthos.servicemesh.hub-idp-url "${HUB_IDP_URL}"
+    # GKE-on-GCP installation uses legacy Hub WIP format to be consistent with GCP Hub public preview feature
+    else
+      kpt cfg set asm anthos.servicemesh.hubTrustDomain "${FLEET_ID}.hub.id.goog"
+      kpt cfg set asm anthos.servicemesh.hub-idp-url "https://gkehub.googleapis.com/projects/${FLEET_ID}/locations/global/memberships/${HUB_MEMBERSHIP_ID}"
+    fi
+  fi
+  if [[ -n "${CA_NAME}" && "${CA}" = "gcp_cas" ]]; then
+    kpt cfg set asm anthos.servicemesh.external_ca.ca_name "${CA_NAME}"
   fi
 
   if [[ "${USE_VM}" -eq 1 ]] && [[ "${_CI_NO_REVISION}" -eq 0 ]]; then
     kpt cfg set asm anthos.servicemesh.istiodHost "istiod-${REVISION_LABEL}.istio-system.svc"
     kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod-${REVISION_LABEL}.istio-system.svc.cluster.local"
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${REVISION_LABEL}"
+  fi
+
+  if [[ "${CA}" == "mesh_ca" ]]; then
+    # set the trust domain aliases to include both new Hub WIP and old Hub WIP to achieve no downtime upgrade.
+    add_trust_domain_alias "${PROJECT_ID}.svc.id.goog"
+    add_trust_domain_alias "${PROJECT_ID}.hub.id.goog"
+    if [[ -n "${_CI_TRUSTED_GCP_PROJECTS}" ]]; then
+      # Gather the trust domain aliases from projects.
+      while IFS=',' read -r trusted_gcp_project; do
+        add_trust_domain_alias "${trusted_gcp_project}.svc.id.goog"
+      done <<EOF
+${_CI_TRUSTED_GCP_PROJECTS}
+EOF
+    fi
+    # shellcheck disable=SC2046
+    kpt cfg set asm anthos.servicemesh.trustDomainAliases $(context_get-option "TRUST_DOMAIN_ALIASES")
   fi
 }

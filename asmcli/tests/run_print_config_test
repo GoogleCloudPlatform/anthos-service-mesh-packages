@@ -73,6 +73,16 @@ EOF
     RETVAL=1
   fi
 
+  if ! echo "${CONFIG}" | grep -q '.svc.id.goog'; then
+    echo "Not using svc WIP!"
+    RETVAL=1
+  fi
+
+  if ! echo "${CONFIG}" | grep -q '.hub.id.goog'; then
+    echo "Not using legacy Hub WIP!"
+    RETVAL=1
+  fi
+
   trap - ERR EXIT
   rm "${CUSTOM_OVERLAY}"
 
