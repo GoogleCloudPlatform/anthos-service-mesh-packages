@@ -451,7 +451,7 @@ is_sa() {
 }
 
 is_sa_impersonation() {
-  local IMPERSONATE_USER; IMPERSONATE_USER="$(gcloud config get-option auth/impersonate_service_account)"
+  local IMPERSONATE_USER; IMPERSONATE_USER="$(gcloud config get-value auth/impersonate_service_account)"
   if [[ -z "${IMPERSONATE_USER}" ]]; then false; fi
 }
 
@@ -1750,7 +1750,7 @@ local_iam_user() {
   fi
 
   if is_sa_impersonation; then
-    ACCOUNT_NAME="$(gcloud config get-option auth/impersonate_service_account)"
+    ACCOUNT_NAME="$(gcloud config get-value auth/impersonate_service_account)"
     ACCOUNT_TYPE="serviceAccount"
     warn "Service account impersonation currently configured to impersonate '${ACCOUNT_NAME}'."
   fi
@@ -2173,7 +2173,7 @@ EOF
 
 is_user_cluster_admin() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local GCLOUD_USER; GCLOUD_USER="$(gcloud config get-option core/account)"
+  local GCLOUD_USER; GCLOUD_USER="$(gcloud config get-value core/account)"
   local IAM_USER; IAM_USER="$(local_iam_user)"
   local ROLES
   ROLES="$(\
@@ -2195,7 +2195,7 @@ is_user_cluster_admin() {
 
 bind_user_to_cluster_admin(){
   info "Querying for core/account..."
-  local GCLOUD_USER; GCLOUD_USER="$(gcloud config get-option core/account)"
+  local GCLOUD_USER; GCLOUD_USER="$(gcloud config get-value core/account)"
   info "Binding ${GCLOUD_USER} to cluster admin role..."
   local PREFIX; PREFIX="$(echo "${GCLOUD_USER}" | cut -f 1 -d @)"
   local YAML; YAML="$(retry 5 kubectl create \
