@@ -1247,6 +1247,8 @@ finalize() {
 
 set_default_tag() {
   info "Setting ${REVISION_LABEL} as the target for \"istio-injection=enabled\"..."
+  kubectl patch mutatingwebhookconfigurations istio-sidecar-injector \
+    --type=json -p='[{"op": "replace", "path": "/webhooks"}]'
   run istioctl x revision tag \
     set default --revision="${REVISION_LABEL}" \
     --overwrite
