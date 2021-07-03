@@ -1269,7 +1269,8 @@ check_proxies() {
   warn "Found unexpected data plane versions:"
   warn "${VERSIONS}"
   warn "This may indicate that workloads are still using the previous"
-  warn "control plane."
+  warn "control plane. This is expected if there are gateways other"
+  warn "than the default ingress gateway."
 
   local response
   read -rp "Continue anyway? (y/N)" response
