@@ -36,6 +36,7 @@ CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly 
 
 KUBECONFIG="$(mktemp)"
 AKUBECTL="$(which kubectl || true)"
+AKPT="$(which kpt || true)"
 
 GKE_CLUSTER_URI=""
 GCE_NETWORK_NAME=""
@@ -334,7 +335,6 @@ jq
 tr
 grep
 kubectl
-kpt
 EOF
 
   if [[ -n "${NOTFOUND}" ]]; then
@@ -507,6 +507,37 @@ EOF
   unset TOKEN
 }
 
+needs_kpt() {
+  if [[ -x "./kpt" ]]; then
+    AKPT="./kpt"
+    false
+    return
+  fi
+  if [[ -z "${AKPT}" ]]; then return; fi
+  KPT_VER="$(kpt version)"
+  if [[ "${KPT_VER:0:1}" != "0" ]]; then return; fi
+  false
+}
+
+download_kpt() {
+  if ! needs_kpt; then return; fi
+
+  local OS
+
+  case "$(uname)" in
+    Linux ) OS="linux_amd64";;
+    Darwin) OS="darwin_arm64";;
+    *     ) fatal "$(uname) is not a supported OS.";;
+  esac
+
+  local KPT_TGZ
+  KPT_TGZ="https://github.com/GoogleContainerTools/kpt/releases/download/v0.39.3/kpt_${OS}-0.39.3.tar.gz"
+
+  info "Downloading kpt.."
+  curl -L "${KPT_TGZ}" | tar xz
+  AKPT="./kpt"
+}
+
 necessary_files_exist() {
   if [[ ! -f "./${ISTIOCTL_REL_PATH}" ]]; then
     false
@@ -519,6 +550,7 @@ necessary_files_exist() {
 }
 
 download_asm() {
+  download_kpt
   if necessary_files_exist; then return; fi
   local OS
 
@@ -1310,6 +1342,7 @@ main() {
   fi
   if [[ "${FINALIZE}" -eq 1 ]]; then
     ensure_backup
+    configure_kubectl
     download_asm
     finalize
   fi
