@@ -564,9 +564,10 @@ can_create_namespace() {
 }
 
 needs_kpt() {
-  if [[ -z "${AKPT}" ]]; then return; fi
+  if [[ -z "${AKPT}" ]]; then readonly AKPT; return; fi
+  local KPT_VER
   KPT_VER="$(kpt version)"
-  if [[ "${KPT_VER:0:1}" != "0" ]]; then return; fi
+  if [[ "${KPT_VER:0:1}" != "0" ]]; then readonly AKPT; return; fi
   false
 }
 
@@ -1292,6 +1293,7 @@ download_kpt() {
   info "Downloading kpt.."
   curl -L "${KPT_TGZ}" | tar xz
   AKPT="$(apath -f kpt)"
+  readonly AKPT
 }
 
 download_asm() {
