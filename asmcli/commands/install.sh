@@ -1,5 +1,3 @@
-MANAGED_CNI="${OPTIONS_DIRECTORY}/cni-managed.yaml"; readonly MANAGED_CNI;
-
 install_subcommand() {
   ### Preparation ###
   parse_args "${@}"
