@@ -14,7 +14,7 @@ steps:
   - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
     entrypoint: '/usr/bin/bazel'
     args: ['build', 'merge']
-  
+
   - name: 'bash'
     id: 'check-commit-artifacts'
     args:
@@ -134,24 +134,6 @@ steps:
     #############
     # SLOW TESTS
     #############
-  - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
-    dir: 'asmcli'
-    id: 'run-basic-suite'
-    entrypoint: '/bin/bash'
-    args:
-      - '-c'
-      - >
-        ./tests/run_basic_suite
-        --PROJECT_ID "${PROJECT_ID}"
-        --BUILD_ID "${BUILD_ID}"
-    env:
-      - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
-      - 'KEY_FILE=${_KEY_FILE}'
-      - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
-      - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
-      - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
-    timeout: 600s
-
   - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
     dir: 'asmcli'
     id: 'run-basic-suite-managed'
