@@ -1280,6 +1280,7 @@ set_default_tag() {
 }
 
 check_proxies() {
+  sleep 10
   local DP_OUTPUT
   DP_OUTPUT="$(istioctl version -ojson | jq '.dataPlaneVersion')"
   local VERSIONS
@@ -1304,13 +1305,19 @@ check_proxies() {
   fi
   warn "This may indicate that workloads are still using the previous"
   warn "control plane. This is expected if there are gateways other"
-  warn "than the default ingress gateway."
+  warn "than the default ingress gateway. It might also happen if some"
+  warn "old pods are still being destroyed. You can retry after a short"
+  warn "pause to give more time for everything to get reconciled."
 
   local response
-  read -rp "Continue anyway? (y/N)" response
+  read -rp "Continue anyway? (y/N/r)" response
 
   case "$response" in
     Y | y )
+      return
+      ;;
+    R | r )
+      check_proxies
       return
       ;;
     *     )
