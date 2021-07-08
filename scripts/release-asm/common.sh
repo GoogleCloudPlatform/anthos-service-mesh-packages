@@ -1,4 +1,7 @@
 _DEBUG="${_DEBUG:=}"
+SCRIPT_PATH="${SCRIPT_PATH:=asmcli}"
+RELEASE_MODE="${RELEASE_MODE:=default}"
+PRECOMMIT="scripts/release-asm/precommit"
 if [[ "${_DEBUG}" -eq 1 ]]; then
   gsutil() {
     echo "DEBUG: would have run 'gsutil ${*}'" >&2
@@ -174,6 +177,10 @@ publish_script() {
   local SCRIPT_NAME; SCRIPT_NAME="${3}"
   local STABLE_VERSION;
 
+  if [[ "${BRANCH_NAME}" =~ "release" && "${RELEASE_MODE}" = "auto" ]]; then
+    auto_release "${VERSION}"
+  fi
+
   git checkout "${BRANCH_NAME}"
 
   if [[ ! -f "${SCRIPT_NAME}" ]]; then echo "${SCRIPT_NAME} not found" >&2; return; fi
@@ -235,4 +242,113 @@ setup() {
   else
     touch asmcli
   fi
+}
+
+prompt_for_confirmation() {
+  local CONFIRMATION
+  read -r -p "${1} [y/N] " CONFIRMATION
+  case "${CONFIRMATION}" in
+      [yY][eE][sS]|[yY])
+          return
+          ;;
+  esac
+  false
+}
+
+prompt_for_message() {
+  local MSG
+  read -r -p "Please provide a release message for ${1}:" MSG
+  if [[ -n "${MSG}" ]]; then
+    echo "${MSG}"
+  fi
+}
+
+update_config_number() {
+  local OLD_NUMBER; OLD_NUMBER="${1}"
+  local NEW_NUMBER; NEW_NUMBER="${2}"
+
+  sed -i.bak "s/CONFIG_VER:=\"${OLD_NUMBER}\"/CONFIG_VER:=\"${NEW_NUMBER}\"/g" "${SCRIPT_PATH}.sh"
+
+  bazel build //:merge && cp ../bazel-bin/asmcli .
+}
+
+auto_release() {
+  local VERSION; VERSION="${1}"
+  local RELEASE_BRANCH; RELEASE_BRANCH="release-${VERSION}-asm"
+  local STAGING_BRANCH; STAGING_BRANCH="staging-${VERSION}-asm"
+  local DELTA_COMMITS
+  local RELEASE_STABLE_VERSION NEW_RELEASE_STABLE_VERSION STAGING_STABLE_VERSION
+  local OLD_NUMBER NEW_NUMBER
+  local TAG_MESSAGE
+
+  git checkout "${STAGING_BRANCH}"
+  STAGING_STABLE_VERSION="$(./${SCRIPT_PATH} --version)"
+
+  git checkout "${RELEASE_BRANCH}"
+  RELEASE_STABLE_VERSION="$(./${SCRIPT_PATH} --version)"
+
+  DELTA_COMMITS="$(git log "${RELEASE_BRANCH}..${STAGING_BRANCH}")"
+  if [[ -z "${DELTA_COMMITS}" ]]; then
+    echo "${RELEASE_BRANCH} branch is up-to-date with ${STAGING_BRANCH} branch. Nothing to merge."
+  else
+    OLD_NUMBER="${RELEASE_STABLE_VERSION##*config}"
+    if [[ "${RELEASE_STABLE_VERSION%config*}" == "${STAGING_STABLE_VERSION%config*}" ]]; then
+      NEW_NUMBER="$((OLD_NUMBER+1))"
+    else
+      NEW_NUMBER=1
+    fi
+    NEW_RELEASE_STABLE_VERSION="${STAGING_STABLE_VERSION%config*}config${NEW_NUMBER}"
+    cat <<EOF
+Merging staging into release...
+Commits to be merged from ${STAGING_BRANCH} to ${RELEASE_BRANCH}:
+${DELTA_COMMITS}
+
+Old version: ${RELEASE_STABLE_VERSION}
+New version: ${NEW_RELEASE_STABLE_VERSION}
+EOF
+    prompt_for_confirmation "Do you want to proceed?" || false
+    git merge --strategy-option=theirs "${STAGING_BRANCH}" --no-edit || git add -u && (git diff-index --quiet HEAD || git commit --no-edit)  # in case of modify/delete
+
+    # Update CONFIG_VER if necessary
+    update_config_number "${OLD_NUMBER}" "${NEW_NUMBER}"
+    if [[ "${NEW_RELEASE_STABLE_VERSION}" != "$(./${SCRIPT_PATH} --version)" ]]; then
+      echo "Error when updating the config number. Expected: ${NEW_RELEASE_STABLE_VERSION} Got: $(./${SCRIPT_PATH} --version)"
+      false
+    fi
+
+    # Commit the CONFIG_NUMBER change
+    git add -u && git commit -m "update the version from ${RELEASE_STABLE_VERSION} to ${NEW_RELEASE_STABLE_VERSION}"
+  fi
+
+  prompt_for_confirmation "Do you want to create tag ${NEW_RELEASE_STABLE_VERSION}?" || false
+  tag_sign_verify "${NEW_RELEASE_STABLE_VERSION}"
+
+  # Push new changes to remote
+  prompt_for_confirmation "Do you want to push your local changes to remote?" || false
+  push_branch_to_remote "${RELEASE_BRANCH}"
+  push_tag_to_remote "${NEW_RELEASE_STABLE_VERSION}"
+}
+
+tag_sign_verify() {
+  local VERSION; VERSION="${1}"
+  echo "Tagging, signing and verifying the release..."
+  TAG_MESSAGE="$(prompt_for_message "${VERSION}")"
+  git tag -s "${VERSION}" -m "${TAG_MESSAGE}" # tag and sign
+  git tag -v "${VERSION}" # verify
+}
+
+push_tag_to_remote() {
+  local TAG; TAG="${1}"
+  if git ls-remote --tags | grep -q "${TAG}"; then
+    echo "${TAG} already exists in remote!"
+    return
+  fi
+
+  git push origin "${TAG}"
+}
+
+push_branch_to_remote() {
+  local BRANCH; BRANCH="${1}"
+
+  git push origin "${BRANCH}"
 }

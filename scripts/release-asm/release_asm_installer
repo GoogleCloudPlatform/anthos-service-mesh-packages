@@ -13,9 +13,11 @@ main() {
 
   get_version_file_and_lock
 
-  while read -r branch version; do
+  # read from a different FD other than stdin
+  # during publish we will read from stdin for user confirmation
+  while read -r branch version <&3; do
     publish_script "${branch}" "${version}" asmcli
-  done <<EOF
+  done 3<<EOF
 $(all_releases)
 EOF
 
