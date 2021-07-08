@@ -1,0 +1,12 @@
+#!/bin/bash
+
+echo "============================================="
+
+CONTEXT_FILE=".${1}"
+>".currContext"
+chmod +x ".currContext"
+if [[ ! -f "./.${1}" ]]; then
+    echo "selected ./.${1} context does not exists."
+fi
+echo "source ./.${1}" >>".currContext"
+echo "CONTEXT: ${1}"
