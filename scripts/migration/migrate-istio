@@ -1204,20 +1204,10 @@ EOF
   while read -r NS; do
     info "Restarting workloads in ${NS} and waiting for them to become available (max 5 min)..."
     run kubectl -n "${NS/namespace\//}" rollout restart deployment
-    local I; I=0;
 
-    while [[ "${I}" -lt 30 ]]; do
-      if kubectl rollout status deployments --all -n "${NS/namespace\//}"; then
-        break
-      fi
-      I=$((I + 1))
-      sleep 10
-    done
-
-    if [[ "${I}" -eq 30 ]]; then
+    if ! kubectl rollout status deployments -n "${NS/namespace\//}" -w --timeout=5m; then
       warn "Deployment not ready after 5 minutes, skipping."
     fi
-
   done <<EOF
 $(cat configuration_backup/labeled_namespaces)
 EOF
