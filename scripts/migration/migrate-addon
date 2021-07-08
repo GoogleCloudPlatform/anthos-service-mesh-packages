@@ -117,8 +117,8 @@ CLEANUP_RESOURCES=(
   "instance/attributes/istio-system"
   "instance/mixer-request-count/istio-system"
   "instance/mixer-request-latency/istio-system"
-  "rule/kubeattrgenrulerule/istio-system"
   "rule/stackdriver-mixer/istio-system"
+  "rule/kubeattrgenrulerule/istio-system"
   "rule/tcpkubeattrgenrulerule/istio-system"
   "DestinationRule/istio-policy/istio-system"
   "DestinationRule/istio-telemetry/istio-system"
@@ -193,6 +193,16 @@ metadata:
 data:
   meshca-root.pem: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUdsRENDQkh5Z0F3SUJBZ0lRRVcyNUFQYTdTOVNqL05qNlY2R3hRVEFOQmdrcWhraUc5dzBCQVFzRkFEQ0IKd1RFTE1Ba0dBMVVFQmhNQ1ZWTXhFekFSQmdOVkJBZ1RDa05oYkdsbWIzSnVhV0V4RmpBVUJnTlZCQWNURFUxdgpkVzUwWVdsdUlGWnBaWGN4RXpBUkJnTlZCQW9UQ2tkdmIyZHNaU0JNVEVNeERqQU1CZ05WQkFzVEJVTnNiM1ZrCk1XQXdYZ1lEVlFRRERGZHBjM1JwYjE5Mk1WOWpiRzkxWkY5M2IzSnJiRzloWkY5eWIyOTBMWE5wWjI1bGNpMHcKTFRJd01UZ3RNRFF0TWpWVU1UUTZNVEU2TXpNdE1EYzZNREFnU3pveExDQXhPa2cxTW5abmQwVnRNM1JqT2pBNgpNVGd3SUJjTk1UZ3dOREkxTWpFeE1UTXpXaGdQTWpFeE9EQTBNalV5TWpFeE16TmFNSUhCTVFzd0NRWURWUVFHCkV3SlZVekVUTUJFR0ExVUVDQk1LUTJGc2FXWnZjbTVwWVRFV01CUUdBMVVFQnhNTlRXOTFiblJoYVc0Z1ZtbGwKZHpFVE1CRUdBMVVFQ2hNS1IyOXZaMnhsSUV4TVF6RU9NQXdHQTFVRUN4TUZRMnh2ZFdReFlEQmVCZ05WQkFNTQpWMmx6ZEdsdlgzWXhYMk5zYjNWa1gzZHZjbXRzYjJGa1gzSnZiM1F0YzJsbmJtVnlMVEF0TWpBeE9DMHdOQzB5Ck5WUXhORG94TVRvek15MHdOem93TUNCTE9qRXNJREU2U0RVeWRtZDNSVzB6ZEdNNk1Eb3hPRENDQWlJd0RRWUoKS29aSWh2Y05BUUVCQlFBRGdnSVBBRENDQWdvQ2dnSUJBSzlkRnRpSEkwL3I3MGs2V2hiRXVEZ0hEemwvTzVNUApzeW1iaVlGNGNRNFpEa01nWFQyYVZIeXVCL01tZHF0ZUMyc3B1RzVvakM2SENIaGorOUpGRjNLZlUrRWovajlBCjVnVXo4ZDRWWUQ5MkxYaDgyaXJJMnRPZWxiUTdQWkFMbjVoUm5wazBnbnB6TGUya3BhOGxHeTBUdEIvdi8zMDMKalpBbDBlN2lLS2tYMU9veTlKemVCQVlkTnF1OXVJaHJsK25hU1hFR3B1V3hDWTZ1aXArRWN1S3A5Y1IxNmtGegpPS05uK3NRMDlkN0tlRk45ckxhWmlvZEJ6bmRWbGlxOUZrV0p3SWVCcDA2Q3E5dFVNa21ZdlVGazNtdDg2bmhaCnJZdmlMSTR0WFNtWklHUU5rdlBRWFUxa2kzdWt2L1pWZEpyWFY3dzJrL0VabWlGKzlveFB3RzRaMjFHRmZPS1QKV0wvazlpN1NDcUl1VDQxcE5LMm1tS0hzUUk3UWxvcnR6NTRzOFkyRHB6Y0tjNEVEZlVJZjYyTm83KytISU14dQpkUHhiZFFlMTFJbXBEUmNRSWc5Wk9xVGJvcnVMYUdOQkxPNnJkY25xbWd0czNDTHJsZXgxTDlRR3hRWkNIUmVhCnJpUjFiV2VRQk5UQW9kWXFTejZ2cFNJNWhYVUNra1hXN0xGY1BNcXZSYlJWY2xhazgvUnAwTGFITFFpRHhrS3AKaVExcHJmQk80SXhZY0hsRUtQbnhvQnJrNVdVWmZYNGowT3Biajhoa05WaStzQisvUnZYcnVGTFpvRkF6Y0t1NQpLV0t0UHpVT2I4UDlWa0VtTnk3RDNKWHlzNUdmaThOa1ZYbi9raFZWYjFCVEhIZjl3QzNuaEo1MG51QmttUHU3CjNiajFBQk9hakIrekFnTUJBQUdqZ1lNd2dZQXdEZ1lEVlIwUEFRSC9CQVFEQWdFR01CMEdBMVVkSlFRV01CUUcKQ0NzR0FRVUZCd01CQmdnckJnRUZCUWNEQWpBUEJnTlZIUk1CQWY4RUJUQURBUUgvTUIwR0ExVWREZ1FXQkJRLwpWc3V5amdSREFFbWNaanlKNzc2MTlKczlpakFmQmdOVkhTTUVHREFXZ0JRL1ZzdXlqZ1JEQUVtY1pqeUo3NzYxCjlKczlpakFOQmdrcWhraUc5dzBCQVFzRkFBT0NBZ0VBVWM1UUpPcXhtTUpZMEUycmNIRVdRWVJhaDF2YXQzd3UKSUh0RVozU2tTdW15ait5OWV5SUhiOVhUVHljNFN5R3lYMW44UmFyeThvU2dRVjRjYnlKVEZYRUVRT0dMSEI5Lwo5OEVLVGhnSnRmUHNvczJXS2UvNTlTOHlOMDVvbnB4Y2FMOXk0UzI5NUt2OWtjU1F4TG01VWZqbHFzS2VISlp5Cm12eGlZem1Cb3g3TEExenFjTFladnNsSk5rSnhLQWs1SkE2Nml5RFNRcU9LN2pJaXhuOHBpMzA1ZEZHQ1pnbFUKRlN0d1dxWTZSYzlyUjhFeWNWaFN4MkFocnZUN09RVFZkS0xmb0tBODREOEpaSlBCN2hyeHFLZjdKSkZzODdLagp0N2MvNWJYUEZKMm9zbWpvTlluYkhqaXE2NGJoMjBzU0NkNjMwcXZoaGVQTHdqak9sQlBpRnlLMzZvL2hRTjg3CjFBRW0xU0NIeSthUWNmSnFGNUtUZ1BuWlF5NUQrRC9DR2F1K0Jma08rV0NHRFZ4UmxlWUJKNGcyTmJBVG9seWcKQjJLV1hyajA3VS9XYVdxVjJoRVJia214WEZoNmNVZGxrWDJNZW9HNHY2WkQyT0tBUHg1RHBKQ2ZwMFRFcTZQegpuUCtaMW1MZC9aakdzT0Y4UjJXR1FKRXVVOEhSenZzcjB3c1g5VXlMTXFmNVhWaURLMTFWL1crZGNJdmpIQ2F5CkJwWDJzZTNkZmV4NWpGaHQrSmNRYytpd0I4Y2FTWGtSNnRHU2lhcmdFdFNKT0RPUmFjTzlJQjhiNlc4U20vL0oKV2YvOHp5aUNjTW0xaTJ5VlZwaHdFMWtjekZ3dW5BaDBKQjg5NlZhWEdWeFhlS0VBTVFvWEhqZ0RkQ1lwOC9FdAp4amI4VWtDbXlqVT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
 EOF
+
+  HUB_WIP="$(kube get cm -n istio-system env-asm-managed -ojsonpath='{.data.TRUST_DOMAIN}' --ignore-not-found)"
+  if [[ -z ${HUB_WIP} ]]; then
+    HUB_WIP="$(kube get cm -n istio-system istio-asm-managed -oyaml | grep 'trustDomain: .*' | cut -d':' -f2 | xargs)"
+  fi
+
+  if [[ "${HUB_WIP}" == "" ]]; then
+    die "Could not determine trust domain for Anthos Service Mesh"
+  fi
+
   kube get cm istio -n istio-system -o yaml > configure_mesh_ca_istio_cm.yaml
 
   HUB_WIP="$(kube get cm -n istio-system env-asm-managed -ojsonpath='{.data.TRUST_DOMAIN}' --ignore-not-found)"
@@ -227,10 +237,10 @@ EOF
   # Wait for Citadel to distribute the cert everywhere. Note: this always takes at least one minute
   # due to a bug/feature in Citadel causing it to delay provisioning at startup.
   heading "Waiting for root certificate to distribute to all pods. This will take a few minutes..."
-  for namespace in $(kubectl get namespaces -oname | cut -d/ -f2); do
+  for namespace in $(kube get namespaces -oname | cut -d/ -f2); do
     # Check against a portion of the root to see if its been distributed.
     # Note: this doesn't ensure the workloads have actually hot-restarted to pickup the change.
-    ROOT_CERT="$(kubectl get secret -n "${namespace}" istio.default -ojsonpath='{.data.root-cert\.pem}')"
+    ROOT_CERT="$(kube get secret -n "${namespace}" istio.default -ojsonpath='{.data.root-cert\.pem}')"
     LAST_ERR=$?
     if [[ "${LAST_ERR}" != 0 ]]; then
       # Likely namespace was deleted while in progress
@@ -239,7 +249,7 @@ EOF
     while ! echo "${ROOT_CERT}" | base64 -d | grep -q 8zyiCcMm1i2yVVphwE1kczFwunAh0JB896VaXGVxXeKEAMQoXHjgDdCYp8; do
       echo "ASM root certificate not distributed to ${namespace}, trying again later"
       sleep 3
-      ROOT_CERT="$(kubectl get secret -n "${namespace}" istio.default -ojsonpath='{.data.root-cert\.pem}')"
+      ROOT_CERT="$(kube get secret -n "${namespace}" istio.default -ojsonpath='{.data.root-cert\.pem}')"
       LAST_ERR=$?
       if [[ "${LAST_ERR}" != 0 ]]; then
         # Likely namespace was deleted while in progress
@@ -261,10 +271,23 @@ EOF
   echo -e "${green}OK${clr}"
 }
 
+rollback_mesh_ca() {
+  prompt "Rollback Anthos Service Mesh TrustAnchor addition from Istio Addon..."
+  pushd "${TMP_DIR}" > /dev/null
+
+  kube rollout undo deployment istio-citadel -n istio-system
+  kube wait --for=condition=available --timeout=120s deployment/istio-citadel -n istio-system
+
+  kube rollout undo deployment istio-pilot -n istio-system
+  kube wait --for=condition=available --timeout=120s deployment/istio-pilot -n istio-system
+
+  kube delete secret meshca-root -n istio-system --ignore-not-found
+  popd > /dev/null
+}
+
 disable_galley_webhook() {
   pushd "${TMP_DIR}" > /dev/null
-  prompt "Disabling the Istio validation webhook..."
-
+  prompt "Disabling the Istio validation webhook.."
   kube get clusterrole istio-galley-istio-system -n istio-system -o yaml > disable_galley_webhook_cluster_role.yaml
   kube patch clusterrole -n istio-system istio-galley-istio-system --type='json' -p='[{"op": "replace", "path": "/rules/2/verbs/0", "value": "get"}]'
 
@@ -276,7 +299,7 @@ disable_galley_webhook() {
 
 enable_galley_webhook() {
   prompt "Re-enabling the Istio validating webhook:"
-  kubectl patch clusterrole -n istio-system istio-galley-istio-system --type='json' -p='[{"op": "replace", "path": "/rules/2/verbs/0", "value": '\''*'\''}]'
+  kube patch clusterrole -n istio-system istio-galley-istio-system --type='json' -p='[{"op": "replace", "path": "/rules/2/verbs/0", "value": '\''*'\''}]'
   # ValidatingWebhookConfiguration not re-installed
   echo "OK"
 }
@@ -366,7 +389,7 @@ EOF
 }
 
 rollback_gateway() {
-  # TODO
+  # pending
   true
 }
 
@@ -390,6 +413,7 @@ metadata:
 data:
   migrationStatus: ${STATUS}
 EOF
+
   echo -e "${green}OK${clr}"
 }
 
@@ -419,7 +443,7 @@ migrate_configs() {
   # Migration of other configs if needed
 }
 
-check_custom_mixer() {
+config_check_custom_mixer() {
   declare -A rsHashMap=(
     ['handler']="127b052edcf2acf7e8450dcb17fd4d308cc659e05ef376999cd6e5dda51ef232
      32bcba96c417ca31ea042b638ce28bc715803fe3b47861c5ac4156886339acc0
@@ -475,9 +499,9 @@ facc7fd2599994a7c92a4cc66bac9061b64d71be106e2bb639066969273d4fb8"
   )
   CUSTOM_MIXER="false"
   for type in handler rule handler; do
-    names=$(kubectl get "${type}" -oname -n istio-system)
+    names=$(kube get "${type}" -oname -n istio-system)
     for rn in ${names}; do
-      hd=$(kubectl get "${rn}" -n istio-system -o jsonpath='{.spec}')
+      hd=$(kube get "${rn}" -n istio-system -o jsonpath='{.spec}')
       actualSHA=$(echo "${hd}" | tr -d '\n' | sha256sum | awk '{print $1}')
       builtinSHA=${rsHashMap[${type}]}
       if [[ $builtinSHA != *"${actualSHA}"* ]];then
@@ -487,7 +511,35 @@ facc7fd2599994a7c92a4cc66bac9061b64d71be106e2bb639066969273d4fb8"
     done
   done
   if [[ "${CUSTOM_MIXER}" == "true" ]];then
-    return 1
+    prompt_unsupported "Detected custom mixer resources that could not be migrated." "Requires manual migration to telemetryv2"
+  fi
+}
+
+config_check_custom_gateway(){
+  local deploymentName
+
+  local deployments; deployments=$(kube get deployments -n istio-system -o json)
+  local deploymentIndices; deploymentIndices="$(echo "${deployments}" | jq '.items[].spec.template.spec.containers[0].args | tojson' | grep -n "router" | cut -d : -f 1)"
+  for depl in ${deploymentIndices}; do
+    deploymentName=$(echo "${deployments}" | jq .items[$(( depl - 1 ))].metadata.name)
+    if [[ "${deploymentName}" != "\"istio-ingressgateway\"" ]]; then
+      prompt_unsupported "Deployment ${deploymentName} appears to be a gateway. Please migrate this manually"
+      heading "Deployment ${deploymentName} could be a custom gateway. Please migrate this manually"
+    fi
+  done
+}
+
+config_check_networking_api(){
+  local VIRTUALSERVICES
+  VIRTUALSERVICES="$(kube get virtualservices --all-namespaces -o json)"
+  if grep -q "appendHeaders" <<< "${VIRTUALSERVICES}" ; then
+    prompt_unsupported "Detected possibly incompatible virtualService config" "appendHeader attribute is no longer supported"
+  fi
+  if grep -q "websocketUpgrade" <<< "${VIRTUALSERVICES}" ; then
+    prompt_unsupported "Detected possibly incompatible virtualservice config" "websocketUpgrade attribute is no longer supported"
+  fi
+  if grep -q "abort\.percent" <<< "${VIRTUALSERVICES}" ; then
+    prompt_unsupported "Detected possibly incompatible virtualservice config" "abort.percent attribute is no longer supported"
   fi
 }
 
@@ -498,22 +550,24 @@ config_check() {
   local LAST_ERR;
   heading "Checking for configurations that will need to be explicitly migrated..."
 
+  set +e
+
   # EnvoyFilter
   local FILTERS
-  FILTERS=$(kubectl get envoyfilter -A -l 'operator.istio.io/component!=Pilot')
+  FILTERS=$(kube get envoyfilter -A -l 'operator.istio.io/component!=Pilot')
   if [[ "${FILTERS}" != "" ]]; then
-    prompt_unsupported "Custom Envoy Filters are not supported by ASM. Please remove these if possible" "${FILTERS}"
+    prompt_unsupported "Detected custom envoy filters are not supported by ASM. Please remove these if possible" "${FILTERS}"
   fi
 
   # Plugin Cert
   local PLUGINCERT
-  PLUGINCERT=$(kubectl get secret cacerts -n istio-system --ignore-not-found)
+  PLUGINCERT=$(kube get secret cacerts -n istio-system --ignore-not-found)
   if [[ "${PLUGINCERT}" != "" ]]; then
-    prompt_unsupported "Detected custom plugin cert." "The plugin certs will not be migrated to ASM."
+    prompt_unsupported "Detected custom plugin cert." "The plugin certs will not be migrated to ASM.."
   fi
 
   # Security Policies
-  set +e
+
   pushd "${TMP_DIR}" > /dev/null
   local MIGRATION_ERR; MIGRATION_ERR=$(./convert 2>&1)
   LAST_ERR=$?
@@ -521,30 +575,17 @@ config_check() {
     prompt_unsupported "Detected security policies that could not be migrated" "Encountered error ${MIGRATION_ERR}"
   fi
   popd > /dev/null
-  set -e
 
   # Incompatible networking policies
-  local VIRTUALSERVICES
-  VIRTUALSERVICES="$(kubectl get virtualservices --all-namespaces -o json)"
-  if grep -q "appendHeaders" <<< "${VIRTUALSERVICES}" ; then
-    prompt_unsupported "Detected possibly incompatible virtualService config" "appendHeader attribute is no longer supported"
-  fi
-  if grep -q "websocketUpgrade" <<< "${VIRTUALSERVICES}" ; then
-    prompt_unsupported "Detected possibly incompatible virtualservice config" "websocketUpgrade attribute is no longer supported"
-  fi
-  if grep -q "abort\.percent" <<< "${VIRTUALSERVICES}" ; then
-    prompt_unsupported "Detected possibly incompatible virtualservice config" "abort.percent attribute is no longer supported"
-  fi
+  config_check_networking_api
 
   # Custom gateway
-  # TODO
+  config_check_custom_gateway
 
   # Check custom mixer policies
-  check_custom_mixer
-  LAST_ERR=$?
-  if [[ "${LAST_ERR}" != "0" ]]; then
-    prompt_unsupported "Detected custom mixer resources that could not be migrated." "Requires manual migration to telemetryv2"
-  fi
+  config_check_custom_mixer
+
+  set -e
 }
 
 print_restart_instructions() {
@@ -569,9 +610,9 @@ cleanup() {
     name="$(echo "${rs}" | cut -d/ -f2)"
     ns="$(echo "${rs}" | cut -d/ -f3)"
     if [[ "${ns}" == "" ]]; then
-      RESP="$(kubectl --context="${CONTEXT}" get "${kind}" "${name}" --ignore-not-found -oname)"
+      RESP="$(kube get "${kind}" "${name}" --ignore-not-found -oname)"
     else
-      RESP="$(kubectl --context="${CONTEXT}" get "${kind}" "${name}" -n "${ns}" --ignore-not-found -oname)"
+      RESP="$(kube get "${kind}" "${name}" -n "${ns}" --ignore-not-found -oname)"
     fi
     if [[ "${RESP}" != "" ]]; then
       echo "Will delete ${kind}/${name}.${ns}"
@@ -686,4 +727,3 @@ while (( "$#" )); do
     esac
     shift
 done
-
