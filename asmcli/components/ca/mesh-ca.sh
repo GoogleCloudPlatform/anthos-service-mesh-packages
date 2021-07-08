@@ -4,18 +4,19 @@ validate_meshca() {
 
 configure_meshca() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local TRUST_DOMAIN_ALIASES
 
+  # set the trust domain aliases to include both new Hub WIP and old Hub WIP to achieve no downtime upgrade.
+  add_trust_domain_alias "${PROJECT_ID}.svc.id.goog"
+  add_trust_domain_alias "${PROJECT_ID}.hub.id.goog"
   if [[ -n "${_CI_TRUSTED_GCP_PROJECTS}" ]]; then
     # Gather the trust domain aliases from projects.
-    TRUST_DOMAIN_ALIASES="${PROJECT_ID}.svc.id.goog"
     while IFS=',' read -r trusted_gcp_project; do
-      TRUST_DOMAIN_ALIASES="${TRUST_DOMAIN_ALIASES} ${trusted_gcp_project}.svc.id.goog"
+      add_trust_domain_alias "${trusted_gcp_project}.svc.id.goog"
     done <<EOF
 ${_CI_TRUSTED_GCP_PROJECTS}
 EOF
-    # kpt treats words in quotes as a single param, while kpt need ${TRUST_DOMAIN_ALIASES} to be splitting params for a list. If we remove quotes, the lint will complain.
-    # eval will translate the quoted TRUST_DOMAIN_ALIASES into params to workaround both.
-    run_command eval kpt cfg set asm anthos.servicemesh.trustDomainAliases "${TRUST_DOMAIN_ALIASES}"
   fi
+
+  # shellcheck disable=SC2046
+  kpt cfg set asm anthos.servicemesh.trustDomainAliases $(context_get-option "TRUST_DOMAIN_ALIASES")
 }
