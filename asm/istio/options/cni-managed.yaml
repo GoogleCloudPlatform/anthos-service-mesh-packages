@@ -93,45 +93,45 @@ metadata:
     install.operator.istio.io/owning-resource: unknown
     operator.istio.io/component: "Cni"
 rules:
-- apiGroups:
-  - mesh.cloud.google.com
-  resources:
-  - '*'
-  verbs:
-  - '*'
-- apiGroups:
-  - apps
-  - extensions
-  resources:
-  - daemonsets
-  - deployments
-  - deployments/finalizers
-  - ingresses
-  - replicasets
-  - statefulsets
-  verbs:
-  - get
-  - list
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  - namespaces
-  verbs:
-  - '*'
-- apiGroups:
-  - "coordination.k8s.io"
-  resources:
-  - leases
-  verbs:
-  - "*"
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  - pods/eviction
-  verbs:
-  - '*'
+  - apiGroups:
+      - mesh.cloud.google.com
+    resources:
+      - '*'
+    verbs:
+      - '*'
+  - apiGroups:
+      - apps
+      - extensions
+    resources:
+      - daemonsets
+      - deployments
+      - deployments/finalizers
+      - ingresses
+      - replicasets
+      - statefulsets
+    verbs:
+      - get
+      - list
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - namespaces
+    verbs:
+      - '*'
+  - apiGroups:
+      - "coordination.k8s.io"
+    resources:
+      - leases
+    verbs:
+      - "*"
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - pods/eviction
+    verbs:
+      - '*'
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -143,9 +143,9 @@ metadata:
     install.operator.istio.io/owning-resource: unknown
     operator.istio.io/component: "Cni"
 subjects:
-- kind: ServiceAccount
-  name: istio-cni
-  namespace: kube-system
+  - kind: ServiceAccount
+    name: istio-cni
+    namespace: kube-system
 roleRef:
   kind: ClusterRole
   name: mdp-controller
@@ -160,8 +160,8 @@ metadata:
     app: istio-cni
     release: istio
 data:
-  # The CNI network configuration to add to the plugin chain on each node.  The special
-  # values in this config will be automatically populated.
+  # The CNI network configuration to add to the plugin chain on each node.
+  # The special values in this config will be automatically populated.
   cni_network_config: |-
         {
           "cniVersion": "0.3.1",
@@ -218,13 +218,15 @@ spec:
           operator: Exists
       priorityClassName: system-cluster-critical
       serviceAccountName: istio-cni
-      # Minimize downtime during a rolling upgrade or deletion; tell Kubernetes to do a "force
-      # deletion": https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods.
+      # Minimize downtime during a rolling upgrade or deletion;
+      # tell Kubernetes to do a "force deletion":
+      # https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods.
       terminationGracePeriodSeconds: 5
       containers:
         # This container installs the Istio CNI binaries
         # and CNI network config file on each node.
         - name: install-cni
+          # yamllint disable-line rule:line-length
           image: "IMAGE_HUB/install-cni:IMAGE_TAG"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cni-image"}
           livenessProbe:
             httpGet:
@@ -254,6 +256,7 @@ spec:
             - mountPath: /host/etc/cni/net.d
               name: cni-net-dir
         - name: repair-cni
+          # yamllint disable-line rule:line-length
           image: "IMAGE_HUB/install-cni:IMAGE_TAG"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cni-image"}
           command: ["/opt/local/bin/istio-cni-repair"]
           env:
@@ -277,6 +280,7 @@ spec:
             - name: "REPAIR_BROKEN-POD-LABEL-VALUE"
               value: "true"
         - name: mdp-controller
+          # yamllint disable-line rule:line-length
           image: "IMAGE_HUB/mdp:IMAGE_TAG"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cni-image"}
           command:
             - mdp
@@ -313,8 +317,8 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
           volumeMounts:
-          - mountPath: /var/run/secrets/tokens
-            name: istio-token
+            - mountPath: /var/run/secrets/tokens
+              name: istio-token
       volumes:
         # Used to install CNI.
         - name: cni-bin-dir
@@ -326,7 +330,7 @@ spec:
         - name: istio-token
           projected:
             sources:
-            - serviceAccountToken:
-                path: istio-token
-                expirationSeconds: 43200
+              - serviceAccountToken:
+                  path: istio-token
+                  expirationSeconds: 43200
                 audience: istio-ca
