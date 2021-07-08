@@ -13,6 +13,7 @@ DRY_RUN=0
 VERBOSE=0
 ENABLE_DEPENDENCIES=0
 UPGRADE_GATEWAYS=1
+CUSTOM_OVERLAY=""
 
 CONFIGURED=0
 MIGRATE=0
@@ -178,6 +179,15 @@ OPTIONS:
   -n|--cluster_name             <NAME>                The name of the target
                                                       cluster.
   -p|--project_id               <ID>                  The GCP project ID.
+  --co|--custom-overlay         <FILE>                Optional. An IstioOperator
+                                                      spec in a yaml file.
+                                                      Passing this in will
+                                                      apply the customizations
+                                                      to ASM on installation.
+                                                      Gateways specified in the
+                                                      spec will be upgraded in
+                                                      place. Not compatible
+                                                      with --no-gateways.
   -f|--fleet_id                 <FLEET_ID>            Optional. If the cluster
                                                       is registered to a Fleet
                                                       that's different from
@@ -256,6 +266,11 @@ parse_args() {
         FLEET_PROJECT_ID="${2}"
         shift 2
         ;;
+      --co | --custom_overlay | --custom-overlay)
+        arg_required "${@}"
+        CUSTOM_OVERLAY="${2}"
+        shift 2
+        ;;
       --enable-dependencies | --enable_dependencies)
         ENABLE_DEPENDENCIES=1
         shift 1
@@ -302,6 +317,11 @@ EOF
 
   if [[ "${MISSING_ARGS}" -ne 0 ]]; then
     fatal "Missing one or more required options."
+  fi
+
+  if [[ "${UPGRADE_GATEWAYS}" -eq 0 && -n "${CUSTOM_OVERLAY}" ]]; then
+    error "Using a custom overlay is not compatible with the --no-gateways flag."
+    fatal "Please re-run with either the overlay or the flag."
   fi
 
   if [[ -z "${FLEET_PROJECT_ID}" ]]; then
@@ -1070,7 +1090,9 @@ install_asm() {
   local PARAMS
   PARAMS="-f ${OPERATOR_MANIFEST}"
   PARAMS="${PARAMS} -f ${CNI_MANIFEST}"
-  if [[ "${UPGRADE_GATEWAYS}" -eq 0 ]]; then
+  if [[ -n "${CUSTOM_OVERLAY}" ]]; then
+    PARAMS="${PARAMS} -f ${CUSTOM_OVERLAY}"
+  elif [[ "${UPGRADE_GATEWAYS}" -eq 0 ]]; then
     PARAMS="${PARAMS} -f ${NO_DEFAULT_INGRESS}"
   fi
   PARAMS="${PARAMS} -c ${KUBECONFIG}"
