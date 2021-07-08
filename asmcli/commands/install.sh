@@ -20,80 +20,13 @@ install_subcommand() {
 }
 
 install() {
-  ### Configure ###
-  configure_ca
-  configure_control_plane
-
-  ### Install ###
   install_ca
   install_control_plane
+  apply_kube_yamls
 
-  ### Completion ###
   outro
   info "Successfully installed ASM."
   return 0
-}
-
-install_managed_components() {
-  info "Configuring ASM managed control plane revision CRD..."
-  context_append "kubectlFiles" "${CRD_CONTROL_PLANE_REVISION}"
-
-  info "Configuring base installation for managed control plane..."
-  context_append "kubectlFiles" "${BASE_REL_PATH}"
-
-  info "Configuring ASM managed control plane validating webhook config..."
-  context_append "kubectlFiles" "${MANAGED_WEBHOOKS}"
-
-  info "Configuring ASM managed control plane revision CR for channels..."
-  context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_REGULAR}"
-  context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_RAPID}"
-  context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_STABLE}"
-
-  local ASM_OPTS
-  ASM_OPTS="$(kubectl -n istio-system \
-    get --ignore-not-found cm asm-options \
-    -o jsonpath='{.data.ASM_OPTS}' || true)"
-
-  local USE_MCP_CNI; USE_MCP_CNI="$(context_get-option "USE_MCP_CNI")"
-  local CNI; CNI="off"
-  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then
-    info "Configuring CNI..."
-    CNI="on"
-  fi
-
-  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=${CNI}"* ]]; then
-    cat >mcp_configmap.yaml <<EOF
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: asm-options
-  namespace: istio-system
-data:
-  ASM_OPTS: "CNI=${CNI}"
-EOF
-
-    context_append "kubectlFiles" "mcp_configmap.yaml"
-  fi
-
-  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then
-    context_append "kubectlFiles" "${MANAGED_CNI}"
-  fi
-}
-
-scrape_managed_urls() {
-  local URL
-  URL="$(kubectl get mutatingwebhookconfiguration istiod-asm-managed -ojson | jq .webhooks[0].clientConfig.url -r)"
-
-  local VALIDATION_URL
-  # shellcheck disable=SC2001
-  VALIDATION_URL="$(echo "${URL}" | sed 's/inject.*$/validate/g')"
-
-  local CLOUDRUN_ADDR
-  # shellcheck disable=SC2001
-  CLOUDRUN_ADDR=$(echo "${URL}" | cut -d'/' -f3)
-
-  echo "${VALIDATION_URL} ${CLOUDRUN_ADDR}"
 }
 
 install_in_cluster_control_plane() {
@@ -247,10 +180,7 @@ configure_ca() {
 }
 
 configure_control_plane() {
-  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
-  if [[ "${MANAGED}" -eq 1 ]]; then
-    configure_managed_control_plane
-  fi
+  :
 }
 
 install_ca() {
@@ -267,7 +197,7 @@ install_control_plane() {
   local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
 
   if [[ "${MANAGED}" -eq 1 ]]; then
-    install_managed_components
+    install_managed_control_plane
   else
     install_in_cluster_control_plane
   fi
@@ -275,6 +205,4 @@ install_control_plane() {
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
     install_canonical_controller
   fi
-
-  apply_kube_yamls
 }
