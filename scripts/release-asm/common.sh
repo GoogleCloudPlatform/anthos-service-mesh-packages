@@ -1,42 +1,39 @@
 _DEBUG="${_DEBUG:=}"
 if [[ "${_DEBUG}" -eq 1 ]]; then
   gsutil() {
-    echo "DEBUG: would have run 'gsutil ${*}'"
+    echo "DEBUG: would have run 'gsutil ${*}'" >&2
   }
 
   git() {
-    echo "DEBUG: would have run 'git ${*}'"
+    echo "DEBUG: would have run 'git ${*}'" >&2
+  }
+
+  curl() {
+    echo "DEBUG: would have run 'curl ${*}'" >&2
   }
 fi
 
 BUCKET_URL="https://storage.googleapis.com"
 BUCKET_PATH="csm-artifacts/asm"; readonly BUCKET_PATH
 
-CURRENT_RELEASE="release-1.9-asm"; readonly CURRENT_RELEASE
+CURRENT_RELEASE="release-1.10-asmcli"; readonly CURRENT_RELEASE
 
-STABLE_VERSION_FILE="STABLE_VERSIONS"; readonly STABLE_VERSION_FILE
+STABLE_VERSION_FILE="ASMCLI_VERSIONS"; readonly STABLE_VERSION_FILE
 STABLE_VERSION_FILE_PATH="${BUCKET_PATH}/${STABLE_VERSION_FILE}"; readonly STABLE_VERSION_FILE_PATH
 HOLD_TYPE="temp"; readonly HOLD_TYPE
 trap 'gsutil retention "${HOLD_TYPE}" release gs://"${STABLE_VERSION_FILE_PATH}"' ERR # hope that the hold is cleared
 
 prod_releases() {
-  cat << EOF
-release 1.9
-release 1.8
-release 1.7
-EOF
+  :
 }
 
 staging_releases() {
-  cat << EOF
-staging 1.9
-staging 1.8
-EOF
+  :
 }
 
 other_releases() {
   cat << EOF
-master unstable
+main unstable
 EOF
 }
 
@@ -45,16 +42,16 @@ EOF
 # e.g. the pair "branch" "demo" will check out the git branch "branch" and
 # upload a file called "<SCRIPT_NAME>_demo" to the GCS bucket.
 all_releases() {
-  while read -r type version; do
-    echo "${type}-${version}-asm" "${version}"
-  done <<EOF
-$(prod_releases)
-EOF
-  while read -r type version; do
-    echo "${type}-${version}-asm" "staging_${version}"
-  done <<EOF
-$(staging_releases)
-EOF
+#  while read -r type version; do
+#    echo "${type}-${version}-asm" "${version}"
+#  done <<EOF
+#$(prod_releases)
+#EOF
+#  while read -r type version; do
+#    echo "${type}-${version}-asm" "staging_${version}"
+#  done <<EOF
+#$(staging_releases)
+#EOF
   while read -r type version; do
     echo "${type}" "${version}"
   done <<EOF
@@ -88,14 +85,14 @@ changes_necessary() {
 
   if curl -O "${URI}.sha256"; then
     if sha256sum -c --ignore-missing "${NAME}.sha256" >/dev/null 2>/dev/null; then
-      echo "No changes in ${NAME}, skipping"
+      echo "No changes in ${NAME}, skipping" >&2
       rm "${NAME}.sha256"
       false
       return
     fi
     rm "${NAME}.sha256"
   else
-    echo "New file {FILE_NAME}"
+    echo "New file {FILE_NAME}" >&2
   fi
 }
 
@@ -107,17 +104,17 @@ check_tags() {
   local VER; VER="$(./"${SCRIPT_NAME}" --version 2>/dev/null || true)";
 
   if [[ "${_DEBUG}" -eq 1 ]]; then
-    echo "DEBUG: Tag: ${TAG} Version: ${VER}"
+    echo "DEBUG: Tag: ${TAG} Version: ${VER}" >&2
     return
   fi
 
   if [[ "${BRANCH_NAME}" = release* && "${TAG}" == "" ]]; then
-    echo "Release branches must be tagged before releasing. Aborting."
+    echo "Release branches must be tagged before releasing. Aborting." >&2
     exit 1
   fi
 
   if [[ "${TAG}" != "" && "${VER}" != "${TAG}" ]]; then
-    echo "${SCRIPT_NAME} version and git tag don't match. Aborting."
+    echo "${SCRIPT_NAME} version and git tag don't match. Aborting." >&2
     exit 1
   fi
 }
@@ -185,7 +182,11 @@ publish_script() {
 
   STABLE_VERSION="$(get_stable_version)"
   write_and_upload "${SCRIPT_NAME}" "${VERSION}"
-  write_and_upload "${SCRIPT_NAME}" "${STABLE_VERSION}"
+  if [[ -n "${STABLE_VERSION}" ]]; then
+    write_and_upload "${SCRIPT_NAME}" "${STABLE_VERSION}"
+  else
+    echo "No stable version found--skipping" >&2
+  fi
 }
 
 write_and_upload() {
@@ -213,7 +214,7 @@ write_and_upload() {
 
   git restore "${SCRIPT_NAME}"
 
-  echo "Published ${FILE_NAME} successfully."
+  echo "Published ${FILE_NAME} successfully." >&2
 }
 
 append_version() {

@@ -15,7 +15,6 @@ main() {
 
   while read -r branch version; do
     publish_script "${branch}" "${version}" asmcli
-    publish_script "${branch}" "${version}" asm_vm
   done <<EOF
 $(all_releases)
 EOF
