@@ -228,7 +228,10 @@ setup() {
   pushd "${tmpdir}"
   git clone git@github.com:GoogleCloudPlatform/anthos-service-mesh-packages.git
   if [[ "${_DEBUG}" -ne 1 ]]; then
-    cd anthos-service-mesh-packages/asmcli
+    cd anthos-service-mesh-packages
+    # remove this after the default branch is switched
+    git checkout main
+    cd asmcli
   else
     touch asmcli
   fi
