@@ -1227,9 +1227,15 @@ EOF
     info "Restarting workloads in ${NS} and waiting for them to become available (max 5 min)..."
     run kubectl -n "${NS/namespace\//}" rollout restart deployment
 
-    if ! kubectl rollout status deployments -n "${NS/namespace\//}" -w --timeout=5m; then
-      warn "Deployment not ready after 5 minutes, skipping."
-    fi
+    local REMAINING
+    REMAINING="$(kubectl get deployment -oname -n "${NS/namespace\//}")"
+
+    while IFS= read -r deployment; do
+      if ! kubectl rollout status -n "${NS/namespace\//}" "${deployment}" -w --timeout=5m; then
+        warn "Deployment ${deployment} not ready after 5 minutes, skipping."
+      fi
+    done <<< "${REMAINING}"
+
   done <<EOF
 $(cat configuration_backup/labeled_namespaces)
 EOF
