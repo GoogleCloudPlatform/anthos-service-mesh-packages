@@ -578,13 +578,17 @@ EOF
 
   WARNED=0
   FATAL_EXITS=0
-  AKPT=""
-  AGCLOUD="gcloud"
-  AKUBECTL="kubectl"
+  AGCLOUD=""
   validate_cli_dependencies
   FATAL_EXITS=1
 
   if [[ "${WARNED}" -eq 0 ]]; then
+    exit 1
+  fi
+}
+
+@test "MAIN: kpt should be downloaded if system version is not 0.x" {
+  if ! needs_kpt; then
     exit 1
   fi
 }

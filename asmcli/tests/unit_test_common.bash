@@ -80,6 +80,9 @@ _intercept_setup() {
     }
 
     kpt() {
+        if [[ "${1}" = "version" ]]; then
+          echo "1.0.0"
+        fi
         return 0
     }
 }

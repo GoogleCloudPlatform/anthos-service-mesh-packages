@@ -12,27 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# [START docs]
 ---
 apiVersion: install.istio.io/v1alpha1
 kind: IstioOperator
 spec:
   components:
-    pilot:
-      k8s:
-        env:
-          - name: SPIFFE_BUNDLE_ENDPOINTS
-            value: ""
-          - name: TOKEN_AUDIENCES
-            value: "istio-ca,PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.token-audiences"}
-          - name: ENABLE_STACKDRIVER_MONITORING
-            value: "true" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.controlplane.monitoring.enabled"}
-  meshConfig:
-    trustDomain: "cluster.local"
-    defaultConfig:
-      proxyMetadata:
-        CA_PROVIDER: "Citadel"
-        PLUGINS: ""
-  values:
-    global:
-      caAddress: ""
-      pilotCertProvider: "istiod"
+    ingressGateways:
+      - name: istio-ingressgateway
+        enabled: false
+# [END docs]

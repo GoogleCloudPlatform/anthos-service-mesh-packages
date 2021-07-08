@@ -16,6 +16,24 @@ steps:
 
   - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
     dir: 'asmcli'
+    id: 'run-basic-suite'
+    entrypoint: '/bin/bash'
+    args:
+      - '-c'
+      - >
+        ./tests/run_basic_suite
+        --PROJECT_ID "${PROJECT_ID}"
+        --BUILD_ID "${BUILD_ID}"
+    env:
+      - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
+      - 'KEY_FILE=${_KEY_FILE}'
+      - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
+      - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
+      - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
+    timeout: 600s
+
+  - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
+    dir: 'asmcli'
     id: 'run-install-custom-cert-suite'
     entrypoint: '/bin/bash'
     args:
@@ -38,7 +56,7 @@ substitutions:
   _IMAGE_NAME: gcloud-with-kpt
   _SCRIPT_NAME: asmcli
   _ASM_VM_SCRIPT_NAME: asm_vm
-  _ASM_PKG_BRANCH: ""
+  _ASM_PKG_BRANCH: $COMMIT_SHA
   _SERVICE_ACCOUNT: asm-installer
   _SECRET_NAME: asm-installer-creds
   _KEY_FILE: key.json

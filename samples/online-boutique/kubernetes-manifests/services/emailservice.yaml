@@ -1,4 +1,4 @@
-# Copyright 2020 Google LLC
+# Copyright 2018 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,18 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
----
-apiVersion: install.istio.io/v1alpha1
-kind: IstioOperator
+apiVersion: v1
+kind: Service
+metadata:
+  name: emailservice
+  namespace: email
 spec:
-  values:
-    pilot:
-      env:
-        ENABLE_CA_SERVER: false
-        ISTIO_MULTIROOT_MESH: true
-  meshConfig:
-    defaultConfig:
-      proxyMetadata:
-        PROXY_CONFIG_XDS_AGENT: "true"
-    trustDomainAliases: # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases"}
-      - "cluster.local"
+  type: ClusterIP
+  selector:
+    app: emailservice
+  ports:
+  - name: grpc
+    port: 5000
+    targetPort: 8080

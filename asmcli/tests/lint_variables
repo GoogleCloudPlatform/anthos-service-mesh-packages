@@ -20,7 +20,7 @@ get_all_variables() {
 
 should_skip() {
   local VARIABLE; VARIABLE="$1"
-  if [[ "${VARIABLE}" = "IFS" ]]; then
+  if [[ "${VARIABLE}" = "IFS" || "${VARIABLE}" = "TZ" ]]; then
     true
     return
   fi

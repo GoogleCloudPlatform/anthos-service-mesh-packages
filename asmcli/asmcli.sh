@@ -47,6 +47,7 @@ OPERATOR_MANIFEST=""
 BETA_CRD_MANIFEST=""
 CITADEL_MANIFEST=""
 OFF_GCP_MANIFEST=""
+MANAGED_CNI=""
 MANAGED_MANIFEST=""
 MANAGED_WEBHOOKS=""
 EXPOSE_ISTIOD_SERVICE=""
@@ -62,7 +63,7 @@ SCRIPT_NAME="${0##*/}"; readonly SCRIPT_NAME
 PROJECT_NUMBER=""
 GKE_CLUSTER_URI=""
 GCE_NETWORK_NAME=""
-GCLOUD_USER_OR_SA=""
+GCLOUD_USER_OR_SA="${GCLOUD_USER_OR_SA:=}"
 KPT_URL=""
 KUBECONFIG=""
 APATH=""
@@ -121,13 +122,13 @@ main() {
 
 prepare_environment() {
   set_up_local_workspace
-  configure_kubectl
-
   validate_cli_dependencies
 
   if is_sa; then
     auth_service_account
   fi
+
+  configure_kubectl
 
   if should_validate || can_modify_at_all; then
     local_iam_user > /dev/null
@@ -135,6 +136,11 @@ prepare_environment() {
       validate_gcp_resources
     fi
   fi
+
+  if needs_asm && needs_kpt; then
+    download_kpt
+  fi
+  readonly AKPT
 
   if needs_asm; then
     if ! necessary_files_exist; then
@@ -183,6 +189,7 @@ init() {
   BETA_CRD_MANIFEST="${OPTIONS_DIRECTORY}/v1beta1-crds.yaml"; readonly BETA_CRD_MANIFEST;
   CITADEL_MANIFEST="${OPTIONS_DIRECTORY}/citadel-ca.yaml"; readonly CITADEL_MANIFEST;
   OFF_GCP_MANIFEST="${OPTIONS_DIRECTORY}/off-gcp.yaml"; readonly OFF_GCP_MANIFEST;
+  MANAGED_CNI="${OPTIONS_DIRECTORY}/cni-managed.yaml"; readonly MANAGED_CNI;
   MANAGED_MANIFEST="${OPTIONS_DIRECTORY}/managed-control-plane.yaml"; readonly MANAGED_MANIFEST;
   MANAGED_WEBHOOKS="${OPTIONS_DIRECTORY}/managed-control-plane-webhooks.yaml"; readonly MANAGED_WEBHOOKS;
   EXPOSE_ISTIOD_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_SERVICE;
@@ -198,7 +205,7 @@ init() {
 
   AKUBECTL="$(which kubectl || true)"; readonly AKUBECTL;
   AGCLOUD="$(which gcloud || true)"; readonly AGCLOUD;
-  AKPT="$(which kpt || true)"; readonly AKPT;
+  AKPT="$(which kpt || true)"
 }
 
 ### Convenience functions ###
@@ -280,6 +287,8 @@ retry() {
     warn "Failed, retrying...($((i+1)) of ${MAX_TRIES})"
     sleep 2
   done
+  local CMD="'$*'"
+  warn "Command $CMD failed."
   false
 }
 
@@ -366,7 +375,12 @@ error() {
 }
 
 info() {
-  echo "${SCRIPT_NAME}: ${1}" >&2
+  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
+  if hash ts 2>/dev/null && [[ "${VERBOSE}" -eq 1 ]]; then
+    echo "${SCRIPT_NAME}: ${1}" | TZ=utc ts '%Y-%m-%dT%.T' >&2
+  else
+    echo "${SCRIPT_NAME}: ${1}" >&2
+  fi
 }
 
 fatal() {
@@ -433,6 +447,11 @@ is_sa() {
   local SERVICE_ACCOUNT; SERVICE_ACCOUNT="$(context_get-option "SERVICE_ACCOUNT")"
 
   if [[ -z "${SERVICE_ACCOUNT}" ]]; then false; fi
+}
+
+is_sa_impersonation() {
+  local IMPERSONATE_USER; IMPERSONATE_USER="$(gcloud config get-value auth/impersonate_service_account)"
+  if [[ -z "${IMPERSONATE_USER}" ]]; then false; fi
 }
 
 should_validate() {
@@ -547,6 +566,24 @@ can_create_namespace() {
   fi
 }
 
+needs_kpt() {
+  if [[ -z "${AKPT}" ]]; then return; fi
+  local KPT_VER
+  KPT_VER="$(kpt version)"
+  if [[ "${KPT_VER:0:1}" != "0" ]]; then return; fi
+  false
+}
+
+add_trust_domain_alias() {
+  local TRUST_DOMAIN_ALIASES
+  TRUST_DOMAIN_ALIASES="$(context_get-option "TRUST_DOMAIN_ALIASES")"
+  if [[ "${TRUST_DOMAIN_ALIASES}" == *${1}* ]]; then
+    return
+  fi
+  TRUST_DOMAIN_ALIASES="${TRUST_DOMAIN_ALIASES} ${1}"
+  context_set-option "TRUST_DOMAIN_ALIASES" "${TRUST_DOMAIN_ALIASES}"
+}
+
 needs_asm() {
   local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
 
@@ -630,6 +667,13 @@ parse_args() {
         ;;
       -o | --option)
         arg_required "${@}"
+
+        if [[ "${2}" == "cni-managed" ]]; then
+          context_set-option "USE_MCP_CNI" 1
+          shift 2
+          continue
+        fi
+
         OPTIONAL_OVERLAY="${2},${OPTIONAL_OVERLAY}"
         context_set-option "OPTIONAL_OVERLAY" "${OPTIONAL_OVERLAY}"
         if [[ "${2}" == "hub-meshca" ]]; then
@@ -1092,6 +1136,9 @@ set_up_local_workspace() {
       fatal "${OUTPUT_DIR} exists and is not a directory, please specify another directory."
     fi
   fi
+
+  if [[ -x "${OUTPUT_DIR}/kpt" ]]; then AKPT="$(apath -f "${OUTPUT_DIR}/kpt")"; fi
+
   pushd "$OUTPUT_DIR" > /dev/null
   context_set-option "OUTPUT_DIR" "${OUTPUT_DIR}"
 
@@ -1194,7 +1241,6 @@ $AGCLOUD
 grep
 jq
 $AKUBECTL
-$AKPT
 sed
 tr
 head
@@ -1208,7 +1254,6 @@ EOF
   done <<EOF
 AKUBECTL
 AGCLOUD
-AKPT
 EOF
 
   if [[ "${CUSTOM_CA}" -eq 1 ]]; then
@@ -1234,6 +1279,23 @@ EOF
   if [[ "$(uname -m)" != "x86_64" ]]; then
     fatal "Installation is only supported on x86_64."
   fi
+}
+
+download_kpt() {
+  local OS
+
+  case "$(uname)" in
+    Linux ) OS="linux_amd64";;
+    Darwin) OS="darwin_arm64";;
+    *     ) fatal "$(uname) is not a supported OS.";;
+  esac
+
+  local KPT_TGZ
+  KPT_TGZ="https://github.com/GoogleContainerTools/kpt/releases/download/v0.39.3/kpt_${OS}-0.39.3.tar.gz"
+
+  info "Downloading kpt.."
+  curl -L "${KPT_TGZ}" | tar xz
+  AKPT="$(apath -f kpt)"
 }
 
 download_asm() {
@@ -1633,12 +1695,11 @@ EOF
 
 exit_if_out_of_iam_policy() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local GCLOUD_MEMBER; GCLOUD_MEMBER="$(iam_user)";
   local MEMBER_ROLES
   MEMBER_ROLES="$(gcloud projects \
     get-iam-policy "${PROJECT_ID}" \
     --flatten='bindings[].members' \
-    --filter="bindings.members:$(iam_user)" \
+    --filter="bindings.members:$(local_iam_user)" \
     --format='value(bindings.role)')"
 
   if [[ "${MEMBER_ROLES}" = *"roles/owner"* ]]; then
@@ -1663,16 +1724,6 @@ EOF
   fi
 }
 
-iam_user() {
-  local MANAGED_SERVICE_ACCOUNT; MANAGED_SERVICE_ACCOUNT="$(context_get-option "MANAGED_SERVICE_ACCOUNT")"
-  if ! is_managed; then
-    local_iam_user
-    return
-  fi
-
-  echo "serviceAccount:${MANAGED_SERVICE_ACCOUNT}"
-}
-
 local_iam_user() {
   if [[ -n "${GCLOUD_USER_OR_SA}" ]]; then
     echo "${GCLOUD_USER_OR_SA}"
@@ -1692,12 +1743,18 @@ local_iam_user() {
 
   local ACCOUNT_TYPE
   ACCOUNT_TYPE="user"
-  if is_sa || [[ "${ACCOUNT_NAME}" = *.iam.gserviceaccount.com ]]; then
+  if is_sa || [[ "${ACCOUNT_NAME}" = *.gserviceaccount.com ]]; then
     ACCOUNT_TYPE="serviceAccount"
   fi
 
-  GCLOUD_USER_OR_SA="${ACCOUNT_TYPE}:${ACCOUNT_NAME}"; readonly GCLOUD_USER_OR_SA
+  if is_sa_impersonation; then
+    ACCOUNT_NAME="$(gcloud config get-value auth/impersonate_service_account)"
+    ACCOUNT_TYPE="serviceAccount"
+    warn "Service account impersonation currently configured to impersonate '${ACCOUNT_NAME}'."
+  fi
 
+  GCLOUD_USER_OR_SA="${ACCOUNT_TYPE}:${ACCOUNT_NAME}"
+  readonly GCLOUD_USER_OR_SA
   echo "${GCLOUD_USER_OR_SA}"
 }
 
@@ -2039,7 +2096,7 @@ populate_fleet_info() {
   context_set-option "HUB_MEMBERSHIP_ID" "${HUB_MEMBERSHIP_ID}"
   HUB_IDP_URL="$(kubectl get memberships.hub.gke.io membership -o=jsonpath='{.spec.identity_provider}')"
   context_set-option "HUB_IDP_URL" "${HUB_IDP_URL}"
-  FLEET_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.workload_identity_pool | sed 's/^\"\(.*\).\(svc\|hub\).id.goog\"$/\1/g')"
+  FLEET_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.workload_identity_pool | sed -E 's/^\"(.*)\.(svc|hub)\.id\.goog\"$/\1/')"
   context_set-option "FLEET_ID" "${FLEET_ID}"
 }
 
@@ -2282,14 +2339,39 @@ configure_package() {
   fi
 
   if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
-    kpt cfg set asm gcloud.project.environProjectID "${FLEET_ID}"
-    kpt cfg set asm anthos.servicemesh.hubMembershipID "${HUB_MEMBERSHIP_ID}"
-    kpt cfg set asm anthos.servicemesh.hub-idp-url "${HUB_IDP_URL}"
+    # VM installation uses the latest Hub WIP format
+    if [[ "${USE_VM}" -eq 1 ]]; then
+      kpt cfg set asm anthos.servicemesh.hubTrustDomain "${FLEET_ID}.svc.id.goog"
+      kpt cfg set asm anthos.servicemesh.hub-idp-url "${HUB_IDP_URL}"
+    # GKE-on-GCP installation uses legacy Hub WIP format to be consistent with GCP Hub public preview feature
+    else
+      kpt cfg set asm anthos.servicemesh.hubTrustDomain "${FLEET_ID}.hub.id.goog"
+      kpt cfg set asm anthos.servicemesh.hub-idp-url "https://gkehub.googleapis.com/projects/${FLEET_ID}/locations/global/memberships/${HUB_MEMBERSHIP_ID}"
+    fi
+  fi
+  if [[ -n "${CA_NAME}" && "${CA}" = "gcp_cas" ]]; then
+    kpt cfg set asm anthos.servicemesh.external_ca.ca_name "${CA_NAME}"
   fi
 
   if [[ "${USE_VM}" -eq 1 ]] && [[ "${_CI_NO_REVISION}" -eq 0 ]]; then
     kpt cfg set asm anthos.servicemesh.istiodHost "istiod-${REVISION_LABEL}.istio-system.svc"
     kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod-${REVISION_LABEL}.istio-system.svc.cluster.local"
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${REVISION_LABEL}"
+  fi
+
+  if [[ "${CA}" == "mesh_ca" ]]; then
+    # set the trust domain aliases to include both new Hub WIP and old Hub WIP to achieve no downtime upgrade.
+    add_trust_domain_alias "${PROJECT_ID}.svc.id.goog"
+    add_trust_domain_alias "${PROJECT_ID}.hub.id.goog"
+    if [[ -n "${_CI_TRUSTED_GCP_PROJECTS}" ]]; then
+      # Gather the trust domain aliases from projects.
+      while IFS=',' read -r trusted_gcp_project; do
+        add_trust_domain_alias "${trusted_gcp_project}.svc.id.goog"
+      done <<EOF
+${_CI_TRUSTED_GCP_PROJECTS}
+EOF
+    fi
+    # shellcheck disable=SC2046
+    kpt cfg set asm anthos.servicemesh.trustDomainAliases $(context_get-option "TRUST_DOMAIN_ALIASES")
   fi
 }

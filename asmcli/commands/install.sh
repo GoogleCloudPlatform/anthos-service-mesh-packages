@@ -48,6 +48,37 @@ install_managed_components() {
   context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_REGULAR}"
   context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_RAPID}"
   context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_STABLE}"
+
+  local ASM_OPTS
+  ASM_OPTS="$(kubectl -n istio-system \
+    get --ignore-not-found cm asm-options \
+    -o jsonpath='{.data.ASM_OPTS}' || true)"
+
+  local USE_MCP_CNI; USE_MCP_CNI="$(context_get-option "USE_MCP_CNI")"
+  local CNI; CNI="off"
+  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then
+    info "Configuring CNI..."
+    CNI="on"
+  fi
+
+  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=${CNI}"* ]]; then
+    cat >mcp_configmap.yaml <<EOF
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: asm-options
+  namespace: istio-system
+data:
+  ASM_OPTS: "CNI=${CNI}"
+EOF
+
+    context_append "kubectlFiles" "mcp_configmap.yaml"
+  fi
+
+  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then
+    context_append "kubectlFiles" "${MANAGED_CNI}"
+  fi
 }
 
 scrape_managed_urls() {
@@ -125,7 +156,12 @@ install_private_ca() {
   # This sets up IAM privileges for the project to be able to access GCP CAS.
   # If modify_gcp_component permissions are not granted, it is assumed that the
   # user has taken care of this, else Istio setup will fail
-  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${WORKLOAD_POOL}[istio-system/istiod-service-account]"
+  local ISTIOD_SERVICE_ACCOUNT
+  ISTIOD_SERVICE_ACCOUNT="istiod-${REVISION_LABEL}"
+  if [[ "${_CI_NO_REVISION}" -eq 1 ]]; then
+    ISTIOD_SERVICE_ACCOUNT="istiod"
+  fi
+  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${WORKLOAD_POOL}[istio-system/${ISTIOD_SERVICE_ACCOUNT}]"
   local NAME; NAME=$(echo "${CA_NAME}" | cut -f6 -d/)
   local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
   local CA_PROJECT; CA_PROJECT=$(echo "${CA_NAME}" | cut -f2 -d/)
