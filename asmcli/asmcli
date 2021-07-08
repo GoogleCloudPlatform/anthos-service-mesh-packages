@@ -2362,22 +2362,8 @@ configure_package() {
     kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod-${REVISION_LABEL}.istio-system.svc.cluster.local"
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${REVISION_LABEL}"
   fi
-
-  if [[ "${CA}" == "mesh_ca" ]]; then
-    # set the trust domain aliases to include both new Hub WIP and old Hub WIP to achieve no downtime upgrade.
-    add_trust_domain_alias "${PROJECT_ID}.svc.id.goog"
-    add_trust_domain_alias "${PROJECT_ID}.hub.id.goog"
-    if [[ -n "${_CI_TRUSTED_GCP_PROJECTS}" ]]; then
-      # Gather the trust domain aliases from projects.
-      while IFS=',' read -r trusted_gcp_project; do
-        add_trust_domain_alias "${trusted_gcp_project}.svc.id.goog"
-      done <<EOF
-${_CI_TRUSTED_GCP_PROJECTS}
-EOF
-    fi
-    # shellcheck disable=SC2046
-    kpt cfg set asm anthos.servicemesh.trustDomainAliases $(context_get-option "TRUST_DOMAIN_ALIASES")
-  fi
+  configure_ca
+  configure_control_plane
 }
 create-mesh_subcommand() {
   ### Preparation ###
@@ -2821,80 +2807,13 @@ install_subcommand() {
 }
 
 install() {
-  ### Configure ###
-  configure_ca
-  configure_control_plane
-
-  ### Install ###
   install_ca
   install_control_plane
+  apply_kube_yamls
 
-  ### Completion ###
   outro
   info "Successfully installed ASM."
   return 0
-}
-
-install_managed_components() {
-  info "Configuring ASM managed control plane revision CRD..."
-  context_append "kubectlFiles" "${CRD_CONTROL_PLANE_REVISION}"
-
-  info "Configuring base installation for managed control plane..."
-  context_append "kubectlFiles" "${BASE_REL_PATH}"
-
-  info "Configuring ASM managed control plane validating webhook config..."
-  context_append "kubectlFiles" "${MANAGED_WEBHOOKS}"
-
-  info "Configuring ASM managed control plane revision CR for channels..."
-  context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_REGULAR}"
-  context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_RAPID}"
-  context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_STABLE}"
-
-  local ASM_OPTS
-  ASM_OPTS="$(kubectl -n istio-system \
-    get --ignore-not-found cm asm-options \
-    -o jsonpath='{.data.ASM_OPTS}' || true)"
-
-  local USE_MCP_CNI; USE_MCP_CNI="$(context_get-option "USE_MCP_CNI")"
-  local CNI; CNI="off"
-  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then
-    info "Configuring CNI..."
-    CNI="on"
-  fi
-
-  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=${CNI}"* ]]; then
-    cat >mcp_configmap.yaml <<EOF
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: asm-options
-  namespace: istio-system
-data:
-  ASM_OPTS: "CNI=${CNI}"
-EOF
-
-    context_append "kubectlFiles" "mcp_configmap.yaml"
-  fi
-
-  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then
-    context_append "kubectlFiles" "${MANAGED_CNI}"
-  fi
-}
-
-scrape_managed_urls() {
-  local URL
-  URL="$(kubectl get mutatingwebhookconfiguration istiod-asm-managed -ojson | jq .webhooks[0].clientConfig.url -r)"
-
-  local VALIDATION_URL
-  # shellcheck disable=SC2001
-  VALIDATION_URL="$(echo "${URL}" | sed 's/inject.*$/validate/g')"
-
-  local CLOUDRUN_ADDR
-  # shellcheck disable=SC2001
-  CLOUDRUN_ADDR=$(echo "${URL}" | cut -d'/' -f3)
-
-  echo "${VALIDATION_URL} ${CLOUDRUN_ADDR}"
 }
 
 install_in_cluster_control_plane() {
@@ -3048,10 +2967,7 @@ configure_ca() {
 }
 
 configure_control_plane() {
-  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
-  if [[ "${MANAGED}" -eq 1 ]]; then
-    configure_managed_control_plane
-  fi
+  :
 }
 
 install_ca() {
@@ -3068,7 +2984,7 @@ install_control_plane() {
   local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
 
   if [[ "${MANAGED}" -eq 1 ]]; then
-    install_managed_components
+    install_managed_control_plane
   else
     install_in_cluster_control_plane
   fi
@@ -3076,8 +2992,6 @@ install_control_plane() {
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
     install_canonical_controller
   fi
-
-  apply_kube_yamls
 }
 print-config_subcommand() {
   # make sure to redirect stdout as soon as possible if we're dumping the config
@@ -3118,7 +3032,7 @@ print_config() {
   fi
 
   local PARAMS; PARAMS="$(gen_install_params)"
-  
+
   # shellcheck disable=SC2086
   istioctl profile dump ${PARAMS}
 }
@@ -3291,20 +3205,21 @@ validate_meshca() {
 
 configure_meshca() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local TRUST_DOMAIN_ALIASES
 
+  # set the trust domain aliases to include both new Hub WIP and old Hub WIP to achieve no downtime upgrade.
+  add_trust_domain_alias "${PROJECT_ID}.svc.id.goog"
+  add_trust_domain_alias "${PROJECT_ID}.hub.id.goog"
   if [[ -n "${_CI_TRUSTED_GCP_PROJECTS}" ]]; then
     # Gather the trust domain aliases from projects.
-    TRUST_DOMAIN_ALIASES="${PROJECT_ID}.svc.id.goog"
     while IFS=',' read -r trusted_gcp_project; do
-      TRUST_DOMAIN_ALIASES="${TRUST_DOMAIN_ALIASES} ${trusted_gcp_project}.svc.id.goog"
+      add_trust_domain_alias "${trusted_gcp_project}.svc.id.goog"
     done <<EOF
 ${_CI_TRUSTED_GCP_PROJECTS}
 EOF
-    # kpt treats words in quotes as a single param, while kpt need ${TRUST_DOMAIN_ALIASES} to be splitting params for a list. If we remove quotes, the lint will complain.
-    # eval will translate the quoted TRUST_DOMAIN_ALIASES into params to workaround both.
-    run_command eval kpt cfg set asm anthos.servicemesh.trustDomainAliases "${TRUST_DOMAIN_ALIASES}"
   fi
+
+  # shellcheck disable=SC2046
+  kpt cfg set asm anthos.servicemesh.trustDomainAliases $(context_get-option "TRUST_DOMAIN_ALIASES")
 }
 validate_private_ca() {
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
@@ -3396,7 +3311,7 @@ validate_managed_control_plane() {
   fi
 }
 
-configure_managed_control_plane() {
+install_managed_control_plane() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
@@ -3405,6 +3320,8 @@ configure_managed_control_plane() {
   if [[ -n "${_CI_CLOUDRUN_IMAGE_HUB}" ]]; then
     CR_IMAGE_JSON="{\"image\": \"${_CI_CLOUDRUN_IMAGE_HUB}:${_CI_CLOUDRUN_IMAGE_TAG}\"}"
   fi
+
+  info "Provisioning control plane..."
   retry 2 run_command curl --request POST \
     "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}:runIstiod" \
     --data "${CR_IMAGE_JSON}" \
@@ -3416,9 +3333,75 @@ configure_managed_control_plane() {
   read -r VALIDATION_URL CLOUDRUN_ADDR <<EOF
 $(scrape_managed_urls)
 EOF
+
   kpt cfg set asm anthos.servicemesh.controlplane.validation-url "${VALIDATION_URL}"
   kpt cfg set asm anthos.servicemesh.managed-controlplane.cloudrun-addr "${CLOUDRUN_ADDR}"
+
+  info "Configuring ASM managed control plane revision CRD..."
+  context_append "kubectlFiles" "${CRD_CONTROL_PLANE_REVISION}"
+
+  info "Configuring base installation for managed control plane..."
+  context_append "kubectlFiles" "${BASE_REL_PATH}"
+
+  info "Configuring ASM managed control plane validating webhook config..."
+  context_append "kubectlFiles" "${MANAGED_WEBHOOKS}"
+
+  info "Configuring ASM managed control plane revision CR for channels..."
+  context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_REGULAR}"
+  context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_RAPID}"
+  context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_STABLE}"
+
+  local ASM_OPTS
+  ASM_OPTS="$(kubectl -n istio-system \
+    get --ignore-not-found cm asm-options \
+    -o jsonpath='{.data.ASM_OPTS}' || true)"
+
+  local USE_MCP_CNI; USE_MCP_CNI="$(context_get-option "USE_MCP_CNI")"
+  local CNI; CNI="off"
+  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then
+    info "Configuring CNI..."
+    CNI="on"
+  fi
+
+  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=${CNI}"* ]]; then
+    cat >mcp_configmap.yaml <<EOF
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: asm-options
+  namespace: istio-system
+data:
+  ASM_OPTS: "CNI=${CNI}"
+EOF
+
+    context_append "kubectlFiles" "mcp_configmap.yaml"
+  fi
+
+  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then
+    context_append "kubectlFiles" "${MANAGED_CNI}"
+  fi
 }
+
+configure_managed_control_plane() {
+  :
+}
+
+scrape_managed_urls() {
+  local URL
+  URL="$(kubectl get mutatingwebhookconfiguration istiod-asm-managed -ojson | jq .webhooks[0].clientConfig.url -r)"
+
+  local VALIDATION_URL
+  # shellcheck disable=SC2001
+  VALIDATION_URL="$(echo "${URL}" | sed 's/inject.*$/validate/g')"
+
+  local CLOUDRUN_ADDR
+  # shellcheck disable=SC2001
+  CLOUDRUN_ADDR=$(echo "${URL}" | cut -d'/' -f3)
+
+  echo "${VALIDATION_URL} ${CLOUDRUN_ADDR}"
+}
+
 
 init_meshconfig_managed() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
