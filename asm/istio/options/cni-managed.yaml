@@ -82,6 +82,75 @@ roleRef:
   kind: ClusterRole
   name: istio-cni-repair-role
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mdp-controller
+  labels:
+    app: istio-cni
+    release: istio
+    istio.io/rev: default
+    install.operator.istio.io/owning-resource: unknown
+    operator.istio.io/component: "Cni"
+rules:
+- apiGroups:
+  - mesh.cloud.google.com
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - apps
+  - extensions
+  resources:
+  - daemonsets
+  - deployments
+  - deployments/finalizers
+  - ingresses
+  - replicasets
+  - statefulsets
+  verbs:
+  - get
+  - list
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - namespaces
+  verbs:
+  - '*'
+- apiGroups:
+  - "coordination.k8s.io"
+  resources:
+  - leases
+  verbs:
+  - "*"
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - pods/eviction
+  verbs:
+  - '*'
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: mdp-controller
+  labels:
+    k8s-app: mdp-controller
+    istio.io/rev: default
+    install.operator.istio.io/owning-resource: unknown
+    operator.istio.io/component: "Cni"
+subjects:
+- kind: ServiceAccount
+  name: istio-cni
+  namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: mdp-controller
+  apiGroup: rbac.authorization.k8s.io
+---
 kind: ConfigMap
 apiVersion: v1
 metadata:
@@ -207,6 +276,45 @@ spec:
               value: "cni.istio.io/uninitialized"
             - name: "REPAIR_BROKEN-POD-LABEL-VALUE"
               value: "true"
+        - name: mdp-controller
+          image: "IMAGE_HUB/mdp:IMAGE_TAG"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cni-image"}
+          command:
+            - mdp
+            - server
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 1337
+            runAsUser: 1337
+            runAsNonRoot: true
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 50m
+              memory: 128Mi
+          env:
+            - name: WATCH_NAMESPACE
+              value: "istio-system"
+            - name: LEADER_ELECTION_NAMESPACE
+              value: "istio-system"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          volumeMounts:
+          - mountPath: /var/run/secrets/tokens
+            name: istio-token
       volumes:
         # Used to install CNI.
         - name: cni-bin-dir
@@ -215,3 +323,10 @@ spec:
         - name: cni-net-dir
           hostPath:
             path: /etc/cni/net.d
+        - name: istio-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: istio-token
+                expirationSeconds: 43200
+                audience: istio-ca
