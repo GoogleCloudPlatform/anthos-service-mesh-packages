@@ -89,9 +89,6 @@ metadata:
   labels:
     app: istio-cni
     release: istio
-    istio.io/rev: default
-    install.operator.istio.io/owning-resource: unknown
-    operator.istio.io/component: "Cni"
 rules:
   - apiGroups:
       - mesh.cloud.google.com
@@ -139,9 +136,6 @@ metadata:
   name: mdp-controller
   labels:
     k8s-app: mdp-controller
-    istio.io/rev: default
-    install.operator.istio.io/owning-resource: unknown
-    operator.istio.io/component: "Cni"
 subjects:
   - kind: ServiceAccount
     name: istio-cni
