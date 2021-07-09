@@ -118,6 +118,10 @@ main() {
       shift 1
       create-mesh_subcommand "${@}"
       ;;
+    experimental | x)
+      shift 1
+      experimental_subcommand "${@}"
+      ;;
     *)
       help_subcommand "${@}"
       ;;
@@ -2533,6 +2537,32 @@ generate_secret_name() {
   fi
 
   echo "${SECRET_NAME}"
+}
+experimental_subcommand() {
+  case "${1}" in
+    *)
+      x_help_subcommand "${@}"
+      ;;
+  esac
+}
+x_help_subcommand() {
+  x_usage
+}
+
+x_usage() {
+  cat << EOF
+${SCRIPT_NAME} $(version_message)
+usage: ${SCRIPT_NAME} experimental [SUBCOMMAND] [OPTION]...
+
+Use features/services in beta or preview states. Can also be accessed using
+'x' as a short version of 'experimental'.
+
+SUBCOMMANDS:
+  install                             Install using a Google backend service
+                                      instead of client-side tools
+  vm                                  Functions to configure a mesh to
+                                      allow external VM workloads.
+EOF
 }
 help_subcommand() {
   local PRINT_HELP; PRINT_HELP=0
