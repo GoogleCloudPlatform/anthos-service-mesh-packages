@@ -426,20 +426,6 @@ EOF
 }
 
 is_cluster_registered() {
-  if ! is_membership_crd_installed; then
-    false
-    return
-  fi
-
-  local IDENTITY_PROVIDER
-  IDENTITY_PROVIDER="$(retry 2 kubectl get memberships.hub.gke.io \
-    membership -ojson 2>/dev/null | jq .spec.identity_provider)"
-
-  if [[ -z "${IDENTITY_PROVIDER}" ]] || [[ "${IDENTITY_PROVIDER}" == 'null' ]]; then
-    false
-    return
-  fi
-
   local LIST
   LIST="$(gcloud container hub memberships list --project "${FLEET_PROJECT_ID}" \
     --format=json | grep "${GKE_CLUSTER_URI}")"
@@ -634,6 +620,9 @@ backup_config() {
     -n istio-system -l app=istio-ingressgateway > configuration_backup/ingress_service
   kubectl apply view-last-applied deployments \
     -n istio-system -l app=istio-ingressgateway > configuration_backup/ingress_deployment
+  if [[ -n "${CUSTOM_OVERLAY}" ]]; then
+    cp "${CUSTOM_OVERLAY}" configuration_backup/iop_backup
+  fi
 }
 
 current_label() {
@@ -1392,6 +1381,7 @@ main() {
   fi
   if [[ "${ROLLBACK}" -eq 1 ]]; then
     ensure_backup
+    configure_kubectl
     rollback
   fi
 
