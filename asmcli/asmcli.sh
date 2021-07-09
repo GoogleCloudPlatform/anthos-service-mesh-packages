@@ -1286,20 +1286,37 @@ EOF
 }
 
 download_kpt() {
-  local OS
-
-  case "$(uname)" in
-    Linux ) OS="linux_amd64";;
-    Darwin) OS="darwin_arm64";;
-    *     ) fatal "$(uname) is not a supported OS.";;
-  esac
+  local PLATFORM
+  PLATFORM="$(get_platform "$(uname)" "$(uname -m)")"
+  if [[ -z "${PLATFORM}" ]]; then
+    fatal "$(uname) $(uname -m) is not a supported platform to perform installation from."
+  fi
 
   local KPT_TGZ
-  KPT_TGZ="https://github.com/GoogleContainerTools/kpt/releases/download/v0.39.3/kpt_${OS}-0.39.3.tar.gz"
+  KPT_TGZ="https://github.com/GoogleContainerTools/kpt/releases/download/v0.39.3/kpt_${PLATFORM}-0.39.3.tar.gz"
 
   info "Downloading kpt.."
   curl -L "${KPT_TGZ}" | tar xz
   AKPT="$(apath -f kpt)"
+}
+
+get_platform() {
+  local OS; OS="${1}"
+  local ARCH; ARCH="${2}"
+  local PLATFORM
+
+  case "${OS}" in
+    Linux ) PLATFORM="linux_amd64";;
+    Darwin)
+      if [[ "${ARCH}" == "arm64" ]]; then
+        PLATFORM="darwin_arm64"
+      else
+        PLATFORM="darwin_amd64"
+      fi
+    ;;
+  esac
+
+  echo "${PLATFORM}"
 }
 
 download_asm() {
