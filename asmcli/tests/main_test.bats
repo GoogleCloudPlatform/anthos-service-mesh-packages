@@ -592,3 +592,21 @@ EOF
     exit 1
   fi
 }
+
+@test "MAIN: platform is detected correctly" {
+  if [[ "$(get_platform Linux x86_64)" != "linux_amd64" ]]; then
+    exit 1
+  fi
+
+  if [[ "$(get_platform Darwin x86_64)" != "darwin_amd64" ]]; then
+    exit 1
+  fi
+
+  if [[ "$(get_platform Darwin arm64)" != "darwin_arm64" ]]; then
+    exit 1
+  fi
+
+  if [[ "$(get_platform Windows x86_64)" != "" ]]; then
+    exit 1
+  fi
+}
