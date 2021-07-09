@@ -37,6 +37,7 @@ lint_file() {
 
   while read -r VARIABLE; do
     VARIABLE=${VARIABLE%=}
+    if [[ -z "${VARIABLE}" ]]; then continue; fi
     if ! grep -Eq "local([[:space:]A-Za-z0-9_\-]+)?${VARIABLE}(;|$|=|[[:space:]])" "${FILE}" \
     && ! grep -Eq "readonly ${VARIABLE}(;|$)" "${FILE}" && ! should_skip "${VARIABLE}"; then
       echo "FAILED: ${VARIABLE} in ${FILE} is not marked as local or readonly!"

@@ -114,6 +114,10 @@ main() {
       shift 1
       create-mesh_subcommand "${@}"
       ;;
+    experimental | x)
+      shift 1
+      experimental_subcommand "${@}"
+      ;;
     *)
       help_subcommand "${@}"
       ;;
