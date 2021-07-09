@@ -11,6 +11,115 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: dataplanecontrols.mesh.cloud.google.com
+spec:
+  additionalPrinterColumns:
+  - JSONPath: .status.state
+    name: Status
+    type: string
+  - JSONPath: .spec.proxyVersion
+    name: Version
+    type: string
+  - JSONPath: .spec.revision
+    name: Revision
+    type: string
+  - JSONPath: .metadata.creationTimestamp
+    name: Age
+    type: date
+  group: mesh.cloud.google.com
+  names:
+    kind: DataPlaneControl
+    listKind: DataPlaneControlList
+    plural: dataplanecontrols
+    singular: dataplanecontrol
+  scope: Cluster
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: DataPlaneControl is the Schema for the data plane controller API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: DataPlaneControlSpec defines the desired state of data plane
+            revisions.
+          properties:
+            proxyTargetBasisPoints:
+              description: ProxyTargetBasisPoints is the basis points (1/10000) of
+                proxies which should be at ProxyVersion. Only auto-injected proxies
+                belonging to Deployments and ReplicaSets in the revision above are
+                considered in the calculation. 0 means that the controller will not
+                auto upgrade any proxy in the cluster. The actual value may vary depending
+                on quantization due to the total number of proxies. Actual value will
+                be rounded down to the nearest value, but never rounded to zero if
+                positive.
+              format: int32
+              type: integer
+            proxyVersion:
+              description: ProxyVersion is the target version of the proxy in the
+                cluster.
+              type: string
+            revision:
+              description: Revision is the revision for this cluster entry. Clusters
+                may have more than one revision.
+              type: string
+          type: object
+        status:
+          description: DataPlaneControlStatus defines the observed state of data plane
+            revisions.
+          properties:
+            errorDetails:
+              description: Error details if the state is an error
+              properties:
+                code:
+                  description: Error code.
+                  format: int32
+                  type: integer
+                message:
+                  description: Error message.
+                  type: string
+              type: object
+            observedGeneration:
+              description: The generation observed by the data plane controller.
+              format: int64
+              type: integer
+            proxyTargetBasisPoints:
+              description: ProxyTargetBasisPoints is the actual basis points of proxies
+                at the target version. -1 means unknown.
+              format: int32
+              type: integer
+            state:
+              description: Current state of the controller.
+              type: string
+          required:
+          - state
+          type: object
+      type: object
+  version: v1alpha1
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
 ---
 apiVersion: v1
 kind: ServiceAccount
