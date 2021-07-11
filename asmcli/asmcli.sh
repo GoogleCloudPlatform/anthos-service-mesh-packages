@@ -113,9 +113,15 @@ main() {
       shift 1
       create-mesh_subcommand "${@}"
       ;;
+<<<<<<< HEAD
     experimental | x)
       shift 1
       experimental_subcommand "${@}"
+=======
+    vm)
+      shift 1
+      vm_subcommand "${@}"
+>>>>>>> 39a3a31 (add vm subcommand)
       ;;
     *)
       help_subcommand "${@}"
