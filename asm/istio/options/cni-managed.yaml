@@ -221,6 +221,7 @@ rules:
     verbs:
       - get
       - list
+      - watch
   - apiGroups:
       - ""
     resources:
@@ -234,6 +235,12 @@ rules:
       - leases
     verbs:
       - "*"
+  - apiGroups:
+      - admissionregistration.k8s.io
+    resources:
+      - mutatingwebhookconfigurations
+    verbs:
+      - '*'
   - apiGroups:
       - ""
     resources:
