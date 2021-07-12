@@ -1,0 +1,1391 @@
+#!/usr/bin/env bash
+set -CeEu
+set -o pipefail
+
+SCRIPT_NAME="${0##*/}"
+
+PROJECT_ID=""
+FLEET_PROJECT_ID=""
+CLUSTER_NAME=""
+CLUSTER_LOCATION=""
+
+DRY_RUN=0
+VERBOSE=0
+ENABLE_DEPENDENCIES=0
+UPGRADE_GATEWAYS=1
+CUSTOM_OVERLAY=""
+
+CONFIGURED=0
+MIGRATE=0
+PRE_MIGRATE=0
+INSTALL_ASM=0
+RELABEL=0
+FINALIZE=0
+ROLLBACK=0
+
+ASM_VERSION="1.10.2-asm.2"
+KPT_URL="https://github.com/GoogleCloudPlatform/anthos-service-mesh-packages"
+KPT_URL="${KPT_URL}.git/asm@release-1.10-asm"; readonly KPT_URL
+REVISION_LABEL="asm-1102-2"; readonly REVISION_LABEL
+ISTIO_FOLDER_NAME="istio-${ASM_VERSION}"; readonly ISTIO_FOLDER_NAME;
+ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
+PACKAGE_DIRECTORY="asm/istio"; readonly PACKAGE_DIRECTORY;
+NO_DEFAULT_INGRESS="${PACKAGE_DIRECTORY}/options/no-default-ingress.yaml"; readonly NO_DEFAULT_INGRESS;
+CNI_MANIFEST="${PACKAGE_DIRECTORY}/options/cni-gcp.yaml"; readonly CNI_MANIFEST;
+OPERATOR_MANIFEST="${PACKAGE_DIRECTORY}/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
+CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
+
+KUBECONFIG="$(mktemp)"
+AKUBECTL="$(which kubectl || true)"
+AKPT="$(which kpt || true)"
+
+GKE_CLUSTER_URI=""
+GCE_NETWORK_NAME=""
+OLD_LABEL=""
+GCLOUD_USER_OR_SA=""
+
+istioctl() {
+  "${ISTIOCTL_REL_PATH}" "${@}"
+}
+
+kubectl() {
+  "${AKUBECTL}" --kubeconfig "${KUBECONFIG}" "${@}"
+}
+
+run() {
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    info "Would have executed: ${*}"
+    return
+  fi
+
+  if [[ "${VERBOSE}" -eq 1 ]]; then
+    info ""
+    info "*****"
+    info "${*}"
+    info "*****"
+  fi
+
+  local RETVAL
+  { "${@}" 2> >(filter_spam >&2); RETVAL="$?"; } || true
+  info ""
+
+  return $RETVAL
+}
+
+filter_spam() {
+  grep -v \
+    -e "GKE Dataplane V2 has been certified" \
+    -e " finished successfully" \
+    -e "The service mesh feature is already enabled" \
+    -e "CustomResourceDefinition is deprecated" \
+    -e "has too few fields" \
+    -e "(unset)" \
+    -e "WARNING:" \
+    -e "ClusterRole is deprecated in" \
+    -e "Please take a few minutes" \
+    -e "deprecated and can be replaced"
+}
+
+retry() {
+  local MAX_TRIES; MAX_TRIES="${1}";
+  shift 1
+  for i in $(seq 0 "${MAX_TRIES}"); do
+    if [[ "${i}" -eq "${MAX_TRIES}" ]]; then
+      false
+      return
+    fi
+    { "${@}" && return 0; } || true
+    warn "Failed, retrying...($((i+1)) of ${MAX_TRIES})"
+    sleep 2
+  done
+  false
+}
+
+strip_trailing_commas() {
+  # shellcheck disable=SC2001
+  echo "${1}" | sed 's/,*$//g'
+}
+
+strip_last_char() {
+  echo "${1:0:$((${#1} - 1))}"
+}
+
+configure_kubectl(){
+  if [[ "${CONFIGURED}" -eq 1 ]]; then
+    return
+  fi
+
+  info "Fetching/writing GCP credentials to kubeconfig file..."
+  KUBECONFIG="${KUBECONFIG}" retry 2 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
+    --project="${PROJECT_ID}" \
+    --zone="${CLUSTER_LOCATION}"
+
+  info "Verifying connectivity (20s)..."
+  local RETVAL; RETVAL=0;
+  kubectl cluster-info --request-timeout='20s' 1>/dev/null 2>/dev/null || RETVAL=$?
+  if [[ "${RETVAL}" -ne 0 ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Couldn't connect to ${CLUSTER_NAME}.
+If this is a private cluster, verify that the correct firewall rules are applied.
+https://cloud.google.com/service-mesh/docs/gke-install-overview#requirements
+EOF
+  fi
+  CONFIGURED=1
+  info "kubeconfig set to ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
+}
+
+warn() {
+  info "[WARNING]: ${1}" >&2
+}
+
+error() {
+  info "[ERROR]: ${1}" >&2
+}
+
+info() {
+  echo "${SCRIPT_NAME}: ${1}" >&2
+}
+
+fatal() {
+  error "${1}"
+  exit 2
+}
+
+usage() {
+  cat << EOF
+usage: ${SCRIPT_NAME} <COMMAND> <OPTION/FLAG>...
+
+${SCRIPT_NAME} is a tool to migrate Istio 1.7+ installations to Anthos Service
+Mesh.
+
+COMMANDS:
+  migrate      Perform the entire migration in one step. Recommended for most
+               users.
+  pre-migrate  Validate the existing Istio installation as long as required
+               dependencies, and backs up necessary configuration. Can also
+               optionally enable dependencies on user's behalf.
+  intall-asm   Installs and configures Anthos Service Mesh into the specified
+               cluster.
+  relabel      Labels namespaces and restarts workloads so that Anthos Service
+               Mesh injects the sidecar proxies.
+  finalize     Validates the post-installation state and removes the Istio
+               control plane from the specified cluster.
+  rollback     Applies backed up configuration to the cluster and removes
+               Anthos Service Mesh components.
+
+OPTIONS:
+  -l|--cluster_location         <LOCATION>            The GCP location of the
+                                                      target cluster.
+  -n|--cluster_name             <NAME>                The name of the target
+                                                      cluster.
+  -p|--project_id               <ID>                  The GCP project ID.
+  --co|--custom-overlay         <FILE>                Optional. An IstioOperator
+                                                      spec in a yaml file.
+                                                      Passing this in will
+                                                      apply the customizations
+                                                      to ASM on installation.
+                                                      Gateways specified in the
+                                                      spec will be upgraded in
+                                                      place. Not compatible
+                                                      with --no-gateways.
+  -f|--fleet_id                 <FLEET_ID>            Optional. If the cluster
+                                                      is registered to a Fleet
+                                                      that's different from
+                                                      --project_id, specify
+                                                      it here. Most users will
+                                                      not need to use this.
+
+FLAGS:
+  --enable-dependencies          Allow this tool to enable dependencies on
+                                 your behalf.
+  --no-gateways                  Skip upgrading gateways.
+  --dry-run                      Any commands that would have side effects
+                                 are skipped and instead printed.
+  --verbose                      Print all commands before running.
+  -h|--help                      Show this message and exit.
+
+Use "${SCRIPT_NAME} <COMMAND> --help" for more information about a command.
+EOF
+}
+
+arg_required() {
+  if [[ ! "${2:-}" || "${2:0:1}" = '-' ]]; then
+    fatal "Option ${1} requires an argument."
+  fi
+}
+
+parse_args() {
+  # shellcheck disable=SC2064
+  trap "$(shopt -p nocasematch)" RETURN
+  shopt -s nocasematch
+
+  if [[ ! "${1:-}" ]]; then
+    error "${SCRIPT_NAME} requires a command."
+    usage
+    exit 2
+  fi
+
+  case "${1}" in
+    migrate) MIGRATE=1;;
+    pre-migrate) PRE_MIGRATE=1;;
+    relabel) RELABEL=1;;
+    install-asm) INSTALL_ASM=1;;
+    finalize) FINALIZE=1;;
+    rollback) ROLLBACK=1;;
+    -h | --help)
+      usage
+      exit
+      ;;
+    *)
+      error "Unknown command ${1}"
+      usage
+      exit 2
+      ;;
+  esac
+  shift 1
+
+  while [[ $# != 0 ]]; do
+    case "${1}" in
+      -l | --cluster_location | --cluster-location)
+        arg_required "${@}"
+        CLUSTER_LOCATION="${2}"
+        shift 2
+        ;;
+      -n | --cluster_name | --cluster-name)
+        arg_required "${@}"
+        CLUSTER_NAME="${2}"
+        shift 2
+        ;;
+      -p | --project_id | --project-id)
+        arg_required "${@}"
+        PROJECT_ID="${2}"
+        shift 2
+        ;;
+      -f | --fleet_id | --fleet-id)
+        arg_required "${@}"
+        FLEET_PROJECT_ID="${2}"
+        shift 2
+        ;;
+      --co | --custom_overlay | --custom-overlay)
+        arg_required "${@}"
+        CUSTOM_OVERLAY="${2}"
+        shift 2
+        ;;
+      --enable-dependencies | --enable_dependencies)
+        ENABLE_DEPENDENCIES=1
+        shift 1
+        ;;
+      --no-gateways | --no_gateways)
+        UPGRADE_GATEWAYS=0
+        shift 1
+        ;;
+      --dry-run | --dry_run)
+        DRY_RUN=1
+        shift 1
+        ;;
+      --verbose)
+        VERBOSE=1
+        shift 1
+        ;;
+      -h | --help)
+        usage
+        exit
+        ;;
+      *)
+        warn "Unknown option: ${1}"
+        usage
+        exit 2
+        ;;
+    esac
+  done
+
+}
+
+validate_args() {
+  local MISSING_ARGS; MISSING_ARGS=0
+  while read -r REQUIRED_ARG; do
+    if [[ -z "${!REQUIRED_ARG}" ]]; then
+      MISSING_ARGS=1
+      warn "Missing value for ${REQUIRED_ARG}"
+    fi
+    readonly "${REQUIRED_ARG}"
+  done <<EOF
+CLUSTER_LOCATION
+CLUSTER_NAME
+PROJECT_ID
+EOF
+
+  if [[ "${MISSING_ARGS}" -ne 0 ]]; then
+    fatal "Missing one or more required options."
+  fi
+
+  if [[ "${UPGRADE_GATEWAYS}" -eq 0 && -n "${CUSTOM_OVERLAY}" ]]; then
+    error "Using a custom overlay is not compatible with the --no-gateways flag."
+    fatal "Please re-run with either the overlay or the flag."
+  fi
+
+  if [[ -z "${FLEET_PROJECT_ID}" ]]; then
+    FLEET_PROJECT_ID="${PROJECT_ID}"
+  fi
+}
+
+validate_dependencies() {
+  validate_cli_dependencies
+  validate_project
+  FLEET_PROJECT_NUMBER="$(gcloud projects describe "${FLEET_PROJECT_ID}" \
+    --format="value(projectNumber)")"
+  populate_cluster_values
+}
+
+validate_cli_dependencies() {
+  local NOTFOUND; NOTFOUND="";
+  local EXITCODE; EXITCODE=0;
+
+  info "Checking installation tool dependencies..."
+  while read -r dependency; do
+    EXITCODE=0
+    hash "${dependency}" 2>/dev/null || EXITCODE=$?
+    if [[ "${EXITCODE}" -ne 0 ]]; then
+      NOTFOUND="${dependency},${NOTFOUND}"
+    fi
+  done <<EOF
+gcloud
+curl
+jq
+tr
+grep
+kubectl
+EOF
+
+  if [[ -n "${NOTFOUND}" ]]; then
+    NOTFOUND="$(strip_last_char "${NOTFOUND}")"
+    for dep in $(echo "${NOTFOUND}" | tr ' ' '\n'); do
+      warn "Dependency not found: ${dep}"
+    done
+    fatal "One or more dependencies were not found. Please install them and retry."
+  fi
+
+  # shellcheck disable=SC2064
+  trap "$(shopt -p nocasematch)" RETURN
+  shopt -s nocasematch
+  if [[ "$(uname -m)" != "x86_64" ]]; then
+    fatal "Installation is only supported on x86_64."
+  fi
+}
+
+validate_project() {
+  local RESULT; RESULT=""
+
+  info "Checking for ${PROJECT_ID}..."
+  RESULT=$(gcloud projects list \
+    --filter="project_id=${PROJECT_ID}" \
+    --format="value(project_id)" \
+    || true)
+
+  if [[ -z "${RESULT}" ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF
+Unable to find project ${PROJECT_ID}. Please verify the spelling and try
+again. To see a list of your projects, run:
+  gcloud projects list --format='value(project_id)'
+EOF
+  fi
+
+  if [[ "${PROJECT_ID}" == "${FLEET_PROJECT_ID}" ]]; then return; fi
+
+  info "Checking for ${FLEET_PROJECT_ID}..."
+  RESULT=$(gcloud projects list \
+    --filter="project_id=${FLEET_PROJECT_ID}" \
+    --format="value(project_id)" \
+    || true)
+
+  if [[ -z "${RESULT}" ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF
+Unable to find project ${FLEET_PROJECT_ID}. Please verify the spelling and try
+again. To see a list of your projects, run:
+  gcloud projects list --format='value(project_id)'
+EOF
+  fi
+}
+
+validate_cluster_name() {
+  local RESULT; RESULT=""
+
+  info "Confirming cluster information for ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
+  RESULT="$(gcloud container clusters list \
+    --project="${PROJECT_ID}" \
+    --filter="name = ${CLUSTER_NAME} AND location = ${CLUSTER_LOCATION}" \
+    --format="value(name)" || true)"
+  if [[ -z "${RESULT}" ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Unable to find cluster ${CLUSTER_LOCATION}/${CLUSTER_NAME}.
+Please verify the spelling and try again. To see a list of your clusters, in
+this project, run:
+  gcloud container clusters list --format='value(name,zone)' --project="${PROJECT_ID}"
+EOF
+  fi
+}
+
+is_cluster_registered() {
+  local LIST
+  LIST="$(gcloud container hub memberships list --project "${FLEET_PROJECT_ID}" \
+    --format=json | grep "${GKE_CLUSTER_URI}")"
+  if [[ -z "${LIST}" ]]; then
+    false
+    return
+  fi
+}
+
+is_membership_crd_installed() {
+  if ! kubectl api-resources --api-group=hub.gke.io | grep -q memberships; then
+    false
+    return
+  fi
+
+  if [[ "$(kubectl get memberships.hub.gke.io -ojsonpath="{..metadata.name}" \
+    | grep -w -c membership || true)" -eq 0 ]]; then
+    false
+  fi
+}
+
+exit_if_service_mesh_feature_not_enabled() {
+  if ! is_service_mesh_feature_enabled; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+The service mesh feature is not enabled on Fleet ${FLEET_PROJECT_ID}.
+Please run the script with the '--enable-dependencies' flag to allow the
+script to enable it on your behalf.
+EOF
+  fi
+}
+
+is_service_mesh_feature_enabled() {
+  local RESPONSE
+  RESPONSE="$(curl -s -H "X-Goog-User-Project: ${FLEET_PROJECT_ID}"  \
+    "https://gkehub.googleapis.com/v1alpha1/projects/${FLEET_PROJECT_ID}/locations/global/features/servicemesh" \
+    -K <(auth_header "$(get_auth_token)"))"
+
+  if [[ "$(echo "${RESPONSE}" | jq -r '.featureState.lifecycleState')" != "ENABLED" ]]; then
+    false
+  fi
+}
+
+
+enable_service_mesh_feature() {
+  info "Enabling the service mesh feature..."
+
+  local TOKEN
+  TOKEN="$(retry 2 gcloud \
+    --project="${FLEET_PROJECT_ID}" auth print-access-token)"
+
+  local RESPONSE
+  RESPONSE="$(run curl -s -H "X-Goog-User-Project: ${FLEET_PROJECT_ID}"  \
+    "https://gkehub.googleapis.com/v1alpha1/projects/${FLEET_PROJECT_ID}/locations/global/features/servicemesh" \
+    -H @- <<EOF
+Authorization: Bearer ${TOKEN}
+EOF
+)"
+
+  if [[ "${DRY_RUN}" -eq 1 ]]; then return; fi
+
+  if [[ "$(echo "${RESPONSE}" | jq -r '.featureState.lifecycleState')" == "ENABLED" ]]; then
+    info "The service mesh feature is already enabled."
+  elif [[ "$(echo "${RESPONSE}" | jq -r '.error.code')" -eq 404 ]]; then
+    run curl -s -H "Content-Type: application/json" \
+      -XPOST "https://gkehub.googleapis.com/v1alpha1/projects/${FLEET_PROJECT_ID}/locations/global/features?feature_id=servicemesh"\
+      -d '{servicemesh_feature_spec: {}}' \
+      -H @- <<EOF
+Authorization: Bearer ${TOKEN}
+EOF
+  elif [[ "$(echo "${RESPONSE}" | jq -r '.error.code')" -eq 403 ]]; then
+    local ERR_MSG
+    ERR_MSG="$(echo "${RESPONSE}" | jq -r '.error.message')"
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF
+Permission was denied when enabling service mesh feature.
+Error message:
+${ERR_MSG}
+EOF
+  else
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF
+Unknown message was returned.
+${RESPONSE}
+EOF
+  fi
+
+  unset TOKEN
+}
+
+needs_kpt() {
+  if [[ -x "./kpt" ]]; then
+    AKPT="./kpt"
+    false
+    return
+  fi
+  if [[ -z "${AKPT}" ]]; then return; fi
+  KPT_VER="$(kpt version)"
+  if [[ "${KPT_VER:0:1}" != "0" ]]; then return; fi
+  false
+}
+
+download_kpt() {
+  if ! needs_kpt; then return; fi
+
+  local OS
+
+  case "$(uname)" in
+    Linux ) OS="linux_amd64";;
+    Darwin) OS="darwin_arm64";;
+    *     ) fatal "$(uname) is not a supported OS.";;
+  esac
+
+  local KPT_TGZ
+  KPT_TGZ="https://github.com/GoogleContainerTools/kpt/releases/download/v0.39.3/kpt_${OS}-0.39.3.tar.gz"
+
+  info "Downloading kpt.."
+  curl -L "${KPT_TGZ}" | tar xz
+  AKPT="./kpt"
+}
+
+necessary_files_exist() {
+  if [[ ! -f "./${ISTIOCTL_REL_PATH}" ]]; then
+    false
+    return
+  elif [[ ! -f "./${OPERATOR_MANIFEST}" ]]; then
+    false
+    return
+  fi
+  true
+}
+
+download_asm() {
+  download_kpt
+  if necessary_files_exist; then return; fi
+  local OS
+
+  case "$(uname)" in
+    Linux ) OS="linux-amd64";;
+    Darwin) OS="osx";;
+    *     ) fatal "$(uname) is not a supported OS.";;
+  esac
+
+  info "Downloading ASM.."
+  local TARBALL; TARBALL="istio-${ASM_VERSION}-${OS}.tar.gz"
+  curl -L "https://storage.googleapis.com/gke-release/asm/${TARBALL}" \
+    | tar xz
+  info "Downloaded to ${ISTIO_FOLDER_NAME}"
+
+  info "Downloading ASM kpt package to the 'asm' directory..."
+  retry 3 kpt pkg get --auto-set=false "${KPT_URL}" asm
+}
+
+populate_cluster_values() {
+  if [[ -z "${GKE_CLUSTER_URI}" && -z "${GCE_NETWORK_NAME}" ]]; then
+    local CLUSTER_DATA
+    CLUSTER_DATA="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
+      --zone="${CLUSTER_LOCATION}" \
+      --project="${PROJECT_ID}" \
+      --format='value(selfLink, network)')"
+    read -r GKE_CLUSTER_URI GCE_NETWORK_NAME <<EOF
+${CLUSTER_DATA}
+EOF
+
+    GCE_NETWORK_NAME="${PROJECT_ID}-${GCE_NETWORK_NAME}"
+    readonly GKE_CLUSTER_URI; readonly GCE_NETWORK_NAME;
+  fi
+}
+
+pre_migrate() {
+  validate_cluster
+  backup_config
+  if [[ "${ENABLE_DEPENDENCIES}" -eq 1 ]]; then
+    enable_dependencies
+  else
+    check_dependencies
+  fi
+  info "Finished pre-migration!"
+}
+
+backup_config() {
+  if [[ -d ./configuration_backup ]]; then
+    if [[ -d ./configuration_backup.old ]]; then rm -r ./configuration_backup.old; fi
+
+    mv ./configuration_backup configuration_backup.old
+  fi
+  mkdir configuration_backup
+  current_label > configuration_backup/label
+  for label in $(current_label); do
+    kubectl get ns -l "${label}" -oname >> configuration_backup/labeled_namespaces
+  done
+  kubectl apply view-last-applied deployments \
+    -n istio-system -l app=istiod > configuration_backup/istiod_deployment
+  kubectl apply view-last-applied services \
+    -n istio-system -l app=istio-ingressgateway > configuration_backup/ingress_service
+  kubectl apply view-last-applied deployments \
+    -n istio-system -l app=istio-ingressgateway > configuration_backup/ingress_deployment
+  if [[ -n "${CUSTOM_OVERLAY}" ]]; then
+    cp "${CUSTOM_OVERLAY}" configuration_backup/iop_backup
+  fi
+}
+
+current_label() {
+  if [[ -s configuration_backup/label ]]; then
+    cat configuration_backup/label
+    return
+  fi
+
+  local OLD_LABEL
+  ALL_LABELS="$(kubectl get ns -ojsonpath='{range .items[*]}{.metadata.labels}')"
+  if grep -q '.*istio-injection.*enabled.*' <<< "${ALL_LABELS}"; then
+    OLD_LABEL="istio-injection=enabled"
+  elif grep -q '.*istio.io/rev.*' <<< "${ALL_LABELS}"; then
+    OLD_LABEL="$(jq <<< "${ALL_LABELS}" | \
+      grep istio.io/rev | sed 's/^.*: "\(.*\)",$/istio.io\/rev=\1/')"
+  fi
+  echo "${OLD_LABEL}"
+}
+
+enable_dependencies() {
+  enable_gcloud_apis
+  register_cluster
+  enable_service_mesh_feature
+  enable_stackdriver_kubernetes
+  add_cluster_labels
+  bind_user_to_cluster_admin
+  init_meshconfig
+}
+
+required_apis() {
+    cat << EOF
+gkehub.googleapis.com
+stackdriver.googleapis.com
+meshconfig.googleapis.com
+meshca.googleapis.com
+EOF
+}
+
+enable_gcloud_apis(){
+  info "Enabling required APIs..."
+  # shellcheck disable=SC2046
+  retry 3 run gcloud services enable --project="${PROJECT_ID}" $(required_apis | tr '\n' ' ')
+  info "APIs enabled."
+}
+
+get_enabled_apis() {
+  local OUTPUT
+  OUTPUT="$(retry 3 gcloud services list \
+    --enabled \
+    --format='get(config.name)' \
+    --project="${PROJECT_ID}")"
+  echo "${OUTPUT}" | tr '\n' ','
+}
+
+find_missing_strings() {
+  local NEEDLES; NEEDLES="${1}";
+  local HAYSTACK; HAYSTACK="${2}";
+  local NOTFOUND; NOTFOUND="";
+
+  while read -r needle; do
+    EXITCODE=0
+    grep -q "${needle}" <<EOF || EXITCODE=$?
+${HAYSTACK}
+EOF
+    if [[ "${EXITCODE}" -ne 0 ]]; then
+      NOTFOUND="${needle},${NOTFOUND}"
+    fi
+  done <<EOF
+${NEEDLES}
+EOF
+
+  if [[ -n "${NOTFOUND}" ]]; then NOTFOUND="$(strip_trailing_commas "${NOTFOUND}")"; fi
+  echo "${NOTFOUND}"
+}
+
+add_cluster_labels(){
+  local LABELS; LABELS="$(get_cluster_labels)";
+
+  local WANT; WANT="$(mesh_id_label; echo "asmv=cm110sl1")";
+
+  local NOTFOUND; NOTFOUND="$(find_missing_strings "${WANT}" "${LABELS}")"
+
+  if [[ -z "${NOTFOUND}" ]]; then return 0; fi
+
+  if [[ -n "${LABELS}" ]]; then
+    LABELS="${LABELS},"
+  fi
+  LABELS="${LABELS}${NOTFOUND}"
+
+  info "Adding labels to ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
+  retry 2 gcloud container clusters update "${CLUSTER_NAME}" \
+    --project="${PROJECT_ID}" \
+    --zone="${CLUSTER_LOCATION}" \
+    --update-labels="${LABELS}"
+  info "Labels added."
+}
+
+exit_if_cluster_unlabeled() {
+  local LABELS; LABELS="$(get_cluster_labels)";
+  local REQUIRED; REQUIRED="$(mesh_id_label)";
+  local NOTFOUND; NOTFOUND="$(find_missing_strings "${REQUIRED}" "${LABELS}")"
+
+  if [[ -n "${NOTFOUND}" ]]; then
+    for label in $(echo "${NOTFOUND}" | tr ',' '\n'); do
+      warn "Cluster label not found - ${label}"
+    done
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+One or more required cluster labels were not found. Please label them and retry,
+or run the script with the '--enable-dependencies' flag to allow the script
+to enable them on your behalf.
+EOF
+  fi
+}
+
+mesh_id_label() {
+  echo "mesh_id=proj-${FLEET_PROJECT_NUMBER}"
+}
+
+get_cluster_labels() {
+  local LABELS
+  LABELS="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
+    --zone="${CLUSTER_LOCATION}" \
+    --project="${PROJECT_ID}" \
+    --format='value(resourceLabels)[delimiter=","]')";
+  echo "${LABELS}"
+}
+
+generate_membership_name() {
+  local MEMBERSHIP_NAME
+  MEMBERSHIP_NAME="${CLUSTER_NAME}"
+  if [[ "$(retry 2 gcloud container hub memberships list --format='value(name)' \
+   --project "${PROJECT_ID}" | grep -c "^${MEMBERSHIP_NAME}$" || true)" -ne 0 ]]; then
+    MEMBERSHIP_NAME="${CLUSTER_NAME}-${PROJECT_ID}-${CLUSTER_LOCATION}"
+  fi
+  if [[ "${#MEMBERSHIP_NAME}" -gt 63 ]] || [[ "$(retry 2 gcloud container hub \
+   memberships list --format='value(name)' --project "${PROJECT_ID}" | grep -c \
+   "^${MEMBERSHIP_NAME}$" || true)" -ne 0 ]]; then
+    local RAND
+    RAND="$(tr -dc "a-z0-9" </dev/urandom | head -c8 || true)"
+    MEMBERSHIP_NAME="${CLUSTER_NAME:0:54}-${RAND}"
+  fi
+  echo "${MEMBERSHIP_NAME}"
+}
+
+register_cluster() {
+  if is_cluster_registered; then return; fi
+
+  enable_workload_identity
+
+  local MEMBERSHIP_NAME
+  MEMBERSHIP_NAME="$(generate_membership_name)"
+  info "Registering the cluster as ${MEMBERSHIP_NAME}..."
+  retry 2 run gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
+    --project="${PROJECT_ID}" \
+    --gke-uri="${GKE_CLUSTER_URI}" \
+    --enable-workload-identity
+  info "Cluster registered."
+}
+
+exit_if_cluster_unregistered() {
+  if ! is_cluster_registered; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Cluster is not registered to a Fleet. Please
+register the cluster and retry, or run the script with the
+'--enable-dependencies' flag to allow the script to register
+to the current project's Fleet on your behalf.
+EOF
+  fi
+}
+
+is_workload_identity_enabled() {
+  local ENABLED
+  ENABLED="$(gcloud container clusters describe \
+    --project="${PROJECT_ID}" \
+    --region "${CLUSTER_LOCATION}" \
+    "${CLUSTER_NAME}" \
+    --format=json | \
+    jq .workloadIdentityConfig)"
+
+  if [[ "${ENABLED}" = 'null' ]]; then false; fi
+}
+
+enable_workload_identity(){
+  if is_workload_identity_enabled; then return; fi
+  local WORKLOAD_POOL; WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"
+  info "Enabling Workload Identity on ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
+  info "(This could take awhile, up to 10 minutes)"
+  retry 2 run gcloud container clusters update "${CLUSTER_NAME}" \
+    --project="${PROJECT_ID}" \
+    --zone="${CLUSTER_LOCATION}" \
+    --workload-pool="${WORKLOAD_POOL}"
+  info "Workload Identity enabled."
+}
+
+exit_if_no_workload_identity() {
+  if ! is_workload_identity_enabled; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Workload identity is not enabled on ${CLUSTER_NAME}. Please enable it and
+retry, or run the script with the '--enable-dependencies' flag to allow
+the script to enable it on your behalf.
+EOF
+  fi
+}
+
+is_stackdriver_enabled() {
+  local ENABLED
+  ENABLED="$(gcloud container clusters describe \
+    --project="${PROJECT_ID}" \
+    --region "${CLUSTER_LOCATION}" \
+    "${CLUSTER_NAME}" \
+    --format=json | \
+    jq '.
+    | [
+    select(
+      .loggingService == "logging.googleapis.com/kubernetes"
+      and .monitoringService == "monitoring.googleapis.com/kubernetes")
+      ] | length')"
+
+  if [[ "${ENABLED}" -lt 1 ]]; then false; fi
+}
+
+enable_stackdriver_kubernetes(){
+  info "Enabling Stackdriver on ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
+  retry 2 run gcloud container clusters update "${CLUSTER_NAME}" \
+    --project="${PROJECT_ID}" \
+    --zone="${CLUSTER_LOCATION}" \
+    --enable-stackdriver-kubernetes
+  info "Stackdriver enabled."
+}
+
+exit_if_stackdriver_not_enabled() {
+  if ! is_stackdriver_enabled; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Cloud Operations (Stackdriver)  is not enabled on ${CLUSTER_NAME}.
+Please enable it and retry, or run the script with the
+'--enable-dependencies' flag to allow the script to enable it on your behalf.
+EOF
+  fi
+}
+
+iam_user() {
+  if [[ -n "${GCLOUD_USER_OR_SA}" ]]; then
+    echo "${GCLOUD_USER_OR_SA}"
+    return
+  fi
+
+  info "Getting account information..."
+  local ACCOUNT_NAME
+  ACCOUNT_NAME="$(retry 3 gcloud auth list \
+    --project="${PROJECT_ID}" \
+    --filter="status:ACTIVE" \
+    --format="value(account)")"
+  if [[ -z "${ACCOUNT_NAME}" ]]; then
+    fatal "Failed to get account name from gcloud. Please authorize and re-try installation."
+  fi
+
+  local ACCOUNT_TYPE
+  ACCOUNT_TYPE="user"
+  if [[ "${ACCOUNT_NAME}" = *.gserviceaccount.com ]]; then
+    ACCOUNT_TYPE="serviceAccount"
+  fi
+
+  MAYBE_IMPERSONATE="$(gcloud config get-value auth/impersonate_service_account 2>/dev/null)"
+
+  if [[ -n "${MAYBE_IMPERSONATE}" ]]; then
+    ACCOUNT_NAME="${MAYBE_IMPERSONATE}"
+    ACCOUNT_TYPE="serviceAccount"
+    warn "Service account impersonation currently configured to impersonate '${ACCOUNT_NAME}'."
+  fi
+
+  GCLOUD_USER_OR_SA="${ACCOUNT_TYPE}:${ACCOUNT_NAME}"
+
+  echo "${GCLOUD_USER_OR_SA}"
+}
+
+is_user_cluster_admin() {
+  info "Checking for cluster admin..."
+  local GCLOUD_USER; GCLOUD_USER="$(gcloud config get-value core/account)"
+  local IAM_USER; IAM_USER="$(iam_user)"
+  local ROLES
+  ROLES="$(\
+    kubectl get clusterrolebinding \
+    --all-namespaces \
+    -o jsonpath='{range .items[?(@.subjects[0].name=="'"${GCLOUD_USER}"'")]}[{.roleRef.name}]{end}'\
+    2>/dev/null)"
+  if echo "${ROLES}" | grep -q cluster-admin; then return; fi
+
+  ROLES="$(gcloud projects \
+    get-iam-policy "${PROJECT_ID}" \
+    --flatten='bindings[].members' \
+    --filter="bindings.members:${IAM_USER}" \
+    --format='value(bindings.role)' 2>/dev/null)"
+  if echo "${ROLES}" | grep -q roles/container.admin; then return; fi
+  if echo "${ROLES}" | grep -q roles/owner; then return; fi
+
+  info "No admin role found for current user."
+  false
+}
+
+bind_user_to_cluster_admin(){
+  info "Querying for core/account..."
+  local GCLOUD_USER; GCLOUD_USER="$(gcloud config get-value core/account)"
+  info "Binding ${GCLOUD_USER} to cluster admin role..."
+  local PREFIX; PREFIX="$(echo "${GCLOUD_USER}" | cut -f 1 -d @)"
+  local YAML; YAML="$(retry 2 run kubectl create \
+    clusterrolebinding "${PREFIX}-cluster-admin-binding" \
+    --clusterrole=cluster-admin \
+    --user="${GCLOUD_USER}" \
+    --dry-run -o yaml)"
+  retry 3 run kubectl apply -f - <<EOF
+${YAML}
+EOF
+  info "Successfully bound to cluster admin role."
+}
+
+exit_if_not_cluster_admin() {
+  if ! is_user_cluster_admin; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Current user must have the cluster-admin role on ${CLUSTER_NAME}.
+Please add the cluster role binding and retry, or run the script with the
+'--enable-dependencies' flag to allow the script to enable it on your behalf.
+EOF
+  fi
+}
+
+check_dependencies() {
+  exit_if_apis_not_enabled
+  exit_if_cluster_unregistered
+  exit_if_service_mesh_feature_not_enabled
+  exit_if_no_workload_identity
+  exit_if_stackdriver_not_enabled
+  exit_if_cluster_unlabeled
+  exit_if_not_cluster_admin
+}
+
+exit_if_apis_not_enabled() {
+  local ENABLED; ENABLED="$(get_enabled_apis)";
+  local REQUIRED; REQUIRED="$(required_apis)";
+  local NOTFOUND; NOTFOUND="";
+
+  info "Checking required APIs..."
+  NOTFOUND="$(find_missing_strings "${REQUIRED}" "${ENABLED}")"
+
+  if [[ -n "${NOTFOUND}" ]]; then
+    for api in $(echo "${NOTFOUND}" | tr ' ' '\n'); do
+      warn "API not enabled - ${api}"
+    done
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+One or more APIs are not enabled. Please enable them and retry, or run the
+script with the '--enable-dependencies' flag to allow the script to enable them on
+your behalf.
+EOF
+  fi
+}
+
+validate_cluster() {
+  validate_cluster_name
+  validate_node_pool
+  validate_istio_version
+}
+
+list_valid_pools() {
+  gcloud container node-pools list \
+    --project="${PROJECT_ID}" \
+    --region "${CLUSTER_LOCATION}" \
+    --cluster "${CLUSTER_NAME}" \
+    --filter "$(valid_pool_query "${1}")"\
+    --format=json
+}
+
+valid_pool_query() {
+  cat <<EOF | tr '\n' ' '
+    config.machineType.split(sep="-").slice(-1:) >= $1
+EOF
+}
+
+validate_node_pool() {
+  local MACHINE_CPU_REQ; MACHINE_CPU_REQ=4; readonly MACHINE_CPU_REQ;
+  local TOTAL_CPU_REQ; TOTAL_CPU_REQ=8; readonly TOTAL_CPU_REQ;
+
+  info "Confirming node pool requirements for ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
+  local ACTUAL_CPU
+  ACTUAL_CPU="$(list_valid_pools "${MACHINE_CPU_REQ}" | \
+      jq '.[] |
+        (if .autoscaling.enabled then .autoscaling.maxNodeCount else .initialNodeCount end)
+        *
+        (.config.machineType / "-" | .[-1] | try tonumber catch 1)
+        * (.locations | length)
+      ' 2>/dev/null)" || true
+
+  local MAX_CPU; MAX_CPU=0;
+  for i in ${ACTUAL_CPU}; do
+    MAX_CPU="$(( i > MAX_CPU ? i : MAX_CPU))"
+  done
+
+  if [[ "$MAX_CPU" -lt "$TOTAL_CPU_REQ" ]]; then
+    { read -r -d '' MSG; warn_pause "${MSG}"; } <<EOF || true
+
+ASM requires you to have at least ${TOTAL_CPU_REQ} vCPUs in node pools whose
+machine type is at least ${MACHINE_CPU_REQ} vCPUs.
+${CLUSTER_LOCATION}/${CLUSTER_NAME} does not meet this requirement. ASM
+may not function as expected.
+
+EOF
+  fi
+}
+
+validate_istio_version() {
+  info "Checking existing Istio version(s)..."
+  local VERSION_OUTPUT; VERSION_OUTPUT="$(retry 2 istioctl version -o json)"
+  if [[ -z "${VERSION_OUTPUT}" ]]; then
+    fatal "Couldn't validate existing Istio versions."
+  fi
+  local FOUND_INVALID_VERSION; FOUND_INVALID_VERSION=0
+  for version in $(echo "${VERSION_OUTPUT}" | jq -r '.meshVersion[].Info.version' -r); do
+    if [[ "$version" =~ ^1.7 || "$version" =~ ^1.8 || "$version" =~ ^1.9 || "$version" =~ ^1.10 ]]; then
+      info "  $version"
+    else
+      info "  $version (not supported)"
+      FOUND_INVALID_VERSION=1
+    fi
+  done
+  if [[ "$FOUND_INVALID_VERSION" -eq 1 ]]; then
+    fatal "Migration requires existing control planes at least version 1.7."
+  fi
+  info "No version issues found."
+}
+
+ensure_backup() {
+  if ! [[ -d ./configuration_backup ]]; then
+    fatal "Configuration backup not found, please run pre-migration step and retry installation."
+  fi
+}
+
+configure_package() {
+  info "Configuring kpt package..."
+
+  run kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
+  run kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
+  run kpt cfg set asm gcloud.project.environProjectNumber "${FLEET_PROJECT_NUMBER}"
+  run kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
+  run kpt cfg set asm gcloud.compute.network "${GCE_NETWORK_NAME}"
+  run kpt cfg set asm anthos.servicemesh.rev "${REVISION_LABEL}"
+  run kpt cfg set asm anthos.servicemesh.tag "${ASM_VERSION}"
+  run kpt cfg set asm anthos.servicemesh.hubTrustDomain "${FLEET_PROJECT_ID}.svc.id.goog"
+  HUB_IDP_URL="$(kubectl get memberships.hub.gke.io membership -o=jsonpath='{.spec.identity_provider}' || true)"
+  run kpt cfg set asm anthos.servicemesh.hub-idp-url "${HUB_IDP_URL}"
+  run kpt cfg set asm anthos.servicemesh.trustDomainAliases \
+    "${FLEET_PROJECT_ID}.svc.id.goog" "${FLEET_PROJECT_ID}.hub.id.goog"
+  info "Configured."
+}
+
+install_asm() {
+  local PARAMS
+  PARAMS="-f ${OPERATOR_MANIFEST}"
+  PARAMS="${PARAMS} -f ${CNI_MANIFEST}"
+  if [[ -n "${CUSTOM_OVERLAY}" ]]; then
+    PARAMS="${PARAMS} -f ${CUSTOM_OVERLAY}"
+  elif [[ "${UPGRADE_GATEWAYS}" -eq 0 ]]; then
+    PARAMS="${PARAMS} -f ${NO_DEFAULT_INGRESS}"
+  fi
+  PARAMS="${PARAMS} -c ${KUBECONFIG}"
+  PARAMS="${PARAMS} --set revision=${REVISION_LABEL}"
+  PARAMS="${PARAMS} --skip-confirmation"
+
+  info "Installing ASM control plane..."
+  # shellcheck disable=SC2086
+  retry 2 run istioctl install $PARAMS
+
+  # Prevent the stderr buffer from ^ messing up the terminal output below
+  sleep 1
+
+  local RAW_YAML; RAW_YAML="${REVISION_LABEL}-manifest-raw.yaml"
+  local EXPANDED_YAML; EXPANDED_YAML="${REVISION_LABEL}-manifest-expanded.yaml"
+
+  PARAMS="-f ${OPERATOR_MANIFEST}"
+  if [[ "${UPGRADE_GATEWAYS}" -eq 0 ]]; then
+    PARAMS="${PARAMS} -f ${NO_DEFAULT_INGRESS}"
+  fi
+
+  # shellcheck disable=SC2086
+  run istioctl profile dump ${PARAMS} >| "${RAW_YAML}"
+  run istioctl manifest generate \
+    <"${RAW_YAML}" \
+    >|"${EXPANDED_YAML}"
+
+  run kubectl apply -f "${CANONICAL_CONTROLLER_MANIFEST}"
+  retry 2 run kubectl wait --for=condition=available --timeout=600s \
+      deployment/canonical-service-controller-manager -n asm-system
+
+  info ""
+  info "*******"
+  info "Control plane installation complete!"
+}
+
+init_meshconfig() {
+  if [[ "${FLEET_PROJECT_ID}" != "${PROJECT_ID}" ]]; then return; fi
+
+  info "Initializing meshconfig API..."
+  run curl --request POST --fail \
+  --data '' -o /dev/null \
+  "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
+  -K <(auth_header "$(get_auth_token)")
+}
+
+get_auth_token() {
+  local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
+  echo "${TOKEN}"
+}
+
+auth_header() {
+  local TOKEN; TOKEN="${1}"
+  echo "--header \"Authorization: Bearer ${TOKEN}\""
+}
+
+relabel_for_asm() {
+  echo "******"
+  info "Installation of Anthos Service Mesh has completed. Migration will continue"
+  info "by re-labeling and restarting workloads in the following namespaces:"
+  while read -r NS; do
+    info "    ${NS}"
+  done <<EOF
+$(cat configuration_backup/labeled_namespaces)
+EOF
+
+  if [[ "${DRY_RUN}" -eq 0 ]]; then
+    info ""
+    local response
+    read -rp "Continue with migration? (Y/n)" response
+
+    case "$response" in
+      Y | y | "" )
+        true
+        ;;
+      *     )
+        info "Migration canceled. You can re-run migration via this tool at any time."
+        info "Migration can also be completed manually by labeling namespaces with"
+        info "${REVISION_LABEL} and restarting workloads, then using this tool to finalize."
+        exit 2
+      ;;
+    esac
+  else
+    info "Would have paused here to confirm before relabelling."
+    info "For --dry-run, continuing automatically."
+  fi
+
+  relabel_namespaces_restart_workloads "istio.io/rev=${REVISION_LABEL}"
+}
+
+relabel_for_rollback() {
+  echo "******"
+  info "Rolling back migration by re-labeling and restarting workloads"
+  info "in the following namespaces:"
+  while read -r NS; do
+    info "    ${NS}"
+  done <<EOF
+$(cat configuration_backup/labeled_namespaces)
+EOF
+
+  info ""
+  local response
+  read -rp "Continue with rollback? (Y/n)" response
+
+  case "$response" in
+    Y | y | "" )
+      true
+      ;;
+    *     )
+      info "Rollback canceled."
+      exit 2
+    ;;
+  esac
+
+  relabel_namespaces_restart_workloads "$(current_label)"
+}
+
+relabel_namespaces_restart_workloads() {
+  local NEW_REV; NEW_REV="${1}"
+  while read -r NS; do
+    info "Re-labeling ${NS}..."
+    if [[ "${NEW_REV}" == "istio-injection=enabled" ]]; then
+      run kubectl label "${NS}" istio-injection=enabled istio.io/rev- --overwrite
+    else
+      run kubectl label "${NS}" istio-injection- "${NEW_REV}" --overwrite
+    fi
+  done <<EOF
+$(cat configuration_backup/labeled_namespaces)
+EOF
+
+  while read -r NS; do
+    info "Restarting workloads in ${NS} and waiting for them to become available (max 5 min)..."
+    run kubectl -n "${NS/namespace\//}" rollout restart deployment
+
+    local REMAINING
+    REMAINING="$(kubectl get deployment -oname -n "${NS/namespace\//}")"
+
+    while IFS= read -r deployment; do
+      if ! kubectl rollout status -n "${NS/namespace\//}" "${deployment}" -w --timeout=5m; then
+        warn "Deployment ${deployment} not ready after 5 minutes, skipping."
+      fi
+    done <<< "${REMAINING}"
+
+  done <<EOF
+$(cat configuration_backup/labeled_namespaces)
+EOF
+
+  info "*******"
+  info "Finished restarting workloads!"
+}
+
+finalize() {
+  if [[ "${DRY_RUN}" -eq 0 ]]; then
+    check_proxies
+  else
+    info "Would have checked to see if all sidecars are using ASM."
+    info "For --dry-run, continuing as if all sidecars were updated correctly."
+  fi
+
+  local response
+  read -rp "Remove previous control plane resources? (Y/n)" response
+
+  case "$response" in
+    Y | y | "" )
+      remove_istio
+      ;;
+    *     )
+      info "Finalize canceled. Finalize can be run at any time via the tool."
+      exit 2
+    ;;
+  esac
+
+  if [[ "$(cat configuration_backup/label)" == "istio-injection=enabled" ]]; then
+    set_default_tag
+  fi
+}
+
+set_default_tag() {
+  info "Setting ${REVISION_LABEL} as the target for \"istio-injection=enabled\"..."
+  kubectl patch mutatingwebhookconfigurations istio-sidecar-injector \
+    --type=json -p='[{"op": "replace", "path": "/webhooks"}]'
+  run istioctl x revision tag \
+    set default --revision="${REVISION_LABEL}" \
+    --overwrite
+}
+
+check_proxies() {
+  sleep 10
+  local DP_OUTPUT
+  DP_OUTPUT="$(istioctl version -ojson | jq '.dataPlaneVersion')"
+  local VERSIONS
+  VERSIONS="$(echo "${DP_OUTPUT}" | \
+    grep IstioVersion | sort -u | \
+    sed 's/^.*: *"\(.*\)"$/\1/g' || true)"
+
+  if [[ "${VERSIONS}" == "${ASM_VERSION}" ]]; then
+    info "All proxies running ASM!"
+    return
+  fi
+
+  local PODS
+  PODS="$(echo "${DP_OUTPUT}" | \
+    jq '.[] | select(.IstioVersion !="'"${ASM_VERSION}"'")')"
+
+  warn "Found unexpected data plane versions:"
+  warn "$(echo "${VERSIONS}" | grep -v "${ASM_VERSION}")"
+  if [[ "${VERBOSE}" -eq 1 ]]; then
+    warn "On these pods:"
+    warn "${PODS}"
+  fi
+  warn "This may indicate that workloads are still using the previous"
+  warn "control plane. This is expected if there are gateways other"
+  warn "than the default ingress gateway. It might also happen if some"
+  warn "old pods are still being destroyed. You can retry after a short"
+  warn "pause to give more time for everything to get reconciled."
+
+  local response
+  read -rp "Continue anyway? (y/N/r)" response
+
+  case "$response" in
+    Y | y )
+      return
+      ;;
+    R | r )
+      check_proxies
+      return
+      ;;
+    *     )
+      info "Finalize canceled. Finalize can be run at any time via the tool."
+      exit 2
+    ;;
+  esac
+}
+
+remove_istio() {
+  run kubectl delete ns istio-operator --ignore-not-found=true
+  run kubectl delete -f configuration_backup/istiod_deployment --ignore-not-found=true
+
+  info "****"
+  info "Previous Istio control plane has been removed."
+}
+
+rollback() {
+  apply_backup
+  remove_asm
+}
+
+apply_backup() {
+  relabel_for_rollback
+
+  run kubectl apply -f configuration_backup/ingress_service
+  run kubectl apply -f configuration_backup/ingress_deployment
+}
+
+remove_asm() {
+  run istioctl x uninstall --revision "${REVISION_LABEL}" -y
+  run kubectl delete ns asm-system
+
+  info "****"
+  info "Anthos Service Mesh has been uninstalled from the cluster."
+}
+
+main() {
+  parse_args "${@}"
+  validate_args
+
+  validate_dependencies
+
+  if [[ "${MIGRATE}" -eq 1 ]]; then
+    PRE_MIGRATE=1
+    INSTALL_ASM=1
+    RELABEL=1
+    FINALIZE=1
+  fi
+  if [[ "${PRE_MIGRATE}" -eq 1 ]]; then
+    download_asm
+    configure_kubectl
+    pre_migrate
+  fi
+  if [[ "${INSTALL_ASM}" -eq 1 ]]; then
+    ensure_backup
+    configure_kubectl
+    download_asm
+    configure_package
+    install_asm
+  fi
+  if [[ "${RELABEL}" -eq 1 ]]; then
+    ensure_backup
+    configure_kubectl
+    relabel_for_asm
+  fi
+  if [[ "${FINALIZE}" -eq 1 ]]; then
+    ensure_backup
+    configure_kubectl
+    download_asm
+    finalize
+  fi
+  if [[ "${ROLLBACK}" -eq 1 ]]; then
+    ensure_backup
+    configure_kubectl
+    rollback
+  fi
+
+  return 0
+}
+
+main "${@}"
