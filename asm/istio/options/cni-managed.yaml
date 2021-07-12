@@ -12,6 +12,118 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 ---
+# yamllint disable rule:line-length
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: dataplanecontrols.mesh.cloud.google.com
+spec:
+  additionalPrinterColumns:
+    - JSONPath: .status.state
+      name: Status
+      type: string
+    - JSONPath: .spec.proxyVersion
+      name: Version
+      type: string
+    - JSONPath: .spec.revision
+      name: Revision
+      type: string
+    - JSONPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+  group: mesh.cloud.google.com
+  names:
+    kind: DataPlaneControl
+    listKind: DataPlaneControlList
+    plural: dataplanecontrols
+    singular: dataplanecontrol
+  scope: Cluster
+  subresources:
+    status: {}
+  validation:
+    openAPIV3Schema:
+      description: DataPlaneControl is the Schema for the data plane controller API
+      properties:
+        apiVersion:
+          description: 'APIVersion defines the versioned schema of this representation
+            of an object. Servers should convert recognized schemas to the latest
+            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+          type: string
+        kind:
+          description: 'Kind is a string value representing the REST resource this
+            object represents. Servers may infer this from the endpoint the client
+            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+          type: string
+        metadata:
+          type: object
+        spec:
+          description: DataPlaneControlSpec defines the desired state of data plane
+            revisions.
+          properties:
+            proxyTargetBasisPoints:
+              description: ProxyTargetBasisPoints is the basis points (1/10000) of
+                proxies which should be at ProxyVersion. Only auto-injected proxies
+                belonging to Deployments and ReplicaSets in the revision above are
+                considered in the calculation. 0 means that the controller will not
+                auto upgrade any proxy in the cluster. The actual value may vary depending
+                on quantization due to the total number of proxies. Actual value will
+                be rounded down to the nearest value, but never rounded to zero if
+                positive.
+              format: int32
+              type: integer
+            proxyVersion:
+              description: ProxyVersion is the target version of the proxy in the
+                cluster.
+              type: string
+            revision:
+              description: Revision is the revision for this cluster entry. Clusters
+                may have more than one revision.
+              type: string
+          type: object
+        status:
+          description: DataPlaneControlStatus defines the observed state of data plane
+            revisions.
+          properties:
+            errorDetails:
+              description: Error details if the state is an error
+              properties:
+                code:
+                  description: Error code.
+                  format: int32
+                  type: integer
+                message:
+                  description: Error message.
+                  type: string
+              type: object
+            observedGeneration:
+              description: The generation observed by the data plane controller.
+              format: int64
+              type: integer
+            proxyTargetBasisPoints:
+              description: ProxyTargetBasisPoints is the actual basis points of proxies
+                at the target version. -1 means unknown.
+              format: int32
+              type: integer
+            state:
+              description: Current state of the controller.
+              type: string
+          required:
+            - state
+          type: object
+      type: object
+  version: v1alpha1
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+# yamllint enable rule:line-length
+---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -82,6 +194,76 @@ roleRef:
   kind: ClusterRole
   name: istio-cni-repair-role
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mdp-controller
+  labels:
+    app: istio-cni
+    release: istio
+rules:
+  - apiGroups:
+      - mesh.cloud.google.com
+    resources:
+      - '*'
+    verbs:
+      - '*'
+  - apiGroups:
+      - apps
+      - extensions
+    resources:
+      - daemonsets
+      - deployments
+      - deployments/finalizers
+      - ingresses
+      - replicasets
+      - statefulsets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - namespaces
+    verbs:
+      - '*'
+  - apiGroups:
+      - "coordination.k8s.io"
+    resources:
+      - leases
+    verbs:
+      - "*"
+  - apiGroups:
+      - admissionregistration.k8s.io
+    resources:
+      - mutatingwebhookconfigurations
+    verbs:
+      - '*'
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - pods/eviction
+    verbs:
+      - '*'
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: mdp-controller
+  labels:
+    k8s-app: mdp-controller
+subjects:
+  - kind: ServiceAccount
+    name: istio-cni
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: mdp-controller
+  apiGroup: rbac.authorization.k8s.io
+---
 kind: ConfigMap
 apiVersion: v1
 metadata:
@@ -91,8 +273,8 @@ metadata:
     app: istio-cni
     release: istio
 data:
-  # The CNI network configuration to add to the plugin chain on each node.  The special
-  # values in this config will be automatically populated.
+  # The CNI network configuration to add to the plugin chain on each node.
+  # The special values in this config will be automatically populated.
   cni_network_config: |-
         {
           "cniVersion": "0.3.1",
@@ -149,13 +331,15 @@ spec:
           operator: Exists
       priorityClassName: system-cluster-critical
       serviceAccountName: istio-cni
-      # Minimize downtime during a rolling upgrade or deletion; tell Kubernetes to do a "force
-      # deletion": https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods.
+      # Minimize downtime during a rolling upgrade or deletion;
+      # tell Kubernetes to do a "force deletion":
+      # https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods.
       terminationGracePeriodSeconds: 5
       containers:
         # This container installs the Istio CNI binaries
         # and CNI network config file on each node.
         - name: install-cni
+          # yamllint disable-line rule:line-length
           image: "IMAGE_HUB/install-cni:IMAGE_TAG"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cni-image"}
           livenessProbe:
             httpGet:
@@ -185,6 +369,7 @@ spec:
             - mountPath: /host/etc/cni/net.d
               name: cni-net-dir
         - name: repair-cni
+          # yamllint disable-line rule:line-length
           image: "IMAGE_HUB/install-cni:IMAGE_TAG"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cni-image"}
           command: ["/opt/local/bin/istio-cni-repair"]
           env:
@@ -207,6 +392,46 @@ spec:
               value: "cni.istio.io/uninitialized"
             - name: "REPAIR_BROKEN-POD-LABEL-VALUE"
               value: "true"
+        - name: mdp-controller
+          # yamllint disable-line rule:line-length
+          image: "IMAGE_HUB/mdp:IMAGE_TAG"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cni-image"}
+          command:
+            - mdp
+            - server
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsGroup: 1337
+            runAsUser: 1337
+            runAsNonRoot: true
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              cpu: 200m
+              memory: 256Mi
+            requests:
+              cpu: 50m
+              memory: 128Mi
+          env:
+            - name: WATCH_NAMESPACE
+              value: "istio-system"
+            - name: LEADER_ELECTION_NAMESPACE
+              value: "istio-system"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          volumeMounts:
+            - mountPath: /var/run/secrets/tokens
+              name: istio-token
       volumes:
         # Used to install CNI.
         - name: cni-bin-dir
@@ -215,3 +440,11 @@ spec:
         - name: cni-net-dir
           hostPath:
             path: /etc/cni/net.d
+        - name: istio-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: istio-token
+                  expirationSeconds: 43200
+                  # yamllint disable-line rule:line-length
+                  audience: "PROJECT_ID.svc.id.goog"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.token-audiences"}
