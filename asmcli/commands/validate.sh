@@ -15,13 +15,15 @@ validate() {
   validate_dependencies
   validate_control_plane
 
-  if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
-    info "Successfully validated all requirements to install ASM in this environment."
+  if only_enable; then
+    info "Successfully performed specified --enable actions."
     exit 0
   fi
 
-  if only_enable; then
-    info "Successfully performed specified --enable actions."
+  istioctl_precheck
+
+  if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
+    info "Successfully validated all requirements to install ASM in this environment."
     exit 0
   fi
 }
@@ -88,4 +90,9 @@ validate_control_plane() {
   else
     validate_in_cluster_control_plane
   fi
+}
+
+istioctl_precheck() {
+  # precheck inspects a Kubernetes cluster for Istio install and upgrade requirements.
+  istioctl x precheck
 }
