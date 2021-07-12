@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+set -eEuC
+set -o pipefail
+
+SCRIPT_PATH="${SCRIPT_PATH:=asmcli}"
+RELEASE_MODE="${RELEASE_MODE:=default}"
+
+prompt_for_confirmation() {
+  local CONFIRMATION
+  read -r -p "${1} [y/N] " CONFIRMATION
+  case "${CONFIRMATION}" in
+      [yY][eE][sS]|[yY])
+          return
+          ;;
+  esac
+  false
+}
+
+prompt_for_message() {
+  local MSG
+  read -r -p "Please provide a release message for ${1}:" MSG
+  if [[ -n "${MSG}" ]]; then
+    echo "${MSG}"
+  fi
+}
+
+update_config_number() {
+  local NEW_NUMBER; NEW_NUMBER="${1}"
+
+  sed -i.bak -E "s/CONFIG_VER:=\"([0-9a-zA-Z-])+\"/CONFIG_VER:=\"${NEW_NUMBER}\"/g" "${SCRIPT_PATH}.sh"
+
+  bazel build //:merge && cp ../bazel-bin/asmcli .
+}
+
+auto_release() {
+  local VERSION; VERSION="${1}"
+  local RELEASE_BRANCH; RELEASE_BRANCH="release-${VERSION}-asmcli"
+  local STAGING_BRANCH; STAGING_BRANCH="staging-${VERSION}-asmcli"
+  local DELTA_COMMITS
+  local RELEASE_STABLE_VERSION NEW_RELEASE_STABLE_VERSION STAGING_STABLE_VERSION
+  local OLD_NUMBER NEW_NUMBER
+  local TAG_MESSAGE
+
+  git checkout "${STAGING_BRANCH}"
+  STAGING_STABLE_VERSION="$(./${SCRIPT_PATH} --version)"
+
+  git checkout "${RELEASE_BRANCH}"
+  RELEASE_STABLE_VERSION="$(./${SCRIPT_PATH} --version)"
+  NEW_RELEASE_STABLE_VERSION="${RELEASE_STABLE_VERSION}"
+
+  DELTA_COMMITS="$(git log "${RELEASE_BRANCH}..${STAGING_BRANCH}")"
+  if [[ -z "${DELTA_COMMITS}" ]]; then
+    echo "${RELEASE_BRANCH} branch is up-to-date with ${STAGING_BRANCH} branch. Nothing to merge."
+  else
+    OLD_NUMBER="${RELEASE_STABLE_VERSION##*config}"
+    if [[ "${RELEASE_STABLE_VERSION%config*}" == "${STAGING_STABLE_VERSION%config*}" ]]; then
+      NEW_NUMBER="$((OLD_NUMBER+1))"
+    else
+      NEW_NUMBER=1
+    fi
+    NEW_RELEASE_STABLE_VERSION="${STAGING_STABLE_VERSION%config*}config${NEW_NUMBER}"
+    cat <<EOF
+Merging staging into release...
+Commits to be merged from ${STAGING_BRANCH} to ${RELEASE_BRANCH}:
+${DELTA_COMMITS}
+
+Old version: ${RELEASE_STABLE_VERSION}
+New version: ${NEW_RELEASE_STABLE_VERSION}
+EOF
+    prompt_for_confirmation "Do you want to proceed?" || exit 0
+    git merge --strategy-option=theirs "${STAGING_BRANCH}" --no-edit || git add -u && (git diff-index --quiet HEAD || git commit --no-edit)  # in case of modify/delete
+
+    # Update CONFIG_VER if necessary
+    update_config_number "${NEW_NUMBER}"
+    if [[ "${NEW_RELEASE_STABLE_VERSION}" != "$(./${SCRIPT_PATH} --version)" ]]; then
+      echo "Error when updating the config number. Expected: ${NEW_RELEASE_STABLE_VERSION} Got: $(./${SCRIPT_PATH} --version)"
+      false
+    fi
+
+    # Commit the CONFIG_NUMBER change
+    git add -u && git commit -m "update the version from ${RELEASE_STABLE_VERSION} to ${NEW_RELEASE_STABLE_VERSION}"
+  fi
+
+  prompt_for_confirmation "Do you want to create tag ${NEW_RELEASE_STABLE_VERSION}?" || exit 0
+  tag_sign_verify "${NEW_RELEASE_STABLE_VERSION}"
+
+  # Push new changes to remote
+  prompt_for_confirmation "Do you want to push your local changes to remote?" || exit 0
+  push_branch_to_remote "${RELEASE_BRANCH}"
+  push_tag_to_remote "${NEW_RELEASE_STABLE_VERSION}"
+}
+
+tag_sign_verify() {
+  local VERSION; VERSION="${1}"
+  echo "Tagging, signing and verifying the release..."
+  TAG_MESSAGE="$(prompt_for_message "${VERSION}")"
+  git tag -s "${VERSION}" -m "${TAG_MESSAGE}" # tag and sign
+  git tag -v "${VERSION}" # verify
+}
+
+push_tag_to_remote() {
+  local TAG; TAG="${1}"
+  if git ls-remote --tags | grep -q "${TAG}"; then
+    echo "${TAG} already exists in remote!"
+    return
+  fi
+
+  git push origin "${TAG}"
+}
+
+push_branch_to_remote() {
+  local BRANCH; BRANCH="${1}"
+
+  git push origin "${BRANCH}"
+}
+
+setup() {
+  tmpdir="$(mktemp -d)"
+  pushd "${tmpdir}"
+  git clone git@github.com:GoogleCloudPlatform/anthos-service-mesh-packages.git
+  cd anthos-service-mesh-packages
+  # remove this after the default branch is switched
+  git checkout main
+  cd asmcli
+}
+
+main() {
+  setup
+
+  # read from a different FD other than stdin
+  # during publish we will read from stdin for user confirmation
+  while read -r version <&3; do
+    auto_release "${version}" asmcli
+  done 3<<EOF
+1.10
+EOF
+}
+
+main
