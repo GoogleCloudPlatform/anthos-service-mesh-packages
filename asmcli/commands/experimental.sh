@@ -9,6 +9,10 @@ experimental_subcommand() {
       shift 1
       vm_subcommand "${@}"
       ;;
+    install)
+      shift 1
+      x_install_subcommand "${@}"
+      ;;
     *)
       x_help_subcommand "${@}"
       ;;
