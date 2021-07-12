@@ -394,7 +394,7 @@ spec:
               value: "true"
         - name: mdp-controller
           # yamllint disable-line rule:line-length
-          image: "IMAGE_HUB/mdp:IMAGE_TAG"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cni-image"}
+          image: "IMAGE_HUB/mdp:IMAGE_TAG"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-mdp-image"}
           command:
             - mdp
             - server
