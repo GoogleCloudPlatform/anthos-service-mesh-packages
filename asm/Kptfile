@@ -167,6 +167,17 @@ openAPI:
             ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub'
           - marker: IMAGE_TAG
             ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag'
+    io.k8s.cli.substitutions.gke-mdp-image:
+      type: string
+      x-k8s-cli:
+        substitution:
+          name: gke-mdp-image
+          pattern: "IMAGE_HUB/mdp:IMAGE_TAG"
+          values:
+          - marker: IMAGE_HUB
+            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub'
+          - marker: IMAGE_TAG
+            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag'
     io.k8s.cli.substitutions.gke-hub-metadata:
       type: string
       x-k8s-cli:
