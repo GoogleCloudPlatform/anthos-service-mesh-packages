@@ -69,7 +69,7 @@ GKE_CLUSTER_URI=""
 GCE_NETWORK_NAME=""
 GCLOUD_USER_OR_SA="${GCLOUD_USER_OR_SA:=}"
 KPT_URL=""
-KUBECONFIG=""
+KUBECONFIG=""; readonly KUBECONFIG
 APATH=""
 AKUBECTL=""
 AKPT=""
@@ -84,8 +84,6 @@ EXPANDED_YAML=""
 NAMESPACE_EXISTS=0
 
 main() {
-  init
-
   if [[ "${*}" = '' ]]; then
     usage_short >&2
     exit 2
@@ -96,6 +94,7 @@ main() {
   shopt -s nocasematch
 
   context_init
+  init
   case "${1}" in
     install)
       shift 1
@@ -781,71 +780,6 @@ install_control_plane() {
     install_canonical_controller
   fi
 }
-
-### Installation functions ###
-configure_package() {
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
-  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
-  local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
-  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
-  local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
-  local CA; CA="$(context_get-option "CA")"
-  local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
-  local USE_VM; USE_VM="$(context_get-option "USE_VM")"
-  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
-  local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
-
-  info "Configuring kpt package..."
-
-  if is_gcp; then
-    populate_cluster_values
-  fi
-
-  populate_fleet_info
-
-  if is_gcp; then
-    kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
-    kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
-    kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
-    kpt cfg set asm gcloud.compute.network "${GCE_NETWORK_NAME}"
-  else
-    kpt cfg set asm gcloud.core.project "${FLEET_ID}"
-  fi
-
-  kpt cfg set asm gcloud.project.environProjectNumber "${PROJECT_NUMBER}"
-  kpt cfg set asm anthos.servicemesh.rev "${REVISION_LABEL}"
-  kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
-  if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then
-    kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
-  fi
-  if [[ -n "${_CI_ASM_IMAGE_TAG}" ]]; then
-    kpt cfg set asm anthos.servicemesh.tag "${_CI_ASM_IMAGE_TAG}"
-  fi
-
-  if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
-    # VM installation uses the latest Hub WIP format
-    if [[ "${USE_VM}" -eq 1 ]]; then
-      kpt cfg set asm anthos.servicemesh.hubTrustDomain "${FLEET_ID}.svc.id.goog"
-      kpt cfg set asm anthos.servicemesh.hub-idp-url "${HUB_IDP_URL}"
-    # GKE-on-GCP installation uses legacy Hub WIP format to be consistent with GCP Hub public preview feature
-    else
-      kpt cfg set asm anthos.servicemesh.hubTrustDomain "${FLEET_ID}.hub.id.goog"
-      kpt cfg set asm anthos.servicemesh.hub-idp-url "https://gkehub.googleapis.com/projects/${FLEET_ID}/locations/global/memberships/${HUB_MEMBERSHIP_ID}"
-    fi
-  fi
-  if [[ -n "${CA_NAME}" && "${CA}" = "gcp_cas" ]]; then
-    kpt cfg set asm anthos.servicemesh.external_ca.ca_name "${CA_NAME}"
-  fi
-
-  if [[ "${USE_VM}" -eq 1 ]] && [[ "${_CI_NO_REVISION}" -eq 0 ]]; then
-    kpt cfg set asm anthos.servicemesh.istiodHost "istiod-${REVISION_LABEL}.istio-system.svc"
-    kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod-${REVISION_LABEL}.istio-system.svc.cluster.local"
-    kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${REVISION_LABEL}"
-  fi
-  configure_ca
-  configure_control_plane
-}
 print-config_subcommand() {
   # make sure to redirect stdout as soon as possible if we're dumping the config
   exec 3>&1
@@ -979,235 +913,6 @@ validate_control_plane() {
   else
     validate_in_cluster_control_plane
   fi
-}
-
-validate_args() {
-  ### Option variables ###
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
-  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
-  local PLATFORM; PLATFORM="$(context_get-option "PLATFORM")"
-  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
-  local CA; CA="$(context_get-option "CA")"
-  local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
-  local OPTIONAL_OVERLAY; OPTIONAL_OVERLAY="$(context_get-option "OPTIONAL_OVERLAY")"
-  local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
-  local ENABLE_CLUSTER_ROLES; ENABLE_CLUSTER_ROLES="$(context_get-option "ENABLE_CLUSTER_ROLES")"
-  local ENABLE_CLUSTER_LABELS; ENABLE_CLUSTER_LABELS="$(context_get-option "ENABLE_CLUSTER_LABELS")"
-  local ENABLE_GCP_APIS; ENABLE_GCP_APIS="$(context_get-option "ENABLE_GCP_APIS")"
-  local ENABLE_GCP_IAM_ROLES; ENABLE_GCP_IAM_ROLES="$(context_get-option "ENABLE_GCP_IAM_ROLES")"
-  local ENABLE_GCP_COMPONENTS; ENABLE_GCP_COMPONENTS="$(context_get-option "ENABLE_GCP_COMPONENTS")"
-  local ENABLE_REGISTRATION; ENABLE_REGISTRATION="$(context_get-option "ENABLE_REGISTRATION")"
-  local ENABLE_NAMESPACE_CREATION; ENABLE_NAMESPACE_CREATION="$(context_get-option "ENABLE_NAMESPACE_CREATION")"
-  local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
-  local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
-  local SERVICE_ACCOUNT; SERVICE_ACCOUNT="$(context_get-option "SERVICE_ACCOUNT")"
-  local KEY_FILE; KEY_FILE="$(context_get-option "KEY_FILE")"
-  local CA_CERT; CA_CERT="$(context_get-option "CA_CERT")"
-  local CA_KEY; CA_KEY="$(context_get-option "CA_KEY")"
-  local CA_ROOT; CA_ROOT="$(context_get-option "CA_ROOT")"
-  local CA_CHAIN; CA_CHAIN="$(context_get-option "CA_CHAIN")"
-  local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
-  local DRY_RUN; DRY_RUN="$(context_get-option "DRY_RUN")"
-  local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
-  local ONLY_ENABLE; ONLY_ENABLE="$(context_get-option "ONLY_ENABLE")"
-  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
-  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
-  local MANAGED_SERVICE_ACCOUNT; MANAGED_SERVICE_ACCOUNT="$(context_get-option "MANAGED_SERVICE_ACCOUNT")"
-  local PRINT_HELP; PRINT_HELP="$(context_get-option "PRINT_HELP")"
-  local PRINT_VERSION; PRINT_VERSION="$(context_get-option "PRINT_VERSION")"
-  local CUSTOM_CA; CUSTOM_CA="$(context_get-option "CUSTOM_CA")"
-  local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
-  local USE_VM; USE_VM="$(context_get-option "USE_VM")"
-  local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
-  local CUSTOM_REVISION; CUSTOM_REVISION="$(context_get-option "CUSTOM_REVISION")"
-  local WI_ENABLED; WI_ENABLED="$(context_get-option "WI_ENABLED")"
-  local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
-  local KUBECONFIG; KUBECONFIG="$(context_get-option "KUBECONFIG")"
-  local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
-
-  if [[ -z "${CA}" ]]; then
-    CA="mesh_ca"
-    context_set-option "CA" "${CA}"
-  fi
-
-  if [[ "${CUSTOM_REVISION}" -eq 1 ]]; then
-    validate_revision_label
-  fi
-
-  if is_managed; then
-    if [[ "${CA}" == "citadel" ]]; then
-      fatal "Citadel is not supported with managed control plane."
-    fi
-
-    if [[ "${CA}" == "gcp_cas" ]]; then
-      fatal "Google Certificate Authority Service integration is not supported with managed control plane."
-    fi
-
-    if [[ "${CUSTOM_CA}" -eq 1 ]]; then
-      fatal "Specifying a custom CA with managed control plane is not supported."
-    fi
-
-    if [[ "${CUSTOM_REVISION}" -eq 1 ]]; then
-      fatal "Specifying a revision label with managed control plane is not supported."
-    fi
-
-    if [[ -n "${CUSTOM_OVERLAY}" ]]; then
-      fatal "Specifying a custom overlay file with managed control plane is not supported."
-    fi
-  fi
-
-  if [[ -z "${PLATFORM}" ]]; then
-    PLATFORM="gcp"
-    context_set-option "PLATFORM" "gcp"
-  fi
-
-  case "${PLATFORM}" in
-      gcp | multicloud);;
-      *) fatal "PLATFORM must be one of 'gcp', 'multicloud'";;
-  esac
-
-  local MISSING_ARGS=0
-
-  local CLUSTER_DETAIL_SUPPLIED=0
-  local CLUSTER_DETAIL_VALID=1
-  while read -r REQUIRED_ARG; do
-    if [[ -z "${!REQUIRED_ARG}" ]]; then
-      CLUSTER_DETAIL_VALID=0
-    else
-      CLUSTER_DETAIL_SUPPLIED=1 # gke cluster param usage intended
-    fi
-  done <<EOF
-PROJECT_ID
-CLUSTER_LOCATION
-CLUSTER_NAME
-EOF
-
-  # Script will not infer the intent between the 2 use cases in case both values are provided
-  if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 1 && "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
-    fatal_with_usage "Incompatible arguments. Kubeconfig cannot be used in conjuntion with [--cluster_location|--cluster_name|--project_id]."
-  fi
-
-  if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 1 && "${CLUSTER_DETAIL_VALID}" -eq 0 ]]; then
-    MISSING_ARGS=1
-    warn "Missing one or more required options for [CLUSTER_LOCATION|CLUSTER_NAME|PROJECT_ID]"
-  fi
-
-  if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 0 && "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
-    MISSING_ARGS=1
-    warn "At least one of the following is required: 1) --kubeconfig or 2) --cluster_location, --cluster_name, --project_id"
-  fi
-
-  if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 && -z "${CONTEXT}" ]]; then
-    # set CONTEXT to current-context in the KUBECONFIG
-    # or fail-fast if current-context doesn't exist
-    CONTEXT="$(kubectl config current-context)"
-    if [[ -z "${CONTEXT}" ]]; then
-      MISSING_ARGS=1
-      warn "Missing current-context in the KUBECONFIG. Please provide context with --context flag or set a current-context in the KUBECONFIG"
-    else
-      context_set-option "CONTEXT" "${CONTEXT}"
-    fi
-  fi
-
-  if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
-    info "Reading cluster information for ${CONTEXT}"
-    IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
-${CONTEXT}
-EOF
-    if is_gcp; then
-      context_set-option "PROJECT_ID" "${PROJECT_ID}"
-      context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
-      context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
-    fi
-  fi
-
-  if is_gcp; then
-    # when no Fleet Id is provided, default to the cluster's project as the Fleet host.
-    if [[ -z "${FLEET_ID}" ]]; then
-      FLEET_ID="${PROJECT_ID}"
-      context_set-option "FLEET_ID" "${FLEET_ID}"
-    fi
-  else
-    # set Project Id to same as Fleet Id.
-    # Project Id will be used to enable APIs if applicable.
-    if [[ -n "${FLEET_ID}" ]]; then
-      PROJECT_ID="${FLEET_ID}"
-      context_set-option "PROJECT_ID" "${PROJECT_ID}"
-    fi
-  fi
-
-  if can_register_cluster && ! has_value "FLEET_ID"; then
-    MISSING_ARGS=1
-    warn "Missing FLEET_ID to register the cluster."
-  fi
-
-  if [[ "${MISSING_ARGS}" -ne 0 ]]; then
-    fatal_with_usage "Missing one or more required options."
-  fi
-
-  while read -r FLAG; do
-    if [[ "${!FLAG}" -ne 0 && "${!FLAG}" -ne 1 ]]; then
-      fatal "${FLAG} must be 0 (off) or 1 (on) if set via environment variables."
-    fi
-    readonly "${FLAG}"
-  done <<EOF
-DRY_RUN
-ENABLE_ALL
-ENABLE_CLUSTER_ROLES
-ENABLE_CLUSTER_LABELS
-ENABLE_GCP_APIS
-ENABLE_GCP_IAM_ROLES
-ENABLE_GCP_COMPONENTS
-ENABLE_REGISTRATION
-MANAGED
-DISABLE_CANONICAL_SERVICE
-ONLY_VALIDATE
-ONLY_ENABLE
-VERBOSE
-EOF
-
-  if [[ "${ENABLE_ALL}" -eq 1 || "${ENABLE_CLUSTER_ROLES}" -eq 1 || \
-    "${ENABLE_CLUSTER_LABELS}" -eq 1 || "${ENABLE_GCP_APIS}" -eq 1 || \
-    "${ENABLE_GCP_IAM_ROLES}" -eq 1 || "${ENABLE_GCP_COMPONENTS}" -eq 1 || \
-    "${ENABLE_REGISTRATION}" -eq 1  || "${ENABLE_NAMESPACE_CREATION}" -eq 1 ]]; then
-    if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
-      fatal "The only_validate flag cannot be used with any --enable* flag"
-    fi
-  elif only_enable; then
-    fatal "You must specify at least one --enable* flag with --only_enable"
-  fi
-
-  if [[ -n "$SERVICE_ACCOUNT" && -z "$KEY_FILE" || -z "$SERVICE_ACCOUNT" && -n "$KEY_FILE" ]]; then
-    fatal "Service account and key file must be used together."
-  fi
-
-  # since we cd to a tmp directory, we need the absolute path for the key file
-  # and yaml file
-  if [[ -f "${KEY_FILE}" ]]; then
-    KEY_FILE="$(apath -f "${KEY_FILE}")"
-    readonly KEY_FILE
-  elif [[ -n "${KEY_FILE}" ]]; then
-    fatal "Couldn't find key file ${KEY_FILE}."
-  fi
-
-  local ABS_OVERLAYS; ABS_OVERLAYS=""
-  while read -d ',' -r yaml_file; do
-    if [[ -f "${yaml_file}" ]]; then
-      ABS_OVERLAYS="$(apath -f "${yaml_file}"),${ABS_OVERLAYS}"
-    elif [[ -n "${yaml_file}" ]]; then
-      fatal "Couldn't find yaml file ${yaml_file}."
-    fi
-  done <<EOF
-${CUSTOM_OVERLAY}
-EOF
-  CUSTOM_OVERLAY="${ABS_OVERLAYS}"
-  context_set-option "CUSTOM_OVERLAY" "${CUSTOM_OVERLAY}"
-
-  WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"; readonly WORKLOAD_POOL
-
-  validate_hub
-  validate_ca
 }
 
 validate_revision_label() {
@@ -1441,26 +1146,6 @@ validate_asm_version() {
   done
   if [[ "$FOUND_INVALID_VERSION" -eq 1 ]]; then
     fatal "Upgrade requires all existing control planes to be between versions 1.$((MINOR-1)).0 (inclusive) and ${RELEASE} (exclusive)."
-  fi
-}
-
-validate_ca() {
-  local CA; CA="$(context_get-option "CA")"
-  local CUSTOM_CA; CUSTOM_CA="$(context_get-option "CUSTOM_CA")"
-
-  case "${CA}" in
-    citadel | mesh_ca | gcp_cas);;
-    "")
-      MISSING_ARGS=1
-      warn "Missing value for CA"
-      ;;
-    *) fatal "CA must be one of 'citadel', 'mesh_ca', 'gcp_cas'";;
-  esac
-
-  if [[ "${CA}" = "gcp_cas" ]]; then
-    validate_private_ca
-  elif [[ "${CUSTOM_CA}" -eq 1 ]]; then
-    validate_citadel
   fi
 }
 
@@ -2450,6 +2135,101 @@ istio_namespace_exists() {
     NAMESPACE_EXISTS=1; readonly NAMESPACE_EXISTS
   fi
 }
+configure_package() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
+  local CA; CA="$(context_get-option "CA")"
+  local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
+  local USE_VM; USE_VM="$(context_get-option "USE_VM")"
+  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
+  local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
+
+  info "Configuring kpt package..."
+
+  if is_gcp; then
+    populate_cluster_values
+  fi
+
+  populate_fleet_info
+
+  if is_gcp; then
+    kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
+    kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
+    kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
+    kpt cfg set asm gcloud.compute.network "${GCE_NETWORK_NAME}"
+  else
+    kpt cfg set asm gcloud.core.project "${FLEET_ID}"
+  fi
+
+  kpt cfg set asm gcloud.project.environProjectNumber "${PROJECT_NUMBER}"
+  kpt cfg set asm anthos.servicemesh.rev "${REVISION_LABEL}"
+  kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
+  if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then
+    kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
+  fi
+  if [[ -n "${_CI_ASM_IMAGE_TAG}" ]]; then
+    kpt cfg set asm anthos.servicemesh.tag "${_CI_ASM_IMAGE_TAG}"
+  fi
+
+  if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
+    # VM installation uses the latest Hub WIP format
+    if [[ "${USE_VM}" -eq 1 ]]; then
+      kpt cfg set asm anthos.servicemesh.hubTrustDomain "${FLEET_ID}.svc.id.goog"
+      kpt cfg set asm anthos.servicemesh.hub-idp-url "${HUB_IDP_URL}"
+    # GKE-on-GCP installation uses legacy Hub WIP format to be consistent with GCP Hub public preview feature
+    else
+      kpt cfg set asm anthos.servicemesh.hubTrustDomain "${FLEET_ID}.hub.id.goog"
+      kpt cfg set asm anthos.servicemesh.hub-idp-url "https://gkehub.googleapis.com/projects/${FLEET_ID}/locations/global/memberships/${HUB_MEMBERSHIP_ID}"
+    fi
+  fi
+  if [[ -n "${CA_NAME}" && "${CA}" = "gcp_cas" ]]; then
+    kpt cfg set asm anthos.servicemesh.external_ca.ca_name "${CA_NAME}"
+  fi
+
+  if [[ "${USE_VM}" -eq 1 ]] && [[ "${_CI_NO_REVISION}" -eq 0 ]]; then
+    kpt cfg set asm anthos.servicemesh.istiodHost "istiod-${REVISION_LABEL}.istio-system.svc"
+    kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod-${REVISION_LABEL}.istio-system.svc.cluster.local"
+    kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${REVISION_LABEL}"
+  fi
+  configure_ca
+  configure_control_plane
+}
+
+configure_kubectl(){
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local KUBECONFIG_FILE; KUBECONFIG_FILE="$(context_get-option "KUBECONFIG")"
+  local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
+  local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
+
+  if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
+    info "Fetching/writing GCP credentials to kubeconfig file..."
+    KUBECONFIG="${KUBECONFIG_FILE}" retry 2 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
+      --project="${PROJECT_ID}" \
+      --zone="${CLUSTER_LOCATION}"
+    context_set-option "KUBECONFIG" "${KUBECONFIG_FILE}"
+    context_set-option "CONTEXT" "$(kubectl config current-context)"
+  fi
+
+  if ! hash nc 2>/dev/null; then
+     warn "nc not found, skipping k8s connection verification"
+     warn "(Installation will continue normally.)"
+     return
+  fi
+
+  if is_gcp; then
+    verify_connectivity
+  fi
+
+  info "kubeconfig set to ${KUBECONFIG_FILE}"
+  CONTEXT="$(context_get-option "CONTEXT")"
+  info "using context ${CONTEXT}"
+}
 context_init() {
   local CONTEXT_JSON; CONTEXT_JSON=$(cat <<EOF
 {
@@ -2708,444 +2488,6 @@ enable_gcloud_apis(){
   # shellcheck disable=SC2046
   retry 3 gcloud services enable --project="${PROJECT_ID}" $(required_apis | tr '\n' ' ')
 }
-KUBE_TAG_MAX_LEN=63; readonly KUBE_TAG_MAX_LEN
-
-gen_install_params() {
-  local CA; CA="$(context_get-option "CA")"
-
-  local PARAM_BUILDER="-f ${OPERATOR_MANIFEST}"
-  for yaml_file in $(context_list "istioctlFiles"); do
-    PARAM_BUILDER="${PARAM_BUILDER} -f ${yaml_file}"
-  done
-
-  if [[ "${K8S_MINOR}" -eq 15 ]]; then
-    PARAM_BUILDER="${PARAM_BUILDER} -f ${BETA_CRD_MANIFEST}"
-  fi
-
-  if [[ "${CA}" == "citadel" ]]; then
-    PARAM_BUILDER="${PARAM_BUILDER} -f ${CITADEL_MANIFEST}"
-  fi
-
-  if ! is_gcp; then
-    PARAM_BUILDER="${PARAM_BUILDER} -f ${OFF_GCP_MANIFEST}"
-  fi
-
-  echo "${PARAM_BUILDER}"
-}
-
-#######
-# run_command takes a list of arguments that represents a command
-# If DRY_RUN or VERBOSE is enabled, it will print the command, and if DRY_RUN is
-# not enabled it runs the command.
-#######
-run_command() {
-  local DRY_RUN; DRY_RUN="$(context_get-option "DRY_RUN")"
-  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
-
-  if [[ "${DRY_RUN}" -eq 1 ]]; then
-    warn "Would have executed: ${*}"
-    return
-  elif [[ "${VERBOSE}" -eq 0 ]]; then
-    "${@}" 2>/dev/null
-    return "$?"
-  fi
-  info "Running: '${*}'"
-  info "-------------"
-  local RETVAL
-  { "${@}"; RETVAL="$?"; } || true
-  return $RETVAL
-}
-
-#######
-# retry takes an integer N as the first argument, and a list of arguments
-# representing a command afterwards. It will retry the given command up to N
-# times before returning 1. If the command is kubectl, it will try to
-# re-get credentials in case something caused the k8s IP to change.
-#######
-retry() {
-  local MAX_TRIES; MAX_TRIES="${1}";
-  shift 1
-  for i in $(seq 0 "${MAX_TRIES}"); do
-    if [[ "${i}" -eq "${MAX_TRIES}" ]]; then
-      break
-    fi
-    { "${@}" && return 0; } || true
-    warn "Failed, retrying...($((i+1)) of ${MAX_TRIES})"
-    sleep 2
-  done
-  local CMD="'$*'"
-  warn "Command $CMD failed."
-  false
-}
-
-find_missing_strings() {
-  local NEEDLES; NEEDLES="${1}";
-  local HAYSTACK; HAYSTACK="${2}";
-  local NOTFOUND; NOTFOUND="";
-
-  while read -r needle; do
-    EXITCODE=0
-    grep -q "${needle}" <<EOF || EXITCODE=$?
-${HAYSTACK}
-EOF
-    if [[ "${EXITCODE}" -ne 0 ]]; then
-      NOTFOUND="${needle},${NOTFOUND}"
-    fi
-  done <<EOF
-${NEEDLES}
-EOF
-
-  if [[ -n "${NOTFOUND}" ]]; then NOTFOUND="$(strip_trailing_commas "${NOTFOUND}")"; fi
-  echo "${NOTFOUND}"
-}
-
-strip_trailing_commas() {
-  # shellcheck disable=SC2001
-  echo "${1}" | sed 's/,*$//g'
-}
-
-warn() {
-  info "[WARNING]: ${1}" >&2
-}
-
-warn_pause() {
-  warn "${1}"
-  sleep 2
-}
-
-error() {
-  info "[ERROR]: ${1}" >&2
-}
-
-info() {
-  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
-  if hash ts 2>/dev/null && [[ "${VERBOSE}" -eq 1 ]]; then
-    echo "${SCRIPT_NAME}: ${1}" | TZ=utc ts '%Y-%m-%dT%.T' >&2
-  else
-    echo "${SCRIPT_NAME}: ${1}" >&2
-  fi
-}
-
-fatal() {
-  error "${1}"
-  exit 2
-}
-
-fatal_with_usage() {
-  error "${1}"
-  usage_short >&2
-  exit 2
-}
-
-prompt_user_for_value() {
-  read -r -p "Please provide a value for ${1}:" VALUE
-  if [[ -n "${VALUE}" ]]; then
-    echo "${VALUE}"
-  fi
-}
-
-starline() {
-  echo "*****************************"
-}
-
-enable_common_message() {
-  echo "Alternatively, use --enable_all|-e to allow this tool to handle all dependencies."
-}
-
-arg_required() {
-  if [[ ! "${2:-}" || "${2:0:1}" = '-' ]]; then
-    fatal "Option ${1} requires an argument."
-  fi
-}
-
-parse_args() {
-  if [[ "${*}" = '' ]]; then
-    usage_short >&2
-    exit 2
-  fi
-
-  # shellcheck disable=SC2064
-  trap "$(shopt -p nocasematch)" RETURN
-  shopt -s nocasematch
-
-  local OPTIONAL_OVERLAY; OPTIONAL_OVERLAY=""
-  local CUSTOM_OVERLAY; CUSTOM_OVERLAY=""
-  while [[ $# != 0 ]]; do
-    case "${1}" in
-      -l | --cluster_location | --cluster-location)
-        arg_required "${@}"
-        context_set-option "CLUSTER_LOCATION" "${2}"
-        shift 2
-        ;;
-      -n | --cluster_name | --cluster-name)
-        arg_required "${@}"
-        context_set-option "CLUSTER_NAME" "${2}"
-        shift 2
-        ;;
-      --kc | --kubeconfig)
-        arg_required "${@}"
-        context_set-option "KUBECONFIG" "${2}"
-        context_set-option "KUBECONFIG_SUPPLIED" 1
-        shift 2
-        ;;
-      --ctx | --context)
-        arg_required "${@}"
-        context_set-option "CONTEXT" "${2}"
-        shift 2
-        ;;
-      -p | --project_id | --project-id)
-        arg_required "${@}"
-        context_set-option "PROJECT_ID" "${2}"
-        shift 2
-        ;;
-      -m | --mode)
-        warn "As of version 1.10 the --mode flag is deprecated and will be ignored."
-        shift 2
-        ;;
-      --fleet_id | --fleet-id)
-        arg_required "${@}"
-        context_set-option "FLEET_ID" "${2}"
-        shift 2
-        ;;
-      -c | --ca)
-        arg_required "${@}"
-        context_set-option "CA" "$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
-        shift 2
-        ;;
-      --ca_name | --ca-name)
-        arg_required "${@}"
-        context_set-option "CA_NAME" "${2}"
-        shift 2
-        ;;
-      -o | --option)
-        arg_required "${@}"
-
-        if [[ "${2}" == "cni-managed" ]]; then
-          context_set-option "USE_MCP_CNI" 1
-          shift 2
-          continue
-        fi
-
-        OPTIONAL_OVERLAY="${2},${OPTIONAL_OVERLAY}"
-        context_set-option "OPTIONAL_OVERLAY" "${OPTIONAL_OVERLAY}"
-        if [[ "${2}" == "hub-meshca" ]]; then
-          context_set-option "USE_HUB_WIP" 1
-        fi
-        if [[ "${2}" == "vm" ]]; then
-          context_set-option "USE_VM" 1
-        fi
-        shift 2
-        ;;
-      --co | --custom_overlay | --custom-overlay)
-        arg_required "${@}"
-        CUSTOM_OVERLAY="${2},${CUSTOM_OVERLAY}"
-        context_set-option "CUSTOM_OVERLAY" "${CUSTOM_OVERLAY}"
-        shift 2
-        ;;
-      -e | --enable_all | --enable-all)
-        context_set-option "ENABLE_ALL" 1
-        shift 1
-        ;;
-      --enable_cluster_roles | --enable-cluster-roles)
-        context_set-option "ENABLE_CLUSTER_ROLES" 1
-        shift 1
-        ;;
-      --enable_cluster_labels | --enable-cluster-labels)
-        context_set-option "ENABLE_CLUSTER_LABELS" 1
-        shift 1
-        ;;
-      --enable_gcp_apis | --enable-gcp-apis)
-        context_set-option "ENABLE_GCP_APIS" 1
-        shift 1
-        ;;
-      --enable_gcp_iam_roles | --enable-gcp-iam-roles)
-        context_set-option "ENABLE_GCP_IAM_ROLES" 1
-        shift 1
-        ;;
-      --enable_gcp_components | --enable-gcp-components)
-        context_set-option "ENABLE_GCP_COMPONENTS" 1
-        shift 1
-        ;;
-      --enable_registration | --enable-registration)
-        context_set-option "ENABLE_REGISTRATION" 1
-        shift 1
-        ;;
-      --enable_namespace_creation | --enable-namespace-creation)
-        context_set-option "ENABLE_NAMESPACE_CREATION" 1
-        shift 1
-        ;;
-      --managed)
-        context_set-option "MANAGED" 1
-        REVISION_LABEL="asm-managed"
-        shift 1
-        ;;
-      --disable_canonical_service | --disable-canonical-service)
-        context_set-option "DISABLE_CANONICAL_SERVICE" 1
-        shift 1
-        ;;
-      --print_config | --print-config)
-        context_set-option "PRINT_CONFIG" 1
-        shift 1
-        ;;
-      -s | --service_account | --service-account)
-        arg_required "${@}"
-        context_set-option "SERVICE_ACCOUNT" "${2}"
-        shift 2
-        ;;
-      -k | --key_file | --key-file)
-        arg_required "${@}"
-        context_set-option "KEY_FILE" "${2}"
-        shift 2
-        ;;
-      -D | --output_dir | --output-dir)
-        arg_required "${@}"
-        context_set-option "OUTPUT_DIR" "${2}"
-        shift 2
-        ;;
-      --dry_run | --dry-run)
-        context_set-option "DRY_RUN" 1
-        shift 1
-        ;;
-      --only_validate | --only-validate)
-        context_set-option "ONLY_VALIDATE" 1
-        shift 1
-        ;;
-      --only_enable | --only-enable)
-        context_set-option "ONLY_ENABLE" 1
-        shift 1
-        ;;
-      --ca_cert | --ca-cert)
-        arg_required "${@}"
-        context_set-option "CA_CERT" "${2}"
-        context_set-option "CUSTOM_CA" 1
-        shift 2
-        ;;
-      --ca_key | --ca-key)
-        arg_required "${@}"
-        context_set-option "CA_KEY" "${2}"
-        context_set-option "CUSTOM_CA" 1
-        shift 2
-        ;;
-      --root_cert | --root-cert)
-        arg_required "${@}"
-        context_set-option "CA_ROOT" "${2}"
-        context_set-option "CUSTOM_CA" 1
-        shift 2
-        ;;
-      --cert_chain | --cert-chain)
-        arg_required "${@}"
-        context_set-option "CA_CHAIN" "${2}"
-        context_set-option "CUSTOM_CA" 1
-        shift 2
-        ;;
-      -r | --revision_name | --revision-name)
-        arg_required "${@}"
-        context_set-option "CUSTOM_REVISION" 1
-        REVISION_LABEL="${2}"
-        shift 2
-        ;;
-      --platform)
-        arg_required "${@}"
-        context_set-option "PLATFORM" "$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
-        shift 2
-        ;;
-      -v | --verbose)
-        context_set-option "VERBOSE" 1
-        shift 1
-        ;;
-      -h | --help)
-        context_set-option "PRINT_HELP" 1
-        shift 1
-        ;;
-      --version)
-        context_set-option "PRINT_VERSION" 1
-        shift 1
-        ;;
-      *)
-        fatal_with_usage "Unknown option ${1}"
-        ;;
-    esac
-  done
-  readonly REVISION_LABEL
-
-  local PRINT_HELP; PRINT_HELP="$(context_get-option "PRINT_HELP")"
-  local PRINT_VERSION; PRINT_VERSION="$(context_get-option "PRINT_VERSION")"
-  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
-  if [[ "${PRINT_HELP}" -eq 1 || "${PRINT_VERSION}" -eq 1 ]]; then
-    if [[ "${PRINT_VERSION}" -eq 1 ]]; then
-      version_message
-    elif [[ "${VERBOSE}" -eq 1 ]]; then
-      usage
-    else
-      usage_short
-    fi
-    exit
-  fi
-}
-
-download_kpt() {
-  local PLATFORM
-  PLATFORM="$(get_platform "$(uname)" "$(uname -m)")"
-  if [[ -z "${PLATFORM}" ]]; then
-    fatal "$(uname) $(uname -m) is not a supported platform to perform installation from."
-  fi
-
-  local KPT_TGZ
-  KPT_TGZ="https://github.com/GoogleContainerTools/kpt/releases/download/v0.39.3/kpt_${PLATFORM}-0.39.3.tar.gz"
-
-  info "Downloading kpt.."
-  curl -L "${KPT_TGZ}" | tar xz
-  AKPT="$(apath -f kpt)"
-}
-
-get_platform() {
-  local OS; OS="${1}"
-  local ARCH; ARCH="${2}"
-  local PLATFORM
-
-  case "${OS}" in
-    Linux ) PLATFORM="linux_amd64";;
-    Darwin)
-      if [[ "${ARCH}" == "arm64" ]]; then
-        PLATFORM="darwin_arm64"
-      else
-        PLATFORM="darwin_amd64"
-      fi
-    ;;
-  esac
-
-  echo "${PLATFORM}"
-}
-
-download_asm() {
-  local OS
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-
-  case "$(uname)" in
-    Linux ) OS="linux-amd64";;
-    Darwin) OS="osx";;
-    *     ) fatal "$(uname) is not a supported OS.";;
-  esac
-
-  info "Downloading ASM.."
-  local TARBALL; TARBALL="istio-${RELEASE}-${OS}.tar.gz"
-  if [[ -z "${_CI_ASM_PKG_LOCATION}" ]]; then
-    curl -L "https://storage.googleapis.com/gke-release/asm/${TARBALL}" \
-      | tar xz
-  else
-    local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
-    run_command curl -L "https://storage.googleapis.com/${_CI_ASM_PKG_LOCATION}/asm/${TARBALL}" \
-      --header @- <<EOF | tar xz
-Authorization: Bearer ${TOKEN}
-EOF
-  fi
-
-  ln -s "${ISTIOCTL_REL_PATH}" .
-
-  info "Downloading ASM kpt package..."
-  retry 3 kpt pkg get --auto-set=false "${KPT_URL}" asm
-  version_message > "${ASM_VERSION_FILE}"
-}
 
 #######
 # valid_pool_query takes an integer argument: the minimum vCPU requirement.
@@ -3344,6 +2686,689 @@ get_auth_token() {
   local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
   echo "${TOKEN}"
 }
+parse_args() {
+  if [[ "${*}" = '' ]]; then
+    usage_short >&2
+    exit 2
+  fi
+
+  # shellcheck disable=SC2064
+  trap "$(shopt -p nocasematch)" RETURN
+  shopt -s nocasematch
+
+  local OPTIONAL_OVERLAY; OPTIONAL_OVERLAY=""
+  local CUSTOM_OVERLAY; CUSTOM_OVERLAY=""
+  REVISION_LABEL="$(context_get-option "REVISION_LABEL")"
+  while [[ $# != 0 ]]; do
+    case "${1}" in
+      -l | --cluster_location | --cluster-location)
+        arg_required "${@}"
+        context_set-option "CLUSTER_LOCATION" "${2}"
+        shift 2
+        ;;
+      -n | --cluster_name | --cluster-name)
+        arg_required "${@}"
+        context_set-option "CLUSTER_NAME" "${2}"
+        shift 2
+        ;;
+      --kc | --kubeconfig)
+        arg_required "${@}"
+        context_set-option "KUBECONFIG" "${2}"
+        context_set-option "KUBECONFIG_SUPPLIED" 1
+        shift 2
+        ;;
+      --ctx | --context)
+        arg_required "${@}"
+        context_set-option "CONTEXT" "${2}"
+        shift 2
+        ;;
+      -p | --project_id | --project-id)
+        arg_required "${@}"
+        context_set-option "PROJECT_ID" "${2}"
+        shift 2
+        ;;
+      -m | --mode)
+        warn "As of version 1.10 the --mode flag is deprecated and will be ignored."
+        shift 2
+        ;;
+      --fleet_id | --fleet-id)
+        arg_required "${@}"
+        context_set-option "FLEET_ID" "${2}"
+        shift 2
+        ;;
+      -c | --ca)
+        arg_required "${@}"
+        context_set-option "CA" "$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+        shift 2
+        ;;
+      --ca_name | --ca-name)
+        arg_required "${@}"
+        context_set-option "CA_NAME" "${2}"
+        shift 2
+        ;;
+      -o | --option)
+        arg_required "${@}"
+
+        if [[ "${2}" == "cni-managed" ]]; then
+          context_set-option "USE_MCP_CNI" 1
+          shift 2
+          continue
+        fi
+
+        OPTIONAL_OVERLAY="${2},${OPTIONAL_OVERLAY}"
+        context_set-option "OPTIONAL_OVERLAY" "${OPTIONAL_OVERLAY}"
+        if [[ "${2}" == "hub-meshca" ]]; then
+          context_set-option "USE_HUB_WIP" 1
+        fi
+        if [[ "${2}" == "vm" ]]; then
+          context_set-option "USE_VM" 1
+        fi
+        shift 2
+        ;;
+      --co | --custom_overlay | --custom-overlay)
+        arg_required "${@}"
+        CUSTOM_OVERLAY="${2},${CUSTOM_OVERLAY}"
+        context_set-option "CUSTOM_OVERLAY" "${CUSTOM_OVERLAY}"
+        shift 2
+        ;;
+      -e | --enable_all | --enable-all)
+        context_set-option "ENABLE_ALL" 1
+        shift 1
+        ;;
+      --enable_cluster_roles | --enable-cluster-roles)
+        context_set-option "ENABLE_CLUSTER_ROLES" 1
+        shift 1
+        ;;
+      --enable_cluster_labels | --enable-cluster-labels)
+        context_set-option "ENABLE_CLUSTER_LABELS" 1
+        shift 1
+        ;;
+      --enable_gcp_apis | --enable-gcp-apis)
+        context_set-option "ENABLE_GCP_APIS" 1
+        shift 1
+        ;;
+      --enable_gcp_iam_roles | --enable-gcp-iam-roles)
+        context_set-option "ENABLE_GCP_IAM_ROLES" 1
+        shift 1
+        ;;
+      --enable_gcp_components | --enable-gcp-components)
+        context_set-option "ENABLE_GCP_COMPONENTS" 1
+        shift 1
+        ;;
+      --enable_registration | --enable-registration)
+        context_set-option "ENABLE_REGISTRATION" 1
+        shift 1
+        ;;
+      --enable_namespace_creation | --enable-namespace-creation)
+        context_set-option "ENABLE_NAMESPACE_CREATION" 1
+        shift 1
+        ;;
+      --managed)
+        context_set-option "MANAGED" 1
+        REVISION_LABEL="asm-managed"
+        shift 1
+        ;;
+      --disable_canonical_service | --disable-canonical-service)
+        context_set-option "DISABLE_CANONICAL_SERVICE" 1
+        shift 1
+        ;;
+      --print_config | --print-config)
+        context_set-option "PRINT_CONFIG" 1
+        shift 1
+        ;;
+      -s | --service_account | --service-account)
+        arg_required "${@}"
+        context_set-option "SERVICE_ACCOUNT" "${2}"
+        shift 2
+        ;;
+      -k | --key_file | --key-file)
+        arg_required "${@}"
+        context_set-option "KEY_FILE" "${2}"
+        shift 2
+        ;;
+      -D | --output_dir | --output-dir)
+        arg_required "${@}"
+        context_set-option "OUTPUT_DIR" "${2}"
+        shift 2
+        ;;
+      --dry_run | --dry-run)
+        context_set-option "DRY_RUN" 1
+        shift 1
+        ;;
+      --only_validate | --only-validate)
+        context_set-option "ONLY_VALIDATE" 1
+        shift 1
+        ;;
+      --only_enable | --only-enable)
+        context_set-option "ONLY_ENABLE" 1
+        shift 1
+        ;;
+      --ca_cert | --ca-cert)
+        arg_required "${@}"
+        context_set-option "CA_CERT" "${2}"
+        context_set-option "CUSTOM_CA" 1
+        shift 2
+        ;;
+      --ca_key | --ca-key)
+        arg_required "${@}"
+        context_set-option "CA_KEY" "${2}"
+        context_set-option "CUSTOM_CA" 1
+        shift 2
+        ;;
+      --root_cert | --root-cert)
+        arg_required "${@}"
+        context_set-option "CA_ROOT" "${2}"
+        context_set-option "CUSTOM_CA" 1
+        shift 2
+        ;;
+      --cert_chain | --cert-chain)
+        arg_required "${@}"
+        context_set-option "CA_CHAIN" "${2}"
+        context_set-option "CUSTOM_CA" 1
+        shift 2
+        ;;
+      -r | --revision_name | --revision-name)
+        arg_required "${@}"
+        context_set-option "CUSTOM_REVISION" 1
+        REVISION_LABEL="${2}"
+        shift 2
+        ;;
+      --platform)
+        arg_required "${@}"
+        context_set-option "PLATFORM" "$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+        shift 2
+        ;;
+      -v | --verbose)
+        context_set-option "VERBOSE" 1
+        shift 1
+        ;;
+      -h | --help)
+        context_set-option "PRINT_HELP" 1
+        shift 1
+        ;;
+      --version)
+        context_set-option "PRINT_VERSION" 1
+        shift 1
+        ;;
+      *)
+        fatal_with_usage "Unknown option ${1}"
+        ;;
+    esac
+  done
+  RAW_YAML="${REVISION_LABEL}-manifest-raw.yaml"; readonly RAW_YAML;
+  EXPANDED_YAML="${REVISION_LABEL}-manifest-expanded.yaml"; readonly EXPANDED_YAML;
+  readonly REVISION_LABEL
+
+  local PRINT_HELP; PRINT_HELP="$(context_get-option "PRINT_HELP")"
+  local PRINT_VERSION; PRINT_VERSION="$(context_get-option "PRINT_VERSION")"
+  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
+  if [[ "${PRINT_HELP}" -eq 1 || "${PRINT_VERSION}" -eq 1 ]]; then
+    if [[ "${PRINT_VERSION}" -eq 1 ]]; then
+      version_message
+    elif [[ "${VERBOSE}" -eq 1 ]]; then
+      usage
+    else
+      usage_short
+    fi
+    exit
+  fi
+}
+
+validate_args() {
+  ### Option variables ###
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local PLATFORM; PLATFORM="$(context_get-option "PLATFORM")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  local CA; CA="$(context_get-option "CA")"
+  local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
+  local OPTIONAL_OVERLAY; OPTIONAL_OVERLAY="$(context_get-option "OPTIONAL_OVERLAY")"
+  local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
+  local ENABLE_CLUSTER_ROLES; ENABLE_CLUSTER_ROLES="$(context_get-option "ENABLE_CLUSTER_ROLES")"
+  local ENABLE_CLUSTER_LABELS; ENABLE_CLUSTER_LABELS="$(context_get-option "ENABLE_CLUSTER_LABELS")"
+  local ENABLE_GCP_APIS; ENABLE_GCP_APIS="$(context_get-option "ENABLE_GCP_APIS")"
+  local ENABLE_GCP_IAM_ROLES; ENABLE_GCP_IAM_ROLES="$(context_get-option "ENABLE_GCP_IAM_ROLES")"
+  local ENABLE_GCP_COMPONENTS; ENABLE_GCP_COMPONENTS="$(context_get-option "ENABLE_GCP_COMPONENTS")"
+  local ENABLE_REGISTRATION; ENABLE_REGISTRATION="$(context_get-option "ENABLE_REGISTRATION")"
+  local ENABLE_NAMESPACE_CREATION; ENABLE_NAMESPACE_CREATION="$(context_get-option "ENABLE_NAMESPACE_CREATION")"
+  local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
+  local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
+  local SERVICE_ACCOUNT; SERVICE_ACCOUNT="$(context_get-option "SERVICE_ACCOUNT")"
+  local KEY_FILE; KEY_FILE="$(context_get-option "KEY_FILE")"
+  local CA_CERT; CA_CERT="$(context_get-option "CA_CERT")"
+  local CA_KEY; CA_KEY="$(context_get-option "CA_KEY")"
+  local CA_ROOT; CA_ROOT="$(context_get-option "CA_ROOT")"
+  local CA_CHAIN; CA_CHAIN="$(context_get-option "CA_CHAIN")"
+  local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
+  local DRY_RUN; DRY_RUN="$(context_get-option "DRY_RUN")"
+  local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
+  local ONLY_ENABLE; ONLY_ENABLE="$(context_get-option "ONLY_ENABLE")"
+  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
+  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
+  local MANAGED_SERVICE_ACCOUNT; MANAGED_SERVICE_ACCOUNT="$(context_get-option "MANAGED_SERVICE_ACCOUNT")"
+  local PRINT_HELP; PRINT_HELP="$(context_get-option "PRINT_HELP")"
+  local PRINT_VERSION; PRINT_VERSION="$(context_get-option "PRINT_VERSION")"
+  local CUSTOM_CA; CUSTOM_CA="$(context_get-option "CUSTOM_CA")"
+  local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
+  local USE_VM; USE_VM="$(context_get-option "USE_VM")"
+  local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
+  local CUSTOM_REVISION; CUSTOM_REVISION="$(context_get-option "CUSTOM_REVISION")"
+  local WI_ENABLED; WI_ENABLED="$(context_get-option "WI_ENABLED")"
+  local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
+  local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
+
+  if [[ -z "${CA}" ]]; then
+    CA="mesh_ca"
+    context_set-option "CA" "${CA}"
+  fi
+
+  if [[ "${CUSTOM_REVISION}" -eq 1 ]]; then
+    validate_revision_label
+  fi
+
+  if is_managed; then
+    if [[ "${CA}" == "citadel" ]]; then
+      fatal "Citadel is not supported with managed control plane."
+    fi
+
+    if [[ "${CA}" == "gcp_cas" ]]; then
+      fatal "Google Certificate Authority Service integration is not supported with managed control plane."
+    fi
+
+    if [[ "${CUSTOM_CA}" -eq 1 ]]; then
+      fatal "Specifying a custom CA with managed control plane is not supported."
+    fi
+
+    if [[ "${CUSTOM_REVISION}" -eq 1 ]]; then
+      fatal "Specifying a revision label with managed control plane is not supported."
+    fi
+
+    if [[ -n "${CUSTOM_OVERLAY}" ]]; then
+      fatal "Specifying a custom overlay file with managed control plane is not supported."
+    fi
+  fi
+
+  if [[ -z "${PLATFORM}" ]]; then
+    PLATFORM="gcp"
+    context_set-option "PLATFORM" "gcp"
+  fi
+
+  case "${PLATFORM}" in
+      gcp | multicloud);;
+      *) fatal "PLATFORM must be one of 'gcp', 'multicloud'";;
+  esac
+
+  local MISSING_ARGS=0
+
+  local CLUSTER_DETAIL_SUPPLIED=0
+  local CLUSTER_DETAIL_VALID=1
+  while read -r REQUIRED_ARG; do
+    if [[ -z "${!REQUIRED_ARG}" ]]; then
+      CLUSTER_DETAIL_VALID=0
+    else
+      CLUSTER_DETAIL_SUPPLIED=1 # gke cluster param usage intended
+    fi
+  done <<EOF
+PROJECT_ID
+CLUSTER_LOCATION
+CLUSTER_NAME
+EOF
+
+  # Script will not infer the intent between the 2 use cases in case both values are provided
+  if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 1 && "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
+    fatal_with_usage "Incompatible arguments. Kubeconfig cannot be used in conjuntion with [--cluster_location|--cluster_name|--project_id]."
+  fi
+
+  if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 1 && "${CLUSTER_DETAIL_VALID}" -eq 0 ]]; then
+    MISSING_ARGS=1
+    warn "Missing one or more required options for [CLUSTER_LOCATION|CLUSTER_NAME|PROJECT_ID]"
+  fi
+
+  if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 0 && "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
+    MISSING_ARGS=1
+    warn "At least one of the following is required: 1) --kubeconfig or 2) --cluster_location, --cluster_name, --project_id"
+  fi
+
+  if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 && -z "${CONTEXT}" ]]; then
+    # set CONTEXT to current-context in the KUBECONFIG
+    # or fail-fast if current-context doesn't exist
+    CONTEXT="$(kubectl config current-context)"
+    if [[ -z "${CONTEXT}" ]]; then
+      MISSING_ARGS=1
+      warn "Missing current-context in the KUBECONFIG. Please provide context with --context flag or set a current-context in the KUBECONFIG"
+    else
+      context_set-option "CONTEXT" "${CONTEXT}"
+    fi
+  fi
+
+  if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
+    info "Reading cluster information for ${CONTEXT}"
+    IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
+${CONTEXT}
+EOF
+    if is_gcp; then
+      context_set-option "PROJECT_ID" "${PROJECT_ID}"
+      context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
+      context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
+    fi
+  fi
+
+  if is_gcp; then
+    # when no Fleet Id is provided, default to the cluster's project as the Fleet host.
+    if [[ -z "${FLEET_ID}" ]]; then
+      FLEET_ID="${PROJECT_ID}"
+      context_set-option "FLEET_ID" "${FLEET_ID}"
+    fi
+  else
+    # set Project Id to same as Fleet Id.
+    # Project Id will be used to enable APIs if applicable.
+    if [[ -n "${FLEET_ID}" ]]; then
+      PROJECT_ID="${FLEET_ID}"
+      context_set-option "PROJECT_ID" "${PROJECT_ID}"
+    fi
+  fi
+
+  if can_register_cluster && ! has_value "FLEET_ID"; then
+    MISSING_ARGS=1
+    warn "Missing FLEET_ID to register the cluster."
+  fi
+
+  case "${CA}" in
+    citadel | mesh_ca | gcp_cas);;
+    "")
+      MISSING_ARGS=1
+      warn "Missing value for CA"
+      ;;
+    *) fatal "CA must be one of 'citadel', 'mesh_ca', 'gcp_cas'";;
+  esac
+
+  if [[ "${CA}" = "gcp_cas" ]]; then
+    validate_private_ca
+  elif [[ "${CUSTOM_CA}" -eq 1 ]]; then
+    validate_citadel
+  fi
+
+  if [[ "${MISSING_ARGS}" -ne 0 ]]; then
+    fatal_with_usage "Missing one or more required options."
+  fi
+
+  while read -r FLAG; do
+    if [[ "${!FLAG}" -ne 0 && "${!FLAG}" -ne 1 ]]; then
+      fatal "${FLAG} must be 0 (off) or 1 (on) if set via environment variables."
+    fi
+    readonly "${FLAG}"
+  done <<EOF
+DRY_RUN
+ENABLE_ALL
+ENABLE_CLUSTER_ROLES
+ENABLE_CLUSTER_LABELS
+ENABLE_GCP_APIS
+ENABLE_GCP_IAM_ROLES
+ENABLE_GCP_COMPONENTS
+ENABLE_REGISTRATION
+MANAGED
+DISABLE_CANONICAL_SERVICE
+ONLY_VALIDATE
+ONLY_ENABLE
+VERBOSE
+EOF
+
+  if [[ "${ENABLE_ALL}" -eq 1 || "${ENABLE_CLUSTER_ROLES}" -eq 1 || \
+    "${ENABLE_CLUSTER_LABELS}" -eq 1 || "${ENABLE_GCP_APIS}" -eq 1 || \
+    "${ENABLE_GCP_IAM_ROLES}" -eq 1 || "${ENABLE_GCP_COMPONENTS}" -eq 1 || \
+    "${ENABLE_REGISTRATION}" -eq 1  || "${ENABLE_NAMESPACE_CREATION}" -eq 1 ]]; then
+    if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
+      fatal "The only_validate flag cannot be used with any --enable* flag"
+    fi
+  elif only_enable; then
+    fatal "You must specify at least one --enable* flag with --only_enable"
+  fi
+
+  if [[ -n "$SERVICE_ACCOUNT" && -z "$KEY_FILE" || -z "$SERVICE_ACCOUNT" && -n "$KEY_FILE" ]]; then
+    fatal "Service account and key file must be used together."
+  fi
+
+  # since we cd to a tmp directory, we need the absolute path for the key file
+  # and yaml file
+  if [[ -f "${KEY_FILE}" ]]; then
+    KEY_FILE="$(apath -f "${KEY_FILE}")"
+    readonly KEY_FILE
+  elif [[ -n "${KEY_FILE}" ]]; then
+    fatal "Couldn't find key file ${KEY_FILE}."
+  fi
+
+  local ABS_OVERLAYS; ABS_OVERLAYS=""
+  while read -d ',' -r yaml_file; do
+    if [[ -f "${yaml_file}" ]]; then
+      ABS_OVERLAYS="$(apath -f "${yaml_file}"),${ABS_OVERLAYS}"
+    elif [[ -n "${yaml_file}" ]]; then
+      fatal "Couldn't find yaml file ${yaml_file}."
+    fi
+  done <<EOF
+${CUSTOM_OVERLAY}
+EOF
+  CUSTOM_OVERLAY="${ABS_OVERLAYS}"
+  context_set-option "CUSTOM_OVERLAY" "${CUSTOM_OVERLAY}"
+
+  WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"; readonly WORKLOAD_POOL
+
+  validate_hub
+}
+
+arg_required() {
+  if [[ ! "${2:-}" || "${2:0:1}" = '-' ]]; then
+    fatal "Option ${1} requires an argument."
+  fi
+}
+KUBE_TAG_MAX_LEN=63; readonly KUBE_TAG_MAX_LEN
+
+gen_install_params() {
+  local CA; CA="$(context_get-option "CA")"
+
+  local PARAM_BUILDER="-f ${OPERATOR_MANIFEST}"
+  for yaml_file in $(context_list "istioctlFiles"); do
+    PARAM_BUILDER="${PARAM_BUILDER} -f ${yaml_file}"
+  done
+
+  if [[ "${K8S_MINOR}" -eq 15 ]]; then
+    PARAM_BUILDER="${PARAM_BUILDER} -f ${BETA_CRD_MANIFEST}"
+  fi
+
+  if [[ "${CA}" == "citadel" ]]; then
+    PARAM_BUILDER="${PARAM_BUILDER} -f ${CITADEL_MANIFEST}"
+  fi
+
+  if ! is_gcp; then
+    PARAM_BUILDER="${PARAM_BUILDER} -f ${OFF_GCP_MANIFEST}"
+  fi
+
+  echo "${PARAM_BUILDER}"
+}
+
+#######
+# run_command takes a list of arguments that represents a command
+# If DRY_RUN or VERBOSE is enabled, it will print the command, and if DRY_RUN is
+# not enabled it runs the command.
+#######
+run_command() {
+  local DRY_RUN; DRY_RUN="$(context_get-option "DRY_RUN")"
+  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
+
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    warn "Would have executed: ${*}"
+    return
+  elif [[ "${VERBOSE}" -eq 0 ]]; then
+    "${@}" 2>/dev/null
+    return "$?"
+  fi
+  info "Running: '${*}'"
+  info "-------------"
+  local RETVAL
+  { "${@}"; RETVAL="$?"; } || true
+  return $RETVAL
+}
+
+#######
+# retry takes an integer N as the first argument, and a list of arguments
+# representing a command afterwards. It will retry the given command up to N
+# times before returning 1. If the command is kubectl, it will try to
+# re-get credentials in case something caused the k8s IP to change.
+#######
+retry() {
+  local MAX_TRIES; MAX_TRIES="${1}";
+  shift 1
+  for i in $(seq 0 "${MAX_TRIES}"); do
+    if [[ "${i}" -eq "${MAX_TRIES}" ]]; then
+      break
+    fi
+    { "${@}" && return 0; } || true
+    warn "Failed, retrying...($((i+1)) of ${MAX_TRIES})"
+    sleep 2
+  done
+  local CMD="'$*'"
+  warn "Command $CMD failed."
+  false
+}
+
+find_missing_strings() {
+  local NEEDLES; NEEDLES="${1}";
+  local HAYSTACK; HAYSTACK="${2}";
+  local NOTFOUND; NOTFOUND="";
+  local EXITCODE; EXITCODE=0;
+
+  while read -r needle; do
+    EXITCODE=0
+    grep -q "${needle}" <<EOF || EXITCODE=$?
+${HAYSTACK}
+EOF
+    if [[ "${EXITCODE}" -ne 0 ]]; then
+      NOTFOUND="${needle},${NOTFOUND}"
+    fi
+  done <<EOF
+${NEEDLES}
+EOF
+
+  if [[ -n "${NOTFOUND}" ]]; then NOTFOUND="$(strip_trailing_commas "${NOTFOUND}")"; fi
+  echo "${NOTFOUND}"
+}
+
+strip_trailing_commas() {
+  # shellcheck disable=SC2001
+  echo "${1}" | sed 's/,*$//g'
+}
+
+warn() {
+  info "[WARNING]: ${1}" >&2
+}
+
+warn_pause() {
+  warn "${1}"
+  sleep 2
+}
+
+error() {
+  info "[ERROR]: ${1}" >&2
+}
+
+info() {
+  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
+  if hash ts 2>/dev/null && [[ "${VERBOSE}" -eq 1 ]]; then
+    echo "${SCRIPT_NAME}: ${1}" | TZ=utc ts '%Y-%m-%dT%.T' >&2
+  else
+    echo "${SCRIPT_NAME}: ${1}" >&2
+  fi
+}
+
+fatal() {
+  error "${1}"
+  exit 2
+}
+
+fatal_with_usage() {
+  error "${1}"
+  usage_short >&2
+  exit 2
+}
+
+prompt_user_for_value() {
+  read -r -p "Please provide a value for ${1}:" VALUE
+  if [[ -n "${VALUE}" ]]; then
+    echo "${VALUE}"
+  fi
+}
+
+starline() {
+  echo "*****************************"
+}
+
+enable_common_message() {
+  echo "Alternatively, use --enable_all|-e to allow this tool to handle all dependencies."
+}
+
+download_kpt() {
+  local PLATFORM
+  PLATFORM="$(get_platform "$(uname)" "$(uname -m)")"
+  if [[ -z "${PLATFORM}" ]]; then
+    fatal "$(uname) $(uname -m) is not a supported platform to perform installation from."
+  fi
+
+  local KPT_TGZ
+  KPT_TGZ="https://github.com/GoogleContainerTools/kpt/releases/download/v0.39.3/kpt_${PLATFORM}-0.39.3.tar.gz"
+
+  info "Downloading kpt.."
+  curl -L "${KPT_TGZ}" | tar xz
+  AKPT="$(apath -f kpt)"
+}
+
+get_platform() {
+  local OS; OS="${1}"
+  local ARCH; ARCH="${2}"
+  local PLATFORM
+
+  case "${OS}" in
+    Linux ) PLATFORM="linux_amd64";;
+    Darwin)
+      if [[ "${ARCH}" == "arm64" ]]; then
+        PLATFORM="darwin_arm64"
+      else
+        PLATFORM="darwin_amd64"
+      fi
+    ;;
+  esac
+
+  echo "${PLATFORM}"
+}
+
+download_asm() {
+  local OS
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+
+  case "$(uname)" in
+    Linux ) OS="linux-amd64";;
+    Darwin) OS="osx";;
+    *     ) fatal "$(uname) is not a supported OS.";;
+  esac
+
+  info "Downloading ASM.."
+  local TARBALL; TARBALL="istio-${RELEASE}-${OS}.tar.gz"
+  if [[ -z "${_CI_ASM_PKG_LOCATION}" ]]; then
+    curl -L "https://storage.googleapis.com/gke-release/asm/${TARBALL}" \
+      | tar xz
+  else
+    local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
+    run_command curl -L "https://storage.googleapis.com/${_CI_ASM_PKG_LOCATION}/asm/${TARBALL}" \
+      --header @- <<EOF | tar xz
+Authorization: Bearer ${TOKEN}
+EOF
+  fi
+
+  ln -s "${ISTIOCTL_REL_PATH}" .
+
+  info "Downloading ASM kpt package..."
+  retry 3 kpt pkg get --auto-set=false "${KPT_URL}" asm
+  version_message > "${ASM_VERSION_FILE}"
+}
 
 # LTS releases don't have curl 7.55 so we can't use the @- construction,
 # using -K keeps the token from printing if this script is run with -v
@@ -3391,6 +3416,7 @@ init() {
   esac
   readonly APATH
 
+  local REVISION_LABEL
   if [[ "${POINT}" == "alpha" ]]; then
     RELEASE="${MAJOR}.${MINOR}-alpha.${REV}"
     REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}"
@@ -3406,6 +3432,7 @@ init() {
   fi
   RELEASE_LINE="${MAJOR}.${MINOR}."
   PREVIOUS_RELEASE_LINE="${MAJOR}.$(( MINOR - 1 ))."
+  context_set-option "REVISION_LABEL" "${REVISION_LABEL}"
   readonly RELEASE; readonly RELEASE_LINE; readonly PREVIOUS_RELEASE_LINE; readonly KPT_BRANCH;
 
   KPT_URL="https://github.com/GoogleCloudPlatform/anthos-service-mesh-packages"
@@ -3427,8 +3454,6 @@ init() {
   EXPOSE_ISTIOD_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_SERVICE;
   CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
   ASM_VERSION_FILE=".asm_version"; readonly ASM_VERSION_FILE;
-  RAW_YAML="${REVISION_LABEL}-manifest-raw.yaml"; readonly RAW_YAML;
-  EXPANDED_YAML="${REVISION_LABEL}-manifest-expanded.yaml"; readonly EXPANDED_YAML;
 
   CRD_CONTROL_PLANE_REVISION="asm/control-plane-revision/crd.yaml"; readonly CRD_CONTROL_PLANE_REVISION;
   CR_CONTROL_PLANE_REVISION_REGULAR="asm/control-plane-revision/cr_regular.yaml"; readonly CR_CONTROL_PLANE_REVISION_REGULAR;
@@ -3494,37 +3519,6 @@ istioctl_path() {
   fi
 }
 
-configure_kubectl(){
-  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
-  local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
-
-  if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
-    info "Fetching/writing GCP credentials to kubeconfig file..."
-    KUBECONFIG="${KUBECONFIG}" retry 2 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
-      --project="${PROJECT_ID}" \
-      --zone="${CLUSTER_LOCATION}"
-    context_set-option "KUBECONFIG" "${KUBECONFIG}"
-  else
-    KUBECONFIG="$(context_get-option "KUBECONFIG")"
-  fi
-
-  if ! hash nc 2>/dev/null; then
-     warn "nc not found, skipping k8s connection verification"
-     warn "(Installation will continue normally.)"
-     return
-  fi
-
-  if is_gcp; then
-    verify_connectivity
-  fi
-
-  info "kubeconfig set to ${KUBECONFIG}"
-  CONTEXT="$(context_get-option "CONTEXT")"
-  info "using context ${CONTEXT}"
-}
-
 verify_connectivity() {
   info "Verifying connectivity (10s)..."
   local ADDR
@@ -3573,6 +3567,7 @@ auth_service_account() {
 set_up_local_workspace() {
   local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
+  local KUBECONFIG_FILE; KUBECONFIG_FILE="$(context_get-option "KUBECONFIG_FILE")"
 
   info "Setting up necessary files..."
   if [[ -z "${OUTPUT_DIR}" ]]; then
@@ -3605,15 +3600,12 @@ set_up_local_workspace() {
   pushd "$OUTPUT_DIR" > /dev/null
   context_set-option "OUTPUT_DIR" "${OUTPUT_DIR}"
 
-  # If KUBECONFIG file is supplied, keep using that.
-  KUBECONFIG="$(context_get-option "KUBECONFIG")"
-
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
-    KUBECONFIG="asm_kubeconfig"
-    context_set-option "KUBECONFIG" "${KUBECONFIG}"
+    KUBECONFIG_FILE="asm_kubeconfig"
+    context_set-option "KUBECONFIG" "${KUBECONFIG_FILE}"
   fi
 
-  info "Using ${KUBECONFIG} as the kubeconfig..."
+  info "Using ${KUBECONFIG_FILE} as the kubeconfig..."
 }
 
 organize_kpt_files() {

@@ -65,7 +65,7 @@ GKE_CLUSTER_URI=""
 GCE_NETWORK_NAME=""
 GCLOUD_USER_OR_SA="${GCLOUD_USER_OR_SA:=}"
 KPT_URL=""
-KUBECONFIG=""
+KUBECONFIG=""; readonly KUBECONFIG
 APATH=""
 AKUBECTL=""
 AKPT=""
@@ -80,8 +80,6 @@ EXPANDED_YAML=""
 NAMESPACE_EXISTS=0
 
 main() {
-  init
-
   if [[ "${*}" = '' ]]; then
     usage_short >&2
     exit 2
@@ -92,6 +90,7 @@ main() {
   shopt -s nocasematch
 
   context_init
+  init
   case "${1}" in
     install)
       shift 1
