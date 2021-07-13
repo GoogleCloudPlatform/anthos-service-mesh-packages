@@ -348,6 +348,16 @@ configure_kubectl(){
      return
   fi
 
+  if is_gcp; then
+    verify_connectivity
+  fi
+
+  info "kubeconfig set to ${KUBECONFIG}"
+  CONTEXT="$(context_get-option "CONTEXT")"
+  info "using context ${CONTEXT}"
+}
+
+verify_connectivity() {
   info "Verifying connectivity (10s)..."
   local ADDR
   ADDR="$(kubectl config view --minify=true -ojson | \
@@ -364,9 +374,6 @@ If this is a private cluster, verify that the correct firewall rules are applied
 https://cloud.google.com/service-mesh/docs/gke-install-overview#requirements
 EOF
   fi
-  info "kubeconfig set to ${KUBECONFIG}"
-  CONTEXT="$(context_get-option "CONTEXT")"
-  info "using context ${CONTEXT}"
 }
 
 warn() {
