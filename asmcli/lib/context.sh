@@ -48,7 +48,8 @@ context_init() {
     "HUB_MEMBERSHIP_ID": "${HUB_MEMBERSHIP_ID:-}",
     "CUSTOM_REVISION": ${CUSTOM_REVISION:-0},
     "TRUST_DOMAIN_ALIASES": "${TRUST_DOMAIN_ALIASES:-}",
-    "WI_ENABLED": ${WI_ENABLED:-0}
+    "WI_ENABLED": ${WI_ENABLED:-0},
+    "HTTPS_PROXY": "${HTTPS_PROXY:-}"
   },
   "istioctlFiles": [],
   "kubectlFiles": [],
@@ -63,6 +64,19 @@ EOF
   export context_FILE_LOCATION
 
   echo "${CONTEXT_JSON}" | jq -S '.' >| "${context_FILE_LOCATION}"
+
+  context_post-init
+}
+
+# Function to be called at the end of context_init
+# that houses any secondary initialization or cleanup
+# steps after the context has been initialized.
+context_post-init() {
+
+  # Certain multicloud clusters require kubectl to use
+  # a proxy. If this proxy is exported, the gcloud will
+  # break.
+  unset HTTPS_PROXY
 }
 
 context_get-option() {
