@@ -257,7 +257,7 @@ init() {
   if [[ "${POINT}" == "alpha" ]]; then
     RELEASE="${MAJOR}.${MINOR}-alpha.${REV}"
     REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}"
-    KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=v2}"
+    KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=main}"
   elif [[ "$(version_message)" =~ ^[0-9]+\.[0-9]+\.[0-9]+-asm\.[0-9]+\+config[0-9]+$ ]]; then
     RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
     REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}-${REV}"
@@ -289,6 +289,7 @@ init() {
   MANAGED_MANIFEST="${OPTIONS_DIRECTORY}/managed-control-plane.yaml"; readonly MANAGED_MANIFEST;
   MANAGED_WEBHOOKS="${OPTIONS_DIRECTORY}/managed-control-plane-webhooks.yaml"; readonly MANAGED_WEBHOOKS;
   EXPOSE_ISTIOD_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_SERVICE;
+  EXPANSION_GATEWAY_FILE="${PACKAGE_DIRECTORY}/expansion/vm-eastwest-gateway.yaml"; readonly EXPANSION_GATEWAY_FILE;
   CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
   ASM_VERSION_FILE=".asm_version"; readonly ASM_VERSION_FILE;
 

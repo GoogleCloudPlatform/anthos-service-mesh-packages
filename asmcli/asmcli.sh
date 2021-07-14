@@ -52,6 +52,7 @@ MANAGED_MANIFEST=""
 MANAGED_WEBHOOKS=""
 EXPOSE_ISTIOD_SERVICE=""
 CANONICAL_CONTROLLER_MANIFEST=""
+EXPANSION_GATEWAY_FILE=""
 
 CRD_CONTROL_PLANE_REVISION=""
 CR_CONTROL_PLANE_REVISION_REGULAR=""
@@ -113,15 +114,9 @@ main() {
       shift 1
       create-mesh_subcommand "${@}"
       ;;
-<<<<<<< HEAD
     experimental | x)
       shift 1
       experimental_subcommand "${@}"
-=======
-    vm)
-      shift 1
-      vm_subcommand "${@}"
->>>>>>> 39a3a31 (add vm subcommand)
       ;;
     *)
       help_subcommand "${@}"
