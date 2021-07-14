@@ -255,10 +255,10 @@ kubectl() {
   fi
 
   if [[ -n "${HTTPS_PROXY}" ]]; then
-    export "HTTPS_PROXY=${HTTPS_PROXY}"
+    HTTPS_PROXY=${HTTPS_PROXY}" run_command "${AKUBECTL}" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
+  else
+    run_command "${AKUBECTL}" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
   fi
-  run_command "${AKUBECTL}" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
-  unset HTTPS_PROXY
 }
 
 kpt() {
@@ -275,10 +275,10 @@ istioctl() {
   fi
 
   if [[ -n "${HTTPS_PROXY}" ]]; then
-    export "HTTPS_PROXY=${HTTPS_PROXY}"
+    HTTPS_PROXY="${HTTPS_PROXY}" run_command "$(istioctl_path)" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
+  else
+    run_command "$(istioctl_path)" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
   fi
-  run_command "$(istioctl_path)" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
-  unset HTTPS_PROXY
 }
 
 istioctl_path() {
