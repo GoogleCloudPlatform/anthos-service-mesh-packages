@@ -246,13 +246,19 @@ gcloud() {
 }
 
 kubectl() {
-  local KCF KCC
+  local KCF KCC HTTPS_PROXY
   KCF="$(context_get-option "KUBECONFIG")"
   KCC="$(context_get-option "CONTEXT")"
+  HTTPS_PROXY="$(context_get-option "HTTPS_PROXY")"
   if [[ -z "${KCF}" ]]; then
     KCF="${KUBECONFIG}"
   fi
-  run_command "${AKUBECTL}" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
+
+  if [[ -n "${HTTPS_PROXY}" ]]; then
+    HTTPS_PROXY="${HTTPS_PROXY}" run_command "${AKUBECTL}" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
+  else
+    run_command "${AKUBECTL}" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
+  fi
 }
 
 kpt() {
@@ -260,9 +266,19 @@ kpt() {
 }
 
 istioctl() {
-  local KCF; KCF="$(context_get-option "KUBECONFIG")"
-  local KCC; KCC="$(context_get-option "CONTEXT")"
-  run_command "$(istioctl_path)" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
+  local KCF KCC HTTPS_PROXY
+  KCF="$(context_get-option "KUBECONFIG")"
+  KCC="$(context_get-option "CONTEXT")"
+  HTTPS_PROXY="$(context_get-option "HTTPS_PROXY")"
+  if [[ -z "${KCF}" ]]; then
+    KCF="${KUBECONFIG}"
+  fi
+
+  if [[ -n "${HTTPS_PROXY}" ]]; then
+    HTTPS_PROXY="${HTTPS_PROXY}" run_command "$(istioctl_path)" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
+  else
+    run_command "$(istioctl_path)" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
+  fi
 }
 
 istioctl_path() {
@@ -272,7 +288,6 @@ istioctl_path() {
     echo "./${ISTIOCTL_REL_PATH}"
   fi
 }
-
 
 #######
 # retry takes an integer N as the first argument, and a list of arguments
