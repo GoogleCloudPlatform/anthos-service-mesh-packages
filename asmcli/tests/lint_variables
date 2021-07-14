@@ -20,7 +20,8 @@ get_all_variables() {
 
 should_skip() {
   local VARIABLE; VARIABLE="$1"
-  if [[ "${VARIABLE}" = "IFS" || "${VARIABLE}" = "TZ" ]]; then
+  if [[ "${VARIABLE}" = "IFS" || "${VARIABLE}" = "TZ" 
+  || "${VARIABLE}" = "KUBECONFIG" || "${VARIABLE}" = "HTTPS_PROXY" ]]; then
     true
     return
   fi

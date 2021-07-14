@@ -72,9 +72,10 @@ configure_kubectl(){
 
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
     info "Fetching/writing GCP credentials to kubeconfig file..."
-    KUBECONFIG="${KUBECONFIG_FILE}" retry 2 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
+    retry 2 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
       --project="${PROJECT_ID}" \
-      --zone="${CLUSTER_LOCATION}"
+      --zone="${CLUSTER_LOCATION}" \
+      --kubeconfig="${KUBECONFIG_FILE}"
     context_set-option "KUBECONFIG" "${KUBECONFIG_FILE}"
     context_set-option "CONTEXT" "$(kubectl config current-context)"
   fi
