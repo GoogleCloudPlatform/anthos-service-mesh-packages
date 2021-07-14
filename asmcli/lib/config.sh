@@ -66,17 +66,16 @@ configure_kubectl(){
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
-  local KUBECONFIG_FILE; KUBECONFIG_FILE="$(context_get-option "KUBECONFIG")"
   local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
+  local KUBECONFIG; KUBECONFIG="$(context_get-option "KUBECONFIG")"
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
 
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
     info "Fetching/writing GCP credentials to kubeconfig file..."
-    retry 2 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
+    KUBECONFIG="${KUBECONFIG}" retry 2 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
       --project="${PROJECT_ID}" \
-      --zone="${CLUSTER_LOCATION}" \
-      --kubeconfig="${KUBECONFIG_FILE}"
-    context_set-option "KUBECONFIG" "${KUBECONFIG_FILE}"
+      --zone="${CLUSTER_LOCATION}"
+    context_set-option "KUBECONFIG" "${KUBECONFIG}"
     context_set-option "CONTEXT" "$(kubectl config current-context)"
   fi
 
@@ -90,7 +89,7 @@ configure_kubectl(){
     verify_connectivity
   fi
 
-  info "kubeconfig set to ${KUBECONFIG_FILE}"
+  info "kubeconfig set to ${KUBECONFIG}"
   CONTEXT="$(context_get-option "CONTEXT")"
   info "using context ${CONTEXT}"
 }

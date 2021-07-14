@@ -404,7 +404,7 @@ auth_service_account() {
 set_up_local_workspace() {
   local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
-  local KUBECONFIG_FILE; KUBECONFIG_FILE="$(context_get-option "KUBECONFIG_FILE")"
+  local KUBECONFIG; KUBECONFIG="$(context_get-option "KUBECONFIG")"
 
   info "Setting up necessary files..."
   if [[ -z "${OUTPUT_DIR}" ]]; then
@@ -438,11 +438,11 @@ set_up_local_workspace() {
   context_set-option "OUTPUT_DIR" "${OUTPUT_DIR}"
 
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
-    KUBECONFIG_FILE="asm_kubeconfig"
-    context_set-option "KUBECONFIG" "${KUBECONFIG_FILE}"
+    KUBECONFIG="asm_kubeconfig"
+    context_set-option "KUBECONFIG" "${KUBECONFIG}"
   fi
 
-  info "Using ${KUBECONFIG_FILE} as the kubeconfig..."
+  info "Using ${KUBECONFIG} as the kubeconfig..."
 }
 
 organize_kpt_files() {
