@@ -2065,6 +2065,7 @@ register_cluster() {
   else
     CMD="${CMD} --kubeconfig=${KCF} --context=${KCC}"
   fi
+  # shellcheck disable=SC2086
   retry 2 ${CMD}
 }
 
