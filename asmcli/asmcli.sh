@@ -2076,7 +2076,8 @@ register_cluster() {
   else
     CMD="${CMD} --kubeconfig=${KCF} --context=${KCC}"
   fi
-  retry 2 "${CMD}"
+  # shellcheck disable=SC2086
+  retry 2 run_command ${CMD}
 }
 
 exit_if_cluster_unregistered() {
