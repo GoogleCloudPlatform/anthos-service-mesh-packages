@@ -1,4 +1,9 @@
 experimental_subcommand() {
+  if [[ "${*}" = '' ]]; then
+    x_usage >&2
+    exit 2
+  fi
+
   case "${1}" in
     vm)
       shift 1

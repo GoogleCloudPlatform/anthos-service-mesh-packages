@@ -1,5 +1,21 @@
 vm_subcommand() {
+  if [[ "${*}" = '' ]]; then
+    vm_usage >&2
+    exit 2
+  fi
+
+  init_vm
   parse_subcommand_for_vm "$@"
+}
+
+init_vm() {
+  ASM_REVISIONS=""
+
+  EXPANSION_GATEWAY_NAME="istio-eastwestgateway"; readonly EXPANSION_GATEWAY_NAME
+  ASM_REVISION_LABEL_KEY="istio.io/rev"; readonly ASM_REVISION_LABEL_KEY
+
+  INSTALL_EXPANSION_GATEWAY=0
+  INSTALL_IDENTITY_PROVIDER=0
 }
 
 parse_subcommand_for_vm() {
@@ -13,8 +29,9 @@ parse_subcommand_for_vm() {
       prepare_cluster_subcommand "${@}"
       ;;
     *)
-      # TODO: update the help text.
-      help_subcommand "${@}"
+      error "Unknown subcommand ${1}"
+      vm_usage >&2
+      exit 2
       ;;
   esac
 }
@@ -28,12 +45,56 @@ prepare_cluster_subcommand() {
   fi
 
   validate_vm_dependencies
+  
+  local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
+  if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
+    info "Successfully validated all prerequistes from this shell."
+    exit 0
+  fi
+
+  if [[ "${INSTALL_EXPANSION_GATEWAY}" -eq 1 ]] || [[ "${INSTALL_IDENTITY_PROVIDER}" -eq 1 ]]; then
+    set_up_local_workspace
+    configure_kubectl
+    if needs_kpt; then
+      download_kpt
+    fi
+    readonly AKPT
+    download_asm
+    if [[ "${INSTALL_IDENTITY_PROVIDER}" -eq 1 ]]; then
+      install_google_identity_provider
+    fi
+    if [[ "${INSTALL_EXPANSION_GATEWAY}" -eq 1 ]]; then
+      install_expansion_gateway
+      expose_istiod_vm
+    fi
+  fi
+
+  enable_service_mesh_feature
+  success_message_prepare_cluster
+  return 0
+}
+
+validate_vm_dependencies() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+
+  validate_vm_cli_dependencies
+  validate_project
+  PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" \
+    --format="value(projectNumber)")"
+  validate_asm_cluster
+}
+
+validate_asm_cluster() {
+  validate_cluster
+  configure_kubectl
+  validate_cluster_registration
+  validate_asm_installation
+  validate_google_identity_provider
 }
 
 parse_vm_args() {
   if [[ "${*}" = '' ]]; then
-    # TODO: update the short help text.
-    usage_short >&2
+    vm_usage >&2
     exit 2
   fi
 
@@ -58,10 +119,6 @@ parse_vm_args() {
         context_set-option "PROJECT_ID" "${2}"
         shift 2
         ;;
-      --print_config | --print-config)
-        context_set-option "PRINT_CONFIG" 1
-        shift 1
-        ;;
       -s | --service_account | --service-account)
         arg_required "${@}"
         context_set-option "SERVICE_ACCOUNT" "${2}"
@@ -70,11 +127,6 @@ parse_vm_args() {
       -k | --key_file | --key-file)
         arg_required "${@}"
         context_set-option "KEY_FILE" "${2}"
-        shift 2
-        ;;
-      -D | --output_dir | --output-dir)
-        arg_required "${@}"
-        context_set-option "OUTPUT_DIR" "${2}"
         shift 2
         ;;
       --dry_run | --dry-run)
@@ -94,30 +146,54 @@ parse_vm_args() {
         shift 1
         ;;
       *)
-        # TODO: update fatal help text.
-        fatal_with_usage "Unknown option ${1}"
+        error "Unknown option ${1}"
+        vm_usage >&2
+        exit 2
         ;;
     esac
   done
 
   local PRINT_HELP; PRINT_HELP="$(context_get-option "PRINT_HELP")"
-  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
-  # TODO: update help message.
   if [[ "${PRINT_HELP}" -eq 1 ]]; then
-    if [[ "${VERBOSE}" -eq 1 ]]; then
-      usage
-    else
-      usage_short
-    fi
+    vm_usage
     exit
   fi
+}
+
+vm_usage() {
+  cat << EOF
+${SCRIPT_NAME} $(version_message)
+usage: ${SCRIPT_NAME} experimental vm [SUBCOMMAND] [OPTION]...
+
+Set up and prepare Anthos Service Mesh to add VM workloads.
+
+SUBCOMMANDS:
+  prepare-cluster                     Prepares the specified cluster to allow
+                                      external VM workloads.
+
+OPTIONS:
+  -l|--cluster_location  <LOCATION>   The GCP location of the target cluster.
+  -n|--cluster_name      <NAME>       The name of the target cluster.
+  -p|--project_id        <ID>         The GCP project ID.
+  -s|--service_account   <ACCOUNT>    The name of a service account used to
+                                      install ASM. If not specified, the gcloud
+                                      user currently configured will be used.
+  -k|--key_file          <FILE PATH>  The key file for a service account. This
+                                      option can be omitted if not using a
+                                      service account.
+
+FLAGS:
+  -v|--verbose                        Print commands before and after execution.
+     --dry_run                        Print commands, but don't execute them.
+     --only_validate                  Run validation, but don't install.
+  -h|--help                           Show this message and exit.
+EOF
 }
 
 validate_vm_args() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
-  local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
   local SERVICE_ACCOUNT; SERVICE_ACCOUNT="$(context_get-option "SERVICE_ACCOUNT")"
   local KEY_FILE; KEY_FILE="$(context_get-option "KEY_FILE")"
   local DRY_RUN; DRY_RUN="$(context_get-option "DRY_RUN")"
@@ -184,16 +260,8 @@ jq
 tr
 awk
 grep
-printf
-tail
 $AKUBECTL
 EOF
-
-  if [[ "${PREPARE_CLUSTER}" -eq 1 ]]; then
-    if ! hash kpt 2>/dev/null; then
-      NOTFOUND="kpt,${NOTFOUND}"
-    fi
-  fi
 
   if [[ -n "${NOTFOUND}" ]]; then
     NOTFOUND="$(strip_last_char "${NOTFOUND}")"
@@ -230,18 +298,140 @@ EOF
   fi
 }
 
-validate_asm_cluster() {
-  validate_cluster
-  configure_kubectl
-  validate_cluster_registration
-  validate_asm_installation
-  validate_google_identity_provider
+validate_cluster_registration() {
+  info "Verifying cluster fleet registration..."
+  if ! is_cluster_registered; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Cluster is not registered to a Fleet. Please make sure your cluster is
+registered and try again.
+EOF
+  fi
 }
 
-validate_vm_dependencies() {
-  validate_vm_cli_dependencies
-  validate_project
-  PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" \
-    --format="value(projectNumber)")"
-  validate_asm_cluster
+validate_asm_installation() {
+  local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
+  
+  info "Checking for istio-system namespace..."
+  if [ "$(retry 2 kubectl get ns | grep -c istio-system || true)" -eq 0 ]; then
+    fatal "istio-system namespace cannot be found in the cluster. Please install Anthos Service Mesh and retry."
+  fi
+
+  info "Verifying Anthos Service Mesh installation..."
+  local ISTIOD_NAMES
+  ISTIOD_NAMES=$(retry 2 kubectl -n istio-system get deploy -lapp=istiod \
+    --no-headers -o custom-columns=":metadata.name")
+  if [[ -n "${ISTIOD_NAMES}" ]]; then
+    for istiod in ${ISTIOD_NAMES}; do
+      local CURR_REVISION
+      CURR_REVISION="$(retry 2 kubectl get deployment "${istiod}" \
+        -n istio-system -ojson | jq -r \
+        '.metadata.labels["'"${ASM_REVISION_LABEL_KEY}"'"]')"
+      ASM_REVISIONS="${ASM_REVISIONS} ${CURR_REVISION}"
+    done
+    local EXPANSION_GATEWAY
+    EXPANSION_GATEWAY=$(retry 2 kubectl -n istio-system get deploy \
+      "${EXPANSION_GATEWAY_NAME}" --no-headers \
+      -o custom-columns=":metadata.name" --ignore-not-found=true)
+    if [[ -z "${EXPANSION_GATEWAY}" ]]; then
+      if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
+        { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+${EXPANSION_GATEWAY_NAME} is not found in the cluster.
+Please install Anthos Service Mesh with VM support or run the current script
+without the --only_validate flag.
+EOF
+      else
+        INSTALL_EXPANSION_GATEWAY=1
+      fi
+    fi
+  fi
+}
+
+validate_google_identity_provider() {
+  local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
+
+  info "Verifying identity providers in the cluster..."
+  if ! is_google_identity_provider_installed; then
+    if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
+      { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+GCE identity provider is not found in the cluster. Please install Anthos Service
+Mesh with VM support to allow the script to register the google identity
+provider in your cluster or run the current script without the --only_validate
+flag.
+EOF
+    else
+      INSTALL_IDENTITY_PROVIDER=1
+    fi
+  fi
+}
+
+is_google_identity_provider_installed() {
+  if ! is_idp_crd_installed; then
+    false
+    return
+  fi
+
+  if ! retry 2 kubectl get identityproviders.security.cloud.google.com -ojsonpath="{..metadata.name}" \
+    | grep -w -q google ; then
+    false
+  fi
+}
+
+is_idp_crd_installed() {
+  if ! kubectl api-resources --api-group=security.cloud.google.com | grep -q identityproviders; then
+    false
+  fi
+}
+
+install_google_identity_provider() {
+  info "Registering GCE Identity Provider in the cluster..."
+  retry 3 kubectl apply -f asm/identity-provider/identityprovider-crd.yaml
+  retry 3 kubectl apply -f asm/identity-provider/googleidp.yaml
+}
+
+install_expansion_gateway() {
+  if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then
+    kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
+  fi
+  if [[ -n "${_CI_ASM_IMAGE_TAG}" ]]; then
+    kpt cfg set asm anthos.servicemesh.tag "${_CI_ASM_IMAGE_TAG}"
+  fi
+
+  local PARAMS; PARAMS="-f ${EXPANSION_GATEWAY_FILE}"
+
+  if [[ "${_CI_NO_REVISION}" -ne 1 ]]; then
+    PARAMS="${PARAMS} --set revision=${REVISION_LABEL}"
+  fi
+
+  PARAMS="${PARAMS} --skip-confirmation"
+
+  info "Installing the expansion gateway..."
+  # shellcheck disable=SC2086
+  retry 5 istioctl install $PARAMS
+
+  # Prevent the stderr buffer from ^ messing up the terminal output below
+  sleep 1
+  info "...done!"
+}
+
+expose_istiod_vm() {
+  info "Exposing the control plane for VM workloads..."
+  retry 3 kubectl apply -f "${EXPOSE_ISTIOD_SERVICE}"
+
+  for rev in ${ASM_REVISIONS}; do
+    kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod-${rev}.istio-system.svc.cluster.local"
+    kpt cfg set asm anthos.servicemesh.istiodHost "istiod-${rev}.istio-system.svc"
+    kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${rev}"
+
+    retry 3 kubectl apply -f "${EXPOSE_ISTIOD_SERVICE}"
+  done
+}
+
+success_message_prepare_cluster() {
+  info "
+*****************************
+The cluster is ready for adding VM workloads.
+Please follow the Anthos Service Mesh for GCE VM user guide to add GCE VMs to
+your mesh.
+*****************************
+"
 }
