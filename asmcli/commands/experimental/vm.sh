@@ -13,9 +13,6 @@ init_vm() {
 
   EXPANSION_GATEWAY_NAME="istio-eastwestgateway"; readonly EXPANSION_GATEWAY_NAME
   ASM_REVISION_LABEL_KEY="istio.io/rev"; readonly ASM_REVISION_LABEL_KEY
-
-  INSTALL_EXPANSION_GATEWAY=0
-  INSTALL_IDENTITY_PROVIDER=0
 }
 
 parse_subcommand_for_vm() {
@@ -52,6 +49,8 @@ prepare_cluster_subcommand() {
     exit 0
   fi
 
+  local INSTALL_EXPANSION_GATEWAY; INSTALL_EXPANSION_GATEWAY="$(context_get-option "INSTALL_EXPANSION_GATEWAY")"
+  local INSTALL_IDENTITY_PROVIDER; INSTALL_IDENTITY_PROVIDER="$(context_get-option "INSTALL_IDENTITY_PROVIDER")"
   if [[ "${INSTALL_EXPANSION_GATEWAY}" -eq 1 ]] || [[ "${INSTALL_IDENTITY_PROVIDER}" -eq 1 ]]; then
     set_up_local_workspace
     configure_kubectl
@@ -75,17 +74,22 @@ prepare_cluster_subcommand() {
 }
 
 validate_vm_dependencies() {
+  validate_cli_dependencies
+  
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local FLEET_ID; FLEET_ID="${PROJECT_ID}"
+  context_set-option "FLEET_ID" "${FLEET_ID}"
+  get_project_number
 
-  validate_vm_cli_dependencies
-  validate_project
   validate_asm_cluster
 }
 
 validate_asm_cluster() {
   validate_cluster
   configure_kubectl
-  validate_cluster_registration
+  
+  exit_if_cluster_unregistered
+  
   validate_asm_installation
   validate_google_identity_provider
 }
@@ -240,72 +244,6 @@ EOF
   fi
 }
 
-validate_vm_cli_dependencies() {
-  local NOTFOUND; NOTFOUND="";
-  local EXITCODE; EXITCODE=0;
-
-  info "Checking installation tool dependencies..."
-  while read -r dependency; do
-    EXITCODE=0
-    hash "${dependency}" 2>/dev/null || EXITCODE=$?
-    if [[ "${EXITCODE}" -ne 0 ]]; then
-      NOTFOUND="${dependency},${NOTFOUND}"
-    fi
-  done <<EOF
-$AGCLOUD
-curl
-jq
-tr
-awk
-grep
-$AKUBECTL
-EOF
-
-  if [[ -n "${NOTFOUND}" ]]; then
-    NOTFOUND="$(strip_last_char "${NOTFOUND}")"
-    for dep in $(echo "${NOTFOUND}" | tr ' ' '\n'); do
-      warn "Dependency not found: ${dep}"
-    done
-    fatal "One or more dependencies were not found. Please install them and retry."
-  fi
-
-  # shellcheck disable=SC2064
-  trap "$(shopt -p nocasematch)" RETURN
-  shopt -s nocasematch
-  if [[ "$(uname -m)" != "x86_64" ]]; then
-    fatal "Installation is only supported on x86_64."
-  fi
-}
-
-validate_project() {
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local RESULT; RESULT=""
-
-  info "Checking for ${PROJECT_ID}..."
-  RESULT=$(gcloud projects list \
-    --filter="project_id=${PROJECT_ID}" \
-    --format="value(project_id)" \
-    || true)
-
-  if [[ -z "${RESULT}" ]]; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF
-Unable to find project ${PROJECT_ID}. Please verify the spelling and try
-again. To see a list of your projects, run:
-  gcloud projects list --format='value(project_id)'
-EOF
-  fi
-}
-
-validate_cluster_registration() {
-  info "Verifying cluster fleet registration..."
-  if ! is_cluster_registered; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-Cluster is not registered to a Fleet. Please make sure your cluster is
-registered and try again.
-EOF
-  fi
-}
-
 validate_asm_installation() {
   local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
   
@@ -339,8 +277,7 @@ Please install Anthos Service Mesh with VM support or run the current script
 without the --only_validate flag.
 EOF
       else
-        INSTALL_EXPANSION_GATEWAY=1
-        readonly INSTALL_EXPANSION_GATEWAY
+        context_set-option "INSTALL_EXPANSION_GATEWAY" 1
       fi
     fi
   fi
@@ -359,8 +296,7 @@ provider in your cluster or run the current script without the --only_validate
 flag.
 EOF
     else
-      INSTALL_IDENTITY_PROVIDER=1
-      readonly INSTALL_IDENTITY_PROVIDER
+      context_set-option "INSTALL_IDENTITY_PROVIDER" 1
     fi
   fi
 }
