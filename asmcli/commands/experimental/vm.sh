@@ -79,8 +79,6 @@ validate_vm_dependencies() {
 
   validate_vm_cli_dependencies
   validate_project
-  PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" \
-    --format="value(projectNumber)")"
   validate_asm_cluster
 }
 
@@ -328,6 +326,7 @@ validate_asm_installation() {
         '.metadata.labels["'"${ASM_REVISION_LABEL_KEY}"'"]')"
       ASM_REVISIONS="${ASM_REVISIONS} ${CURR_REVISION}"
     done
+    readonly ASM_REVISIONS
     local EXPANSION_GATEWAY
     EXPANSION_GATEWAY=$(retry 2 kubectl -n istio-system get deploy \
       "${EXPANSION_GATEWAY_NAME}" --no-headers \
@@ -341,6 +340,7 @@ without the --only_validate flag.
 EOF
       else
         INSTALL_EXPANSION_GATEWAY=1
+        readonly INSTALL_EXPANSION_GATEWAY
       fi
     fi
   fi
@@ -360,6 +360,7 @@ flag.
 EOF
     else
       INSTALL_IDENTITY_PROVIDER=1
+      readonly INSTALL_IDENTITY_PROVIDER
     fi
   fi
 }
