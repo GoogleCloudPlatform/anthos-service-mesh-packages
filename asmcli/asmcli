@@ -1241,114 +1241,6 @@ EOF
   fi
 }
 
-<<<<<<< HEAD
-mesh_id_label() {
-  echo "mesh_id=proj-${PROJECT_NUMBER}"
-}
-
-get_cluster_labels() {
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
-  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
-
-  info "Reading labels for ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
-  local LABELS
-  LABELS="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
-    --zone="${CLUSTER_LOCATION}" \
-    --project="${PROJECT_ID}" \
-    --format='value(resourceLabels)[delimiter=","]')";
-  echo "${LABELS}"
-}
-
-is_cluster_registered() {
-  if ! is_membership_crd_installed; then
-    false
-    return
-  fi
-
-  local IDENTITY_PROVIDER
-  IDENTITY_PROVIDER="$(retry 2 kubectl get memberships.hub.gke.io \
-    membership -ojson 2>/dev/null | jq .spec.identity_provider)"
-
-  if [[ -z "${IDENTITY_PROVIDER}" ]] || [[ "${IDENTITY_PROVIDER}" == 'null' ]]; then
-    false
-  fi
-
-  populate_fleet_info
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
-  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
-  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
-
-  local WANT
-  WANT="//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
-  local LIST
-  LIST="$(gcloud container hub memberships list --project "${FLEET_ID}" \
-    --format=json | grep "${WANT}")"
-  if [[ -z "${LIST}" ]]; then
-    { read -r -d '' MSG; warn "${MSG}"; } <<EOF || true
-Cluster is registered in the project ${FLEET_ID}, but the script is
-unable to verify in the project. The script will continue to execute.
-EOF
-  fi
-}
-
-generate_membership_name() {
-  if is_gcp; then
-    local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-    local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
-    local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
-
-    local MEMBERSHIP_NAME
-    MEMBERSHIP_NAME="${CLUSTER_NAME}"
-    if [[ "$(retry 2 gcloud container hub memberships list --format='value(name)' \
-    --project "${PROJECT_ID}" | grep -c "^${MEMBERSHIP_NAME}$" || true)" -ne 0 ]]; then
-      MEMBERSHIP_NAME="${CLUSTER_NAME}-${PROJECT_ID}-${CLUSTER_LOCATION}"
-    fi
-    if [[ "${#MEMBERSHIP_NAME}" -gt "${KUBE_TAG_MAX_LEN}" ]] || [[ "$(retry 2 gcloud container hub \
-    memberships list --format='value(name)' --project "${PROJECT_ID}" | grep -c \
-    "^${MEMBERSHIP_NAME}$" || true)" -ne 0 ]]; then
-      local RAND
-      RAND="$(tr -dc "a-z0-9" </dev/urandom | head -c8 || true)"
-      MEMBERSHIP_NAME="${CLUSTER_NAME:0:54}-${RAND}"
-    fi
-  else
-    MEMBERSHIP_NAME="$(date +%s%N)"
-  fi
-  echo "${MEMBERSHIP_NAME}"
-}
-
-register_cluster() {
-  if is_cluster_registered; then return; fi
-
-  if is_gcp; then
-    if can_modify_gcp_components; then
-      enable_workload_identity
-    else
-      exit_if_no_workload_identity
-    fi
-    populate_cluster_values
-  fi
-
-  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name)"
-  info "Registering the cluster as ${MEMBERSHIP_NAME}..."
-  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
-
-  local CMD
-  CMD="gcloud container hub memberships register ${MEMBERSHIP_NAME}"
-  CMD="${CMD} --project=${FLEET_ID}"
-  CMD="${CMD} --enable-workload-identity"
-  if is_gcp; then
-    CMD="${CMD} --gke-uri=${GKE_CLUSTER_URI}"
-  else
-    CMD="${CMD} --kubeconfig=${KCF} --context=${KCC}"
-  fi
-  # shellcheck disable=SC2086
-  retry 2 run_command ${CMD}
-}
-
-=======
->>>>>>> 20c1834 (refactor the asmcli.sh to use functions from lib/)
 exit_if_cluster_unregistered() {
   if ! is_cluster_registered; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
@@ -2619,7 +2511,8 @@ register_cluster() {
   else
     CMD="${CMD} --kubeconfig=${KCF} --context=${KCC}"
   fi
-  retry 2 "${CMD}"
+  # shellcheck disable=SC2086
+  retry 2 run_command ${CMD}
 }
 
 add_cluster_labels(){
