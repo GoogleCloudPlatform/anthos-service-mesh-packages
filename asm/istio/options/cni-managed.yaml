@@ -316,14 +316,10 @@ spec:
         # if it ever gets evicted.
         scheduler.alpha.kubernetes.io/critical-pod: ''
         sidecar.istio.io/inject: "false"
-        # Add Prometheus Scrape annotations
-        prometheus.io/scrape: 'true'
-        prometheus.io/port: "15014"
-        prometheus.io/path: '/metrics'
-        # Custom annotations
     spec:
       nodeSelector:
         kubernetes.io/os: linux
+      hostNetwork: true
       tolerations:
         # Make sure istio-cni-node gets scheduled on all nodes.
         - effect: NoSchedule
@@ -333,7 +329,7 @@ spec:
           operator: Exists
         - effect: NoExecute
           operator: Exists
-      priorityClassName: system-node-critical
+      priorityClassName: system-cluster-critical
       serviceAccountName: istio-cni
       # Minimize downtime during a rolling upgrade or deletion;
       # tell Kubernetes to do a "force deletion":
@@ -367,32 +363,35 @@ spec:
             # Deploy as a standalone CNI plugin or as chained?
             - name: CHAINED_CNI_PLUGIN
               value: "true"
-            - name: REPAIR_ENABLED
-              value: "true"
-            - name: REPAIR_NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            - name: REPAIR_LABEL_PODS
-              value: "true"
-            # Set to true to enable pod deletion
-            - name: REPAIR_DELETE_PODS
-              value: "true"
-            - name: REPAIR_RUN_AS_DAEMON
-              value: "true"
-            - name: REPAIR_SIDECAR_ANNOTATION
-              value: "sidecar.istio.io/status"
-            - name: REPAIR_INIT_CONTAINER_NAME
-              value: "istio-validation"
-            - name: REPAIR_BROKEN_POD_LABEL_KEY
-              value: "cni.istio.io/uninitialized"
-            - name: REPAIR_BROKEN_POD_LABEL_VALUE
-              value: "true"
           volumeMounts:
             - mountPath: /host/opt/cni/bin
               name: cni-bin-dir
             - mountPath: /host/etc/cni/net.d
               name: cni-net-dir
+        - name: repair-cni
+          # yamllint disable-line rule:line-length
+          image: "IMAGE_HUB/install-cni:IMAGE_TAG"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cni-image"}
+          command: ["/opt/local/bin/istio-cni-repair"]
+          env:
+            - name: "REPAIR_NODE-NAME"
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: "REPAIR_LABEL-PODS"
+              value: "true"
+            # Set to true to enable pod deletion
+            - name: "REPAIR_DELETE-PODS"
+              value: "true"
+            - name: "REPAIR_RUN-AS-DAEMON"
+              value: "true"
+            - name: "REPAIR_SIDECAR-ANNOTATION"
+              value: "sidecar.istio.io/status"
+            - name: "REPAIR_INIT-CONTAINER-NAME"
+              value: "istio-validation"
+            - name: "REPAIR_BROKEN-POD-LABEL-KEY"
+              value: "cni.istio.io/uninitialized"
+            - name: "REPAIR_BROKEN-POD-LABEL-VALUE"
+              value: "true"
         - name: mdp-controller
           # yamllint disable-line rule:line-length
           image: "IMAGE_HUB/mdp:IMAGE_TAG"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-mdp-image"}
