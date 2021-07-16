@@ -251,7 +251,7 @@ teardown() {
   fi
 }
 
-@test "MAIN: --enable-all should grant all permissions but shouldn't register to environ when unnecessary" {
+@test "MAIN: --enable-all should grant all permissions and register to environ when necessary" {
   context_init
 
   local CMD
@@ -263,7 +263,7 @@ teardown() {
 
   parse_args ${CMD}
 
-  if can_register_cluster; then
+  if ! can_register_cluster; then
     exit 1
   fi
 }

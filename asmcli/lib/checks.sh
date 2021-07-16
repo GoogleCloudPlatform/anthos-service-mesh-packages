@@ -270,14 +270,11 @@ can_modify_gcp_components() {
 
 can_register_cluster() {
   local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
-  local USE_VM; USE_VM="$(context_get-option "USE_VM")"
-  local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
   local ENABLE_REGISTRATION; ENABLE_REGISTRATION="$(context_get-option "ENABLE_REGISTRATION")"
 
   if ! can_modify_at_all; then false; return; fi
 
-  if [[ "${ENABLE_ALL}" -eq 1 && ("${USE_VM}" -eq 1 || "${USE_HUB_WIP}" -eq 1) ]] \
-    || [[ "${ENABLE_REGISTRATION}" -eq 1 ]]; then
+  if [[ "${ENABLE_ALL}" -eq 1 ]] || [[ "${ENABLE_REGISTRATION}" -eq 1 ]]; then
     true
   else
     false

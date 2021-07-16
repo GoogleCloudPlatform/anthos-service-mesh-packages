@@ -36,12 +36,6 @@ validate_dependencies() {
     exit_if_apis_not_enabled
   fi
 
-  if can_register_cluster && is_gcp; then
-    register_cluster
-  elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 || "${USE_VM}" -eq 1 ]]; then
-    exit_if_cluster_unregistered
-  fi
-
   if is_gcp; then
     if can_modify_gcp_components; then
       enable_workload_identity
@@ -56,6 +50,12 @@ validate_dependencies() {
         exit_if_service_mesh_feature_not_enabled
       fi
     fi
+  fi
+
+  if can_register_cluster && is_gcp; then
+    register_cluster
+  elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 || "${USE_VM}" -eq 1 ]]; then
+    exit_if_cluster_unregistered
   fi
 
   get_project_number
@@ -118,6 +118,14 @@ validate_hub() {
 
   if ! is_managed && [[ "${USE_VM}" -eq 1 && "${USE_HUB_WIP}" -eq 0 ]]; then
     fatal "Hub Workload Identity Pool is required to add VM workloads. Run the script with the -o hub-meshca option."
+  fi
+
+  if ! is_managed && [[ "${CA}" == "mesh_ca" && "${USE_HUB_WIP}" -eq 0 ]] && ( can_register_cluster && is_gcp || is_cluster_registered ) ; then
+    info "Fleet workload identity pool is used as default for Mesh CA. "
+    context_set-option "USE_HUB_WIP" 1
+    local OPTIONAL_OVERLAY; OPTIONAL_OVERLAY="$(context_get-option "OPTIONAL_OVERLAY")"
+    OPTIONAL_OVERLAY="hub-meshca,${OPTIONAL_OVERLAY}"
+    context_set-option "OPTIONAL_OVERLAY" "${OPTIONAL_OVERLAY}"
   fi
 }
 
