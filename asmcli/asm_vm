@@ -23,9 +23,9 @@ _CI_ISTIOCTL_REL_PATH="${_CI_ISTIOCTL_REL_PATH:=}"
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=10}"; readonly MINOR;
-POINT="${POINT:=2}"; readonly POINT;
-REV="${REV:=3}"; readonly REV;
-CONFIG_VER="${CONFIG_VER:="1-unstable"}"; readonly CONFIG_VER;
+POINT="${POINT:=3}"; readonly POINT;
+REV="${REV:=0}"; readonly REV;
+CONFIG_VER="${CONFIG_VER:="1-alpha"}"; readonly CONFIG_VER;
 ASM_RELEASE="${MAJOR}.${MINOR}"
 ASM_META_VERSION="${ASM_RELEASE}.0"
 ASM_FULL_VERSION="${MAJOR}.${MINOR}.${POINT}"
