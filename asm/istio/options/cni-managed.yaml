@@ -393,6 +393,8 @@ spec:
               name: cni-bin-dir
             - mountPath: /host/etc/cni/net.d
               name: cni-net-dir
+            - mountPath: /var/run/istio-cni
+              name: cni-log-dir
         - name: mdp-controller
           # yamllint disable-line rule:line-length
           image: "IMAGE_HUB/mdp:IMAGE_TAG"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-mdp-image"}
@@ -441,6 +443,9 @@ spec:
         - name: cni-net-dir
           hostPath:
             path: /etc/cni/net.d
+        - name: cni-log-dir
+          hostPath:
+            path: /var/run/istio-cni
         - name: istio-token
           projected:
             sources:
