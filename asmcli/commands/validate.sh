@@ -16,7 +16,7 @@ validate() {
   validate_control_plane
 
   if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
-    info "Successfully validated all requirements to install ASM in this environment."
+    info "Successfully validated all requirements to install ASM."
     exit 0
   fi
 
