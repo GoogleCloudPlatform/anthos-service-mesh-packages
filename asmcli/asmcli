@@ -1089,10 +1089,6 @@ install_in_cluster_control_plane() {
   if [[ "${USE_VM}" -eq 1 ]]; then
     info "Exposing the control plane for VM workloads..."
 
-    kpt cfg set asm anthos.servicemesh.istiodHost "istiod.istio-system.svc"
-    kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod.istio-system.svc.cluster.local"
-    kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs"
-    
     expose_istiod
   fi
 }
