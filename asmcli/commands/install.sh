@@ -60,13 +60,11 @@ install_in_cluster_control_plane() {
 
   if [[ "${USE_VM}" -eq 1 ]]; then
     info "Exposing the control plane for VM workloads..."
-    expose_istiod
 
-    # The default istiod service is exposed so that any fallback on the VM side
-    # to use the default Istiod service can still connect to the control plane.
     kpt cfg set asm anthos.servicemesh.istiodHost "istiod.istio-system.svc"
     kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod.istio-system.svc.cluster.local"
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs"
+    
     expose_istiod
   fi
 }
@@ -143,7 +141,10 @@ install_control_plane_revision() {
 }
 
 expose_istiod() {
-  context_append "kubectlFiles" "${EXPOSE_ISTIOD_SERVICE}"
+  # The default istiod service is exposed so that any fallback on the VM side
+  # to use the default Istiod service can still connect to the control plane.
+  context_append "kubectlFiles" "${EXPOSE_ISTIOD_DEFAULT_SERVICE}"
+  context_append "kubectlFiles" "${EXPOSE_ISTIOD_REVISION_SERVICE}"
 }
 
 outro() {
