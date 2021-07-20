@@ -28,7 +28,6 @@ main() {
 
   while read -r tag; do
     publish_script "${tag}" asmcli
-    publish_script "${tag}" asm_vm
   done <<EOF
 $(all_release_tags)
 EOF
