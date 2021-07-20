@@ -17,7 +17,6 @@ document describes how to use the scripts.
   - [asm\_vm](#asm_vm)
     - [Prerequisites for asm\_vm](#prerequisites-for-asm_vm)
     - [Running asm\_vm](#running-asm_vm)
-  - [Release](#release)
 
 ## Downloading the scripts
 

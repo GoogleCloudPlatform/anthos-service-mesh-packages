@@ -28,11 +28,6 @@ setup_cluster() {
       -p "${LT_PROJECT_ID}" \
       -D "${OUTPUT_DIR}" > /dev/null
 
-    cleanup_old_instance_templates
-    cleanup_old_instances
-    cleanup_old_images
-    cleanup_old_workload_service_accounts
-
     configure_kubectl "${cluster}" "${LT_PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
     kubectl delete validatingwebhookconfiguration istiod-istio-system || true
     cleanup_old_test_namespaces "${OUTPUT_DIR}"

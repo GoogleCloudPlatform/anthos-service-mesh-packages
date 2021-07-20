@@ -55,7 +55,6 @@ substitutions:
   _CLUSTER_LOCATION: us-central1-c
   _IMAGE_NAME: gcloud-with-kpt
   _SCRIPT_NAME: asmcli
-  _ASM_VM_SCRIPT_NAME: asm_vm
   _ASM_PKG_BRANCH: $COMMIT_SHA
   _SERVICE_ACCOUNT: asm-installer
   _SECRET_NAME: asm-installer-creds
