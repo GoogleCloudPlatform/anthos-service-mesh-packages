@@ -54,7 +54,8 @@ OFF_GCP_MANIFEST=""
 MANAGED_CNI=""
 MANAGED_MANIFEST=""
 MANAGED_WEBHOOKS=""
-EXPOSE_ISTIOD_SERVICE=""
+EXPOSE_ISTIOD_DEFAULT_SERVICE=""
+EXPOSE_ISTIOD_REVISION_SERVICE=""
 CANONICAL_CONTROLLER_MANIFEST=""
 EXPANSION_GATEWAY_FILE=""
 
@@ -754,14 +755,14 @@ install_expansion_gateway() {
 
 expose_istiod_vm() {
   info "Exposing the control plane for VM workloads..."
-  retry 3 kubectl apply -f "${EXPOSE_ISTIOD_SERVICE}"
+  retry 3 kubectl apply -f "${EXPOSE_ISTIOD_DEFAULT_SERVICE}"
 
   for rev in ${ASM_REVISIONS}; do
     kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod-${rev}.istio-system.svc.cluster.local"
     kpt cfg set asm anthos.servicemesh.istiodHost "istiod-${rev}.istio-system.svc"
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${rev}"
 
-    retry 3 kubectl apply -f "${EXPOSE_ISTIOD_SERVICE}"
+    retry 3 kubectl apply -f "${EXPOSE_ISTIOD_REVISION_SERVICE}"
   done
 }
 
@@ -1087,13 +1088,11 @@ install_in_cluster_control_plane() {
 
   if [[ "${USE_VM}" -eq 1 ]]; then
     info "Exposing the control plane for VM workloads..."
-    expose_istiod
 
-    # The default istiod service is exposed so that any fallback on the VM side
-    # to use the default Istiod service can still connect to the control plane.
     kpt cfg set asm anthos.servicemesh.istiodHost "istiod.istio-system.svc"
     kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod.istio-system.svc.cluster.local"
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs"
+    
     expose_istiod
   fi
 }
@@ -1170,7 +1169,10 @@ install_control_plane_revision() {
 }
 
 expose_istiod() {
-  context_append "kubectlFiles" "${EXPOSE_ISTIOD_SERVICE}"
+  # The default istiod service is exposed so that any fallback on the VM side
+  # to use the default Istiod service can still connect to the control plane.
+  context_append "kubectlFiles" "${EXPOSE_ISTIOD_DEFAULT_SERVICE}"
+  context_append "kubectlFiles" "${EXPOSE_ISTIOD_REVISION_SERVICE}"
 }
 
 outro() {
@@ -3237,7 +3239,8 @@ init() {
   MANAGED_CNI="${OPTIONS_DIRECTORY}/cni-managed.yaml"; readonly MANAGED_CNI;
   MANAGED_MANIFEST="${OPTIONS_DIRECTORY}/managed-control-plane.yaml"; readonly MANAGED_MANIFEST;
   MANAGED_WEBHOOKS="${OPTIONS_DIRECTORY}/managed-control-plane-webhooks.yaml"; readonly MANAGED_WEBHOOKS;
-  EXPOSE_ISTIOD_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_SERVICE;
+  EXPOSE_ISTIOD_DEFAULT_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_DEFAULT_SERVICE;
+  EXPOSE_ISTIOD_REVISION_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod-rev.yaml"; readonly EXPOSE_ISTIOD_REVISION_SERVICE;
   EXPANSION_GATEWAY_FILE="${PACKAGE_DIRECTORY}/expansion/vm-eastwest-gateway.yaml"; readonly EXPANSION_GATEWAY_FILE;
   CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
   ASM_VERSION_FILE=".asm_version"; readonly ASM_VERSION_FILE;

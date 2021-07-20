@@ -352,14 +352,14 @@ install_expansion_gateway() {
 
 expose_istiod_vm() {
   info "Exposing the control plane for VM workloads..."
-  retry 3 kubectl apply -f "${EXPOSE_ISTIOD_SERVICE}"
+  retry 3 kubectl apply -f "${EXPOSE_ISTIOD_DEFAULT_SERVICE}"
 
   for rev in ${ASM_REVISIONS}; do
     kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod-${rev}.istio-system.svc.cluster.local"
     kpt cfg set asm anthos.servicemesh.istiodHost "istiod-${rev}.istio-system.svc"
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${rev}"
 
-    retry 3 kubectl apply -f "${EXPOSE_ISTIOD_SERVICE}"
+    retry 3 kubectl apply -f "${EXPOSE_ISTIOD_REVISION_SERVICE}"
   done
 }
 
