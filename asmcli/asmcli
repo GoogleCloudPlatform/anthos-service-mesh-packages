@@ -77,6 +77,9 @@ AKPT=""
 AGCLOUD=""
 RELEASE=""
 REVISION_LABEL=""
+REVISION_LABEL_REGULAR=""
+REVISION_LABEL_RAPID=""
+REVISION_LABEL_STABLE=""
 RELEASE_LINE=""
 PREVIOUS_RELEASE_LINE=""
 KPT_BRANCH=""
@@ -307,6 +310,10 @@ experimental_subcommand() {
       shift 1
       vm_subcommand "${@}"
       ;;
+    install)
+      shift 1
+      x_install_subcommand "${@}"
+      ;;
     *)
       x_help_subcommand "${@}"
       ;;
@@ -330,6 +337,68 @@ SUBCOMMANDS:
   vm                                  Functions to configure a mesh to
                                       allow external VM workloads.
 EOF
+}
+x_install_subcommand() {
+  x_parse_install_args "${@}"
+  context_set-option "MANAGED" 1
+  context_set-option "PLATFORM" "gcp"
+  x_validate_install_args
+  prepare_environment
+
+  x_validate_dependencies
+  x_install
+}
+
+x_install() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+
+  # TODO: MANAGED_CNI install should go here, if necessary
+
+  install_control_plane_revision "${CR_CONTROL_PLANE_REVISION_REGULAR}" "${REVISION_LABEL_REGULAR}"
+  install_control_plane_revision "${CR_CONTROL_PLANE_REVISION_RAPID}" "${REVISION_LABEL_RAPID}"
+  install_control_plane_revision "${CR_CONTROL_PLANE_REVISION_STABLE}" "${REVISION_LABEL_STABLE}"
+
+  outro
+  info "Successfully installed ASM."
+  return 0
+}
+x_validate_dependencies() {
+  if can_modify_gcp_apis; then
+    enable_gcloud_apis
+  elif should_validate; then
+    exit_if_apis_not_enabled
+  fi
+
+  if can_register_cluster; then
+    register_cluster
+  elif should_validate; then
+    exit_if_cluster_unregistered
+  fi
+
+  if can_modify_gcp_components; then
+    enable_workload_identity
+    enable_stackdriver_kubernetes
+    enable_service_mesh_feature
+  else
+    exit_if_no_workload_identity
+    exit_if_stackdriver_not_enabled
+    exit_if_service_mesh_feature_not_enabled
+  fi
+
+  get_project_number
+  if can_modify_cluster_labels; then
+    add_cluster_labels
+  elif should_validate; then
+    exit_if_cluster_unlabeled
+  fi
+
+  if can_create_namespace; then
+    create_istio_namespace
+  elif should_validate; then
+    exit_if_istio_namespace_not_exists
+  fi
 }
 vm_subcommand() {
   if [[ "${*}" = '' ]]; then
@@ -1090,6 +1159,16 @@ install_canonical_controller() {
   info "...done!"
 }
 
+install_control_plane_revision() {
+  local CR; CR="${1}"
+  local REVISION; REVISION="${2}"
+  info "Installing ASM Contro Plane Revision CR with ${REVISION} channel in istio-system namespace..."
+  retry 3 kubectl apply -f "${CR}"
+  info "Waiting for deployment..."
+  retry 3 kubectl wait --for=condition=ProvisioningFinished \
+    controlplanerevision "${REVISION}" -n istio-system
+}
+
 expose_istiod() {
   context_append "kubectlFiles" "${EXPOSE_ISTIOD_SERVICE}"
 }
@@ -1762,10 +1841,7 @@ is_service_mesh_feature_enabled() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
 
   local RESPONSE
-  # IAM permission: gkehub.features.get
-  RESPONSE="$(run_command curl -s -H "X-Goog-User-Project: ${PROJECT_ID}"  \
-    "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features/servicemesh" \
-    -K <(auth_header "$(get_auth_token)"))"
+  RESPONSE="$(run_command gcloud alpha container hub mesh describe --project="${PROJECT_ID}")"
 
   if [[ "$(echo "${RESPONSE}" | jq -r '.featureState.lifecycleState')" != "ENABLED" ]]; then
     false
@@ -2741,6 +2817,136 @@ parse_args() {
     exit
   fi
 }
+
+x_parse_install_args() {
+  if [[ "${*}" = '' ]]; then
+    x_usage >&2
+    exit 2
+  fi
+
+  # shellcheck disable=SC2064
+  trap "$(shopt -p nocasematch)" RETURN
+  shopt -s nocasematch
+
+  while [[ $# != 0 ]]; do
+    case "${1}" in
+      -l | --cluster_location | --cluster-location)
+        arg_required "${@}"
+        context_set-option "CLUSTER_LOCATION" "${2}"
+        shift 2
+        ;;
+      -n | --cluster_name | --cluster-name)
+        arg_required "${@}"
+        context_set-option "CLUSTER_NAME" "${2}"
+        shift 2
+        ;;
+      --kc | --kubeconfig)
+        arg_required "${@}"
+        context_set-option "KUBECONFIG" "${2}"
+        context_set-option "KUBECONFIG_SUPPLIED" 1
+        shift 2
+        ;;
+      --ctx | --context)
+        arg_required "${@}"
+        context_set-option "CONTEXT" "${2}"
+        shift 2
+        ;;
+      -p | --project_id | --project-id)
+        arg_required "${@}"
+        context_set-option "PROJECT_ID" "${2}"
+        shift 2
+        ;;
+      --fleet_id | --fleet-id)
+        arg_required "${@}"
+        context_set-option "FLEET_ID" "${2}"
+        shift 2
+        ;;
+      -e | --enable_all | --enable-all)
+        context_set-option "ENABLE_ALL" 1
+        shift 1
+        ;;
+      --enable_cluster_labels | --enable-cluster-labels)
+        context_set-option "ENABLE_CLUSTER_LABELS" 1
+        shift 1
+        ;;
+      --enable_gcp_apis | --enable-gcp-apis)
+        context_set-option "ENABLE_GCP_APIS" 1
+        shift 1
+        ;;
+      --enable_gcp_iam_roles | --enable-gcp-iam-roles)
+        context_set-option "ENABLE_GCP_IAM_ROLES" 1
+        shift 1
+        ;;
+      --enable_gcp_components | --enable-gcp-components)
+        context_set-option "ENABLE_GCP_COMPONENTS" 1
+        shift 1
+        ;;
+      --enable_registration | --enable-registration)
+        context_set-option "ENABLE_REGISTRATION" 1
+        shift 1
+        ;;
+      --enable_namespace_creation | --enable-namespace-creation)
+        context_set-option "ENABLE_NAMESPACE_CREATION" 1
+        shift 1
+        ;;
+      --disable_canonical_service | --disable-canonical-service)
+        context_set-option "DISABLE_CANONICAL_SERVICE" 1
+        shift 1
+        ;;
+      -s | --service_account | --service-account)
+        arg_required "${@}"
+        context_set-option "SERVICE_ACCOUNT" "${2}"
+        shift 2
+        ;;
+      -k | --key_file | --key-file)
+        arg_required "${@}"
+        context_set-option "KEY_FILE" "${2}"
+        shift 2
+        ;;
+      -D | --output_dir | --output-dir)
+        arg_required "${@}"
+        context_set-option "OUTPUT_DIR" "${2}"
+        shift 2
+        ;;
+      --dry_run | --dry-run)
+        context_set-option "DRY_RUN" 1
+        shift 1
+        ;;
+      -v | --verbose)
+        context_set-option "VERBOSE" 1
+        shift 1
+        ;;
+      -h | --help)
+        context_set-option "PRINT_HELP" 1
+        shift 1
+        ;;
+      --version)
+        context_set-option "PRINT_VERSION" 1
+        shift 1
+        ;;
+      *)
+        fatal_with_usage "Unknown option ${1}"
+        ;;
+    esac
+  done
+  RAW_YAML="${REVISION_LABEL}-manifest-raw.yaml"; readonly RAW_YAML;
+  EXPANDED_YAML="${REVISION_LABEL}-manifest-expanded.yaml"; readonly EXPANDED_YAML;
+  readonly REVISION_LABEL
+
+  local PRINT_HELP; PRINT_HELP="$(context_get-option "PRINT_HELP")"
+  local PRINT_VERSION; PRINT_VERSION="$(context_get-option "PRINT_VERSION")"
+  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
+  if [[ "${PRINT_HELP}" -eq 1 || "${PRINT_VERSION}" -eq 1 ]]; then
+    if [[ "${PRINT_VERSION}" -eq 1 ]]; then
+      version_message
+    elif [[ "${VERBOSE}" -eq 1 ]]; then
+      usage
+    else
+      usage_short
+    fi
+    exit
+  fi
+}
 KUBE_TAG_MAX_LEN=63; readonly KUBE_TAG_MAX_LEN
 
 gen_install_params() {
@@ -3040,6 +3246,9 @@ init() {
   CR_CONTROL_PLANE_REVISION_REGULAR="asm/control-plane-revision/cr_regular.yaml"; readonly CR_CONTROL_PLANE_REVISION_REGULAR;
   CR_CONTROL_PLANE_REVISION_RAPID="asm/control-plane-revision/cr_rapid.yaml"; readonly CR_CONTROL_PLANE_REVISION_RAPID;
   CR_CONTROL_PLANE_REVISION_STABLE="asm/control-plane-revision/cr_stable.yaml"; readonly CR_CONTROL_PLANE_REVISION_STABLE;
+  REVISION_LABEL_REGULAR="asm-managed"; readonly REVISION_LABEL_REGULAR
+  REVISION_LABEL_RAPID="asm-managed-rapid"; readonly REVISION_LABEL_RAPID
+  REVISION_LABEL_STABLE="asm-managed-stable"; readonly REVISION_LABEL_STABLE
 
   AKUBECTL="$(which kubectl || true)"; readonly AKUBECTL;
   AGCLOUD="$(which gcloud || true)"; readonly AGCLOUD;
@@ -3719,11 +3928,7 @@ enable_service_mesh_feature() {
 
   info "Enabling the service mesh feature..."
 
-  # IAM permission: gkehub.features.create
-  retry 2 run_command curl -s -H "Content-Type: application/json" \
-    -XPOST "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features?feature_id=servicemesh"\
-    -d '{servicemesh_feature_spec: {}}' \
-    -K <(auth_header "$(get_auth_token)")
+  retry 2 run_command gcloud alpha container hub mesh enable --project="${PROJECT_ID}"
 }
 
 check_istio_deployed(){
@@ -3992,6 +4197,148 @@ EOF
 arg_required() {
   if [[ ! "${2:-}" || "${2:0:1}" = '-' ]]; then
     fatal "Option ${1} requires an argument."
+  fi
+}
+
+x_validate_install_args() {
+  ### Option variables ###
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
+  local ENABLE_CLUSTER_ROLES; ENABLE_CLUSTER_ROLES="$(context_get-option "ENABLE_CLUSTER_ROLES")"
+  local ENABLE_CLUSTER_LABELS; ENABLE_CLUSTER_LABELS="$(context_get-option "ENABLE_CLUSTER_LABELS")"
+  local ENABLE_GCP_APIS; ENABLE_GCP_APIS="$(context_get-option "ENABLE_GCP_APIS")"
+  local ENABLE_GCP_IAM_ROLES; ENABLE_GCP_IAM_ROLES="$(context_get-option "ENABLE_GCP_IAM_ROLES")"
+  local ENABLE_GCP_COMPONENTS; ENABLE_GCP_COMPONENTS="$(context_get-option "ENABLE_GCP_COMPONENTS")"
+  local ENABLE_REGISTRATION; ENABLE_REGISTRATION="$(context_get-option "ENABLE_REGISTRATION")"
+  local ENABLE_NAMESPACE_CREATION; ENABLE_NAMESPACE_CREATION="$(context_get-option "ENABLE_NAMESPACE_CREATION")"
+  local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
+  local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
+  local SERVICE_ACCOUNT; SERVICE_ACCOUNT="$(context_get-option "SERVICE_ACCOUNT")"
+  local KEY_FILE; KEY_FILE="$(context_get-option "KEY_FILE")"
+  local DRY_RUN; DRY_RUN="$(context_get-option "DRY_RUN")"
+  local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
+  local ONLY_ENABLE; ONLY_ENABLE="$(context_get-option "ONLY_ENABLE")"
+  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
+  local MANAGED_SERVICE_ACCOUNT; MANAGED_SERVICE_ACCOUNT="$(context_get-option "MANAGED_SERVICE_ACCOUNT")"
+  local PRINT_HELP; PRINT_HELP="$(context_get-option "PRINT_HELP")"
+  local PRINT_VERSION; PRINT_VERSION="$(context_get-option "PRINT_VERSION")"
+  local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
+  local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
+
+  local MISSING_ARGS=0
+
+  local CLUSTER_DETAIL_SUPPLIED=0
+  local CLUSTER_DETAIL_VALID=1
+  while read -r REQUIRED_ARG; do
+    if [[ -z "${!REQUIRED_ARG}" ]]; then
+      CLUSTER_DETAIL_VALID=0
+    else
+      CLUSTER_DETAIL_SUPPLIED=1 # gke cluster param usage intended
+    fi
+  done <<EOF
+PROJECT_ID
+CLUSTER_LOCATION
+CLUSTER_NAME
+EOF
+
+  # Script will not infer the intent between the 2 use cases in case both values are provided
+  if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 1 && "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
+    fatal_with_usage "Incompatible arguments. Kubeconfig cannot be used in conjuntion with [--cluster_location|--cluster_name|--project_id]."
+  fi
+
+  if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 1 && "${CLUSTER_DETAIL_VALID}" -eq 0 ]]; then
+    MISSING_ARGS=1
+    warn "Missing one or more required options for [CLUSTER_LOCATION|CLUSTER_NAME|PROJECT_ID]"
+  fi
+
+  if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 0 && "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
+    MISSING_ARGS=1
+    warn "At least one of the following is required: 1) --kubeconfig or 2) --cluster_location, --cluster_name, --project_id"
+  fi
+
+  if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 && -z "${CONTEXT}" ]]; then
+    # set CONTEXT to current-context in the KUBECONFIG
+    # or fail-fast if current-context doesn't exist
+    CONTEXT="$(kubectl config current-context)"
+    if [[ -z "${CONTEXT}" ]]; then
+      MISSING_ARGS=1
+      warn "Missing current-context in the KUBECONFIG. Please provide context with --context flag or set a current-context in the KUBECONFIG"
+    else
+      context_set-option "CONTEXT" "${CONTEXT}"
+    fi
+  fi
+
+  if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
+    info "Reading cluster information for ${CONTEXT}"
+    IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
+${CONTEXT}
+EOF
+    if is_gcp; then
+      context_set-option "PROJECT_ID" "${PROJECT_ID}"
+      context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
+      context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
+    fi
+  fi
+
+  if is_gcp; then
+    # when no Fleet Id is provided, default to the cluster's project as the Fleet host.
+    if [[ -z "${FLEET_ID}" ]]; then
+      FLEET_ID="${PROJECT_ID}"
+      context_set-option "FLEET_ID" "${FLEET_ID}"
+    fi
+  else
+    # set Project Id to same as Fleet Id.
+    # Project Id will be used to enable APIs if applicable.
+    if [[ -n "${FLEET_ID}" ]]; then
+      PROJECT_ID="${FLEET_ID}"
+      context_set-option "PROJECT_ID" "${PROJECT_ID}"
+    fi
+  fi
+
+  if can_register_cluster && ! has_value "FLEET_ID"; then
+    MISSING_ARGS=1
+    warn "Missing FLEET_ID to register the cluster."
+  fi
+
+  if [[ "${MISSING_ARGS}" -ne 0 ]]; then
+    fatal_with_usage "Missing one or more required options."
+  fi
+
+  while read -r FLAG; do
+    if [[ "${!FLAG}" -ne 0 && "${!FLAG}" -ne 1 ]]; then
+      fatal "${FLAG} must be 0 (off) or 1 (on) if set via environment variables."
+    fi
+    readonly "${FLAG}"
+  done <<EOF
+DRY_RUN
+ENABLE_ALL
+ENABLE_CLUSTER_LABELS
+ENABLE_GCP_APIS
+ENABLE_GCP_IAM_ROLES
+ENABLE_GCP_COMPONENTS
+ENABLE_REGISTRATION
+DISABLE_CANONICAL_SERVICE
+ONLY_VALIDATE
+ONLY_ENABLE
+VERBOSE
+EOF
+
+  if [[ "${ENABLE_ALL}" -eq 1 || \
+    "${ENABLE_CLUSTER_LABELS}" -eq 1 || "${ENABLE_GCP_APIS}" -eq 1 || \
+    "${ENABLE_GCP_IAM_ROLES}" -eq 1 || "${ENABLE_GCP_COMPONENTS}" -eq 1 || \
+    "${ENABLE_REGISTRATION}" -eq 1  || "${ENABLE_NAMESPACE_CREATION}" -eq 1 ]]; then
+    if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
+      fatal "The only_validate flag cannot be used with any --enable* flag"
+    fi
+  elif only_enable; then
+    fatal "You must specify at least one --enable* flag with --only_enable"
+  fi
+
+  if [[ -n "$SERVICE_ACCOUNT" && -z "$KEY_FILE" || -z "$SERVICE_ACCOUNT" && -n "$KEY_FILE" ]]; then
+    fatal "Service account and key file must be used together."
   fi
 }
 

@@ -421,11 +421,7 @@ enable_service_mesh_feature() {
 
   info "Enabling the service mesh feature..."
 
-  # IAM permission: gkehub.features.create
-  retry 2 run_command curl -s -H "Content-Type: application/json" \
-    -XPOST "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features?feature_id=servicemesh"\
-    -d '{servicemesh_feature_spec: {}}' \
-    -K <(auth_header "$(get_auth_token)")
+  retry 2 run_command gcloud alpha container hub mesh enable --project="${PROJECT_ID}"
 }
 
 check_istio_deployed(){
@@ -694,5 +690,147 @@ EOF
 arg_required() {
   if [[ ! "${2:-}" || "${2:0:1}" = '-' ]]; then
     fatal "Option ${1} requires an argument."
+  fi
+}
+
+x_validate_install_args() {
+  ### Option variables ###
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
+  local ENABLE_CLUSTER_ROLES; ENABLE_CLUSTER_ROLES="$(context_get-option "ENABLE_CLUSTER_ROLES")"
+  local ENABLE_CLUSTER_LABELS; ENABLE_CLUSTER_LABELS="$(context_get-option "ENABLE_CLUSTER_LABELS")"
+  local ENABLE_GCP_APIS; ENABLE_GCP_APIS="$(context_get-option "ENABLE_GCP_APIS")"
+  local ENABLE_GCP_IAM_ROLES; ENABLE_GCP_IAM_ROLES="$(context_get-option "ENABLE_GCP_IAM_ROLES")"
+  local ENABLE_GCP_COMPONENTS; ENABLE_GCP_COMPONENTS="$(context_get-option "ENABLE_GCP_COMPONENTS")"
+  local ENABLE_REGISTRATION; ENABLE_REGISTRATION="$(context_get-option "ENABLE_REGISTRATION")"
+  local ENABLE_NAMESPACE_CREATION; ENABLE_NAMESPACE_CREATION="$(context_get-option "ENABLE_NAMESPACE_CREATION")"
+  local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
+  local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
+  local SERVICE_ACCOUNT; SERVICE_ACCOUNT="$(context_get-option "SERVICE_ACCOUNT")"
+  local KEY_FILE; KEY_FILE="$(context_get-option "KEY_FILE")"
+  local DRY_RUN; DRY_RUN="$(context_get-option "DRY_RUN")"
+  local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
+  local ONLY_ENABLE; ONLY_ENABLE="$(context_get-option "ONLY_ENABLE")"
+  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
+  local MANAGED_SERVICE_ACCOUNT; MANAGED_SERVICE_ACCOUNT="$(context_get-option "MANAGED_SERVICE_ACCOUNT")"
+  local PRINT_HELP; PRINT_HELP="$(context_get-option "PRINT_HELP")"
+  local PRINT_VERSION; PRINT_VERSION="$(context_get-option "PRINT_VERSION")"
+  local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
+  local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
+
+  local MISSING_ARGS=0
+
+  local CLUSTER_DETAIL_SUPPLIED=0
+  local CLUSTER_DETAIL_VALID=1
+  while read -r REQUIRED_ARG; do
+    if [[ -z "${!REQUIRED_ARG}" ]]; then
+      CLUSTER_DETAIL_VALID=0
+    else
+      CLUSTER_DETAIL_SUPPLIED=1 # gke cluster param usage intended
+    fi
+  done <<EOF
+PROJECT_ID
+CLUSTER_LOCATION
+CLUSTER_NAME
+EOF
+
+  # Script will not infer the intent between the 2 use cases in case both values are provided
+  if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 1 && "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
+    fatal_with_usage "Incompatible arguments. Kubeconfig cannot be used in conjuntion with [--cluster_location|--cluster_name|--project_id]."
+  fi
+
+  if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 1 && "${CLUSTER_DETAIL_VALID}" -eq 0 ]]; then
+    MISSING_ARGS=1
+    warn "Missing one or more required options for [CLUSTER_LOCATION|CLUSTER_NAME|PROJECT_ID]"
+  fi
+
+  if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 0 && "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
+    MISSING_ARGS=1
+    warn "At least one of the following is required: 1) --kubeconfig or 2) --cluster_location, --cluster_name, --project_id"
+  fi
+
+  if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 && -z "${CONTEXT}" ]]; then
+    # set CONTEXT to current-context in the KUBECONFIG
+    # or fail-fast if current-context doesn't exist
+    CONTEXT="$(kubectl config current-context)"
+    if [[ -z "${CONTEXT}" ]]; then
+      MISSING_ARGS=1
+      warn "Missing current-context in the KUBECONFIG. Please provide context with --context flag or set a current-context in the KUBECONFIG"
+    else
+      context_set-option "CONTEXT" "${CONTEXT}"
+    fi
+  fi
+
+  if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
+    info "Reading cluster information for ${CONTEXT}"
+    IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
+${CONTEXT}
+EOF
+    if is_gcp; then
+      context_set-option "PROJECT_ID" "${PROJECT_ID}"
+      context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
+      context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
+    fi
+  fi
+
+  if is_gcp; then
+    # when no Fleet Id is provided, default to the cluster's project as the Fleet host.
+    if [[ -z "${FLEET_ID}" ]]; then
+      FLEET_ID="${PROJECT_ID}"
+      context_set-option "FLEET_ID" "${FLEET_ID}"
+    fi
+  else
+    # set Project Id to same as Fleet Id.
+    # Project Id will be used to enable APIs if applicable.
+    if [[ -n "${FLEET_ID}" ]]; then
+      PROJECT_ID="${FLEET_ID}"
+      context_set-option "PROJECT_ID" "${PROJECT_ID}"
+    fi
+  fi
+
+  if can_register_cluster && ! has_value "FLEET_ID"; then
+    MISSING_ARGS=1
+    warn "Missing FLEET_ID to register the cluster."
+  fi
+
+  if [[ "${MISSING_ARGS}" -ne 0 ]]; then
+    fatal_with_usage "Missing one or more required options."
+  fi
+
+  while read -r FLAG; do
+    if [[ "${!FLAG}" -ne 0 && "${!FLAG}" -ne 1 ]]; then
+      fatal "${FLAG} must be 0 (off) or 1 (on) if set via environment variables."
+    fi
+    readonly "${FLAG}"
+  done <<EOF
+DRY_RUN
+ENABLE_ALL
+ENABLE_CLUSTER_LABELS
+ENABLE_GCP_APIS
+ENABLE_GCP_IAM_ROLES
+ENABLE_GCP_COMPONENTS
+ENABLE_REGISTRATION
+DISABLE_CANONICAL_SERVICE
+ONLY_VALIDATE
+ONLY_ENABLE
+VERBOSE
+EOF
+
+  if [[ "${ENABLE_ALL}" -eq 1 || \
+    "${ENABLE_CLUSTER_LABELS}" -eq 1 || "${ENABLE_GCP_APIS}" -eq 1 || \
+    "${ENABLE_GCP_IAM_ROLES}" -eq 1 || "${ENABLE_GCP_COMPONENTS}" -eq 1 || \
+    "${ENABLE_REGISTRATION}" -eq 1  || "${ENABLE_NAMESPACE_CREATION}" -eq 1 ]]; then
+    if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
+      fatal "The only_validate flag cannot be used with any --enable* flag"
+    fi
+  elif only_enable; then
+    fatal "You must specify at least one --enable* flag with --only_enable"
+  fi
+
+  if [[ -n "$SERVICE_ACCOUNT" && -z "$KEY_FILE" || -z "$SERVICE_ACCOUNT" && -n "$KEY_FILE" ]]; then
+    fatal "Service account and key file must be used together."
   fi
 }

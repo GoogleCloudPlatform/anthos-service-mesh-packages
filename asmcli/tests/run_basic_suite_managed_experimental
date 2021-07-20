@@ -1,0 +1,24 @@
+#!/bin/bash
+set -CeEu
+set -o pipefail
+
+SPATH="$(readlink -f "$0")"
+SDIR="$(dirname "${SPATH}")"; export SDIR;
+SCRIPT_NAME="${0##*/}"
+
+# shellcheck source=common.sh
+. "${SDIR}/common.sh"
+
+cd "${SDIR}"
+
+main() {
+  # CLI setup
+  parse_args "$@"
+
+  run_basic_test "experimental install" ""; RETVAL=$?;
+  cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"
+
+  exit "${RETVAL}"
+}
+
+main "$@"

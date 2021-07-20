@@ -175,10 +175,7 @@ is_service_mesh_feature_enabled() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
 
   local RESPONSE
-  # IAM permission: gkehub.features.get
-  RESPONSE="$(run_command curl -s -H "X-Goog-User-Project: ${PROJECT_ID}"  \
-    "https://gkehub.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/global/features/servicemesh" \
-    -K <(auth_header "$(get_auth_token)"))"
+  RESPONSE="$(run_command gcloud alpha container hub mesh describe --project="${PROJECT_ID}")"
 
   if [[ "$(echo "${RESPONSE}" | jq -r '.featureState.lifecycleState')" != "ENABLED" ]]; then
     false

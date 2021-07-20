@@ -132,6 +132,16 @@ install_canonical_controller() {
   info "...done!"
 }
 
+install_control_plane_revision() {
+  local CR; CR="${1}"
+  local REVISION; REVISION="${2}"
+  info "Installing ASM Contro Plane Revision CR with ${REVISION} channel in istio-system namespace..."
+  retry 3 kubectl apply -f "${CR}"
+  info "Waiting for deployment..."
+  retry 3 kubectl wait --for=condition=ProvisioningFinished \
+    controlplanerevision "${REVISION}" -n istio-system
+}
+
 expose_istiod() {
   context_append "kubectlFiles" "${EXPOSE_ISTIOD_SERVICE}"
 }

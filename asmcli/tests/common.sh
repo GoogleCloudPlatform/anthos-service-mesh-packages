@@ -701,6 +701,10 @@ run_basic_test() {
     SERVICE_ACCOUNT="-s ${SERVICE_ACCOUNT}"
   fi
 
+  if [[ -n "${CA}" ]]; then
+    CA="-c ${CA}"
+  fi
+
   mkfifo "${LT_NAMESPACE}"
 
   create_ns "${ISTIO_NAMESPACE}"
@@ -710,7 +714,7 @@ run_basic_test() {
   echo "_CI_REVISION_PREFIX=${LT_NAMESPACE} \
   ../asmcli ${SUBCOMMAND} ${KEY_FILE} ${SERVICE_ACCOUNT} \
     --kc ${KUBECONFIG} \
-    -c ${CA} -v \
+    ${CA} -v \
     --output-dir ${OUTPUT_DIR} \
     ${EXTRA_FLAGS}"
   # shellcheck disable=SC2086
@@ -720,7 +724,7 @@ run_basic_test() {
   _CI_REVISION_PREFIX="${LT_NAMESPACE}" \
     ../asmcli ${SUBCOMMAND} ${KEY_FILE} ${SERVICE_ACCOUNT} \
     --kc "${KUBECONFIG}" \
-    -c "${CA}" -v \
+    ${CA} -v \
     --output-dir "${OUTPUT_DIR}" \
     ${EXTRA_FLAGS} ${_EXTRA_FLAGS} 2>&1 | tee "${LT_NAMESPACE}" &
 
@@ -739,7 +743,7 @@ run_basic_test() {
   roll "${LT_NAMESPACE}"
 
   # MCP doesn't install Ingress
-  if [[ "${EXTRA_FLAGS}" = *--managed* ]]; then
+  if [[ "${EXTRA_FLAGS}" = *--managed* || "${SUBCOMMAND}" = *experimental* ]]; then
     return
   fi
 
