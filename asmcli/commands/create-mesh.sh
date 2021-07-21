@@ -47,7 +47,7 @@ validate_cluster_args() {
   # flatten any kubeconfig files into cluster P/L/C
   while read -r KCF; do
     # check a default context exists
-    CONTEXT="$(kubectl --kubeconfig ${KCF} config current-context)"
+    CONTEXT="$(kubectl --kubeconfig "${KCF}" config current-context)"
     if [[ -z "${CONTEXT}" ]]; then
       fatal "Missing current-context in ${KCF}. Please set a current-context in the KUBECONFIG"
     else

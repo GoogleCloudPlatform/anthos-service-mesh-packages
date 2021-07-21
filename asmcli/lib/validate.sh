@@ -565,7 +565,7 @@ EOF
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 && -z "${CONTEXT}" ]]; then
     # set CONTEXT to current-context in the KUBECONFIG
     # or fail-fast if current-context doesn't exist
-    CONTEXT="$(kubectl --kubeconfig ${KCF} config current-context)"
+    CONTEXT="$(kubectl --kubeconfig "${KCF}" config current-context)"
     if [[ -z "${CONTEXT}" ]]; then
       MISSING_ARGS=1
       warn "Missing current-context in the KUBECONFIG. Please provide context with --context flag or set a current-context in the KUBECONFIG"
