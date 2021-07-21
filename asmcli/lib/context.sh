@@ -57,7 +57,8 @@ context_init() {
   "kubectlFiles": [],
   "clustersInfo": [],
   "clusterRegistrations": [],
-  "clusterContexts": []
+  "clusterContexts": [],
+  "kubeconfigFiles": []
 }
 EOF
 )

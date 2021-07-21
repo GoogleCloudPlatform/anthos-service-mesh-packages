@@ -22,8 +22,13 @@ parse_cluster_args() {
   fi
 
   while [[ $# != 0 ]]; do
-    local CLUSTER; CLUSTER="${1}"
-    context_append "clustersInfo" "${CLUSTER//\// }"
+    if [[ "$1" =~ .+/.+/.+ ]]; then
+      local CLUSTER; CLUSTER="${1}"
+      context_append "clustersInfo" "${CLUSTER//\// }"
+    else
+      local KCF; KCF="${1}"
+      context_append "kubeconfigFiles" "${KCF}"
+    fi
     shift 1
   done
 }
