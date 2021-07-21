@@ -22,18 +22,45 @@ parse_cluster_args() {
   fi
 
   while [[ $# != 0 ]]; do
-    local CLUSTER; CLUSTER="${1}"
-    context_append "clustersInfo" "${CLUSTER//\// }"
+    if [ -f "$1" ]; then
+      local KCF; KCF="${1}"
+      context_append "kubeconfigFiles" "${KCF}"
+    else
+      local CLUSTER; CLUSTER="${1}"
+      context_append "clustersInfo" "${CLUSTER//\// }"
+    fi
     shift 1
   done
 }
 
 validate_cluster_args() {
+  local KCF
+  local PROJECT_ID
+  local CLUSTER_LOCATION
+  local CLUSTER_NAME
+  local CTX_CLUSTER
+  local GKE_CLUSTER_URI
+
   # validate fleet id is valid
   get_project_number
 
+  # flatten any kubeconfig files into cluster P/L/C
+  # this is GCP-only and will need to be reworked for other platforms
+  while read -r KCF; do
+    # check a default context exists
+    local CONTEXT; CONTEXT="$(kubectl --kubeconfig "${KCF}" config current-context)"
+    if [[ -z "${CONTEXT}" ]]; then
+      fatal "Missing current-context in ${KCF}. Please set a current-context in the KUBECONFIG"
+    else
+      # use the default context to add to clusterInfo list
+      IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
+${CONTEXT}
+EOF
+      context_append "clustersInfo" "${PROJECT_ID} ${CLUSTER_LOCATION} ${CLUSTER_NAME}"
+    fi
+  done < <(context_list "kubeconfigFiles")
+
   # validate clusters are valid
-  local PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME CTX_CLUSTER GKE_CLUSTER_URI
   while read -r PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME; do
     context_set-option "PROJECT_ID" "${PROJECT_ID}"
     context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
