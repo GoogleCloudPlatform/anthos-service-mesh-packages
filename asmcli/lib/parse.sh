@@ -148,7 +148,9 @@ parse_args() {
         shift 1
         ;;
       --only_validate | --only-validate)
-        context_set-option "ONLY_VALIDATE" 1
+        warn "As of version 1.10 the --only_validate flag is deprecated and will be ignored."
+        warn "Please use \"asmcli valdiate\" instead."
+        exit
         shift 1
         ;;
       --only_enable | --only-enable)

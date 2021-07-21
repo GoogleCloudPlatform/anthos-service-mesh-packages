@@ -163,7 +163,6 @@ FLAGS:
                                       support various features.
   -v|--verbose                        Print commands before and after execution.
      --dry_run                        Print commands, but don't execute them.
-     --only_validate                  Run validation, but don't install.
      --only_enable                    Perform the specified steps to set up the
                                       current user/cluster but don't install
                                       anything.
