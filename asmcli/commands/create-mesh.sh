@@ -22,7 +22,7 @@ parse_cluster_args() {
   fi
 
   while [[ $# != 0 ]]; do
-    if [ -e "$1" ]; then
+    if [ -f "$1" ]; then
       local KCF; KCF="${1}"
       context_append "kubeconfigFiles" "${KCF}"
     else
@@ -45,9 +45,10 @@ validate_cluster_args() {
   get_project_number
 
   # flatten any kubeconfig files into cluster P/L/C
+  # this is GCP-only and will need to be reworked for other platforms
   while read -r KCF; do
     # check a default context exists
-    CONTEXT="$(kubectl --kubeconfig "${KCF}" config current-context)"
+    local CONTEXT; CONTEXT="$(kubectl --kubeconfig "${KCF}" config current-context)"
     if [[ -z "${CONTEXT}" ]]; then
       fatal "Missing current-context in ${KCF}. Please set a current-context in the KUBECONFIG"
     else
@@ -57,9 +58,7 @@ ${CONTEXT}
 EOF
       context_append "clustersInfo" "${PROJECT_ID} ${CLUSTER_LOCATION} ${CLUSTER_NAME}"
     fi
-  done <<EOF
-$(context_list "kubeconfigFiles")
-EOF
+  done < <(context_list "kubeconfigFiles")
 
   # validate clusters are valid
   while read -r PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME; do
