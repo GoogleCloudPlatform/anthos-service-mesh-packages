@@ -1,9 +1,4 @@
 parse_args() {
-  if [[ "${*}" = '' ]]; then
-    usage_short >&2
-    exit 2
-  fi
-
   # shellcheck disable=SC2064
   trap "$(shopt -p nocasematch)" RETURN
   shopt -s nocasematch
@@ -229,11 +224,6 @@ parse_args() {
 }
 
 x_parse_install_args() {
-  if [[ "${*}" = '' ]]; then
-    x_usage >&2
-    exit 2
-  fi
-
   # shellcheck disable=SC2064
   trap "$(shopt -p nocasematch)" RETURN
   shopt -s nocasematch
