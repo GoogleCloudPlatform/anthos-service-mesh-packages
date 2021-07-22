@@ -3909,7 +3909,7 @@ exit_if_istio_namespace_not_exists() {
   if ! istio_namespace_exists; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 The istio-system namespace doesn't exist.
-Please create the "istio-namespace" and retry, or run the script with the
+Please create the "istio-system" and retry, or run the script with the
 '--enable_namespace_creation' flag to allow the script to enable it on your behalf.
 $(enable_common_message)
 EOF
