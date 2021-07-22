@@ -99,13 +99,17 @@ EOF
 }
 
 validate_gcp_resources() {
-  validate_cluster
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  validate_cluster "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
 }
 
 validate_cluster() {
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
-  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local PROJECT_ID; PROJECT_ID="${1}"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}"
+  local CLUSTER_NAME; CLUSTER_NAME="${3}"
+  
   local RESULT; RESULT=""
 
   RESULT="$(gcloud container clusters list \
@@ -391,9 +395,9 @@ EOF
 }
 
 exit_if_cluster_registered_to_another_fleet() {
-  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local PROJECT_ID; PROJECT_ID="${1}"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}"
+  local CLUSTER_NAME; CLUSTER_NAME="${3}"
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   local WANT
@@ -710,59 +714,6 @@ arg_required() {
   if [[ ! "${2:-}" || "${2:0:1}" = '-' ]]; then
     fatal "Option ${1} requires an argument."
   fi
-}
-
-validate_create_mesh_args() {
-  local KCF
-  local PROJECT_ID
-  local CLUSTER_LOCATION
-  local CLUSTER_NAME
-  local CTX_CLUSTER
-  local GKE_CLUSTER_URI
-
-  # validate fleet id is valid
-  get_project_number
-
-  # flatten any kubeconfig files into cluster P/L/C
-  # this is GCP-only and will need to be reworked for other platforms
-  while read -r KCF; do
-    # check a default context exists
-    local CONTEXT; CONTEXT="$(kubectl --kubeconfig "${KCF}" config current-context)"
-    if [[ -z "${CONTEXT}" ]]; then
-      fatal "Missing current-context in ${KCF}. Please set a current-context in the KUBECONFIG"
-    else
-      # use the default context to add to clusterInfo list
-      IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
-${CONTEXT}
-EOF
-      context_append "clustersInfo" "${PROJECT_ID} ${CLUSTER_LOCATION} ${CLUSTER_NAME}"
-    fi
-  done < <(context_list "kubeconfigFiles")
-
-  # validate clusters are valid
-  while read -r PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME; do
-    context_set-option "PROJECT_ID" "${PROJECT_ID}"
-    context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
-    context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
-
-    validate_cluster
-    configure_kubectl
-
-    CTX_CLUSTER="$(kubectl config current-context)"
-    if ! is_membership_crd_installed; then
-      GKE_CLUSTER_URI="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
-      --zone="${CLUSTER_LOCATION}" \
-      --project="${PROJECT_ID}" \
-      --format='value(selfLink)')"
-      context_append "clusterRegistrations" "${CTX_CLUSTER} ${GKE_CLUSTER_URI}"
-    else
-      exit_if_cluster_registered_to_another_fleet
-      warn "Cluster ${CLUSTER_NAME} is already registered with project ${PROJECT_ID}. Skipping."
-    fi
-    context_append "clusterContexts" "${CTX_CLUSTER}"
-  done <<EOF
-$(context_list "clustersInfo")
-EOF
 }
 
 x_validate_install_args() {

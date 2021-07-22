@@ -29,6 +29,7 @@ validate() {
 validate_dependencies() {
   local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
   local USE_VM; USE_VM="$(context_get-option "USE_VM")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   if can_modify_gcp_apis; then
     enable_gcloud_apis
@@ -58,7 +59,7 @@ validate_dependencies() {
     fi
   fi
 
-  get_project_number
+  get_project_number "${FLEET_ID}"
   if is_gcp; then
     if can_modify_cluster_labels; then
       add_cluster_labels

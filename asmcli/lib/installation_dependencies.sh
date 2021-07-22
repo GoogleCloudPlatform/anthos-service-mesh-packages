@@ -170,7 +170,7 @@ EOF
 # For GCP: project number corresponds to the (optional) ASM Fleet project or the (default) cluster's project.
 # For non-GCP: project number corresponds to the (required) ASM Fleet project.
 get_project_number() {
-  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  local FLEET_ID; FLEET_ID="${1}"
   local RESULT; RESULT=""
 
   info "Checking for project ${FLEET_ID}..."
@@ -229,9 +229,9 @@ get_cluster_labels() {
 
 generate_membership_name() {
   if is_gcp; then
-    local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-    local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
-    local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+    local PROJECT_ID; PROJECT_ID="${1}"
+    local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}"
+    local CLUSTER_NAME; CLUSTER_NAME="${3}"
 
     local MEMBERSHIP_NAME
     MEMBERSHIP_NAME="${CLUSTER_NAME}"
@@ -276,7 +276,10 @@ register_cluster() {
     populate_cluster_values
   fi
 
-  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name)"
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}")"
   info "Registering the cluster as ${MEMBERSHIP_NAME}..."
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 

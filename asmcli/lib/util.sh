@@ -222,7 +222,10 @@ prepare_environment() {
     auth_service_account
   fi
 
-  configure_kubectl
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  configure_kubectl "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
 
   if should_validate || can_modify_at_all; then
     local_iam_user > /dev/null
@@ -235,26 +238,6 @@ prepare_environment() {
     download_kpt
   fi
   readonly AKPT
-
-  if needs_asm; then
-    if ! necessary_files_exist; then
-      download_asm
-    fi
-    organize_kpt_files
-  fi
-}
-
-# Need to prepare differently under multicluster environment
-# validate_cluster and configure_kubectl will be called in validation
-# for each cluster
-prepare_create_mesh_environment() {
-  set_up_local_workspace
-
-  validate_cli_dependencies
-
-  if is_sa; then
-    auth_service_account
-  fi
 
   if needs_asm; then
     if ! necessary_files_exist; then
