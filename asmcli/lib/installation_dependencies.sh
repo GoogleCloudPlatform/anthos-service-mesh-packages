@@ -252,6 +252,18 @@ generate_membership_name() {
   echo "${MEMBERSHIP_NAME}"
 }
 
+generate_secret_name() {
+  local SECRET_NAME; SECRET_NAME="${1}"
+
+  if [[ "${#SECRET_NAME}" -gt "${KUBE_TAG_MAX_LEN}" ]]; then
+    local DIGEST
+    DIGEST="$(echo "${SECRET_NAME}" | sha256sum | head -c20 || true)"
+    SECRET_NAME="${SECRET_NAME:0:42}-${DIGEST}"
+  fi
+
+  echo "${SECRET_NAME}"
+}
+
 register_cluster() {
   if is_cluster_registered; then return; fi
 

@@ -223,6 +223,57 @@ parse_args() {
   fi
 }
 
+parse_create_mesh_args() {
+  if [[ $# -lt 2 ]]; then
+    create-mesh_usage_short
+    exit 2
+  fi
+
+  local FLEET_ID; FLEET_ID="${1}"
+  context_set-option "FLEET_ID" "${FLEET_ID}"
+  shift 1
+
+  while [[ $# != 0 ]]; do
+    case "${1}" in
+      -v | --verbose)
+        context_set-option "VERBOSE" 1
+        shift 1
+        ;;
+      -h | --help)
+        context_set-option "PRINT_HELP" 1
+        shift 1
+        ;;
+      --version)
+        context_set-option "PRINT_VERSION" 1
+        shift 1
+        ;;
+      *)
+        if [ -f "$1" ]; then
+          local KCF; KCF="${1}"
+          context_append "kubeconfigFiles" "${KCF}"
+        else
+          local CLUSTER; CLUSTER="${1}"
+          context_append "clustersInfo" "${CLUSTER//\// }"
+        fi
+        shift 1
+        ;;
+    esac
+  done
+  local PRINT_HELP; PRINT_HELP="$(context_get-option "PRINT_HELP")"
+  local PRINT_VERSION; PRINT_VERSION="$(context_get-option "PRINT_VERSION")"
+  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
+  if [[ "${PRINT_HELP}" -eq 1 || "${PRINT_VERSION}" -eq 1 ]]; then
+    if [[ "${PRINT_VERSION}" -eq 1 ]]; then
+      version_message
+    elif [[ "${VERBOSE}" -eq 1 ]]; then
+      create-mesh_usage
+    else
+      create-mesh_usage_short
+    fi
+    exit
+  fi
+}
+
 x_parse_install_args() {
   # shellcheck disable=SC2064
   trap "$(shopt -p nocasematch)" RETURN

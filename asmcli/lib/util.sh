@@ -244,6 +244,26 @@ prepare_environment() {
   fi
 }
 
+# Need to prepare differently under multicluster environment
+# validate_cluster and configure_kubectl will be called in validation
+# for each cluster
+prepare_create_mesh_environment() {
+  set_up_local_workspace
+
+  validate_cli_dependencies
+
+  if is_sa; then
+    auth_service_account
+  fi
+
+  if needs_asm; then
+    if ! necessary_files_exist; then
+      download_asm
+    fi
+    organize_kpt_files
+  fi
+}
+
 init() {
   # BSD-style readlink apparently doesn't have the same -f toggle on readlink
   case "$(uname)" in
