@@ -246,24 +246,8 @@ teardown() {
     || ! can_modify_cluster_labels \
     || ! can_modify_gcp_apis \
     || ! can_modify_gcp_components \
-    || ! can_modify_gcp_iam_roles; then
-    exit 1
-  fi
-}
-
-@test "MAIN: --enable-all should grant all permissions but shouldn't register to environ when unnecessary" {
-  context_init
-
-  local CMD
-  CMD="-l this_should_pass"
-  CMD="${CMD} -n this_should_pass"
-  CMD="${CMD} -p this_should_pass"
-  CMD="${CMD} -c mesh_ca"
-  CMD="${CMD} -e"
-
-  parse_args ${CMD}
-
-  if can_register_cluster; then
+    || ! can_modify_gcp_iam_roles \
+    || ! can_register_cluster; then
     exit 1
   fi
 }
@@ -414,7 +398,6 @@ teardown() {
   CMD="${CMD} -n this_should_pass"
   CMD="${CMD} -p this_should_pass"
   CMD="${CMD} -c mesh_ca"
-  CMD="${CMD} -e"
   CMD="${CMD} --option vm"
   CMD="${CMD} --option hub_meshca"
 
@@ -452,7 +435,6 @@ teardown() {
   CMD="${CMD} -n this_should_pass"
   CMD="${CMD} -p this_should_pass"
   CMD="${CMD} -c mesh_ca"
-  CMD="${CMD} -e"
   CMD="${CMD} --option vm"
   CMD="${CMD} --managed"
 
