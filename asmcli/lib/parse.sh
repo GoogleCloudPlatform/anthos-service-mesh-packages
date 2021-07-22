@@ -1,9 +1,4 @@
 parse_args() {
-  if [[ "${*}" = '' ]]; then
-    usage_short >&2
-    exit 2
-  fi
-
   # shellcheck disable=SC2064
   trap "$(shopt -p nocasematch)" RETURN
   shopt -s nocasematch
@@ -148,6 +143,8 @@ parse_args() {
         shift 1
         ;;
       --only_validate | --only-validate)
+        warn "In version 1.11 the --only_validate flag will be deprecated and ignored."
+        warn "Please use \"asmcli valdiate\" instead."
         context_set-option "ONLY_VALIDATE" 1
         shift 1
         ;;
@@ -227,11 +224,6 @@ parse_args() {
 }
 
 x_parse_install_args() {
-  if [[ "${*}" = '' ]]; then
-    x_usage >&2
-    exit 2
-  fi
-
   # shellcheck disable=SC2064
   trap "$(shopt -p nocasematch)" RETURN
   shopt -s nocasematch

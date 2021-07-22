@@ -651,7 +651,7 @@ EOF
     "${ENABLE_GCP_IAM_ROLES}" -eq 1 || "${ENABLE_GCP_COMPONENTS}" -eq 1 || \
     "${ENABLE_REGISTRATION}" -eq 1  || "${ENABLE_NAMESPACE_CREATION}" -eq 1 ]]; then
     if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
-      fatal "The only_validate flag cannot be used with any --enable* flag"
+      fatal "validation cannot be run with any --enable* flag"
     fi
   elif only_enable; then
     fatal "You must specify at least one --enable* flag with --only_enable"
@@ -825,7 +825,7 @@ EOF
     "${ENABLE_GCP_IAM_ROLES}" -eq 1 || "${ENABLE_GCP_COMPONENTS}" -eq 1 || \
     "${ENABLE_REGISTRATION}" -eq 1  || "${ENABLE_NAMESPACE_CREATION}" -eq 1 ]]; then
     if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
-      fatal "The only_validate flag cannot be used with any --enable* flag"
+      fatal "validation cannot be run with any --enable* flag"
     fi
   elif only_enable; then
     fatal "You must specify at least one --enable* flag with --only_enable"
