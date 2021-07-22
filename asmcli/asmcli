@@ -1964,8 +1964,8 @@ can_register_cluster() {
 
   if ! can_modify_at_all; then false; return; fi
 
-  if [[ "${ENABLE_ALL}" -eq 1 && ("${USE_VM}" -eq 1 || "${USE_HUB_WIP}" -eq 1) ]] \
-    || [[ "${ENABLE_REGISTRATION}" -eq 1 ]]; then
+  if [[ "${ENABLE_ALL}" -eq 1 || "${USE_VM}" -eq 1 || "${USE_HUB_WIP}" -eq 1 \
+    || "${ENABLE_REGISTRATION}" -eq 1 ]]; then
     true
   else
     false
