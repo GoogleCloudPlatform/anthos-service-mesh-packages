@@ -8,7 +8,6 @@ configure_package() {
   local CA; CA="$(context_get-option "CA")"
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
   local USE_VM; USE_VM="$(context_get-option "USE_VM")"
-  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
   local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
 
   info "Configuring kpt package..."
@@ -26,7 +25,9 @@ configure_package() {
     kpt cfg set asm gcloud.compute.network "${GCE_NETWORK_NAME}"
   else
     kpt cfg set asm gcloud.core.project "${FLEET_ID}"
-    kpt cfg set asm anthos.servicemesh.controlplane.monitoring.enabled "false"
+    if ! is_cluster_registered; then
+      kpt cfg set asm anthos.servicemesh.controlplane.monitoring.enabled "false"
+    fi
   fi
 
   kpt cfg set asm gcloud.project.environProjectNumber "${PROJECT_NUMBER}"
