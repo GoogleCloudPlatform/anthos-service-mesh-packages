@@ -177,6 +177,11 @@ create-mesh_prepare_environment() {
     auth_service_account
   fi
 
+  if needs_asm && needs_kpt; then
+    download_kpt
+  fi
+  readonly AKPT
+
   if needs_asm; then
     if ! necessary_files_exist; then
       download_asm
