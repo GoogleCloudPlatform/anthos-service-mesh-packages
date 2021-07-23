@@ -20,17 +20,13 @@ spec:
     pilot:
       k8s:
         env:
-          - name: TOKEN_AUDIENCES
-            value: "istio-ca,PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.token-audiences"}
-          - name: EXTERNAL_CA
-            value: "ISTIOD_RA_CAS_API"
-          - name: CA_NAME
-            value: "" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.external_ca.ca_name"}
+          - name: ENABLE_CA_SERVER
+            value: "false"
   meshConfig:
     defaultConfig:
       proxyMetadata:
-        CA_PROVIDER: "Citadel"
+        CA_PROVIDER: "GoogleCAS"
         PLUGINS: ""
   values:
     global:
-      caAddress: ""
+      caAddress: "" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.external_ca.ca_name"}
