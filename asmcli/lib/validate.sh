@@ -640,7 +640,7 @@ EOF
   if [[ "${CA}" = "gcp_cas" ]]; then
     validate_private_ca
   elif [[ "${CUSTOM_CA}" -eq 1 ]]; then
-    validate_citadel
+    validate_custom_ca
   fi
 
   if [[ "${MISSING_ARGS}" -ne 0 ]]; then

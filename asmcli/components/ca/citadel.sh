@@ -1,5 +1,4 @@
-validate_citadel() {
-  local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
+validate_custom_ca() {
   local CA_ROOT; CA_ROOT="$(context_get-option "CA_ROOT")"
   local CA_KEY; CA_KEY="$(context_get-option "CA_KEY")"
   local CA_CHAIN; CA_CHAIN="$(context_get-option "CA_CHAIN")"
@@ -61,12 +60,10 @@ EOF
   if ! openssl verify -trusted "${CA_ROOT}" -untrusted "${CA_CHAIN}" "${CA_CERT}"; then
     fatal "Unable to verify chain of trust."
   fi
-
-  local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
-  CUSTOM_OVERLAY="${OPTIONS_DIRECTORY}/citadel-ca.yaml,${CUSTOM_OVERLAY}"
-  context_set-option "CUSTOM_OVERLAY" "${CUSTOM_OVERLAY}"
 }
 
 configure_citadel() {
-  return
+  local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
+  CUSTOM_OVERLAY="${OPTIONS_DIRECTORY}/citadel-ca.yaml,${CUSTOM_OVERLAY}"
+  context_set-option "CUSTOM_OVERLAY" "${CUSTOM_OVERLAY}"
 }
