@@ -249,3 +249,57 @@ FLAGS:
   --version
 EOF
 }
+
+create-mesh_usage() {
+  cat << EOF
+${SCRIPT_NAME} $(version_message)
+usage: ${SCRIPT_NAME} create-mesh FLEET_ID (PROJECT_ID/CLUSTER_LOCATION/CLUSTER_NAME | KUBECONFIG_PATH) ... 
+
+Create a multi-cluster service mesh and allow cross-cluster service discovery. This is done by
+registering the clusters to the specified fleet and installing the necessary Kubernetes cluster
+secrets to allow ASM to communicate securely.
+
+You can pass in an arbitrary number of clusters at once, either by specifying the project ID,
+cluster location, and cluster name (for GKE on GCP clusters only) or the location of a
+kubeconfig file that has the default context set to the desired cluster.
+
+When adding/removing clusters to an existing multi-cluster fleet, you must specify the entire set
+of clusters for every invocation. You cannot add or remove clusters one at a time.
+
+This command will fail if any of the specified clusters are registered to a fleet other than the one
+specified by FLEET_ID.
+
+FLAGS:
+  The following several flags are used to display help texts and the version message.
+  -v|--verbose                        Print commands before and after execution.
+  -h|--help                           Show this message and exit.
+  --version                           Print the version of this tool and exit.
+
+EXAMPLE:
+The following invocation will create a mesh using the provided 6 clusters
+by registering them to a fleet named "my_cluster" and install remote secrets on each pair of clusters:
+
+  $> ${SCRIPT_NAME} \\
+      create-mesh \\
+      my-fleet \\
+      my-project/us-central1-c/my-cluster1 \\
+      path/to/kubeconfig2 \\
+      my-project/us-central1-c/my-cluster3
+
+EOF
+}
+
+create-mesh_usage_short() {
+  cat << EOF
+${SCRIPT_NAME} $(version_message)
+usage: ${SCRIPT_NAME} create-mesh FLEET_ID (PROJECT_ID/CLUSTER_LOCATION/CLUSTER_NAME | KUBECONFIG_PATH) ...
+
+Create a multi-cluster service mesh and allow cross-cluster service discovery.
+Use -h|--help with -v|--verbose to show detailed descriptions.
+
+FLAGS:
+  -v|--verbose
+  -h|--help
+  --version
+EOF
+}

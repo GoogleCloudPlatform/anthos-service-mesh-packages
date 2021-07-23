@@ -38,6 +38,8 @@ run_add_to_mesh_test() {
 $(get_test_clusters)
 EOF
 
+  ARGS="${ARGS} -v"
+
   # Test starts here
   echo "Validating the clusters are unregistered..."
   while read -r CLUSTER_NAME; do
@@ -51,9 +53,9 @@ $(get_test_clusters)
 EOF
 
   echo "Adding clusters to fleet..."
-  echo "VERBOSE=1 ../asmcli ${ARGS}"
+  echo "../asmcli ${ARGS}"
   # shellcheck disable=SC2086
-  VERBOSE=1 ../asmcli ${ARGS}
+  ../asmcli ${ARGS}
 
   date +"%T"
 

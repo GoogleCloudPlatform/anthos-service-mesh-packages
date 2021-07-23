@@ -133,49 +133,77 @@ main() {
 }
 create-mesh_subcommand() {
   ### Preparation ###
-  parse_cluster_args "$@"
-  prepare_add_to_mesh_environment
-  validate_cluster_args
+  create-mesh_parse_args "$@"
+  create-mesh_prepare_environment
+  create-mesh_validate_args
 
   ### Registration ###
-  add_all_to_mesh
+  create_mesh
   install_all_remote_secrets
 }
 
-parse_cluster_args() {
-  if [[ $# != 0 ]]; then
-    local FLEET_ID; FLEET_ID="${1}"
-    context_set-option "FLEET_ID" "${FLEET_ID}"
-    shift 1
-  fi
-
-  if [[ "${*}" = '' ]]; then
-    usage_short >&2
+create-mesh_parse_args() {
+  if [[ $# -lt 2 ]]; then
+    create-mesh_usage_short
     exit 2
   fi
 
+  local FLEET_ID; FLEET_ID="${1}"
+  context_set-option "FLEET_ID" "${FLEET_ID}"
+  shift 1
+
   while [[ $# != 0 ]]; do
-    if [ -f "$1" ]; then
-      local KCF; KCF="${1}"
-      context_append "kubeconfigFiles" "${KCF}"
-    else
-      local CLUSTER; CLUSTER="${1}"
-      context_append "clustersInfo" "${CLUSTER//\// }"
-    fi
-    shift 1
+    case "${1}" in
+      -v | --verbose)
+        context_set-option "VERBOSE" 1
+        shift 1
+        ;;
+      -h | --help)
+        context_set-option "PRINT_HELP" 1
+        shift 1
+        ;;
+      --version)
+        context_set-option "PRINT_VERSION" 1
+        shift 1
+        ;;
+      *)
+        if [ -f "$1" ]; then
+          local KCF; KCF="${1}"
+          context_append "kubeconfigFiles" "${KCF}"
+        else
+          local CLUSTER; CLUSTER="${1}"
+          context_append "clustersInfo" "${CLUSTER//\// }"
+        fi
+        shift 1
+        ;;
+    esac
   done
+  local PRINT_HELP; PRINT_HELP="$(context_get-option "PRINT_HELP")"
+  local PRINT_VERSION; PRINT_VERSION="$(context_get-option "PRINT_VERSION")"
+  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
+  if [[ "${PRINT_HELP}" -eq 1 || "${PRINT_VERSION}" -eq 1 ]]; then
+    if [[ "${PRINT_VERSION}" -eq 1 ]]; then
+      version_message
+    elif [[ "${VERBOSE}" -eq 1 ]]; then
+      create-mesh_usage
+    else
+      create-mesh_usage_short
+    fi
+    exit
+  fi
 }
 
-validate_cluster_args() {
+create-mesh_validate_args() {
   local KCF
   local PROJECT_ID
   local CLUSTER_LOCATION
   local CLUSTER_NAME
   local CTX_CLUSTER
   local GKE_CLUSTER_URI
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   # validate fleet id is valid
-  get_project_number
+  get_project_number "${FLEET_ID}"
 
   # flatten any kubeconfig files into cluster P/L/C
   # this is GCP-only and will need to be reworked for other platforms
@@ -195,12 +223,8 @@ EOF
 
   # validate clusters are valid
   while read -r PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME; do
-    context_set-option "PROJECT_ID" "${PROJECT_ID}"
-    context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
-    context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
-
-    validate_cluster
-    configure_kubectl
+    validate_cluster "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
+    configure_kubectl "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
 
     CTX_CLUSTER="$(kubectl config current-context)"
     if ! is_membership_crd_installed; then
@@ -210,7 +234,7 @@ EOF
       --format='value(selfLink)')"
       context_append "clusterRegistrations" "${CTX_CLUSTER} ${GKE_CLUSTER_URI}"
     else
-      exit_if_cluster_registered_to_another_fleet
+      exit_if_cluster_registered_to_another_fleet "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
       warn "Cluster ${CLUSTER_NAME} is already registered with project ${PROJECT_ID}. Skipping."
     fi
     context_append "clusterContexts" "${CTX_CLUSTER}"
@@ -219,25 +243,7 @@ $(context_list "clustersInfo")
 EOF
 }
 
-exit_if_cluster_registered_to_another_fleet() {
-  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
-  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
-
-  local WANT
-  WANT="//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
-  local LIST
-  LIST="$(gcloud container hub memberships list --project "${FLEET_ID}" \
-    --format=json | grep "${WANT}")"
-  if [[ -z "${LIST}" ]]; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-Cluster is already registered but not in the project ${FLEET_ID}.
-EOF
-  fi
-}
-
-add_all_to_mesh() {
+create_mesh() {
   local CTX_CLUSTER GKE_CLUSTER_URI
 
   # for-loop does not read lines but words, so setting IFS to explicitly split with line breaks
@@ -253,15 +259,11 @@ add_one_to_mesh() {
   local PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME MEMBERSHIP_NAME
   IFS='_' read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME < <(echo "$CTX_CLUSTER")
 
-  context_set-option "PROJECT_ID" "${PROJECT_ID}"
-  context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
-  context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
-  MEMBERSHIP_NAME="$(generate_membership_name)"
+  MEMBERSHIP_NAME="$(generate_membership_name "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}")"
 
   info "Registering the cluster ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME} as ${MEMBERSHIP_NAME}..."
 
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  retry 2 gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
+  retry 2 gcloud container hub memberships register "${MEMBERSHIP_NAME}" \
     --project="${PROJECT_ID}" \
     --gke-uri="${GKE_CLUSTER_URI}" \
     --enable-workload-identity
@@ -299,7 +301,7 @@ install_one_remote_secret() {
 # Need to prepare differently under multicluster environment
 # validate_cluster and configure_kubectl will be called in validation
 # for each cluster
-prepare_add_to_mesh_environment() {
+create-mesh_prepare_environment() {
   set_up_local_workspace
 
   validate_cli_dependencies
@@ -308,24 +310,17 @@ prepare_add_to_mesh_environment() {
     auth_service_account
   fi
 
+  if needs_asm && needs_kpt; then
+    download_kpt
+  fi
+  readonly AKPT
+
   if needs_asm; then
     if ! necessary_files_exist; then
       download_asm
     fi
     organize_kpt_files
   fi
-}
-
-generate_secret_name() {
-  local SECRET_NAME; SECRET_NAME="${1}"
-
-  if [[ "${#SECRET_NAME}" -gt "${KUBE_TAG_MAX_LEN}" ]]; then
-    local DIGEST
-    DIGEST="$(echo "${SECRET_NAME}" | sha256sum | head -c20 || true)"
-    SECRET_NAME="${SECRET_NAME:0:42}-${DIGEST}"
-  fi
-
-  echo "${SECRET_NAME}"
 }
 experimental_subcommand() {
   if [[ "${*}" = '' ]]; then
@@ -393,6 +388,8 @@ x_install() {
   return 0
 }
 x_validate_dependencies() {
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+
   if can_modify_gcp_apis; then
     enable_gcloud_apis
   elif should_validate; then
@@ -415,7 +412,7 @@ x_validate_dependencies() {
     exit_if_service_mesh_feature_not_enabled
   fi
 
-  get_project_number
+  get_project_number "${FLEET_ID}"
   if can_modify_cluster_labels; then
     add_cluster_labels
   elif should_validate; then
@@ -481,9 +478,12 @@ prepare_cluster_subcommand() {
 
   local INSTALL_EXPANSION_GATEWAY; INSTALL_EXPANSION_GATEWAY="$(context_get-option "INSTALL_EXPANSION_GATEWAY")"
   local INSTALL_IDENTITY_PROVIDER; INSTALL_IDENTITY_PROVIDER="$(context_get-option "INSTALL_IDENTITY_PROVIDER")"
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   if [[ "${INSTALL_EXPANSION_GATEWAY}" -eq 1 ]] || [[ "${INSTALL_IDENTITY_PROVIDER}" -eq 1 ]]; then
     set_up_local_workspace
-    configure_kubectl
+    configure_kubectl "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
     if needs_kpt; then
       download_kpt
     fi
@@ -509,14 +509,18 @@ validate_vm_dependencies() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local FLEET_ID; FLEET_ID="${PROJECT_ID}"
   context_set-option "FLEET_ID" "${FLEET_ID}"
-  get_project_number
+  get_project_number "${FLEET_ID}"
 
   validate_asm_cluster
 }
 
 validate_asm_cluster() {
-  validate_cluster
-  configure_kubectl
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+
+  validate_cluster "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
+  configure_kubectl "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
   
   exit_if_cluster_unregistered
   
@@ -1053,6 +1057,60 @@ FLAGS:
   --version
 EOF
 }
+
+create-mesh_usage() {
+  cat << EOF
+${SCRIPT_NAME} $(version_message)
+usage: ${SCRIPT_NAME} create-mesh FLEET_ID (PROJECT_ID/CLUSTER_LOCATION/CLUSTER_NAME | KUBECONFIG_PATH) ... 
+
+Create a multi-cluster service mesh and allow cross-cluster service discovery. This is done by
+registering the clusters to the specified fleet and installing the necessary Kubernetes cluster
+secrets to allow ASM to communicate securely.
+
+You can pass in an arbitrary number of clusters at once, either by specifying the project ID,
+cluster location, and cluster name (for GKE on GCP clusters only) or the location of a
+kubeconfig file that has the default context set to the desired cluster.
+
+When adding/removing clusters to an existing multi-cluster fleet, you must specify the entire set
+of clusters for every invocation. You cannot add or remove clusters one at a time.
+
+This command will fail if any of the specified clusters are registered to a fleet other than the one
+specified by FLEET_ID.
+
+FLAGS:
+  The following several flags are used to display help texts and the version message.
+  -v|--verbose                        Print commands before and after execution.
+  -h|--help                           Show this message and exit.
+  --version                           Print the version of this tool and exit.
+
+EXAMPLE:
+The following invocation will create a mesh using the provided 6 clusters
+by registering them to a fleet named "my_cluster" and install remote secrets on each pair of clusters:
+
+  $> ${SCRIPT_NAME} \\
+      create-mesh \\
+      my-fleet \\
+      my-project/us-central1-c/my-cluster1 \\
+      path/to/kubeconfig2 \\
+      my-project/us-central1-c/my-cluster3
+
+EOF
+}
+
+create-mesh_usage_short() {
+  cat << EOF
+${SCRIPT_NAME} $(version_message)
+usage: ${SCRIPT_NAME} create-mesh FLEET_ID (PROJECT_ID/CLUSTER_LOCATION/CLUSTER_NAME | KUBECONFIG_PATH) ...
+
+Create a multi-cluster service mesh and allow cross-cluster service discovery.
+Use -h|--help with -v|--verbose to show detailed descriptions.
+
+FLAGS:
+  -v|--verbose
+  -h|--help
+  --version
+EOF
+}
 install_subcommand() {
   ### Preparation ###
   parse_args "${@}"
@@ -1342,6 +1400,7 @@ validate() {
 validate_dependencies() {
   local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
   local USE_VM; USE_VM="$(context_get-option "USE_VM")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   if can_modify_gcp_apis; then
     enable_gcloud_apis
@@ -1371,7 +1430,7 @@ validate_dependencies() {
     fi
   fi
 
-  get_project_number
+  get_project_number "${FLEET_ID}"
   if is_gcp; then
     if can_modify_cluster_labels; then
       add_cluster_labels
@@ -2126,9 +2185,9 @@ configure_package() {
 }
 
 configure_kubectl(){
-  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local PROJECT_ID; PROJECT_ID="${1}"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}"
+  local CLUSTER_NAME; CLUSTER_NAME="${3}"
   local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
   local KUBECONFIG; KUBECONFIG="$(context_get-option "KUBECONFIG")"
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
@@ -2441,7 +2500,7 @@ EOF
 # For GCP: project number corresponds to the (optional) ASM Fleet project or the (default) cluster's project.
 # For non-GCP: project number corresponds to the (required) ASM Fleet project.
 get_project_number() {
-  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  local FLEET_ID; FLEET_ID="${1}"
   local RESULT; RESULT=""
 
   info "Checking for project ${FLEET_ID}..."
@@ -2500,9 +2559,9 @@ get_cluster_labels() {
 
 generate_membership_name() {
   if is_gcp; then
-    local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-    local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
-    local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+    local PROJECT_ID; PROJECT_ID="${1}"
+    local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}"
+    local CLUSTER_NAME; CLUSTER_NAME="${3}"
 
     local MEMBERSHIP_NAME
     MEMBERSHIP_NAME="${CLUSTER_NAME}"
@@ -2523,6 +2582,18 @@ generate_membership_name() {
   echo "${MEMBERSHIP_NAME}"
 }
 
+generate_secret_name() {
+  local SECRET_NAME; SECRET_NAME="${1}"
+
+  if [[ "${#SECRET_NAME}" -gt "${KUBE_TAG_MAX_LEN}" ]]; then
+    local DIGEST
+    DIGEST="$(echo "${SECRET_NAME}" | sha256sum | head -c20 || true)"
+    SECRET_NAME="${SECRET_NAME:0:42}-${DIGEST}"
+  fi
+
+  echo "${SECRET_NAME}"
+}
+
 register_cluster() {
   if is_cluster_registered; then return; fi
 
@@ -2535,7 +2606,10 @@ register_cluster() {
     populate_cluster_values
   fi
 
-  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name)"
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}")"
   info "Registering the cluster as ${MEMBERSHIP_NAME}..."
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
@@ -3189,7 +3263,10 @@ prepare_environment() {
     auth_service_account
   fi
 
-  configure_kubectl
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  configure_kubectl "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
 
   if should_validate || can_modify_at_all; then
     local_iam_user > /dev/null
@@ -3625,13 +3702,17 @@ EOF
 }
 
 validate_gcp_resources() {
-  validate_cluster
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  validate_cluster "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
 }
 
 validate_cluster() {
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
-  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local PROJECT_ID; PROJECT_ID="${1}"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}"
+  local CLUSTER_NAME; CLUSTER_NAME="${3}"
+  
   local RESULT; RESULT=""
 
   RESULT="$(gcloud container clusters list \
@@ -3912,6 +3993,24 @@ The istio-system namespace doesn't exist.
 Please create the "istio-system" and retry, or run the script with the
 '--enable_namespace_creation' flag to allow the script to enable it on your behalf.
 $(enable_common_message)
+EOF
+  fi
+}
+
+exit_if_cluster_registered_to_another_fleet() {
+  local PROJECT_ID; PROJECT_ID="${1}"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}"
+  local CLUSTER_NAME; CLUSTER_NAME="${3}"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+
+  local WANT
+  WANT="//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
+  local LIST
+  LIST="$(gcloud container hub memberships list --project "${FLEET_ID}" \
+    --format=json | grep "${WANT}")"
+  if [[ -z "${LIST}" ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Cluster is already registered but not in the project ${FLEET_ID}.
 EOF
   fi
 }

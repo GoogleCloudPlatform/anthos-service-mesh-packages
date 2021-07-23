@@ -99,13 +99,17 @@ EOF
 }
 
 validate_gcp_resources() {
-  validate_cluster
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  validate_cluster "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
 }
 
 validate_cluster() {
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
-  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local PROJECT_ID; PROJECT_ID="${1}"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}"
+  local CLUSTER_NAME; CLUSTER_NAME="${3}"
+  
   local RESULT; RESULT=""
 
   RESULT="$(gcloud container clusters list \
@@ -386,6 +390,24 @@ The istio-system namespace doesn't exist.
 Please create the "istio-system" and retry, or run the script with the
 '--enable_namespace_creation' flag to allow the script to enable it on your behalf.
 $(enable_common_message)
+EOF
+  fi
+}
+
+exit_if_cluster_registered_to_another_fleet() {
+  local PROJECT_ID; PROJECT_ID="${1}"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}"
+  local CLUSTER_NAME; CLUSTER_NAME="${3}"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+
+  local WANT
+  WANT="//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
+  local LIST
+  LIST="$(gcloud container hub memberships list --project "${FLEET_ID}" \
+    --format=json | grep "${WANT}")"
+  if [[ -z "${LIST}" ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Cluster is already registered but not in the project ${FLEET_ID}.
 EOF
   fi
 }

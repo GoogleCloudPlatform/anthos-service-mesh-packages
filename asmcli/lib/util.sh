@@ -222,7 +222,10 @@ prepare_environment() {
     auth_service_account
   fi
 
-  configure_kubectl
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  configure_kubectl "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
 
   if should_validate || can_modify_at_all; then
     local_iam_user > /dev/null

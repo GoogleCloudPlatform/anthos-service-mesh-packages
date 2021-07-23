@@ -51,9 +51,12 @@ prepare_cluster_subcommand() {
 
   local INSTALL_EXPANSION_GATEWAY; INSTALL_EXPANSION_GATEWAY="$(context_get-option "INSTALL_EXPANSION_GATEWAY")"
   local INSTALL_IDENTITY_PROVIDER; INSTALL_IDENTITY_PROVIDER="$(context_get-option "INSTALL_IDENTITY_PROVIDER")"
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   if [[ "${INSTALL_EXPANSION_GATEWAY}" -eq 1 ]] || [[ "${INSTALL_IDENTITY_PROVIDER}" -eq 1 ]]; then
     set_up_local_workspace
-    configure_kubectl
+    configure_kubectl "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
     if needs_kpt; then
       download_kpt
     fi
@@ -79,14 +82,18 @@ validate_vm_dependencies() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local FLEET_ID; FLEET_ID="${PROJECT_ID}"
   context_set-option "FLEET_ID" "${FLEET_ID}"
-  get_project_number
+  get_project_number "${FLEET_ID}"
 
   validate_asm_cluster
 }
 
 validate_asm_cluster() {
-  validate_cluster
-  configure_kubectl
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+
+  validate_cluster "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
+  configure_kubectl "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
   
   exit_if_cluster_unregistered
   

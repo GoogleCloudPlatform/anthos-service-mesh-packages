@@ -1,48 +1,76 @@
 create-mesh_subcommand() {
   ### Preparation ###
-  parse_cluster_args "$@"
-  prepare_add_to_mesh_environment
-  validate_cluster_args
+  create-mesh_parse_args "$@"
+  create-mesh_prepare_environment
+  create-mesh_validate_args
 
   ### Registration ###
-  add_all_to_mesh
+  create_mesh
   install_all_remote_secrets
 }
 
-parse_cluster_args() {
-  if [[ $# != 0 ]]; then
-    local FLEET_ID; FLEET_ID="${1}"
-    context_set-option "FLEET_ID" "${FLEET_ID}"
-    shift 1
-  fi
-
-  if [[ "${*}" = '' ]]; then
-    usage_short >&2
+create-mesh_parse_args() {
+  if [[ $# -lt 2 ]]; then
+    create-mesh_usage_short
     exit 2
   fi
 
+  local FLEET_ID; FLEET_ID="${1}"
+  context_set-option "FLEET_ID" "${FLEET_ID}"
+  shift 1
+
   while [[ $# != 0 ]]; do
-    if [ -f "$1" ]; then
-      local KCF; KCF="${1}"
-      context_append "kubeconfigFiles" "${KCF}"
-    else
-      local CLUSTER; CLUSTER="${1}"
-      context_append "clustersInfo" "${CLUSTER//\// }"
-    fi
-    shift 1
+    case "${1}" in
+      -v | --verbose)
+        context_set-option "VERBOSE" 1
+        shift 1
+        ;;
+      -h | --help)
+        context_set-option "PRINT_HELP" 1
+        shift 1
+        ;;
+      --version)
+        context_set-option "PRINT_VERSION" 1
+        shift 1
+        ;;
+      *)
+        if [ -f "$1" ]; then
+          local KCF; KCF="${1}"
+          context_append "kubeconfigFiles" "${KCF}"
+        else
+          local CLUSTER; CLUSTER="${1}"
+          context_append "clustersInfo" "${CLUSTER//\// }"
+        fi
+        shift 1
+        ;;
+    esac
   done
+  local PRINT_HELP; PRINT_HELP="$(context_get-option "PRINT_HELP")"
+  local PRINT_VERSION; PRINT_VERSION="$(context_get-option "PRINT_VERSION")"
+  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
+  if [[ "${PRINT_HELP}" -eq 1 || "${PRINT_VERSION}" -eq 1 ]]; then
+    if [[ "${PRINT_VERSION}" -eq 1 ]]; then
+      version_message
+    elif [[ "${VERBOSE}" -eq 1 ]]; then
+      create-mesh_usage
+    else
+      create-mesh_usage_short
+    fi
+    exit
+  fi
 }
 
-validate_cluster_args() {
+create-mesh_validate_args() {
   local KCF
   local PROJECT_ID
   local CLUSTER_LOCATION
   local CLUSTER_NAME
   local CTX_CLUSTER
   local GKE_CLUSTER_URI
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   # validate fleet id is valid
-  get_project_number
+  get_project_number "${FLEET_ID}"
 
   # flatten any kubeconfig files into cluster P/L/C
   # this is GCP-only and will need to be reworked for other platforms
@@ -62,12 +90,8 @@ EOF
 
   # validate clusters are valid
   while read -r PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME; do
-    context_set-option "PROJECT_ID" "${PROJECT_ID}"
-    context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
-    context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
-
-    validate_cluster
-    configure_kubectl
+    validate_cluster "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
+    configure_kubectl "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
 
     CTX_CLUSTER="$(kubectl config current-context)"
     if ! is_membership_crd_installed; then
@@ -77,7 +101,7 @@ EOF
       --format='value(selfLink)')"
       context_append "clusterRegistrations" "${CTX_CLUSTER} ${GKE_CLUSTER_URI}"
     else
-      exit_if_cluster_registered_to_another_fleet
+      exit_if_cluster_registered_to_another_fleet "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
       warn "Cluster ${CLUSTER_NAME} is already registered with project ${PROJECT_ID}. Skipping."
     fi
     context_append "clusterContexts" "${CTX_CLUSTER}"
@@ -86,25 +110,7 @@ $(context_list "clustersInfo")
 EOF
 }
 
-exit_if_cluster_registered_to_another_fleet() {
-  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
-  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
-
-  local WANT
-  WANT="//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
-  local LIST
-  LIST="$(gcloud container hub memberships list --project "${FLEET_ID}" \
-    --format=json | grep "${WANT}")"
-  if [[ -z "${LIST}" ]]; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-Cluster is already registered but not in the project ${FLEET_ID}.
-EOF
-  fi
-}
-
-add_all_to_mesh() {
+create_mesh() {
   local CTX_CLUSTER GKE_CLUSTER_URI
 
   # for-loop does not read lines but words, so setting IFS to explicitly split with line breaks
@@ -120,15 +126,11 @@ add_one_to_mesh() {
   local PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME MEMBERSHIP_NAME
   IFS='_' read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME < <(echo "$CTX_CLUSTER")
 
-  context_set-option "PROJECT_ID" "${PROJECT_ID}"
-  context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
-  context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
-  MEMBERSHIP_NAME="$(generate_membership_name)"
+  MEMBERSHIP_NAME="$(generate_membership_name "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}")"
 
   info "Registering the cluster ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME} as ${MEMBERSHIP_NAME}..."
 
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  retry 2 gcloud beta container hub memberships register "${MEMBERSHIP_NAME}" \
+  retry 2 gcloud container hub memberships register "${MEMBERSHIP_NAME}" \
     --project="${PROJECT_ID}" \
     --gke-uri="${GKE_CLUSTER_URI}" \
     --enable-workload-identity
@@ -166,7 +168,7 @@ install_one_remote_secret() {
 # Need to prepare differently under multicluster environment
 # validate_cluster and configure_kubectl will be called in validation
 # for each cluster
-prepare_add_to_mesh_environment() {
+create-mesh_prepare_environment() {
   set_up_local_workspace
 
   validate_cli_dependencies
@@ -175,22 +177,15 @@ prepare_add_to_mesh_environment() {
     auth_service_account
   fi
 
+  if needs_asm && needs_kpt; then
+    download_kpt
+  fi
+  readonly AKPT
+
   if needs_asm; then
     if ! necessary_files_exist; then
       download_asm
     fi
     organize_kpt_files
   fi
-}
-
-generate_secret_name() {
-  local SECRET_NAME; SECRET_NAME="${1}"
-
-  if [[ "${#SECRET_NAME}" -gt "${KUBE_TAG_MAX_LEN}" ]]; then
-    local DIGEST
-    DIGEST="$(echo "${SECRET_NAME}" | sha256sum | head -c20 || true)"
-    SECRET_NAME="${SECRET_NAME:0:42}-${DIGEST}"
-  fi
-
-  echo "${SECRET_NAME}"
 }

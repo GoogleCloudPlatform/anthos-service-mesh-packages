@@ -63,9 +63,9 @@ configure_package() {
 }
 
 configure_kubectl(){
-  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local PROJECT_ID; PROJECT_ID="${1}"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}"
+  local CLUSTER_NAME; CLUSTER_NAME="${3}"
   local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
   local KUBECONFIG; KUBECONFIG="$(context_get-option "KUBECONFIG")"
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
