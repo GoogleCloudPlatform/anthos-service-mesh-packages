@@ -33,7 +33,7 @@ staging_releases() {
 
 other_releases() {
   cat << EOF
-main unstable
+main alpha
 EOF
 }
 
