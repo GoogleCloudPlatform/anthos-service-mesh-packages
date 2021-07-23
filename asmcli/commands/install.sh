@@ -83,21 +83,20 @@ install_private_ca() {
   # This sets up IAM privileges for the project to be able to access GCP CAS.
   # If modify_gcp_component permissions are not granted, it is assumed that the
   # user has taken care of this, else Istio setup will fail
-  local ISTIOD_SERVICE_ACCOUNT
-  ISTIOD_SERVICE_ACCOUNT="istiod-${REVISION_LABEL}"
-  if [[ "${_CI_NO_REVISION}" -eq 1 ]]; then
-    ISTIOD_SERVICE_ACCOUNT="istiod"
-  fi
-  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${WORKLOAD_POOL}[istio-system/${ISTIOD_SERVICE_ACCOUNT}]"
-  local NAME; NAME=$(echo "${CA_NAME}" | cut -f6 -d/)
-  local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
-  local CA_PROJECT; CA_PROJECT=$(echo "${CA_NAME}" | cut -f2 -d/)
+  local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
 
-  retry 3 gcloud beta privateca subordinates add-iam-policy-binding "${NAME}" \
+  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${WORKLOAD_POOL}[-/-]"
+  local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
+
+  retry 3 gcloud privateca pools add-iam-policy-binding "${CA_NAME}" \
     --location "${CA_LOCATION}" \
-    --project "${CA_PROJECT}" \
     --member "serviceAccount:${WORKLOAD_IDENTITY}" \
-    --role "roles/privateca.certificateManager"
+    --role "roles/privateca.workloadCertificateRequester"
+
+  retry 3 gcloud privateca pools add-iam-policy-binding "${CA_NAME}" \
+    --location "${CA_LOCATION}" \
+    --member "serviceAccount:${WORKLOAD_IDENTITY}" \
+    --role "roles/privateca.auditor"
 }
 
 does_istiod_exist(){
