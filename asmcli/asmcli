@@ -2145,6 +2145,7 @@ configure_package() {
     kpt cfg set asm gcloud.compute.network "${GCE_NETWORK_NAME}"
   else
     kpt cfg set asm gcloud.core.project "${FLEET_ID}"
+    kpt cfg set asm anthos.servicemesh.controlplane.monitoring.enabled "false"
   fi
 
   kpt cfg set asm gcloud.project.environProjectNumber "${PROJECT_NUMBER}"
@@ -2170,6 +2171,13 @@ configure_package() {
   fi
   if [[ -n "${CA_NAME}" && "${CA}" = "gcp_cas" ]]; then
     kpt cfg set asm anthos.servicemesh.external_ca.ca_name "${CA_NAME}"
+  fi
+  if [[ "${CA}" = "citadel" ]]; then
+    kpt cfg set asm anthos.servicemesh.tokenAudiences "istio-ca,${PROJECT_ID}.svc.id.goog"
+    kpt cfg set asm anthos.servicemesh.spiffeBundleEndpoints ""
+  else
+    kpt cfg set asm anthos.servicemesh.tokenAudiences "${PROJECT_ID}.svc.id.goog"
+    kpt cfg set asm anthos.servicemesh.spiffeBundleEndpoints "${PROJECT_ID}.svc.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json"
   fi
 
   if [[ "${USE_VM}" -eq 1 ]] && [[ "${_CI_NO_REVISION}" -eq 0 ]]; then

@@ -16,12 +16,6 @@
 apiVersion: install.istio.io/v1alpha1
 kind: IstioOperator
 spec:
-  components:
-    pilot:
-      k8s:
-        env:
-          - name: ENABLE_STACKDRIVER_MONITORING
-            value: "false"
   meshConfig:
     defaultConfig:
       proxyMetadata:
