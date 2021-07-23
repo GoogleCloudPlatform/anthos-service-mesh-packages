@@ -4174,7 +4174,7 @@ EOF
 
   # Script will not infer the intent between the 2 use cases in case both values are provided
   if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 1 && "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
-    fatal_with_usage "Incompatible arguments. Kubeconfig cannot be used in conjuntion with [--cluster_location|--cluster_name|--project_id]."
+    fatal_with_usage "Incompatible arguments. Kubeconfig cannot be used in conjunction with [--cluster_location|--cluster_name|--project_id]."
   fi
 
   if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 1 && "${CLUSTER_DETAIL_VALID}" -eq 0 ]]; then
@@ -4365,7 +4365,7 @@ EOF
 
   # Script will not infer the intent between the 2 use cases in case both values are provided
   if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 1 && "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
-    fatal_with_usage "Incompatible arguments. Kubeconfig cannot be used in conjuntion with [--cluster_location|--cluster_name|--project_id]."
+    fatal_with_usage "Incompatible arguments. Kubeconfig cannot be used in conjunction with [--cluster_location|--cluster_name|--project_id]."
   fi
 
   if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 1 && "${CLUSTER_DETAIL_VALID}" -eq 0 ]]; then
