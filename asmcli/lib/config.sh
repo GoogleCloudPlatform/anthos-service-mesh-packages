@@ -9,7 +9,6 @@ configure_package() {
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
   local USE_VM; USE_VM="$(context_get-option "USE_VM")"
   local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
-  local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
 
   info "Configuring kpt package..."
 
@@ -18,6 +17,7 @@ configure_package() {
   fi
 
   populate_fleet_info
+  local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
 
   if is_gcp; then
     kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
