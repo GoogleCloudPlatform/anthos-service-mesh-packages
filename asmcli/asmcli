@@ -2128,6 +2128,7 @@ configure_package() {
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
   local USE_VM; USE_VM="$(context_get-option "USE_VM")"
   local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
+  local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
 
   info "Configuring kpt package..."
 
@@ -2144,7 +2145,8 @@ configure_package() {
     kpt cfg set asm gcloud.compute.network "${GCE_NETWORK_NAME}"
   else
     kpt cfg set asm gcloud.core.project "${FLEET_ID}"
-    if ! is_cluster_registered; then
+    kpt cfg set asm gcloud.container.cluster "${HUB_MEMBERSHIP_ID}"
+    if [[ "${CA}" == "citadel" ]]; then
       kpt cfg set asm anthos.servicemesh.controlplane.monitoring.enabled "false"
     fi
   fi
