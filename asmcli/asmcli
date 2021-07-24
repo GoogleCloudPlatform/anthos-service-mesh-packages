@@ -2146,6 +2146,8 @@ configure_package() {
   else
     kpt cfg set asm gcloud.core.project "${FLEET_ID}"
     kpt cfg set asm gcloud.container.cluster "${HUB_MEMBERSHIP_ID}"
+    # us-central1 is the current dummy value in the user guide for on-prem
+    kpt cfg set asm gcloud.compute.location "us-central1"
     if [[ "${CA}" == "citadel" ]]; then
       kpt cfg set asm anthos.servicemesh.controlplane.monitoring.enabled "false"
     fi
