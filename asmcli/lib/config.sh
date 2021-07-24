@@ -8,8 +8,8 @@ configure_package() {
   local CA; CA="$(context_get-option "CA")"
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
   local USE_VM; USE_VM="$(context_get-option "USE_VM")"
-  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
   local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
+  local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
 
   info "Configuring kpt package..."
 
@@ -26,6 +26,10 @@ configure_package() {
     kpt cfg set asm gcloud.compute.network "${GCE_NETWORK_NAME}"
   else
     kpt cfg set asm gcloud.core.project "${FLEET_ID}"
+    kpt cfg set asm gcloud.container.cluster "${HUB_MEMBERSHIP_ID}"
+    if [[ "${CA}" == "citadel" ]]; then
+      kpt cfg set asm anthos.servicemesh.controlplane.monitoring.enabled "false"
+    fi
   fi
 
   kpt cfg set asm gcloud.project.environProjectNumber "${PROJECT_NUMBER}"
@@ -51,6 +55,13 @@ configure_package() {
   fi
   if [[ -n "${CA_NAME}" && "${CA}" = "gcp_cas" ]]; then
     kpt cfg set asm anthos.servicemesh.external_ca.ca_name "${CA_NAME}"
+  fi
+  if [[ "${CA}" = "citadel" ]]; then
+    kpt cfg set asm anthos.servicemesh.tokenAudiences "istio-ca,${PROJECT_ID}.svc.id.goog"
+    kpt cfg set asm anthos.servicemesh.spiffeBundleEndpoints ""
+  else
+    kpt cfg set asm anthos.servicemesh.tokenAudiences "${PROJECT_ID}.svc.id.goog"
+    kpt cfg set asm anthos.servicemesh.spiffeBundleEndpoints "${PROJECT_ID}.svc.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json"
   fi
 
   if [[ "${USE_VM}" -eq 1 ]] && [[ "${_CI_NO_REVISION}" -eq 0 ]]; then

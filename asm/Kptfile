@@ -120,6 +120,18 @@ openAPI:
         setter:
           name: anthos.servicemesh.hubTrustDomain
           value: HUB_TRUST_DOMAIN
+    io.k8s.cli.setters.anthos.servicemesh.tokenAudiences:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.tokenAudiences
+          value: TOKEN_AUDIENCES
+    io.k8s.cli.setters.anthos.servicemesh.spiffeBundleEndpoints:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.spiffeBundleEndpoints
+          value: SPIFFE_BUNDLE_ENDPOINTS
     io.k8s.cli.setters.anthos.servicemesh.controlplane.validation-url:
       type: string
       x-k8s-cli:
@@ -207,10 +219,10 @@ openAPI:
       x-k8s-cli:
         substitution:
           name: token-audiences
-          pattern: "istio-ca,PROJECT_ID.svc.id.goog"
+          pattern: "TOKEN_AUDIENCES"
           values:
-          - marker: PROJECT_ID
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+          - marker: TOKEN_AUDIENCES
+            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.tokenAudiences'
     io.k8s.cli.substitutions.token-audiences-hub:
       type: string
       x-k8s-cli:
@@ -259,10 +271,10 @@ openAPI:
       x-k8s-cli:
         substitution:
           name: spiffe-bundle-endpoints
-          pattern: PROJECT_ID.svc.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json
+          pattern: SPIFFE_BUNDLE_ENDPOINTS
           values:
-          - marker: PROJECT_ID
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+          - marker: SPIFFE_BUNDLE_ENDPOINTS
+            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.spiffeBundleEndpoints'
     io.k8s.cli.substitutions.gkeio-cluster:
       x-k8s-cli:
         substitution:
