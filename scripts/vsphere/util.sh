@@ -17,10 +17,11 @@ function fill_unspecified_context() {
   alias kubectl="kubectl --kubeconfig ${KUBECONFIG}"
 
   echo "Using KUBECONFIG ${KUBECONFIG}"
-  PROJECT_ID=$(gcloud config get-value project)
-  echo "Using PROJECT_ID ${PROJECT_ID}"
-  PROJECT_NUMBER=$(gcloud projects describe ${PROJECT_ID} --format="value(projectNumber)")
-  echo "Using PROJECT_NUMBER ${PROJECT_NUMBER}"
+
+  if [[ -z "${MESH_ID}" ]]; then
+    MESH_ID=$(kubectl -n istio-system get IstioOperator installed-state-${REVISION} --output=json  | jq  '.spec.values.global.meshID')
+    echo "Mesh ID         is not specified. Set Mesh ID as context cluster meshID: ${MESH_ID}."
+  fi
 
   # use the absolute path for the key file
   if [[ -f "${KEY_FILE}" ]]; then
@@ -54,14 +55,14 @@ function fill_unspecified_context() {
     echo "REVISION        is not specified. Set REVISION as \"\" ."
   fi
 
+  if [[ -z "${IMAGE}" ]]; then
+    IMAGE="rpm"
+    echo "IMAGE           is not specified. Set IMAGE as \"rpm\" ."
+  fi
+
   if [[ -z "${VM_NAMESPACE}" ]]; then
     VM_NAMESPACE="default"
     echo "VM NAMESPACE    is not specified. Set VM NAMESPACE as namespace default."
-  fi
-
-  if [[ -z "${MESH_ID}" ]]; then
-    MESH_ID="proj-${PROJECT_NUMBER}"
-    echo "Mesh ID         is not specified. Set Mesh ID as proj-PROJECT_NUMBER: ${MESH_ID}."
   fi
 
   # name of the Kubernetes service account you want to use for your VM. Set as "default" by default
@@ -193,6 +194,11 @@ function read_args() {
       echo "export REVISION=${REVISION}" >>".attachConfig"
       shift 2
       ;;
+    -image | --image)
+      export IMAGE="${2}"
+      echo "export IMAGE=${IMAGE}" >>".attachConfig"
+      shift 2
+      ;;
     *)
       warn "Unknown option ${1}"
       exit 2
@@ -202,6 +208,7 @@ function read_args() {
 }
 
 function  write_config_context() {
+  rm -f ${CONTEXT_FILE}
   >${CONTEXT_FILE}
   chmod +x ${CONTEXT_FILE}
 
@@ -217,6 +224,7 @@ function  write_config_context() {
   echo "export VM_NAMESPACE=${VM_NAMESPACE}" >>${CONTEXT_FILE}
   echo "export SERVICE_ACCOUNT=${SERVICE_ACCOUNT}" >>${CONTEXT_FILE}
   echo "export VM_DIR=${VM_DIR}" >>${CONTEXT_FILE}
+  echo "export IMAGE=${IMAGE}" >>${CONTEXT_FILE}
 
   if [[ ! -z "${LABELS}" ]]; then
     if [[ ${LABELS:0:1} != "\"" ]] ; then LABELS="\"${LABELS}\"";  fi
