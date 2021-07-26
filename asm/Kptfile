@@ -131,7 +131,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.spiffeBundleEndpoints
-          value: SPIFFE_BUNDLE_ENDPOINTS
+          value: ""
     io.k8s.cli.setters.anthos.servicemesh.controlplane.validation-url:
       type: string
       x-k8s-cli:

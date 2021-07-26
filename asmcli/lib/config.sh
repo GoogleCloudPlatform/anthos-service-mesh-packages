@@ -60,7 +60,6 @@ configure_package() {
   fi
   if [[ "${CA}" = "citadel" ]]; then
     kpt cfg set asm anthos.servicemesh.tokenAudiences "istio-ca,${PROJECT_ID}.svc.id.goog"
-    kpt cfg set asm anthos.servicemesh.spiffeBundleEndpoints ""
   else
     kpt cfg set asm anthos.servicemesh.tokenAudiences "${PROJECT_ID}.svc.id.goog"
     kpt cfg set asm anthos.servicemesh.spiffeBundleEndpoints "${PROJECT_ID}.svc.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json"
