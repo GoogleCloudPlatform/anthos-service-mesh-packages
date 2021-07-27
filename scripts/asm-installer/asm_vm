@@ -703,12 +703,6 @@ tail
 $AKUBECTL
 EOF
 
-  if [[ "${PREPARE_CLUSTER}" -eq 1 ]]; then
-    if ! hash kpt 2>/dev/null; then
-      NOTFOUND="kpt,${NOTFOUND}"
-    fi
-  fi
-
   if [[ -n "${NOTFOUND}" ]]; then
     NOTFOUND="$(strip_last_char "${NOTFOUND}")"
     for dep in $(echo "${NOTFOUND}" | tr ' ' '\n'); do
@@ -1666,6 +1660,47 @@ set_kpt_package_url() {
   readonly KPT_URL;
 }
 
+needs_kpt() {
+  if [[ -z "${AKPT}" ]]; then return; fi
+  KPT_VER="$(kpt version)"
+  if [[ "${KPT_VER:0:1}" != "0" ]]; then return; fi
+  false
+}
+
+download_kpt() {
+  local PLATFORM
+  PLATFORM="$(get_platform "$(uname)" "$(uname -m)")"
+  if [[ -z "${PLATFORM}" ]]; then
+    fatal "$(uname) $(uname -m) is not a supported platform to perform installation from."
+  fi
+
+  local KPT_TGZ
+  KPT_TGZ="https://github.com/GoogleContainerTools/kpt/releases/download/v0.39.3/kpt_${PLATFORM}-0.39.3.tar.gz"
+
+  info "Downloading kpt.."
+  curl -L "${KPT_TGZ}" | tar xz
+  AKPT="$(apath -f kpt)"
+}
+
+get_platform() {
+  local OS; OS="${1}"
+  local ARCH; ARCH="${2}"
+  local PLATFORM
+
+  case "${OS}" in
+    Linux ) PLATFORM="linux_amd64";;
+    Darwin)
+      if [[ "${ARCH}" == "arm64" ]]; then
+        PLATFORM="darwin_arm64"
+      else
+        PLATFORM="darwin_amd64"
+      fi
+    ;;
+  esac
+
+  echo "${PLATFORM}"
+}
+
 download_asm() {
   local OS
 
@@ -1715,7 +1750,7 @@ expose_istiod() {
   info "Exposing the control plane for VM workloads..."
   retry 3 kubectl apply -f "${EXPOSE_ISTIOD_SERVICE}"
 
-  for rev in "${!ASM_REVISIONS[*]}"; do
+  for rev in "${!ASM_REVISIONS[@]}"; do
     kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod-${rev}.istio-system.svc.cluster.local"
     kpt cfg set asm anthos.servicemesh.istiodHost "istiod-${rev}.istio-system.svc"
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${rev}"
@@ -1813,6 +1848,9 @@ main() {
   if [[ "${PREPARE_CLUSTER}" -eq 1 ]]; then
     if [[ "${INSTALL_EXPANSION_GATEWAY}" -eq 1 ]] || [[ "${INSTALL_IDENTITY_PROVIDER}" -eq 1 ]]; then
       set_up_local_workspace
+      if needs_kpt; then
+        download_kpt
+      fi
       set_kpt_package_url
       download_asm
       if [[ "${INSTALL_EXPANSION_GATEWAY}" -eq 1 ]]; then
