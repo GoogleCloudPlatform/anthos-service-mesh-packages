@@ -34,6 +34,7 @@ context_init() {
     "CA_NAME": "${CA_NAME:-}",
     "DRY_RUN": ${DRY_RUN:-0},
     "ONLY_VALIDATE": ${ONLY_VALIDATE:-0},
+    "VALIDATION_ERROR": ${VALIDATION_ERROR:-0},
     "ONLY_ENABLE": ${ONLY_ENABLE:-0},
     "VERBOSE": ${VERBOSE:-0},
     "MANAGED": ${MANAGED:-0},

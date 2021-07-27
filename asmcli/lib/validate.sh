@@ -117,7 +117,7 @@ validate_cluster() {
     --filter="name = ${CLUSTER_NAME} AND location = ${CLUSTER_LOCATION}" \
     --format="value(name)" || true)"
   if [[ -z "${RESULT}" ]]; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+    { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
 Unable to find cluster ${CLUSTER_LOCATION}/${CLUSTER_NAME}.
 Please verify the spelling and try again. To see a list of your clusters, in
 this project, run:
@@ -182,7 +182,7 @@ check_no_istiod_outside_of_istio_system_namespace() {
   IN_NAMESPACE="$(kubectl get deployment -n istio-system --ignore-not-found=true | grep -c istiod || true)";
 
   if [ "$IN_ANY_NAMESPACE" -gt "$IN_NAMESPACE" ]; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+    { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
 found istiod deployment outside of istio-system namespace. This installer
 does not support that configuration.
 EOF
@@ -279,7 +279,7 @@ exit_if_out_of_iam_policy() {
     for role in $(echo "${NOTFOUND}" | tr ',' '\n'); do
       warn "IAM role not enabled - ${role}"
     done
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+    { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
 One or more IAM roles required to install ASM is missing. Please add
 ${GCLOUD_MEMBER} to the roles above, or run
 the script with "--enable_gcp_iam_roles" to allow the script to add
@@ -301,7 +301,7 @@ exit_if_apis_not_enabled() {
     for api in $(echo "${NOTFOUND}" | tr ' ' '\n'); do
       warn "API not enabled - ${api}"
     done
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+    { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
 One or more APIs are not enabled. Please enable them and retry, or run the
 script with the '--enable_gcp_apis' flag to allow the script to enable them on
 your behalf.
@@ -319,7 +319,7 @@ exit_if_cluster_unlabeled() {
     for label in $(echo "${NOTFOUND}" | tr ',' '\n'); do
       warn "Cluster label not found - ${label}"
     done
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+    { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
 One or more required cluster labels were not found. Please label them and retry,
 or run the script with the '--enable_cluster_labels' flag to allow the script
 to enable them on your behalf.
@@ -330,7 +330,7 @@ EOF
 
 exit_if_cluster_unregistered() {
   if ! is_cluster_registered; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+    { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
 Cluster is not registered to a fleet. Please register the cluster and
 retry, or run the script with the '--enable_registration' flag to allow
 the script to register to the current project's fleet on your behalf.
@@ -340,7 +340,7 @@ EOF
 
 exit_if_no_workload_identity() {
   if ! is_workload_identity_enabled; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+    { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
 Workload identity is not enabled on ${CLUSTER_NAME}. Please enable it and
 retry, or run the script with the '--enable_gcp_components' flag to allow
 the script to enable it on your behalf.
@@ -351,7 +351,7 @@ EOF
 
 exit_if_stackdriver_not_enabled() {
   if ! is_stackdriver_enabled; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+    { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
 Cloud Operations (Stackdriver)  is not enabled on ${CLUSTER_NAME}.
 Please enable it and retry, or run the script with the
 '--enable_gcp_components' flag to allow the script to enable it on your behalf.
@@ -362,7 +362,7 @@ EOF
 
 exit_if_not_cluster_admin() {
   if ! is_user_cluster_admin; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+    { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
 Current user must have the cluster-admin role on ${CLUSTER_NAME}.
 Please add the cluster role binding and retry, or run the script with the
 '--enable_cluster_roles' flag to allow the script to enable it on your behalf.
@@ -373,7 +373,7 @@ EOF
 
 exit_if_service_mesh_feature_not_enabled() {
   if ! is_service_mesh_feature_enabled; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+    { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
 The service mesh feature is not enabled on project ${PROJECT_ID}.
 Please run the script with the '--enable_gcp_components' flag to allow the
 script to enable it on your behalf.
@@ -385,7 +385,7 @@ EOF
 exit_if_istio_namespace_not_exists() {
   info "Checking for istio-system namespace..."
   if ! istio_namespace_exists; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+    { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
 The istio-system namespace doesn't exist.
 Please create the "istio-system" and retry, or run the script with the
 '--enable_namespace_creation' flag to allow the script to enable it on your behalf.
@@ -406,7 +406,7 @@ exit_if_cluster_registered_to_another_fleet() {
   LIST="$(gcloud container hub memberships list --project "${FLEET_ID}" \
     --format=json | grep "${WANT}")"
   if [[ -z "${LIST}" ]]; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+    { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
 Cluster is already registered but not in the project ${FLEET_ID}.
 EOF
   fi

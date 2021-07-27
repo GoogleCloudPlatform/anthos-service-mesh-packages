@@ -188,6 +188,11 @@ should_validate() {
   if [[ "${PRINT_CONFIG}" -eq 1 || "${_CI_NO_VALIDATE}" -eq 1 ]] || only_enable; then false; fi
 }
 
+only_validate() {
+  local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
+  if [[ "${ONLY_VALIDATE}" -eq 0 ]]; then false; fi
+}
+
 only_enable() {
   local ONLY_ENABLE; ONLY_ENABLE="$(context_get-option "ONLY_ENABLE")"
   if [[ "${ONLY_ENABLE}" -eq 0 ]]; then false; fi

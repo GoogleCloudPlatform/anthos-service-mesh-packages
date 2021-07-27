@@ -117,6 +117,15 @@ info() {
   fi
 }
 
+validation_error() {
+  error "${1}"
+  if only_validate; then
+    context_set-option "VALIDATION_ERROR" 1
+  else
+    exit 2
+  fi
+}
+
 fatal() {
   error "${1}"
   exit 2
