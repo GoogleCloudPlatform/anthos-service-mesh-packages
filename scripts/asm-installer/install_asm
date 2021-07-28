@@ -1102,10 +1102,6 @@ validate_args() {
       fatal "Citadel is not supported with managed control plane."
     fi
 
-    if [[ "${CA}" == "gcp_cas" ]]; then
-      fatal "Google Certificate Authority Service integration is not supported with managed control plane."
-    fi
-
     if [[ "${CUSTOM_CA}" -eq 1 ]]; then
       fatal "Specifying a custom CA with managed control plane is not supported."
     fi
@@ -1308,7 +1304,7 @@ validate_revision_label() {
 
 validate_gcp_cas_args() {
   local CA_NAME_TEMPLATE
-  CA_NAME_TEMPLATE="projects/project_name/locations/ca_region/certificateAuthorities/ca_name"
+  CA_NAME_TEMPLATE="projects/project_name/locations/ca_region/caPools/ca_pool"
   readonly CA_NAME_TEMPLATE
 
   if [[ -z ${CA_NAME} ]]; then
@@ -1897,9 +1893,10 @@ is_meshca_installed() {
 }
 
 is_gcp_cas_installed() {
-  local INSTALLED_CA; INSTALLED_CA="$(kubectl -n istio-system get pod -l istio=istiod \
-    -o jsonpath='{.items[].spec.containers[].env[?(@.name=="EXTERNAL_CA")].value}')"
-  [[ "${INSTALLED_CA}" = "ISTIOD_RA_CAS_API" ]] && return 0
+  local INSTALLED_CA_PROVIDER
+  INSTALLED_CA_PROVIDER="$(kubectl -n istio-system get pod -l istio=ingressgateway \
+    -o jsonpath='{.items[].spec.containers[].env[?(@.name=="CA_PROVIDER")].value}')"
+  [[ "${INSTALLED_CA_PROVIDER}" = "GoogleCAS" ]] && return 0
 }
 
 bind_user_to_iam_policy(){
@@ -2583,17 +2580,19 @@ install_secrets() {
 }
 
 init_gcp_cas() {
-  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="$PROJECT_ID.svc.id.goog[istio-system/istiod-service-account]"
-
-  local NAME; NAME=$(echo "${CA_NAME}" | cut -f6 -d/)
+  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${PROJECT_ID}.svc.id.goog[-/-]"
   local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
-  local CA_PROJECT; CA_PROJECT=$(echo "${CA_NAME}" | cut -f2 -d/)
 
-  retry 3 gcloud beta privateca subordinates add-iam-policy-binding "${NAME}" \
+  retry 3 gcloud privateca pools add-iam-policy-binding "${CA_NAME}" \
     --location "${CA_LOCATION}" \
-    --project "${CA_PROJECT}" \
     --member "serviceAccount:${WORKLOAD_IDENTITY}" \
-    --role "roles/privateca.certificateManager"
+    --role "roles/privateca.workloadCertificateRequester"
+
+  retry 3 gcloud privateca pools add-iam-policy-binding "${CA_NAME}" \
+    --location "${CA_LOCATION}" \
+    --member "serviceAccount:${WORKLOAD_IDENTITY}" \
+    --role "roles/privateca.auditor"
+
 }
 
 does_istiod_exist(){
