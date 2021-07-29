@@ -42,7 +42,7 @@ context_init() {
     "PRINT_HELP": ${PRINT_HELP:-0},
     "PRINT_VERSION": ${PRINT_VERSION:-0},
     "CUSTOM_CA": ${CUSTOM_CA:-0},
-    "USE_HUB_WIP": ${USE_HUB_WIP:-0},
+    "USE_HUB_WIP": ${USE_HUB_WIP:-1},
     "USE_VM": ${USE_VM:-0},
     "USE_MCP_CNI": ${USE_MCP_CNI:-0},
     "FLEET_ID": "${FLEET_ID:-}",

@@ -44,25 +44,13 @@ configure_package() {
     kpt cfg set asm anthos.servicemesh.tag "${_CI_ASM_IMAGE_TAG}"
   fi
 
-  if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
-    # VM installation uses the latest Hub WIP format
-    if [[ "${USE_VM}" -eq 1 ]]; then
-      kpt cfg set asm anthos.servicemesh.hubTrustDomain "${FLEET_ID}.svc.id.goog"
-      kpt cfg set asm anthos.servicemesh.hub-idp-url "${HUB_IDP_URL}"
-    # GKE-on-GCP installation uses legacy Hub WIP format to be consistent with GCP Hub public preview feature
-    else
-      kpt cfg set asm anthos.servicemesh.hubTrustDomain "${FLEET_ID}.hub.id.goog"
-      kpt cfg set asm anthos.servicemesh.hub-idp-url "https://gkehub.googleapis.com/projects/${FLEET_ID}/locations/global/memberships/${HUB_MEMBERSHIP_ID}"
-    fi
-  fi
   if [[ -n "${CA_NAME}" && "${CA}" = "gcp_cas" ]]; then
     kpt cfg set asm anthos.servicemesh.external_ca.ca_name "${CA_NAME}"
   fi
-  if [[ "${CA}" = "citadel" ]]; then
-    kpt cfg set asm anthos.servicemesh.tokenAudiences "istio-ca,${PROJECT_ID}.svc.id.goog"
-  else
-    kpt cfg set asm anthos.servicemesh.tokenAudiences "${PROJECT_ID}.svc.id.goog"
-    kpt cfg set asm anthos.servicemesh.spiffeBundleEndpoints "${PROJECT_ID}.svc.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json"
+
+  kpt cfg set asm anthos.servicemesh.tokenAudiences "istio-ca,${FLEET_ID}.svc.id.goog"
+  if [[ "${CA}" == "mesh_ca" ]]; then
+    kpt cfg set asm anthos.servicemesh.spiffeBundleEndpoints "${FLEET_ID}.svc.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json"
   fi
 
   if [[ "${USE_VM}" -eq 1 ]] && [[ "${_CI_NO_REVISION}" -eq 0 ]]; then

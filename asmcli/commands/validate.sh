@@ -43,12 +43,6 @@ validate_dependencies() {
     exit_if_apis_not_enabled
   fi
 
-  if can_register_cluster && is_gcp; then
-    register_cluster
-  elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 || "${USE_VM}" -eq 1 ]]; then
-    exit_if_cluster_unregistered
-  fi
-
   if is_gcp; then
     if can_modify_gcp_components; then
       enable_workload_identity
@@ -63,6 +57,12 @@ validate_dependencies() {
         exit_if_service_mesh_feature_not_enabled
       fi
     fi
+  fi
+
+  if can_register_cluster && is_gcp; then
+    register_cluster
+  elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 || "${USE_VM}" -eq 1 ]]; then
+    exit_if_cluster_unregistered
   fi
 
   get_project_number "${FLEET_ID}"

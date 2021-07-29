@@ -1414,12 +1414,6 @@ validate_dependencies() {
     exit_if_apis_not_enabled
   fi
 
-  if can_register_cluster && is_gcp; then
-    register_cluster
-  elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 || "${USE_VM}" -eq 1 ]]; then
-    exit_if_cluster_unregistered
-  fi
-
   if is_gcp; then
     if can_modify_gcp_components; then
       enable_workload_identity
@@ -1434,6 +1428,12 @@ validate_dependencies() {
         exit_if_service_mesh_feature_not_enabled
       fi
     fi
+  fi
+
+  if can_register_cluster && is_gcp; then
+    register_cluster
+  elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 || "${USE_VM}" -eq 1 ]]; then
+    exit_if_cluster_unregistered
   fi
 
   get_project_number "${FLEET_ID}"
@@ -1542,10 +1542,27 @@ validate_meshca() {
 
 configure_meshca() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
+  local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
+
+  if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
+    kpt cfg set asm anthos.servicemesh.trustDomain "${FLEET_ID}.svc.id.goog"
+    kpt cfg set asm anthos.servicemesh.idp-url "${HUB_IDP_URL}"
+  else
+    kpt cfg set asm anthos.servicemesh.trustDomain "${PROJECT_ID}.svc.id.goog"
+    kpt cfg set asm anthos.servicemesh.idp-url "https://container.googleapis.com/v1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
+  fi
 
   # set the trust domain aliases to include both new Hub WIP and old Hub WIP to achieve no downtime upgrade.
-  add_trust_domain_alias "${PROJECT_ID}.svc.id.goog"
-  add_trust_domain_alias "${PROJECT_ID}.hub.id.goog"
+  add_trust_domain_alias "${FLEET_ID}.svc.id.goog"
+  add_trust_domain_alias "${FLEET_ID}.hub.id.goog"
+  if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
+    add_trust_domain_alias "${PROJECT_ID}.svc.id.goog"
+  fi
   if [[ -n "${_CI_TRUSTED_GCP_PROJECTS}" ]]; then
     # Gather the trust domain aliases from projects.
     while IFS=',' read -r trusted_gcp_project; do
@@ -1611,13 +1628,13 @@ configure_in_cluster_control_plane() {
 
 init_meshconfig() {
   local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
-  local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
 
   info "Initializing meshconfig API..."
   if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
     populate_fleet_info
+    local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
     info "Cluster has Membership ID ${HUB_MEMBERSHIP_ID} in the Hub of project ${FLEET_ID}"
     if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
       info "Skip initializing meshconfig API as the Hub is not hosted in the project ${PROJECT_ID}"
@@ -2031,8 +2048,7 @@ can_register_cluster() {
 
   if ! can_modify_at_all; then false; return; fi
 
-  if [[ "${ENABLE_ALL}" -eq 1 || "${USE_VM}" -eq 1 || "${USE_HUB_WIP}" -eq 1 \
-    || "${ENABLE_REGISTRATION}" -eq 1 ]]; then
+  if [[ "${ENABLE_ALL}" -eq 1 || "${USE_VM}" -eq 1 || "${ENABLE_REGISTRATION}" -eq 1 ]]; then
     true
   else
     false
@@ -2174,25 +2190,13 @@ configure_package() {
     kpt cfg set asm anthos.servicemesh.tag "${_CI_ASM_IMAGE_TAG}"
   fi
 
-  if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
-    # VM installation uses the latest Hub WIP format
-    if [[ "${USE_VM}" -eq 1 ]]; then
-      kpt cfg set asm anthos.servicemesh.hubTrustDomain "${FLEET_ID}.svc.id.goog"
-      kpt cfg set asm anthos.servicemesh.hub-idp-url "${HUB_IDP_URL}"
-    # GKE-on-GCP installation uses legacy Hub WIP format to be consistent with GCP Hub public preview feature
-    else
-      kpt cfg set asm anthos.servicemesh.hubTrustDomain "${FLEET_ID}.hub.id.goog"
-      kpt cfg set asm anthos.servicemesh.hub-idp-url "https://gkehub.googleapis.com/projects/${FLEET_ID}/locations/global/memberships/${HUB_MEMBERSHIP_ID}"
-    fi
-  fi
   if [[ -n "${CA_NAME}" && "${CA}" = "gcp_cas" ]]; then
     kpt cfg set asm anthos.servicemesh.external_ca.ca_name "${CA_NAME}"
   fi
-  if [[ "${CA}" = "citadel" ]]; then
-    kpt cfg set asm anthos.servicemesh.tokenAudiences "istio-ca,${PROJECT_ID}.svc.id.goog"
-  else
-    kpt cfg set asm anthos.servicemesh.tokenAudiences "${PROJECT_ID}.svc.id.goog"
-    kpt cfg set asm anthos.servicemesh.spiffeBundleEndpoints "${PROJECT_ID}.svc.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json"
+
+  kpt cfg set asm anthos.servicemesh.tokenAudiences "istio-ca,${FLEET_ID}.svc.id.goog"
+  if [[ "${CA}" == "mesh_ca" ]]; then
+    kpt cfg set asm anthos.servicemesh.spiffeBundleEndpoints "${FLEET_ID}.svc.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json"
   fi
 
   if [[ "${USE_VM}" -eq 1 ]] && [[ "${_CI_NO_REVISION}" -eq 0 ]]; then
@@ -2279,7 +2283,7 @@ context_init() {
     "PRINT_HELP": ${PRINT_HELP:-0},
     "PRINT_VERSION": ${PRINT_VERSION:-0},
     "CUSTOM_CA": ${CUSTOM_CA:-0},
-    "USE_HUB_WIP": ${USE_HUB_WIP:-0},
+    "USE_HUB_WIP": ${USE_HUB_WIP:-1},
     "USE_VM": ${USE_VM:-0},
     "USE_MCP_CNI": ${USE_MCP_CNI:-0},
     "FLEET_ID": "${FLEET_ID:-}",
@@ -2778,7 +2782,7 @@ parse_args() {
         OPTIONAL_OVERLAY="${2},${OPTIONAL_OVERLAY}"
         context_set-option "OPTIONAL_OVERLAY" "${OPTIONAL_OVERLAY}"
         if [[ "${2}" == "hub-meshca" ]]; then
-          context_set-option "USE_HUB_WIP" 1
+          info "Fleet workload identity pool is used as default for Mesh CA. No need to specify hub-meshca option."
         fi
         if [[ "${2}" == "vm" ]]; then
           context_set-option "USE_VM" 1
@@ -3650,16 +3654,8 @@ validate_revision_label() {
 }
 
 validate_hub() {
-  local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
-  local CA; CA="$(context_get-option "CA")"
-  local USE_VM; USE_VM="$(context_get-option "USE_VM")"
-
-  if [[ "${CA}" == "citadel" && "${USE_HUB_WIP}" -eq 1 ]]; then
-    fatal "Hub Workload Identity Pool is only supported for Mesh CA"
-  fi
-
-  if ! is_managed && [[ "${USE_VM}" -eq 1 && "${USE_HUB_WIP}" -eq 0 ]]; then
-    fatal "Hub Workload Identity Pool is required to add VM workloads. Run the script with the -o hub-meshca option."
+  if ! is_cluster_registered && ! can_register_cluster ; then
+    context_set-option "USE_HUB_WIP" 0
   fi
 }
 
