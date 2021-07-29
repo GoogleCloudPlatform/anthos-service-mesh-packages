@@ -339,6 +339,7 @@ EOF
 }
 
 exit_if_no_workload_identity() {
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   if ! is_workload_identity_enabled; then
     { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
 Workload identity is not enabled on ${CLUSTER_NAME}. Please enable it and
@@ -350,6 +351,7 @@ EOF
 }
 
 exit_if_stackdriver_not_enabled() {
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   if ! is_stackdriver_enabled; then
     { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
 Cloud Operations (Stackdriver)  is not enabled on ${CLUSTER_NAME}.
@@ -361,6 +363,7 @@ EOF
 }
 
 exit_if_not_cluster_admin() {
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   if ! is_user_cluster_admin; then
     { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
 Current user must have the cluster-admin role on ${CLUSTER_NAME}.
@@ -372,6 +375,7 @@ EOF
 }
 
 exit_if_service_mesh_feature_not_enabled() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   if ! is_service_mesh_feature_enabled; then
     { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
 The service mesh feature is not enabled on project ${PROJECT_ID}.

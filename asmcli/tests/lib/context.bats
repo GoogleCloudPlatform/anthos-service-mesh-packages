@@ -212,7 +212,7 @@ EOF
   assert_success
 }
 
-@test "test missing values in interactive will read from stdin" {
+@test "CONTEXT: test missing values in interactive will read from stdin" {
   local FLEET_ID; FLEET_ID="111111"
   has_value "FLEET_ID" << EOF
 ${FLEET_ID}

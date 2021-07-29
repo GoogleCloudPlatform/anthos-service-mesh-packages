@@ -78,7 +78,6 @@ teardown() {
   [ "${RETVAL}" -eq 0 ]
 }
 
-
 @test "MAIN: create-mesh should register" {
   local CMD
   CMD="create-mesh"

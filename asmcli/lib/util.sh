@@ -120,7 +120,8 @@ info() {
 validation_error() {
   error "${1}"
   if only_validate; then
-    context_set-option "VALIDATION_ERROR" 1
+    local VALIDATION_ERROR; VALIDATION_ERROR="$(context_get-option "VALIDATION_ERROR")"
+    context_set-option "VALIDATION_ERROR" $((VALIDATION_ERROR + 1))
   else
     exit 2
   fi
