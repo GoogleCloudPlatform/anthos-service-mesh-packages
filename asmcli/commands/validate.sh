@@ -15,9 +15,15 @@ validate() {
   validate_dependencies
   validate_control_plane
 
-  if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
-    info "Successfully validated all requirements to install ASM."
-    exit 0
+  if [[ "${ONLY_VALIDATE}" -ne 0 ]]; then
+    local VALIDATION_ERROR; VALIDATION_ERROR="$(context_get-option "VALIDATION_ERROR")"
+    if [[ "${VALIDATION_ERROR}" -eq 0 ]]; then
+      info "Successfully validated all requirements to install ASM."
+      exit 0
+    else
+      warn "Please see the errors above."
+      exit 2
+    fi
   fi
 
   if only_enable; then
