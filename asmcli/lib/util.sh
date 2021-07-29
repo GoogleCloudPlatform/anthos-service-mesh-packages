@@ -259,21 +259,12 @@ prepare_environment() {
 
 init() {
   # BSD-style readlink apparently doesn't have the same -f toggle on readlink
-  local UN; UN="$(uname)"
-  case "${UN}" in
+  case "$(uname)" in
     Linux ) APATH="readlink";;
     Darwin) APATH="stat";;
     *);;
   esac
   readonly APATH
-
-  # BSD-style ln requires -f to overwrite files
-  if [[ "${UN}" == "Darwin" ]]; then
-    local LNP; LNP="$(apath ln)"
-    ln() {
-      "${LNP}" -f "${@}"
-    }
-  fi
 
   local REVISION_LABEL
   if [[ "${POINT}" == "alpha" ]]; then
