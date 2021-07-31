@@ -48,6 +48,7 @@ configure_package() {
     kpt cfg set asm anthos.servicemesh.external_ca.ca_name "${CA_NAME}"
   fi
 
+  kpt cfg set asm anthos.servicemesh.trustDomain "${FLEET_ID}.svc.id.goog"
   kpt cfg set asm anthos.servicemesh.tokenAudiences "istio-ca,${FLEET_ID}.svc.id.goog"
   if [[ "${CA}" == "mesh_ca" ]]; then
     kpt cfg set asm anthos.servicemesh.spiffeBundleEndpoints "${FLEET_ID}.svc.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json"

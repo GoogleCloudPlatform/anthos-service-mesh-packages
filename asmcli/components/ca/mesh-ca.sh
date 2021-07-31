@@ -12,10 +12,8 @@ configure_meshca() {
   local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
 
   if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
-    kpt cfg set asm anthos.servicemesh.trustDomain "${FLEET_ID}.svc.id.goog"
     kpt cfg set asm anthos.servicemesh.idp-url "${HUB_IDP_URL}"
   else
-    kpt cfg set asm anthos.servicemesh.trustDomain "${PROJECT_ID}.svc.id.goog"
     kpt cfg set asm anthos.servicemesh.idp-url "https://container.googleapis.com/v1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
   fi
 
