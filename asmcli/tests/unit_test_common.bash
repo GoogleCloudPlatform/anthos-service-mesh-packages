@@ -185,6 +185,21 @@ privateca.googleapis.com
 EOF
   return 0
   fi
+  if [[ "${*}" == *"hub memberships list"* ]]; then
+    cat <<EOF
+[
+  {
+    "authority": {
+      "identityProvider": "https://container.googleapis.com/projects/this_should_pass/locations/this_should_pass/clusters/this_should_pass",
+      "issuer": "https://kubernetes.default.svc.cluster.local",
+      "oidcJwks": "dummy",
+      "workloadIdentityPool": "this_should_pass.svc.id.goog"
+    },
+  }
+]
+EOF
+    return 0
+  fi
   if [[ "${*}" == *"this_should_pass"* ]]; then
     echo "this_should_pass"
     return 0
@@ -267,6 +282,33 @@ EOF
   fi
   if [[ "${*}" == *"clusterrolebinding"*"this_should_pass"* ]]; then
     echo '[cluster-admin]'
+    return 0
+  fi
+  if [[ "${*}" == *"--api-group=hub.gke.io"* ]]; then
+    cat <<EOF
+NAME          SHORTNAMES   APIGROUP     NAMESPACED   KIND
+memberships                hub.gke.io   false        Membership
+EOF
+    return 0
+  fi
+  if [[ "${*}" == *"memberships.hub.gke.io -ojsonpath={..metadata.name}"* ]]; then
+    echo 'membership'
+    return 0
+  fi
+  if [[ "${*}" == *"memberships.hub.gke.io membership -o=json"* ]]; then
+    cat <<EOF
+{
+    "apiVersion": "hub.gke.io/v1",
+    "kind": "Membership",
+    "spec": {
+        "identity_provider": "https://container.googleapis.com/v1/projects/this_should_pass/locations/this_should_pass/clusters/this_should_pass",
+        "owner": {
+            "id": "//gkehub.googleapis.com/projects/this_should_pass/locations/global/memberships/this_should_pass"
+        },
+        "workload_identity_pool": "this_should_pass.svc.id.goog"
+    }
+}
+EOF
     return 0
   fi
   if [[ "${FAKE_CONFIG}" == *"has_istio"*"right_namespace"*  ]]; then

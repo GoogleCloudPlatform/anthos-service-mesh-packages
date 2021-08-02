@@ -16,16 +16,8 @@ validate_revision_label() {
 }
 
 validate_hub() {
-  local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
-  local CA; CA="$(context_get-option "CA")"
-  local USE_VM; USE_VM="$(context_get-option "USE_VM")"
-
-  if [[ "${CA}" == "citadel" && "${USE_HUB_WIP}" -eq 1 ]]; then
-    fatal "Hub Workload Identity Pool is only supported for Mesh CA"
-  fi
-
-  if ! is_managed && [[ "${USE_VM}" -eq 1 && "${USE_HUB_WIP}" -eq 0 ]]; then
-    fatal "Hub Workload Identity Pool is required to add VM workloads. Run the script with the -o hub-meshca option."
+  if ! is_cluster_registered && ! can_register_cluster ; then
+    context_set-option "USE_HUB_WIP" 0
   fi
 }
 

@@ -21,11 +21,11 @@ spec:
   tag: 1.10.2-asm.1 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
   meshConfig:
     trustDomainAliases: # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases"}
-      - PROJECT_ID.svc.id.goog # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
-    trustDomain: PROJECT_ID.svc.id.goog # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
+      - PROJECT_ID.svc.id.goog # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.trustDomain"}
+    trustDomain: PROJECT_ID.svc.id.goog # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.trustDomain"}
     defaultConfig:
       proxyMetadata:
-        GKE_CLUSTER_URL: "https://container.googleapis.com/v1/projects/PROJECT_ID/locations/us-central1-c/clusters/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cluster-url"}
+        GKE_CLUSTER_URL: "" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.idp-url"}
         GCP_METADATA: "PROJECT_ID|PROJECT_NUMBER|asm-cluster|us-central1-c" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-metadata"}
         CA_PROVIDER: "GoogleCA"
         PLUGINS: "GoogleTokenExchange"
@@ -64,7 +64,7 @@ spec:
         replicaCount: 2
         env:
           - name: GKE_CLUSTER_URL
-            value: "https://container.googleapis.com/v1/projects/PROJECT_ID/locations/us-central1-c/clusters/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cluster-url"}
+            value: "" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.idp-url"}
           - name: GCP_METADATA
             value: "PROJECT_ID|PROJECT_NUMBER|asm-cluster|us-central1-c" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-metadata"}
           - name: SPIFFE_BUNDLE_ENDPOINTS
@@ -98,7 +98,7 @@ spec:
         servicePort: 15463
       sds:
         token:
-          aud: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
+          aud: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.trustDomain"}
       multiCluster:
         # Provided to ensure a human readable name rather than a UUID.
         clusterName: "cn-PROJECTID-us-central1-c-asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
