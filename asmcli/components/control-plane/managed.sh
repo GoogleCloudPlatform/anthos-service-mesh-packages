@@ -1,6 +1,7 @@
 validate_managed_control_plane() {
   if can_modify_gcp_iam_roles; then
     bind_user_to_iam_policy "roles/meshconfig.admin" "$(local_iam_user)"
+    bind_user_to_iam_policy "roles/resourcemanager.projectIamAdmin" "$(local_iam_user)"
   fi
   if can_modify_at_all; then
     if ! init_meshconfig_managed; then
