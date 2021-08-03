@@ -14,10 +14,9 @@ gen_install_params() {
 
   if [[ "${CA}" == "citadel" ]]; then
     PARAM_BUILDER="${PARAM_BUILDER} -f ${CITADEL_MANIFEST}"
-  fi
-
-  if ! is_gcp; then
-    PARAM_BUILDER="${PARAM_BUILDER} -f ${OFF_GCP_MANIFEST}"
+    if ! is_gcp; then
+      PARAM_BUILDER="${PARAM_BUILDER} -f ${OFF_GCP_MANIFEST}"
+    fi
   fi
 
   echo "${PARAM_BUILDER}"
