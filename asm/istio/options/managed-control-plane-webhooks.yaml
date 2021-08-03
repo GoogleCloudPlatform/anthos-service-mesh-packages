@@ -33,6 +33,7 @@ webhooks:
         apiGroups:
           - security.istio.io
           - networking.istio.io
+          - telemetry.istio.io
         apiVersions:
           - "*"
         resources:
