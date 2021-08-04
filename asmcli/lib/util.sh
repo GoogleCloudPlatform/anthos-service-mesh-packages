@@ -569,8 +569,5 @@ EOF
 # Reads in stdin, expected in the form of kubectl config get-contexts
 # output and isolates the default context's cluster value.
 get_context_cluster() {
-  local CONTEXT_ROW
-  while IFS= read -r CONTEXT_ROW; do
-    echo "${CONTEXT_ROW}" | grep '^\*' | cut -c2- | sed 's/\([[:blank:]]\)*\1/\1/g' | cut -d ' ' -f 3
-  done
+  grep '^\*' | cut -c2- | sed 's/\([[:blank:]]\)*\1/\1/g' | cut -d ' ' -f 3
 }
