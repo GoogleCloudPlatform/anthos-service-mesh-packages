@@ -3629,6 +3629,15 @@ EOF
     readonly GKE_CLUSTER_URI; readonly GCE_NETWORK_NAME;
   fi
 }
+
+# Reads in stdin, expected in the form of kubectl config get-contexts
+# output and isolates the default context's cluster value.
+get_context_cluster() {
+  local CONTEXT_ROW
+  while IFS= read -r CONTEXT_ROW; do
+    echo "${CONTEXT_ROW}" | grep '^\*' | cut -c2- | sed 's/\([[:blank:]]\)*\1/\1/g' | cut -d ' ' -f 3
+  done
+}
 validate_revision_label() {
   # Matches DNS label formats of RFC 1123
   local DNS_1123_LABEL_MAX_LEN; DNS_1123_LABEL_MAX_LEN=63;
@@ -4225,7 +4234,7 @@ EOF
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
     info "Reading cluster information for ${CONTEXT}"
     local CONTEXT_CLUSTER;
-    CONTEXT_CLUSTER="$(kubectl config get-contexts --no-headers | cut -c2- | sed 's/\([[:blank:]]\)*\1/\1/g' | cut -d ' ' -f 3)"
+    CONTEXT_CLUSTER="$(kubectl config get-contexts --no-headers | get_context_cluster)"
     IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
 ${CONTEXT_CLUSTER}
 EOF
@@ -4418,7 +4427,7 @@ EOF
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
     info "Reading cluster information for ${CONTEXT}"
     local CONTEXT_CLUSTER;
-    CONTEXT_CLUSTER="$(kubectl config get-contexts --no-headers | cut -c2- | sed 's/\([[:blank:]]\)*\1/\1/g' | cut -d ' ' -f 3)"
+    CONTEXT_CLUSTER="$(kubectl config get-contexts --no-headers | get_context_cluster)"
     IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
 ${CONTEXT_CLUSTER}
 EOF

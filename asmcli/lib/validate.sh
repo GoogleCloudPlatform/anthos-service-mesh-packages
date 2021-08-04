@@ -594,7 +594,7 @@ EOF
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
     info "Reading cluster information for ${CONTEXT}"
     local CONTEXT_CLUSTER;
-    CONTEXT_CLUSTER="$(kubectl config get-contexts --no-headers | cut -c2- | sed 's/\([[:blank:]]\)*\1/\1/g' | cut -d ' ' -f 3)"
+    CONTEXT_CLUSTER="$(kubectl config get-contexts --no-headers | get_context_cluster)"
     IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
 ${CONTEXT_CLUSTER}
 EOF
@@ -787,7 +787,7 @@ EOF
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
     info "Reading cluster information for ${CONTEXT}"
     local CONTEXT_CLUSTER;
-    CONTEXT_CLUSTER="$(kubectl config get-contexts --no-headers | cut -c2- | sed 's/\([[:blank:]]\)*\1/\1/g' | cut -d ' ' -f 3)"
+    CONTEXT_CLUSTER="$(kubectl config get-contexts --no-headers | get_context_cluster)"
     IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
 ${CONTEXT_CLUSTER}
 EOF

@@ -33,3 +33,12 @@ setup() {
   run context_get-option "VALIDATION_ERROR"
   assert_output 2
 }
+
+@test "UTIL: context's cluster uses the default set context" {
+  run get_context_cluster <<EOF
+      cluster1       gke_gzip-dev_us-central1-c_cluster1       gke_gzip-dev_us-central1-c_cluster1       
+      cluster2       gke_gzip-dev_us-central1-c_cluster2       gke_gzip-dev_us-central1-c_cluster2       
+*     cluster3       gke_gzip-dev_us-central1-c_cluster3       gke_gzip-dev_us-central1-c_cluster3       
+EOF
+  assert_output "gke_gzip-dev_us-central1-c_cluster3"
+}
