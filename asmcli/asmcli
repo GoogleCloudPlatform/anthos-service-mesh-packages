@@ -2777,11 +2777,15 @@ parse_args() {
           continue
         fi
 
-        OPTIONAL_OVERLAY="${2},${OPTIONAL_OVERLAY}"
-        context_set-option "OPTIONAL_OVERLAY" "${OPTIONAL_OVERLAY}"
         if [[ "${2}" == "hub-meshca" ]]; then
           info "Fleet workload identity pool is used as default for Mesh CA. No need to specify hub-meshca option."
+          shift 2
+          continue
         fi
+
+        OPTIONAL_OVERLAY="${2},${OPTIONAL_OVERLAY}"
+        context_set-option "OPTIONAL_OVERLAY" "${OPTIONAL_OVERLAY}"
+
         if [[ "${2}" == "vm" ]]; then
           context_set-option "USE_VM" 1
         fi
