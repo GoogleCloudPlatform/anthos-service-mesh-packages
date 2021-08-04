@@ -594,8 +594,10 @@ EOF
 
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
     info "Reading cluster information for ${CONTEXT}"
+    local CONTEXT_CLUSTER;
+    CONTEXT_CLUSTER="$(--kubeconfig "${KCF}" config get-contexts --no-headers | cut -c2- | sed 's/\([[:blank:]]\)*\1/\1/g' | cut -d ' ' -f 3)"
     IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
-${CONTEXT}
+${CONTEXT_CLUSTER}
 EOF
     if is_gcp; then
       context_set-option "PROJECT_ID" "${PROJECT_ID}"
@@ -785,8 +787,10 @@ EOF
 
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
     info "Reading cluster information for ${CONTEXT}"
+    local CONTEXT_CLUSTER;
+    CONTEXT_CLUSTER="$(--kubeconfig "${KCF}" config get-contexts --no-headers | cut -c2- | sed 's/\([[:blank:]]\)*\1/\1/g' | cut -d ' ' -f 3)"
     IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
-${CONTEXT}
+${CONTEXT_CLUSTER}
 EOF
     if is_gcp; then
       context_set-option "PROJECT_ID" "${PROJECT_ID}"
