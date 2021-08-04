@@ -506,7 +506,6 @@ validate_args() {
   local WI_ENABLED; WI_ENABLED="$(context_get-option "WI_ENABLED")"
   local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
-  local KCF; KCF="$(context_get-option "KUBECONFIG")"
 
   if [[ -z "${CA}" ]]; then
     CA="mesh_ca"
@@ -583,7 +582,7 @@ EOF
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 && -z "${CONTEXT}" ]]; then
     # set CONTEXT to current-context in the KUBECONFIG
     # or fail-fast if current-context doesn't exist
-    CONTEXT="$(kubectl --kubeconfig "${KCF}" config current-context)"
+    CONTEXT="$(kubectl config current-context)"
     if [[ -z "${CONTEXT}" ]]; then
       MISSING_ARGS=1
       warn "Missing current-context in the KUBECONFIG. Please provide context with --context flag or set a current-context in the KUBECONFIG"
@@ -594,8 +593,10 @@ EOF
 
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
     info "Reading cluster information for ${CONTEXT}"
+    local CONTEXT_CLUSTER;
+    CONTEXT_CLUSTER="$(kubectl config get-contexts --no-headers | get_context_cluster)"
     IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
-${CONTEXT}
+${CONTEXT_CLUSTER}
 EOF
     if is_gcp; then
       context_set-option "PROJECT_ID" "${PROJECT_ID}"
@@ -785,8 +786,10 @@ EOF
 
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then
     info "Reading cluster information for ${CONTEXT}"
+    local CONTEXT_CLUSTER;
+    CONTEXT_CLUSTER="$(kubectl config get-contexts --no-headers | get_context_cluster)"
     IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
-${CONTEXT}
+${CONTEXT_CLUSTER}
 EOF
     if is_gcp; then
       context_set-option "PROJECT_ID" "${PROJECT_ID}"

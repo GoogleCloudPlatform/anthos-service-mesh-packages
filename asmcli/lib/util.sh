@@ -565,3 +565,9 @@ EOF
     readonly GKE_CLUSTER_URI; readonly GCE_NETWORK_NAME;
   fi
 }
+
+# Reads in stdin, expected in the form of kubectl config get-contexts
+# output and isolates the default context's cluster value.
+get_context_cluster() {
+  grep '^\*' | cut -c2- | sed 's/\([[:blank:]]\)*\1/\1/g' | cut -d ' ' -f 3
+}
