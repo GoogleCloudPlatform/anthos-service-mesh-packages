@@ -16,17 +16,11 @@
 apiVersion: install.istio.io/v1alpha1
 kind: IstioOperator
 spec:
-  components:
-    pilot:
-      k8s:
-        env:
-          - name: ENABLE_CA_SERVER
-            value: "false"
   meshConfig:
     defaultConfig:
       proxyMetadata:
         CA_PROVIDER: "GoogleCAS"
-        PLUGINS: ""
+        PLUGINS: "GoogleTokenExchange"
   values:
     global:
       caAddress: "" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.external_ca.ca_name"}
