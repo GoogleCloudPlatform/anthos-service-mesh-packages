@@ -67,3 +67,26 @@ configure_citadel() {
   CUSTOM_OVERLAY="${OPTIONS_DIRECTORY}/citadel-ca.yaml,${CUSTOM_OVERLAY}"
   context_set-option "CUSTOM_OVERLAY" "${CUSTOM_OVERLAY}"
 }
+
+install_citadel() {
+  local CUSTOM_CA; CUSTOM_CA="$(context_get-option "CUSTOM_CA")"
+
+  if [[ "${CUSTOM_CA}" -eq 1 ]]; then
+    install_custom_certificates
+  fi
+}
+
+install_custom_certificates() {
+
+  local CA_CERT; CA_CERT="$(context_get-option "CA_CERT")"
+  local CA_KEY; CA_KEY="$(context_get-option "CA_KEY")"
+  local CA_ROOT; CA_ROOT="$(context_get-option "CA_ROOT")"
+  local CA_CHAIN; CA_CHAIN="$(context_get-option "CA_CHAIN")"
+
+  info "Installing certificates into the cluster..."
+  kubectl create secret generic cacerts -n istio-system \
+    --from-file="${CA_CERT}" \
+    --from-file="${CA_KEY}" \
+    --from-file="${CA_ROOT}" \
+    --from-file="${CA_CHAIN}"
+}
