@@ -78,6 +78,16 @@ openAPI:
           name: anthos.servicemesh.tag
           value: 1.10.3-asm.0
           isSet: true
+    io.k8s.cli.substitutions.gke-mcp-image:
+      x-k8s-cli:
+        substitution:
+          name: gke-mcp-image
+          pattern: "IMAGE_HUB/cloudrun:IMAGE_TAG"
+          values:
+          - marker: IMAGE_HUB
+            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub'
+          - marker: IMAGE_TAG
+            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag'
     io.k8s.cli.setters.anthos.servicemesh.rev:
       x-k8s-cli:
         setter:
