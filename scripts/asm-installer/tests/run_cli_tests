@@ -530,6 +530,32 @@ test_main() {
   echo "***"
 
   #################
+  # should be able to enable meshconfig separately
+  #################
+
+  clear_variables
+  parse_args ${CMD} --enable-meshconfig-init
+
+  if ! can_meshconfig_init || can_enable_gcp_components; then
+    echo "Permissions with --enable-meshconfig-init flag: FAIL"
+    ((++FAILURES))
+  else
+    echo "Permissions with --enable-meshconfig-init flag: PASS"
+  fi
+  echo "***"
+
+  clear_variables
+  parse_args ${CMD} --enable-all --option vm --option hub_meshca
+
+  if ! can_register_cluster; then
+    echo "Enable all registers with environ when necessary: FAIL"
+    ((++FAILURES))
+  else
+    echo "Enable all registers with environ when necessary: PASS"
+  fi
+  echo "***"
+
+  #################
   # find_missing_strings shouldn't return anything with a trailing comma
   #################
 
