@@ -1177,20 +1177,6 @@ install_in_cluster_control_plane() {
   fi
 }
 
-install_citadel() {
-  local CA_CERT; CA_CERT="$(context_get-option "CA_CERT")"
-  local CA_KEY; CA_KEY="$(context_get-option "CA_KEY")"
-  local CA_ROOT; CA_ROOT="$(context_get-option "CA_ROOT")"
-  local CA_CHAIN; CA_CHAIN="$(context_get-option "CA_CHAIN")"
-
-  info "Installing certificates into the cluster..."
-  kubectl create secret generic cacerts -n istio-system \
-    --from-file="${CA_CERT}" \
-    --from-file="${CA_KEY}" \
-    --from-file="${CA_ROOT}" \
-    --from-file="${CA_CHAIN}"
-}
-
 install_private_ca() {
   # This sets up IAM privileges for the project to be able to access GCP CAS.
   # If modify_gcp_component permissions are not granted, it is assumed that the
@@ -1534,6 +1520,29 @@ configure_citadel() {
   local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
   CUSTOM_OVERLAY="${OPTIONS_DIRECTORY}/citadel-ca.yaml,${CUSTOM_OVERLAY}"
   context_set-option "CUSTOM_OVERLAY" "${CUSTOM_OVERLAY}"
+}
+
+install_citadel() {
+  local CUSTOM_CA; CUSTOM_CA="$(context_get-option "CUSTOM_CA")"
+
+  if [[ "${CUSTOM_CA}" -eq 1 ]]; then
+    install_custom_certificates
+  fi
+}
+
+install_custom_certificates() {
+
+  local CA_CERT; CA_CERT="$(context_get-option "CA_CERT")"
+  local CA_KEY; CA_KEY="$(context_get-option "CA_KEY")"
+  local CA_ROOT; CA_ROOT="$(context_get-option "CA_ROOT")"
+  local CA_CHAIN; CA_CHAIN="$(context_get-option "CA_CHAIN")"
+
+  info "Installing certificates into the cluster..."
+  kubectl create secret generic cacerts -n istio-system \
+    --from-file="${CA_CERT}" \
+    --from-file="${CA_KEY}" \
+    --from-file="${CA_ROOT}" \
+    --from-file="${CA_CHAIN}"
 }
 validate_meshca() {
   return
