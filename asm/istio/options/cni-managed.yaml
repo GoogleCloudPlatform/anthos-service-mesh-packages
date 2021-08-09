@@ -147,12 +147,12 @@ metadata:
     app: istio-cni
     release: istio
 rules:
-  - apiGroups: [""]
-    resources:
-      - pods
-      - nodes
-    verbs:
-      - get
+- apiGroups: [""]
+  resources:
+  - pods
+  - nodes
+  verbs:
+  - get
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -162,12 +162,12 @@ metadata:
     app: istio-cni
     release: istio
 rules:
-  - apiGroups: [""]
-    resources: ["pods"]
-    verbs: ["get", "list", "watch", "delete", "patch", "update"]
-  - apiGroups: [""]
-    resources: ["events"]
-    verbs: ["get", "list", "watch", "delete", "patch", "update", "create"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch", "delete", "patch", "update"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["get", "list", "watch", "delete", "patch", "update", "create"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -181,9 +181,9 @@ roleRef:
   kind: ClusterRole
   name: istio-cni
 subjects:
-  - kind: ServiceAccount
-    name: istio-cni
-    namespace: kube-system
+- kind: ServiceAccount
+  name: istio-cni
+  namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -192,9 +192,9 @@ metadata:
   labels:
     k8s-app: istio-cni-repair
 subjects:
-  - kind: ServiceAccount
-    name: istio-cni
-    namespace: kube-system
+- kind: ServiceAccount
+  name: istio-cni
+  namespace: kube-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -208,52 +208,52 @@ metadata:
     app: istio-cni
     release: istio
 rules:
-  - apiGroups:
-      - mesh.cloud.google.com
-    resources:
-      - '*'
-    verbs:
-      - '*'
-  - apiGroups:
-      - apps
-      - extensions
-    resources:
-      - daemonsets
-      - deployments
-      - deployments/finalizers
-      - ingresses
-      - replicasets
-      - statefulsets
-    verbs:
-      - get
-      - list
-      - watch
-  - apiGroups:
-      - ""
-    resources:
-      - configmaps
-      - namespaces
-    verbs:
-      - '*'
-  - apiGroups:
-      - "coordination.k8s.io"
-    resources:
-      - leases
-    verbs:
-      - "*"
-  - apiGroups:
-      - admissionregistration.k8s.io
-    resources:
-      - mutatingwebhookconfigurations
-    verbs:
-      - '*'
-  - apiGroups:
-      - ""
-    resources:
-      - pods
-      - pods/eviction
-    verbs:
-      - '*'
+- apiGroups:
+  - mesh.cloud.google.com
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- apiGroups:
+  - apps
+  - extensions
+  resources:
+  - daemonsets
+  - deployments
+  - deployments/finalizers
+  - ingresses
+  - replicasets
+  - statefulsets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - namespaces
+  verbs:
+  - '*'
+- apiGroups:
+  - "coordination.k8s.io"
+  resources:
+  - leases
+  verbs:
+  - "*"
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - mutatingwebhookconfigurations
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  - pods/eviction
+  verbs:
+  - '*'
 ---
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -262,9 +262,9 @@ metadata:
   labels:
     k8s-app: mdp-controller
 subjects:
-  - kind: ServiceAccount
-    name: istio-cni
-    namespace: kube-system
+- kind: ServiceAccount
+  name: istio-cni
+  namespace: kube-system
 roleRef:
   kind: ClusterRole
   name: mdp-controller
@@ -331,14 +331,14 @@ spec:
       nodeSelector:
         kubernetes.io/os: linux
       tolerations:
-        # Make sure istio-cni-node gets scheduled on all nodes.
-        - effect: NoSchedule
-          operator: Exists
-        # Mark the pod as a critical add-on for rescheduling.
-        - key: CriticalAddonsOnly
-          operator: Exists
-        - effect: NoExecute
-          operator: Exists
+      # Make sure istio-cni-node gets scheduled on all nodes.
+      - effect: NoSchedule
+        operator: Exists
+      # Mark the pod as a critical add-on for rescheduling.
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - effect: NoExecute
+        operator: Exists
       priorityClassName: system-node-critical
       serviceAccountName: istio-cni
       # Minimize downtime during a rolling upgrade or deletion;
@@ -346,117 +346,117 @@ spec:
       # https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods.
       terminationGracePeriodSeconds: 5
       containers:
-        # This container installs the Istio CNI binaries
-        # and CNI network config file on each node.
-        - name: install-cni
-          # yamllint disable-line rule:line-length
-          image: "IMAGE_HUB/install-cni:IMAGE_TAG"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cni-image"}
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8000
-            initialDelaySeconds: 5
-          readinessProbe:
-            httpGet:
-              path: /readyz
-              port: 8000
-          command: ["install-cni"]
-          env:
-            # The CNI network config to install on each node.
-            - name: CNI_NETWORK_CONFIG
-              valueFrom:
-                configMapKeyRef:
-                  name: istio-cni-config
-                  key: cni_network_config
-            - name: CNI_NET_DIR
-              value: /etc/cni/net.d
-            # Deploy as a standalone CNI plugin or as chained?
-            - name: CHAINED_CNI_PLUGIN
-              value: "true"
-            - name: REPAIR_ENABLED
-              value: "true"
-            - name: REPAIR_NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            - name: REPAIR_LABEL_PODS
-              value: "true"
-            # Set to true to enable pod deletion
-            - name: REPAIR_DELETE_PODS
-              value: "true"
-            - name: REPAIR_RUN_AS_DAEMON
-              value: "true"
-            - name: REPAIR_SIDECAR_ANNOTATION
-              value: "sidecar.istio.io/status"
-            - name: REPAIR_INIT_CONTAINER_NAME
-              value: "istio-validation"
-            - name: REPAIR_BROKEN_POD_LABEL_KEY
-              value: "cni.istio.io/uninitialized"
-            - name: REPAIR_BROKEN_POD_LABEL_VALUE
-              value: "true"
-          volumeMounts:
-            - mountPath: /host/opt/cni/bin
-              name: cni-bin-dir
-            - mountPath: /host/etc/cni/net.d
-              name: cni-net-dir
-            - mountPath: /var/run/istio-cni
-              name: cni-log-dir
-        - name: mdp-controller
-          # yamllint disable-line rule:line-length
-          image: "IMAGE_HUB/mdp:IMAGE_TAG"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-mdp-image"}
-          command:
-            - mdp
-            - server
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-            privileged: false
-            readOnlyRootFilesystem: true
-            runAsGroup: 1337
-            runAsUser: 1337
-            runAsNonRoot: true
-          imagePullPolicy: IfNotPresent
-          resources:
-            limits:
-              cpu: 200m
-              memory: 256Mi
-            requests:
-              cpu: 50m
-              memory: 128Mi
-          env:
-            - name: WATCH_NAMESPACE
-              value: "istio-system"
-            - name: LEADER_ELECTION_NAMESPACE
-              value: "istio-system"
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: POD_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-          volumeMounts:
-            - mountPath: /var/run/secrets/tokens
-              name: istio-token
+      # This container installs the Istio CNI binaries
+      # and CNI network config file on each node.
+      - name: install-cni
+        # yamllint disable-line rule:line-length
+        image: "IMAGE_HUB/install-cni:IMAGE_TAG"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cni-image"}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8000
+          initialDelaySeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8000
+        command: ["install-cni"]
+        env:
+        # The CNI network config to install on each node.
+        - name: CNI_NETWORK_CONFIG
+          valueFrom:
+            configMapKeyRef:
+              name: istio-cni-config
+              key: cni_network_config
+        - name: CNI_NET_DIR
+          value: /etc/cni/net.d
+        # Deploy as a standalone CNI plugin or as chained?
+        - name: CHAINED_CNI_PLUGIN
+          value: "true"
+        - name: REPAIR_ENABLED
+          value: "true"
+        - name: REPAIR_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: REPAIR_LABEL_PODS
+          value: "true"
+        # Set to true to enable pod deletion
+        - name: REPAIR_DELETE_PODS
+          value: "true"
+        - name: REPAIR_RUN_AS_DAEMON
+          value: "true"
+        - name: REPAIR_SIDECAR_ANNOTATION
+          value: "sidecar.istio.io/status"
+        - name: REPAIR_INIT_CONTAINER_NAME
+          value: "istio-validation"
+        - name: REPAIR_BROKEN_POD_LABEL_KEY
+          value: "cni.istio.io/uninitialized"
+        - name: REPAIR_BROKEN_POD_LABEL_VALUE
+          value: "true"
+        volumeMounts:
+        - mountPath: /host/opt/cni/bin
+          name: cni-bin-dir
+        - mountPath: /host/etc/cni/net.d
+          name: cni-net-dir
+        - mountPath: /var/run/istio-cni
+          name: cni-log-dir
+      - name: mdp-controller
+        # yamllint disable-line rule:line-length
+        image: "IMAGE_HUB/mdp:IMAGE_TAG"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-mdp-image"}
+        command:
+        - mdp
+        - server
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+          runAsGroup: 1337
+          runAsUser: 1337
+          runAsNonRoot: true
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi
+        env:
+        - name: WATCH_NAMESPACE
+          value: "istio-system"
+        - name: LEADER_ELECTION_NAMESPACE
+          value: "istio-system"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        volumeMounts:
+        - mountPath: /var/run/secrets/tokens
+          name: istio-token
       volumes:
-        # Used to install CNI.
-        - name: cni-bin-dir
-          hostPath:
-            path: /home/kubernetes/bin
-        - name: cni-net-dir
-          hostPath:
-            path: /etc/cni/net.d
-        - name: cni-log-dir
-          hostPath:
-            path: /var/run/istio-cni
-        - name: istio-token
-          projected:
-            sources:
-              - serviceAccountToken:
-                  path: istio-token
-                  expirationSeconds: 43200
-                  # yamllint disable-line rule:line-length
-                  audience: "PROJECT_ID.svc.id.goog"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
+      # Used to install CNI.
+      - name: cni-bin-dir
+        hostPath:
+          path: /home/kubernetes/bin
+      - name: cni-net-dir
+        hostPath:
+          path: /etc/cni/net.d
+      - name: cni-log-dir
+        hostPath:
+          path: /var/run/istio-cni
+      - name: istio-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: istio-token
+              expirationSeconds: 43200
+              # yamllint disable-line rule:line-length
+              audience: "PROJECT_ID.svc.id.goog"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
