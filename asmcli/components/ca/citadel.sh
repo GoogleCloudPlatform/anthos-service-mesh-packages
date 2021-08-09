@@ -83,6 +83,13 @@ install_custom_certificates() {
   local CA_ROOT; CA_ROOT="$(context_get-option "CA_ROOT")"
   local CA_CHAIN; CA_CHAIN="$(context_get-option "CA_CHAIN")"
 
+  if kubectl get secret cacerts -n istio-system >/dev/null 2>/dev/null; then
+    error "Custom certificates already exist in the cluster. Please remove the"
+    error "'cacerts' secret from the 'istio-system' namespace and try again."
+    error "If you want to keep the same custom certificates, re-run the script"
+    fatal "without any of the custom certificate flags."
+  fi
+
   info "Installing certificates into the cluster..."
   kubectl create secret generic cacerts -n istio-system \
     --from-file="${CA_CERT}" \
