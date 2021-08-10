@@ -129,11 +129,6 @@ main() {
 
   echo "Checking for validation service yaml..."
 
-  if [[ ! -f mesh_migration/istiod-service.yaml ]]; then
-    echo "Couldn't find validation service at mesh_migration/istiod-service.yaml!"
-    SUCCESS=1
-  fi
-
   # Cluster teardown
   echo "Deleting cluster ${CLUSTER_NAME} and associated resources..."
   cleanup "${PROJECT_ID}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}" "${NAMESPACE}"
