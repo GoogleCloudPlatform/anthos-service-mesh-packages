@@ -273,8 +273,8 @@ register_cluster() {
     else
       exit_if_no_workload_identity
     fi
-    populate_cluster_values
   fi
+  populate_cluster_values
 
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
@@ -347,6 +347,16 @@ create_istio_namespace() {
   if istio_namespace_exists; then return; fi
 
   retry 2 kubectl create ns istio-system
+}
+
+label_istio_namespace() {
+  local NETWORK_ID; NETWORK_ID="$(context_get-option "NETWORK_ID")"
+  local NETWORK_LABEL; NETWORK_LABEL="$(kubectl get ns istio-system -o json | jq -r '.metadata.labels."topology.istio.io/network"')"
+  if [[ "${NETWORK_LABEL}" = 'null' ]]; then
+    retry 2 kubectl label ns istio-system "topology.istio.io/network=${NETWORK_ID}"
+  else
+    info "topology.istio.io/network is already set to ${NETWORK_LABEL} and will NOT be overridden."
+  fi
 }
 
 register_gce_identity_provider() {

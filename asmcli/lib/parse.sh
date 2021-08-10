@@ -43,6 +43,11 @@ parse_args() {
         context_set-option "FLEET_ID" "${2}"
         shift 2
         ;;
+      --network_id | --network-id)
+        arg_required "${@}"
+        context_set-option "NETWORK_ID" "${2}"
+        shift 2
+        ;;
       -c | --ca)
         arg_required "${@}"
         context_set-option "CA" "$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
@@ -263,6 +268,11 @@ x_parse_install_args() {
       --fleet_id | --fleet-id)
         arg_required "${@}"
         context_set-option "FLEET_ID" "${2}"
+        shift 2
+        ;;
+      --network_id | --network-id)
+        arg_required "${@}"
+        context_set-option "NETWORK_ID" "${2}"
         shift 2
         ;;
       -e | --enable_all | --enable-all)

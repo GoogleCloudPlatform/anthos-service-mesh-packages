@@ -67,7 +67,6 @@ SCRIPT_NAME="${0##*/}"; readonly SCRIPT_NAME
 
 PROJECT_NUMBER=""
 GKE_CLUSTER_URI=""
-GCE_NETWORK_NAME=""
 GCLOUD_USER_OR_SA="${GCLOUD_USER_OR_SA:=}"
 KPT_URL=""
 KUBECONFIG=""
@@ -878,6 +877,10 @@ OPTIONS:
   --fleet_id             <FLEET ID>   The Fleet host project ID. Required for non-GCP
                                       clusters. When not provided for GCP clusters, it
                                       defaults to the cluster's project ID.
+  --network_id          <NETWORK ID>  The value for topology.istio.io/network label that
+                                      will be applied to the istio-system namespace. For GKE,
+                                      defaults to the network name for the cluster. For other
+                                      environments, "default" will be used.
   -c|--ca                <CA>         The type of certificate authority to be
                                       used. Defaults to "mesh_ca" for install.
                                       Allowed values for <CA> are {citadel|mesh_ca|gcp_cas}.
@@ -1018,6 +1021,7 @@ OPTIONS:
   --kc|--kubeconfig      <KUBECONFIG_FILE>
   --ctx|--context        <CONTEXT>
   --fleet_id             <FLEET ID>
+  --network_id           <NETWORK ID>
   -c|--ca                <CA>
 
   -o|--option            <FILE NAME>
@@ -1304,6 +1308,7 @@ install_control_plane() {
   if [[ "${MANAGED}" -eq 1 ]]; then
     install_managed_control_plane
   else
+    label_istio_namespace
     install_in_cluster_control_plane
   fi
 
@@ -2171,10 +2176,9 @@ configure_package() {
 
   info "Configuring kpt package..."
 
-  if is_gcp; then
-    populate_cluster_values
-  fi
-
+  populate_cluster_values
+  local NETWORK_ID; NETWORK_ID="$(context_get-option "NETWORK_ID")"
+  
   populate_fleet_info
   local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
 
@@ -2182,7 +2186,6 @@ configure_package() {
     kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
     kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
     kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
-    kpt cfg set asm gcloud.compute.network "${GCE_NETWORK_NAME}"
   else
     kpt cfg set asm gcloud.core.project "${FLEET_ID}"
     kpt cfg set asm gcloud.container.cluster "${HUB_MEMBERSHIP_ID}"
@@ -2193,6 +2196,7 @@ configure_package() {
     fi
   fi
 
+  kpt cfg set asm gcloud.compute.network "${NETWORK_ID}"
   kpt cfg set asm gcloud.project.environProjectNumber "${PROJECT_NUMBER}"
   kpt cfg set asm anthos.servicemesh.rev "${REVISION_LABEL}"
   kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
@@ -2268,6 +2272,7 @@ context_init() {
     "CONTEXT": "${CONTEXT:-}",
     "CUSTOM_OVERLAY": "${CUSTOM_OVERLAY:-}",
     "OPTIONAL_OVERLAY": "${OPTIONAL_OVERLAY:-}",
+    "NETWORK_ID": "${NETWORK_ID:-}",
     "ENABLE_ALL": ${ENABLE_ALL:-0},
     "ENABLE_CLUSTER_ROLES": ${ENABLE_CLUSTER_ROLES:-0},
     "ENABLE_CLUSTER_LABELS": ${ENABLE_CLUSTER_LABELS:-0},
@@ -2300,7 +2305,6 @@ context_init() {
     "USE_HUB_WIP": ${USE_HUB_WIP:-1},
     "USE_VM": ${USE_VM:-0},
     "USE_MCP_CNI": ${USE_MCP_CNI:-0},
-    "FLEET_ID": "${FLEET_ID:-}",
     "HUB_MEMBERSHIP_ID": "${HUB_MEMBERSHIP_ID:-}",
     "CUSTOM_REVISION": ${CUSTOM_REVISION:-0},
     "TRUST_DOMAIN_ALIASES": "${TRUST_DOMAIN_ALIASES:-}",
@@ -2642,8 +2646,8 @@ register_cluster() {
     else
       exit_if_no_workload_identity
     fi
-    populate_cluster_values
   fi
+  populate_cluster_values
 
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
@@ -2718,6 +2722,16 @@ create_istio_namespace() {
   retry 2 kubectl create ns istio-system
 }
 
+label_istio_namespace() {
+  local NETWORK_ID; NETWORK_ID="$(context_get-option "NETWORK_ID")"
+  local NETWORK_LABEL; NETWORK_LABEL="$(kubectl get ns istio-system -o json | jq -r '.metadata.labels."topology.istio.io/network"')"
+  if [[ "${NETWORK_LABEL}" = 'null' ]]; then
+    retry 2 kubectl label ns istio-system "topology.istio.io/network=${NETWORK_ID}"
+  else
+    info "topology.istio.io/network is already set to ${NETWORK_LABEL} and will NOT be overridden."
+  fi
+}
+
 register_gce_identity_provider() {
   info "Registering GCE Identity Provider in the cluster..."
   context_append "kubectlFiles" "asm/identity-provider/identityprovider-crd.yaml"
@@ -2772,6 +2786,11 @@ parse_args() {
       --fleet_id | --fleet-id)
         arg_required "${@}"
         context_set-option "FLEET_ID" "${2}"
+        shift 2
+        ;;
+      --network_id | --network-id)
+        arg_required "${@}"
+        context_set-option "NETWORK_ID" "${2}"
         shift 2
         ;;
       -c | --ca)
@@ -2994,6 +3013,11 @@ x_parse_install_args() {
       --fleet_id | --fleet-id)
         arg_required "${@}"
         context_set-option "FLEET_ID" "${2}"
+        shift 2
+        ;;
+      --network_id | --network-id)
+        arg_required "${@}"
+        context_set-option "NETWORK_ID" "${2}"
         shift 2
         ;;
       -e | --enable_all | --enable-all)
@@ -3634,19 +3658,27 @@ populate_cluster_values() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local NETWORK_ID; NETWORK_ID="$(context_get-option "NETWORK_ID")"
   local CLUSTER_DATA
 
-  if [[ -z "${GKE_CLUSTER_URI}" && -z "${GCE_NETWORK_NAME}" ]]; then
-    CLUSTER_DATA="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
-      --zone="${CLUSTER_LOCATION}" \
-      --project="${PROJECT_ID}" \
-      --format='value(selfLink, network)')"
-    read -r GKE_CLUSTER_URI GCE_NETWORK_NAME <<EOF
+  if is_gcp; then
+    if [[ -z "${GKE_CLUSTER_URI}" && -z "${NETWORK_ID}" ]]; then
+      CLUSTER_DATA="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
+        --zone="${CLUSTER_LOCATION}" \
+        --project="${PROJECT_ID}" \
+        --format='value(selfLink, network)')"
+      read -r GKE_CLUSTER_URI NETWORK_ID <<EOF
 ${CLUSTER_DATA}
 EOF
 
-    GCE_NETWORK_NAME="${PROJECT_ID}-${GCE_NETWORK_NAME}"
-    readonly GKE_CLUSTER_URI; readonly GCE_NETWORK_NAME;
+      context_set-option "NETWORK_ID" "${PROJECT_ID}-${NETWORK_ID}"
+      readonly GKE_CLUSTER_URI
+    fi
+  else
+    if [[ -z "${NETWORK_ID}" ]]; then
+      NETWORK_ID="default"
+      context_set-option "NETWORK_ID" "${NETWORK_ID}"
+    fi
   fi
 }
 

@@ -192,6 +192,7 @@ install_control_plane() {
   if [[ "${MANAGED}" -eq 1 ]]; then
     install_managed_control_plane
   else
+    label_istio_namespace
     install_in_cluster_control_plane
   fi
 

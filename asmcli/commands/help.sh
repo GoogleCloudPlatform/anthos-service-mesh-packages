@@ -71,6 +71,10 @@ OPTIONS:
   --fleet_id             <FLEET ID>   The Fleet host project ID. Required for non-GCP
                                       clusters. When not provided for GCP clusters, it
                                       defaults to the cluster's project ID.
+  --network_id          <NETWORK ID>  The value for topology.istio.io/network label that
+                                      will be applied to the istio-system namespace. For GKE,
+                                      defaults to the network name for the cluster. For other
+                                      environments, "default" will be used.
   -c|--ca                <CA>         The type of certificate authority to be
                                       used. Defaults to "mesh_ca" for install.
                                       Allowed values for <CA> are {citadel|mesh_ca|gcp_cas}.
@@ -211,6 +215,7 @@ OPTIONS:
   --kc|--kubeconfig      <KUBECONFIG_FILE>
   --ctx|--context        <CONTEXT>
   --fleet_id             <FLEET ID>
+  --network_id           <NETWORK ID>
   -c|--ca                <CA>
 
   -o|--option            <FILE NAME>
