@@ -45,7 +45,7 @@ spec:
             maxReplicas: 5
             minReplicas: 2
     ingressGateways:
-      - enabled: true
+      - enabled: false
         name: istio-ingressgateway
         k8s:
           hpaSpec:
@@ -104,3 +104,10 @@ spec:
         clusterName: "cn-PROJECTID-us-central1-c-asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
       meshID: "proj-PROJECT_NUMBER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh-id"}
       network: "NETWORK_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.compute.network"}
+    gateways:
+      istio-ingressgateway:
+        # Enable gateway injection
+        injectionTemplate: gateway
+      istio-egressgateway:
+        # Enable gateway injection
+        injectionTemplate: gateway
