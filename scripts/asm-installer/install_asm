@@ -344,6 +344,10 @@ init() {
   MANAGED_CNI="${OPTIONS_DIRECTORY}/cni-managed.yaml"; readonly MANAGED_CNI;
   EXPOSE_ISTIOD_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_SERVICE;
   CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
+  CRD_CONTROL_PLANE_REVISION="asm/control-plane-revision/crd.yaml"; readonly CRD_CONTROL_PLANE_REVISION;
+  CR_CONTROL_PLANE_REVISION_REGULAR="asm/control-plane-revision/cr_regular.yaml"; readonly CR_CONTROL_PLANE_REVISION_REGULAR;
+  CR_CONTROL_PLANE_REVISION_RAPID="asm/control-plane-revision/cr_rapid.yaml"; readonly CR_CONTROL_PLANE_REVISION_RAPID;
+  CR_CONTROL_PLANE_REVISION_STABLE="asm/control-plane-revision/cr_stable.yaml"; readonly CR_CONTROL_PLANE_REVISION_STABLE;
 
   AKUBECTL="$(which kubectl || true)"
   AGCLOUD="$(which gcloud || true)"
@@ -2671,6 +2675,9 @@ start_managed_control_plane() {
   info "Configuring base installation for managed control plane..."
   run kubectl apply --overwrite=true -f "${BASE_REL_PATH}"
 
+  info "Configuring ASM managed control plane revision CRD..."
+  run kubectl apply --overwrite=true -f "${CRD_CONTROL_PLANE_REVISION}"
+
   local ASM_OPTS
   ASM_OPTS="$(kubectl -n istio-system \
     get --ignore-not-found cm asm-options \
@@ -2723,11 +2730,11 @@ scrape_managed_urls() {
 install_managed_components() {
   if [[ "${USE_MCP_CNI}" -eq 1 ]]; then
     info "Installing CNI into the cluster..."
-    kubectl apply -f "${MANAGED_CNI}"
+    run kubectl apply -f "${MANAGED_CNI}"
   fi
 
   info "Configuring ASM managed control plane validating webhook config..."
-  kubectl apply -f "${MANAGED_WEBHOOKS}"
+  run kubectl apply -f "${MANAGED_WEBHOOKS}"
 
   info "Configuring ASM managed control plane components..."
   print_config >| managed_control_plane_gateway.yaml
@@ -2736,6 +2743,15 @@ install_managed_components() {
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
     install_canonical_controller
   fi
+
+  info "Configuring ASM managed control plane revision CR for regular channel..."
+  run kubectl apply -f "${CR_CONTROL_PLANE_REVISION_REGULAR}"
+
+  info "Configuring ASM managed control plane revision CR for rapid channel..."
+  run kubectl apply -f "${CR_CONTROL_PLANE_REVISION_RAPID}"
+
+  info "Configuring ASM managed control plane revision CR for stable channel..."
+  run kubectl apply -f "${CR_CONTROL_PLANE_REVISION_STABLE}"
 }
 
 outro() {
