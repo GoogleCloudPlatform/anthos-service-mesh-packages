@@ -12,10 +12,9 @@ configure_package() {
 
   info "Configuring kpt package..."
 
-  if is_gcp; then
-    populate_cluster_values
-  fi
-
+  populate_cluster_values
+  local NETWORK_ID; NETWORK_ID="$(context_get-option "NETWORK_ID")"
+  
   populate_fleet_info
   local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
 
@@ -23,7 +22,6 @@ configure_package() {
     kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
     kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
     kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
-    kpt cfg set asm gcloud.compute.network "${GCE_NETWORK_NAME}"
   else
     kpt cfg set asm gcloud.core.project "${FLEET_ID}"
     kpt cfg set asm gcloud.container.cluster "${HUB_MEMBERSHIP_ID}"
@@ -34,6 +32,7 @@ configure_package() {
     fi
   fi
 
+  kpt cfg set asm gcloud.compute.network "${NETWORK_ID}"
   kpt cfg set asm gcloud.project.environProjectNumber "${PROJECT_NUMBER}"
   kpt cfg set asm anthos.servicemesh.rev "${REVISION_LABEL}"
   kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"

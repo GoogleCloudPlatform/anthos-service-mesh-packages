@@ -189,6 +189,7 @@ install_control_plane() {
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
   local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
 
+  label_istio_namespace
   if [[ "${MANAGED}" -eq 1 ]]; then
     install_managed_control_plane
   else
