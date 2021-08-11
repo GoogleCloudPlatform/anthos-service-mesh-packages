@@ -1,0 +1,171 @@
+#!/bin/bash
+
+if [[ ! -z "${LOG_LEVEL}" ]]; then
+  set -ex
+else
+  set -CeE
+fi
+set -o pipefail
+set +o noclobber
+set +o verbose
+
+source vsphere/util.sh
+
+main() {
+  echo "============================================="
+  init
+  read_args "${@}"
+  write_config_context_vm
+
+  echo "[Step 1] Register VM at namespace: ${VM_NAMESPACE}"
+  create_workloadgroup
+
+  echo "[Step 2] Copy configuration files to VM: ${VM_APP}@${VM_IP}"
+  configure_vm_transfer_file
+
+  echo "[Step 3] Install ASM agent on VM"
+  runagent
+
+}
+
+create_workloadgroup() {
+  cd ${OUTPUT_DIR}/vm-${VM_APP}
+
+  # Register VM and create a service for the VM
+  cat <<EOF >workloadgroup.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: WorkloadGroup
+metadata:
+  name: "${VM_APP}"
+  namespace: "${VM_NAMESPACE}"
+spec:
+  metadata:
+    labels:
+      app: "${VM_APP}"
+  template:
+    serviceAccount: "${SERVICE_ACCOUNT}"
+    network: "${VM_NETWORK}"
+EOF
+
+  # add more labels for vm workloadgroup
+  if [[ -n "${LABELS}" ]]; then
+    if [[ ${LABELS:0:1} == "\"" ]] ; then LABELS=${LABELS:1:-1};  fi
+    tmpLabels=(${LABELS//;/ })
+    echo ${tmpLabels[@]}
+    for tmplabel in "${tmpLabels[@]}"; do
+      curLabels=(${tmplabel//:/ })
+
+      tmplabel0=${curLabels[0]}
+      tmplabel0+=":\ \""
+      tmplabel0+=${curLabels[1]}
+      tmplabel0+="\""
+
+      sed -i -e "10 i \ \ \ \ \ \ $tmplabel0" workloadgroup.yaml
+    done
+  fi
+
+  kubectl --namespace "${VM_NAMESPACE}" apply -f workloadgroup.yaml
+}
+
+configure_vm_transfer_file() {
+  # Create files to transfer to VM
+  cd ${WORK_DIR}
+  if [[ -z "${REVISION}" ]]; then
+    istioctl x workload entry configure -f ${OUTPUT_DIR}/vm-${VM_APP}/workloadgroup.yaml -o ${OUTPUT_DIR}/vm-${VM_APP} --clusterID ${CLUSTER} --autoregister
+  else
+    istioctl x workload entry configure --revision ${REVISION} -f ${OUTPUT_DIR}/vm-${VM_APP}/workloadgroup.yaml -o ${OUTPUT_DIR}/vm-${VM_APP} --clusterID ${CLUSTER} --autoregister
+  fi
+
+  cd ${OUTPUT_DIR}/vm-${VM_APP}
+
+  ssh -i "${KEY_FILE}" -o StrictHostKeyChecking=no root@${VM_IP} mkdir "${VM_DIR}" || true
+  scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no cluster.env hosts istio-token mesh.yaml root-cert.pem root@${VM_IP}:"${VM_DIR}"
+
+  cd ${WORK_DIR}
+  if [[ ! -e "vsphere/runagent.sh" ]]; then
+    fatal "file vsphere/runagent.sh does not exists in working dir ${WORK_DIR}"
+  fi
+
+  scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no vsphere/runagent.sh root@${VM_IP}:"${VM_DIR}"
+
+  if [[ "${IMAGE}" == "rpm" ]]; then
+    if [[ ! -e "istio-sidecar.rpm" ]]; then
+      fatal "file istio-sidecar.rpm does not exists in working dir ${WORK_DIR}"
+    fi
+    scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no istio-sidecar.rpm root@${VM_IP}:"${VM_DIR}"
+  else
+    # deb VM
+    if [[ ! -e "istio-sidecar.deb" ]]; then
+      fatal "file istio-sidecar.deb does not exists in working dir ${WORK_DIR}"
+    fi
+    scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no istio-sidecar.deb root@${VM_IP}:"${VM_DIR}"
+  fi
+}
+
+runagent() {
+  # SSH to VM and execute runagent.sh on VM
+  runagentcmd="chmod +x ${VM_DIR}/runagent.sh; ${VM_DIR}/runagent.sh ${VM_DIR} ${IMAGE}"
+  until ssh -i "${KEY_FILE}" -o StrictHostKeyChecking=no root@${VM_IP} ${runagentcmd}; do
+    sleep 1
+  done
+
+  # verify workload entry generation
+  ENTRY="${VM_APP}-${VM_IP}-${VM_NETWORK}"
+  sleep 2
+#  ENTRY_RES="$(kubectl get workloadentry ${ENTRY} -n ${VM_NAMESPACE})"
+  until [[ ! -z $(kubectl get workloadentry ${ENTRY} -n ${VM_NAMESPACE}) -o name ]]; do
+    sleep 1
+    kubectl get workloadentry ${ENTRY} -n ${VM_NAMESPACE}
+  done
+
+  ENTRY_RES="$(kubectl get workloadentry ${ENTRY} -n ${VM_NAMESPACE}) -o name"
+
+  if [[ ${ENTRY_RES} == *"Error"* ]]; then
+    fatal "Failed to generate workloadentry for attached VM with context ${ENTRY_RES}. Please check trouble shooting section in user guide."
+  fi
+
+  echo "============================================="
+  echo -e "\xE2\x9C\x94 Under the context of cluster:${CLUSTER} clusterNetwork:${CLUSTER_NETWORK} vmNetwork:${VM_NETWORK}"
+  echo -e "\xE2\x9C\x94 successfully add vm:${VM_APP} addr:${VM_IP} sa:${SERVICE_ACCOUNT} ns:${VM_NAMESPACE}"
+}
+
+write_config_context_vm() {
+  # select different context from current context
+  if [[ -n "${SELECT_CONTEXT}" ]]; then
+    export CONTEXT="${SELECT_CONTEXT}"
+  elif [[ ! -e "./.currContext" || ! -s "./.currContext" ]]; then
+    # attach vm directly without set context
+    export CONTEXT="attachConfig"
+  else
+    currContext=$(cat "./.currContext")
+    export CONTEXT=${currContext:10}
+  fi
+
+  source "./.${CONTEXT}"
+  source "./.attachConfig"
+  fill_unspecified_context
+
+  alias istioctl="istioctl --kubeconfig ${KUBECONFIG}"
+
+  if [[ -e ${OUTPUT_DIR}/vm-${VM_APP} ]]; then
+    rm -rf ${OUTPUT_DIR}/vm-${VM_APP}
+  fi
+
+  if [[ ! -e ${OUTPUT_DIR} ]]; then
+    mkdir ${OUTPUT_DIR}
+  fi
+
+  mkdir -p ${OUTPUT_DIR}/vm-${VM_APP}
+  CONTEXT_FILE=${OUTPUT_DIR}/vm-${VM_APP}/".context"
+
+  write_config_context
+
+
+  echo "export VM_APP=${VM_APP}" >>${CONTEXT_FILE}
+  echo "export VM_IP=${VM_IP}" >>${CONTEXT_FILE}
+
+  rm ".attachConfig"
+  cat ${OUTPUT_DIR}/vm-${VM_APP}/".context"
+}
+
+main "${@}"
