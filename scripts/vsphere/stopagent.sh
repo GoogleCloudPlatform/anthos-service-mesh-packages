@@ -24,5 +24,6 @@ grep -v "istiod" "/etc/hosts" > "o"; mv "o" "/etc/hosts"
 cd ${DIR}
 rm -f cluster.env hosts istio-token mesh.yaml root-cert.pem runagent.sh
 rm -f istio-sidecar.rpm
+rm -f istio-sidecar.deb
 
 exit

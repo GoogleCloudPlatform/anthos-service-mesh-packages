@@ -78,14 +78,6 @@ configure_vm_transfer_file() {
 
   cd ${OUTPUT_DIR}/vm-${VM_APP}
 
-  HOST_INFO=$(cat "./hosts")
-  if [[ "${HOST_INFO}" =~ .*"asm".* ]]; then
-    # host with revision label
-    # echo "${HOST_INFO//istiod*.istio/istiod.istio}" >>"./hosts1"
-    # echo "${HOST_INFO}" >>"./hosts1"
-    # mv "./hosts1" "./hosts"
-    echo "${HOST_INFO//istiod*.istio/istiod.istio}" >>"./hosts"
-  fi
   ssh -i "${KEY_FILE}" -o StrictHostKeyChecking=no root@${VM_IP} mkdir "${VM_DIR}" || true
   scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no cluster.env hosts istio-token mesh.yaml root-cert.pem root@${VM_IP}:"${VM_DIR}"
 
@@ -96,18 +88,41 @@ configure_vm_transfer_file() {
 
   scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no vsphere/runagent.sh root@${VM_IP}:"${VM_DIR}"
 
-  if [[ ! -e "istio-sidecar.rpm" ]]; then
-    fatal "file istio-sidecar.rpm does not exists in working dir ${WORK_DIR}"
+  if [[ "${IMAGE}" == "rpm" ]]; then
+    if [[ ! -e "istio-sidecar.rpm" ]]; then
+      fatal "file istio-sidecar.rpm does not exists in working dir ${WORK_DIR}"
+    fi
+    scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no istio-sidecar.rpm root@${VM_IP}:"${VM_DIR}"
+  else
+    # deb VM
+    if [[ ! -e "istio-sidecar.deb" ]]; then
+      fatal "file istio-sidecar.deb does not exists in working dir ${WORK_DIR}"
+    fi
+    scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no istio-sidecar.deb root@${VM_IP}:"${VM_DIR}"
   fi
-  scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no istio-sidecar.rpm root@${VM_IP}:"${VM_DIR}"
 }
 
 runagent() {
   # SSH to VM and execute runagent.sh on VM
-  runagentcmd="chmod +x ${VM_DIR}/runagent.sh; ${VM_DIR}/runagent.sh ${VM_DIR}"
+  runagentcmd="chmod +x ${VM_DIR}/runagent.sh; ${VM_DIR}/runagent.sh ${VM_DIR} ${IMAGE}"
   until ssh -i "${KEY_FILE}" -o StrictHostKeyChecking=no root@${VM_IP} ${runagentcmd}; do
     sleep 1
   done
+
+  # verify workload entry generation
+  ENTRY="${VM_APP}-${VM_IP}-${VM_NETWORK}"
+  sleep 2
+#  ENTRY_RES="$(kubectl get workloadentry ${ENTRY} -n ${VM_NAMESPACE})"
+  until [[ ! -z $(kubectl get workloadentry ${ENTRY} -n ${VM_NAMESPACE}) -o name ]]; do
+    sleep 1
+    kubectl get workloadentry ${ENTRY} -n ${VM_NAMESPACE}
+  done
+
+  ENTRY_RES="$(kubectl get workloadentry ${ENTRY} -n ${VM_NAMESPACE}) -o name"
+
+  if [[ ${ENTRY_RES} == *"Error"* ]]; then
+    fatal "Failed to generate workloadentry for attached VM with context ${ENTRY_RES}. Please check trouble shooting section in user guide."
+  fi
 
   echo "============================================="
   echo -e "\xE2\x9C\x94 Under the context of cluster:${CLUSTER} clusterNetwork:${CLUSTER_NETWORK} vmNetwork:${VM_NETWORK}"

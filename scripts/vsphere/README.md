@@ -1,4 +1,6 @@
-# Attach VM to Anthos Service Mesh (Private Preview)
+# Attach VM to Anthos Service Mesh 
+
+Note: this feature is not available for public use.
 
 Adding vSphere VMs to Anthos Service Mesh includes three steps:
 - Create attach context.
@@ -6,7 +8,6 @@ Adding vSphere VMs to Anthos Service Mesh includes three steps:
 - Attach individual VMs.
 
 This script has the following dependencies:
-- gcloud
 - kubectl
 - jq
 - printf
