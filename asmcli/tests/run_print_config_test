@@ -39,7 +39,7 @@ EOF
     -n long-term-test-cluster \
     -p asm-scriptaro-oss \
     -d test_output_dir \
-    --option egressgateways \
+    --option legacy-default-egressgateway \
     --custom_overlay ${CUSTOM_OVERLAY}"
 
   CONFIG="$(../asmcli \
@@ -48,7 +48,7 @@ EOF
     -n long-term-test-cluster \
     -p asm-scriptaro-oss \
     -d test_output_dir \
-    --option egressgateways \
+    --option legacy-default-egressgateway \
     --custom_overlay ${CUSTOM_OVERLAY})"
 
   if [[ ! -d test_output_dir ]]; then

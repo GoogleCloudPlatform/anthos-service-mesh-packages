@@ -20,5 +20,5 @@ spec:
   components:
     ingressGateways:
       - name: istio-ingressgateway
-        enabled: false
+        enabled: true
 # [END docs]

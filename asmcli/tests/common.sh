@@ -705,6 +705,11 @@ run_basic_test() {
     CA="-c ${CA}"
   fi
 
+  local _OPTIONS
+  if [[ "${EXTRA_FLAGS}" != *--managed* && "${SUBCOMMAND}" != *experimental* ]]; then
+    _OPTIONS="-o legacy-default-ingressgateway"
+  fi
+
   mkfifo "${LT_NAMESPACE}"
 
   create_ns "${ISTIO_NAMESPACE}"
@@ -714,7 +719,7 @@ run_basic_test() {
   echo "_CI_REVISION_PREFIX=${LT_NAMESPACE} \
   ../asmcli ${SUBCOMMAND} ${KEY_FILE} ${SERVICE_ACCOUNT} \
     --kc ${KUBECONFIG} \
-    ${CA} -v \
+    ${CA} ${_OPTIONS} -v \
     --output-dir ${OUTPUT_DIR} \
     ${EXTRA_FLAGS}"
   # shellcheck disable=SC2086
