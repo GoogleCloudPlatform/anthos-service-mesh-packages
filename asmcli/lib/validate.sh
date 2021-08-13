@@ -703,8 +703,6 @@ EOF
   context_set-option "CUSTOM_OVERLAY" "${CUSTOM_OVERLAY}"
 
   WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"; readonly WORKLOAD_POOL
-
-  validate_hub
 }
 
 arg_required() {

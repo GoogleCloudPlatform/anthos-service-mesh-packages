@@ -1373,6 +1373,7 @@ validate_subcommand() {
 validate() {
   local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
 
+  validate_hub
   validate_dependencies
   validate_control_plane
 
@@ -4392,8 +4393,6 @@ EOF
   context_set-option "CUSTOM_OVERLAY" "${CUSTOM_OVERLAY}"
 
   WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"; readonly WORKLOAD_POOL
-
-  validate_hub
 }
 
 arg_required() {
