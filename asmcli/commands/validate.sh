@@ -12,6 +12,7 @@ validate_subcommand() {
 validate() {
   local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
 
+  validate_hub
   validate_dependencies
   validate_control_plane
 
