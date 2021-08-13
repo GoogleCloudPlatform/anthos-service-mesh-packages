@@ -321,7 +321,7 @@ is_google_identity_provider_installed() {
 }
 
 is_idp_crd_installed() {
-  if ! kubectl api-resources --api-group=security.cloud.google.com | grep -q identityproviders; then
+  if ! retry 2 kubectl api-resources --api-group=security.cloud.google.com | grep -q identityproviders; then
     false
   fi
 }
