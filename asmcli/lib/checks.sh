@@ -117,7 +117,8 @@ is_workload_identity_enabled() {
 }
 
 is_membership_crd_installed() {
-  if ! kubectl api-resources --api-group=hub.gke.io | grep -q memberships; then
+  if [[ "$(retry 2 kubectl get crd memberships.hub.gke.io -ojsonpath="{..metadata.name}" \
+    | grep -w -c memberships || true)" -eq 0 ]]; then
     false
     return
   fi
