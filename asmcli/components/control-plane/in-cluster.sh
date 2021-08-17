@@ -35,21 +35,13 @@ init_meshconfig() {
     populate_fleet_info
     local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
     info "Cluster has Membership ID ${HUB_MEMBERSHIP_ID} in the Hub of project ${FLEET_ID}"
-    if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
-      info "Skip initializing meshconfig API as the Hub is not hosted in the project ${PROJECT_ID}"
-      return 0
-    fi
     # initialize replaces the existing Workload Identity Pools in the IAM binding, so we need to support both Hub and GKE Workload Identity Pools
     local POST_DATA; POST_DATA='{"workloadIdentityPools":["'${FLEET_ID}'.hub.id.goog","'${FLEET_ID}'.svc.id.goog"]}'
-    run_command curl --request POST --fail \
-    --data "${POST_DATA}" -o /dev/null \
-    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
-    --header "Content-Type: application/json" \
-    -K <(auth_header "$(get_auth_token)")
+    init_meshconfig_curl "${POST_DATA}" "${PROJECT_ID}"
+    if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
+      init_meshconfig_curl "${POST_DATA}" "${FLEET_ID}"
+    fi
   else
-    run_command curl --request POST --fail \
-    --data '' -o /dev/null \
-    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
-    -K <(auth_header "$(get_auth_token)")
+    init_meshconfig_curl "''" "${PROJECT_ID}"
   fi
 }
