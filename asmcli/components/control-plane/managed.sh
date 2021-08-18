@@ -102,13 +102,13 @@ scrape_managed_urls() {
 
 
 init_meshconfig_managed() {
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
 
   info "Initializing meshconfig managed API..."
-  run_command curl --request POST --fail \
-    --data '{"prepare_istiod": true}' \
-    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
-    --header "X-Server-Timeout: 600" \
-    --header "Content-Type: application/json" \
-    -K <(auth_header "$(get_auth_token)")
+  local POST_DATA; POST_DATA='{"workloadIdentityPools":["'${FLEET_ID}'.hub.id.goog","'${FLEET_ID}'.svc.id.goog"], "prepare_istiod": true}'
+  init_meshconfig_curl "${POST_DATA}" "${PROJECT_ID}"
+  if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
+    init_meshconfig_curl "${POST_DATA}" "${FLEET_ID}"
+  fi
 }

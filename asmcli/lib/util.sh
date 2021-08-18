@@ -579,3 +579,14 @@ EOF
 get_context_cluster() {
   grep '^\*' | cut -c2- | sed 's/\([[:blank:]]\)*\1/\1/g' | cut -d ' ' -f 3
 }
+
+init_meshconfig_curl() {
+  local POST_DATA; POST_DATA="${1}"
+  local ID; ID="${2}"
+  run_command curl --request POST --fail \
+    --data "${POST_DATA}" -o /dev/null \
+    "https://meshconfig.googleapis.com/v1alpha1/projects/${ID}:initialize" \
+    --header "X-Server-Timeout: 600" \
+    --header "Content-Type: application/json" \
+    -K <(auth_header "$(get_auth_token)")
+}
