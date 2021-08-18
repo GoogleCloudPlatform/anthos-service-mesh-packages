@@ -42,6 +42,6 @@ init_meshconfig() {
       init_meshconfig_curl "${POST_DATA}" "${FLEET_ID}"
     fi
   else
-    init_meshconfig_curl "''" "${PROJECT_ID}"
+    init_meshconfig_curl '' "${PROJECT_ID}"
   fi
 }
