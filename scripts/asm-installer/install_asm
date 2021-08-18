@@ -2088,30 +2088,32 @@ init_meshconfig() {
   if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
     populate_environ_info
     info "Cluster has Membership ID ${HUB_MEMBERSHIP_ID} in the Hub of project ${ENVIRON_PROJECT_ID}"
-    if [[ "${ENVIRON_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
-      info "Skip initializing meshconfig API as the Hub is not hosted in the project ${PROJECT_ID}"
-      return 0
-    fi
     # initialize replaces the existing Workload Identity Pools in the IAM binding, so we need to support both Hub and GKE Workload Identity Pools
     local POST_DATA; POST_DATA='{"workloadIdentityPools":["'${ENVIRON_PROJECT_ID}'.hub.id.goog","'${ENVIRON_PROJECT_ID}'.svc.id.goog"]}'
-    run curl --request POST --fail \
-    --data "${POST_DATA}" -o /dev/null \
-    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
-    --header "Content-Type: application/json" \
-    -K <(auth_header "$(get_auth_token)")
+    init_meshconfig_curl "${POST_DATA}" "${PROJECT_ID}"
+    if [[ "${ENVIRON_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
+      init_meshconfig_curl "${POST_DATA}" "${ENVIRON_PROJECT_ID}"
+    fi
   else
-    run curl --request POST --fail \
-    --data '' -o /dev/null \
-    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
-    -K <(auth_header "$(get_auth_token)")
+    init_meshconfig_curl '' "${PROJECT_ID}"
   fi
 }
 
 init_meshconfig_managed() {
   info "Initializing meshconfig managed API..."
+  local POST_DATA; POST_DATA='{"workloadIdentityPools":["'${ENVIRON_PROJECT_ID}'.hub.id.goog","'${ENVIRON_PROJECT_ID}'.svc.id.goog"], "prepare_istiod": true}'
+  init_meshconfig_curl "${POST_DATA}" "${PROJECT_ID}"
+  if [[ "${ENVIRON_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
+    init_meshconfig_curl "${POST_DATA}" "${ENVIRON_PROJECT_ID}"
+  fi
+}
+
+init_meshconfig_curl() {
+  local POST_DATA; POST_DATA="${1}"
+  local ID; ID="${2}"
   run curl --request POST --fail \
-    --data '{"prepare_istiod": true}' \
-    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
+    --data "${POST_DATA}" -o /dev/null \
+    "https://meshconfig.googleapis.com/v1alpha1/projects/${ID}:initialize" \
     --header "X-Server-Timeout: 600" \
     --header "Content-Type: application/json" \
     -K <(auth_header "$(get_auth_token)")
