@@ -39,6 +39,7 @@ spec:
         # required configuration.
         inject.istio.io/templates: gateway
       labels:
+        app: istio-ingressgateway
         istio: ingressgateway
         istio.io/rev: REVISION # This is required only if the namespace is not labeled.
     spec:

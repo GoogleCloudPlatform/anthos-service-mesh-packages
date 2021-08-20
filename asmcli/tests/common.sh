@@ -4,6 +4,7 @@ LT_CLUSTER_LOCATION="us-central1-c"
 LT_PROJECT_ID="asm-scriptaro-oss"
 LT_NAMESPACE=""
 OUTPUT_DIR=""
+SAMPLE_INGRESS_FILE="../../samples/gateways/istio-ingressgateway.yaml"
 
 ### vm related variables
 WORKLOAD_NAME="vm"
@@ -193,6 +194,17 @@ $(get_demo_yaml "istio" )
 EOF
 
   anneal_k8s "${NAMESPACE}"
+}
+
+install_sample_ingress() {
+  local NS; NS="${1}"
+  local REV; REV="${2}"
+
+  sed 's/GATEWAY_NAMESPACE/'"${NS}"'/g' <"${SAMPLE_INGRESS_FILE}" | \
+  sed 's/REVISION/'"${REV}"'/g' | \
+  kubectl apply -f -
+
+  anneal_k8s "${NS}"
 }
 
 label_with_revision() {
@@ -510,9 +522,11 @@ kube_ingress() {
 }
 
 istio_ingress() {
+  local NS; NS="${1}"
+  if [[ -z "${NS}" ]]; then NS="istio-system"; fi
   warn "Running kubectl get service istio-ingressgateway..."
   for _ in $(seq 1 30); do
-    IP=$(kubectl -n "istio-system" \
+    IP=$(kubectl -n "${NS}" \
       get service istio-ingressgateway \
       -o jsonpath="{.status.loadBalancer.ingress[0].ip}")
     [[ -n "${IP}" ]] && break || \
@@ -733,8 +747,14 @@ run_basic_test() {
   REV="$(echo "${LABEL}" | cut -f 2 -d =)"
   echo "Got label ${LABEL}"
   rm "${LT_NAMESPACE}"
-
   sleep 5
+
+  if [[ "${EXTRA_FLAGS}" != *--managed* && "${SUBCOMMAND}" != *experimental* ]]; then
+    echo "Installing Istio ingress..."
+    install_sample_ingress "${LT_NAMESPACE}" "${REV}"
+    sleep 5
+  fi
+
   echo "Installing Istio manifests for demo app..."
   install_demo_app_istio_manifests "${LT_NAMESPACE}"
 
@@ -749,7 +769,7 @@ run_basic_test() {
 
   local SUCCESS; SUCCESS=0;
   echo "Getting istio ingress IP..."
-  GATEWAY="$(istio_ingress)"
+  GATEWAY="$(istio_ingress "${LT_NAMESPACE}")"
   echo "Got ${GATEWAY}"
   echo "Verifying demo app via Istio ingress..."
   set +e
@@ -761,7 +781,7 @@ run_basic_test() {
     roll "${LT_NAMESPACE}"
 
     echo "Getting istio ingress IP..."
-    GATEWAY="$(istio_ingress)"
+    GATEWAY="$(istio_ingress "${LT_NAMESPACE}")"
     echo "Got ${GATEWAY}"
     echo "Verifying demo app via Istio ingress..."
     set +e
