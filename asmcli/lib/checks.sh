@@ -60,36 +60,44 @@ is_gcp_cas_installed() {
 }
 
 is_cluster_registered() {
+  info "Verifying cluster registration."
+
   if ! is_membership_crd_installed; then
     false
     return
   fi
 
   local IDENTITY_PROVIDER
-  IDENTITY_PROVIDER="$(retry 2 kubectl get memberships.hub.gke.io \
-    membership -ojson 2>/dev/null | jq .spec.identity_provider)"
+  # expected value is the project id to which the cluster is registered
+  IDENTITY_PROVIDER="$(retry 2 kubectl get memberships.hub.gke.io membership -ojson 2>/dev/null \
+    | jq .spec.identity_provider \
+    | sed -E 's/.*projects\/|\/locations.*//g')"
 
-  if [[ -z "${IDENTITY_PROVIDER}" ]] || [[ "${IDENTITY_PROVIDER}" == 'null' ]]; then
-    false
-  fi
-
-  populate_fleet_info
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
-  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
-  local WANT
-  WANT="//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
-  local LIST
-  LIST="$(gcloud container hub memberships list --project "${FLEET_ID}" \
-    --format=json | grep "${WANT}")"
-  if [[ -z "${LIST}" ]]; then
-    { read -r -d '' MSG; warn "${MSG}"; } <<EOF || true
-Cluster is registered in the project ${FLEET_ID}, but the script is
-unable to verify in the project. The script will continue to execute.
+  populate_fleet_info
+  local LOCATION MEMBERSHIP WANT LIST
+  LOCATION="$(retry 2 kubectl get memberships.hub.gke.io membership -ojson 2>/dev/null \
+    | jq -r .spec.owner.id \
+    | sed -E 's/.*locations\/|\/memberships.*//g')"
+  MEMBERSHIP="$(retry 2 kubectl get memberships.hub.gke.io membership -ojson 2>/dev/null \
+    | jq -r .spec.owner.id \
+    | sed -E 's/.*memberships\///g')"
+  WANT="name.*projects/${FLEET_ID}/locations/${LOCATION}/memberships/${MEMBERSHIP}"
+  LIST="$(gcloud container hub memberships list --project "${FLEET_ID}" --format=json \
+    | grep "${WANT}")"
+
+  if [[ -z "${IDENTITY_PROVIDER}" ]] || \
+     [[ "${IDENTITY_PROVIDER}" == 'null' ]] || \
+     [[ "${IDENTITY_PROVIDER}" != "${FLEET_ID}" ]] || \
+     [[ -z "${LIST}" ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Cluster is registered in the project ${IDENTITY_PROVIDER}, but the required Fleet project is ${FLEET_ID}.
+Please ensure that the cluster is registered to the ${FLEET_ID} project.
 EOF
   fi
+
+  info "Verified cluster is registered to ${IDENTITY_PROVIDER}"
 }
 
 is_workload_identity_enabled() {

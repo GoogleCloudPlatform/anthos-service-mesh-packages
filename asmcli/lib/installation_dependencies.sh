@@ -337,8 +337,6 @@ populate_fleet_info() {
   context_set-option "HUB_MEMBERSHIP_ID" "${HUB_MEMBERSHIP_ID}"
   HUB_IDP_URL="$(kubectl get memberships.hub.gke.io membership -o=jsonpath='{.spec.identity_provider}')"
   context_set-option "HUB_IDP_URL" "${HUB_IDP_URL}"
-  FLEET_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.workload_identity_pool | sed -E 's/^\"(.*)\.(svc|hub)\.id\.goog\"$/\1/')"
-  context_set-option "FLEET_ID" "${FLEET_ID}"
 }
 
 create_istio_namespace() {
