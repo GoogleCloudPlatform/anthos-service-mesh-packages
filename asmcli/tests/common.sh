@@ -526,7 +526,7 @@ istio_ingress() {
   if [[ -z "${NS}" ]]; then NS="istio-system"; fi
   warn "Running kubectl get service istio-ingressgateway..."
   for _ in $(seq 1 30); do
-    IP=$(kubectl -n "istio-system" \
+    IP=$(kubectl -n "${NS}" \
       get service istio-ingressgateway \
       -o jsonpath="{.status.loadBalancer.ingress[0].ip}")
     [[ -n "${IP}" ]] && break || \
@@ -719,11 +719,6 @@ run_basic_test() {
     CA="-c ${CA}"
   fi
 
-  local _OPTIONS
-  if [[ "${EXTRA_FLAGS}" != *--managed* && "${SUBCOMMAND}" != *experimental* ]]; then
-    _OPTIONS="-o legacy-default-ingressgateway"
-  fi
-
   mkfifo "${LT_NAMESPACE}"
 
   create_ns "${ISTIO_NAMESPACE}"
@@ -733,7 +728,7 @@ run_basic_test() {
   echo "_CI_REVISION_PREFIX=${LT_NAMESPACE} \
   ../asmcli ${SUBCOMMAND} ${KEY_FILE} ${SERVICE_ACCOUNT} \
     --kc ${KUBECONFIG} \
-    ${CA} ${_OPTIONS} -v \
+    ${CA} -v \
     --output-dir ${OUTPUT_DIR} \
     ${EXTRA_FLAGS}"
   # shellcheck disable=SC2086
