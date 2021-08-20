@@ -2135,7 +2135,12 @@ init_meshconfig() {
 
 init_meshconfig_managed() {
   info "Initializing meshconfig managed API..."
-  local POST_DATA; POST_DATA='{"workloadIdentityPools":["'${ENVIRON_PROJECT_ID}'.hub.id.goog","'${ENVIRON_PROJECT_ID}'.svc.id.goog"], "prepare_istiod": true}'
+  local POST_DATA
+  if [[ "${USE_HUB_WIP}" -eq 1 && -n "${ENVIRON_PROJECT_ID}" ]]; then
+    POST_DATA='{"workloadIdentityPools":["'${ENVIRON_PROJECT_ID}'.hub.id.goog","'${ENVIRON_PROJECT_ID}'.svc.id.goog"], "prepare_istiod": true}'
+  else
+    POST_DATA='{"workloadIdentityPools":["'${PROJECT_ID}'.hub.id.goog","'${PROJECT_ID}'.svc.id.goog"], "prepare_istiod": true}'
+  fi
   init_meshconfig_curl "${POST_DATA}" "${PROJECT_ID}"
   if [[ "${ENVIRON_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
     init_meshconfig_curl "${POST_DATA}" "${ENVIRON_PROJECT_ID}"
