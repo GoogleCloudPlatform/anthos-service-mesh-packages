@@ -202,7 +202,7 @@ install_sample_ingress() {
 
   sed 's/GATEWAY_NAMESPACE/'"${NS}"'/g' <"${SAMPLE_INGRESS_FILE}" | \
   sed 's/REVISION/'"${REV}"'/g' | \
-  kubectl apply
+  kubectl apply -f -
 
   anneal_k8s "${NS}"
 }
