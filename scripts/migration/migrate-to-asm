@@ -13,6 +13,7 @@ DRY_RUN=0
 VERBOSE=0
 ENABLE_DEPENDENCIES=0
 UPGRADE_GATEWAYS=1
+NO_MCP=0
 CUSTOM_OVERLAY=""
 
 CONFIGURED=0
@@ -26,6 +27,7 @@ ROLLBACK=0
 ASM_VERSION="1.10.4-asm.4"
 KPT_URL="https://github.com/GoogleCloudPlatform/anthos-service-mesh-packages"
 KPT_URL="${KPT_URL}.git/asm@release-1.10-asm"; readonly KPT_URL
+
 REVISION_LABEL="asm-1104-4"; readonly REVISION_LABEL
 ISTIO_FOLDER_NAME="istio-${ASM_VERSION}"; readonly ISTIO_FOLDER_NAME;
 ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
@@ -570,10 +572,11 @@ download_asm() {
   local TARBALL; TARBALL="istio-${ASM_VERSION}-${OS}.tar.gz"
   curl -L "https://storage.googleapis.com/gke-release/asm/${TARBALL}" \
     | tar xz
+
   info "Downloaded to ${ISTIO_FOLDER_NAME}"
 
   info "Downloading ASM kpt package to the 'asm' directory..."
-  retry 3 kpt pkg get --auto-set=false "${KPT_URL}" asm
+  retry 3 "${AKPT}" pkg get --auto-set=false "${KPT_URL}" asm
 }
 
 populate_cluster_values() {
@@ -622,6 +625,14 @@ backup_config() {
     -n istio-system -l app=istio-ingressgateway > configuration_backup/ingress_deployment
   if [[ -n "${CUSTOM_OVERLAY}" ]]; then
     cp "${CUSTOM_OVERLAY}" configuration_backup/iop_backup
+  fi
+}
+
+asm_revision_label() {
+  if should_use_mcp; then
+    echo "asm_managed"
+  else
+    echo "${REVISION_LABEL}"
   fi
 }
 
@@ -1092,17 +1103,17 @@ ensure_backup() {
 configure_package() {
   info "Configuring kpt package..."
 
-  run kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
-  run kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
-  run kpt cfg set asm gcloud.project.environProjectNumber "${FLEET_PROJECT_NUMBER}"
-  run kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
-  run kpt cfg set asm gcloud.compute.network "${GCE_NETWORK_NAME}"
-  run kpt cfg set asm anthos.servicemesh.rev "${REVISION_LABEL}"
-  run kpt cfg set asm anthos.servicemesh.tag "${ASM_VERSION}"
-  run kpt cfg set asm anthos.servicemesh.hubTrustDomain "${FLEET_PROJECT_ID}.svc.id.goog"
+  run "${AKPT}" cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
+  run "${AKPT}" cfg set asm gcloud.core.project "${PROJECT_ID}"
+  run "${AKPT}" cfg set asm gcloud.project.environProjectNumber "${FLEET_PROJECT_NUMBER}"
+  run "${AKPT}" cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
+  run "${AKPT}" cfg set asm gcloud.compute.network "${GCE_NETWORK_NAME}"
+  run "${AKPT}" cfg set asm anthos.servicemesh.rev "$(asm_revision_label)"
+  run "${AKPT}" cfg set asm anthos.servicemesh.tag "${ASM_VERSION}"
+  run "${AKPT}" cfg set asm anthos.servicemesh.hubTrustDomain "${FLEET_PROJECT_ID}.svc.id.goog"
   HUB_IDP_URL="$(kubectl get memberships.hub.gke.io membership -o=jsonpath='{.spec.identity_provider}' || true)"
-  run kpt cfg set asm anthos.servicemesh.hub-idp-url "${HUB_IDP_URL}"
-  run kpt cfg set asm anthos.servicemesh.trustDomainAliases \
+  run "${AKPT}" cfg set asm anthos.servicemesh.hub-idp-url "${HUB_IDP_URL}"
+  run "${AKPT}" cfg set asm anthos.servicemesh.trustDomainAliases \
     "${FLEET_PROJECT_ID}.svc.id.goog" "${FLEET_PROJECT_ID}.hub.id.goog"
   info "Configured."
 }
@@ -1117,7 +1128,7 @@ install_asm() {
     PARAMS="${PARAMS} -f ${NO_DEFAULT_INGRESS}"
   fi
   PARAMS="${PARAMS} -c ${KUBECONFIG}"
-  PARAMS="${PARAMS} --set revision=${REVISION_LABEL}"
+  PARAMS="${PARAMS} --set revision=$(asm_revision_label)"
   PARAMS="${PARAMS} --skip-confirmation"
 
   info "Installing ASM control plane..."
@@ -1127,8 +1138,8 @@ install_asm() {
   # Prevent the stderr buffer from ^ messing up the terminal output below
   sleep 1
 
-  local RAW_YAML; RAW_YAML="${REVISION_LABEL}-manifest-raw.yaml"
-  local EXPANDED_YAML; EXPANDED_YAML="${REVISION_LABEL}-manifest-expanded.yaml"
+  local RAW_YAML; RAW_YAML="$(asm_revision_label)-manifest-raw.yaml"
+  local EXPANDED_YAML; EXPANDED_YAML="$(asm_revision_label)-manifest-expanded.yaml"
 
   PARAMS="-f ${OPERATOR_MANIFEST}"
   if [[ "${UPGRADE_GATEWAYS}" -eq 0 ]]; then
@@ -1192,7 +1203,7 @@ EOF
       *     )
         info "Migration canceled. You can re-run migration via this tool at any time."
         info "Migration can also be completed manually by labeling namespaces with"
-        info "${REVISION_LABEL} and restarting workloads, then using this tool to finalize."
+        info "$(asm_revision_label) and restarting workloads, then using this tool to finalize."
         exit 2
       ;;
     esac
@@ -1201,7 +1212,7 @@ EOF
     info "For --dry-run, continuing automatically."
   fi
 
-  relabel_namespaces_restart_workloads "istio.io/rev=${REVISION_LABEL}"
+  relabel_namespaces_restart_workloads "istio.io/rev=$(asm_revision_label)"
 }
 
 relabel_for_rollback() {
@@ -1292,11 +1303,11 @@ finalize() {
 }
 
 set_default_tag() {
-  info "Setting ${REVISION_LABEL} as the target for \"istio-injection=enabled\"..."
+  info "Setting $(asm_revision_label) as the target for \"istio-injection=enabled\"..."
   kubectl patch mutatingwebhookconfigurations istio-sidecar-injector \
     --type=json -p='[{"op": "replace", "path": "/webhooks"}]'
   run istioctl x revision tag \
-    set default --revision="${REVISION_LABEL}" \
+    set default --revision="$(asm_revision_label)" \
     --overwrite
 }
 
@@ -1369,11 +1380,75 @@ apply_backup() {
 }
 
 remove_asm() {
-  run istioctl x uninstall --revision "${REVISION_LABEL}" -y
+  run istioctl x uninstall --revision "$(asm_revision_label)" -y
   run kubectl delete ns asm-system
 
   info "****"
   info "Anthos Service Mesh has been uninstalled from the cluster."
+}
+
+should_use_mcp() {
+  if [[ "${NO_MCP}" -eq 1 ]]; then false; return; fi
+  if [[ -f ./configuration_backup/use_mcp ]]; then return; fi
+  if [[ -f ./configuration_backup/no_use_mcp ]]; then false; return; fi
+
+  run_mcp_fit_assessment
+}
+
+is_private_cluster() {
+  false
+}
+
+is_autopilot() {
+  false
+}
+
+is_supported_location() {
+  true
+}
+
+run_mcp_fit_assessment() {
+  echo "Analyzing cluster configuration to determine optimal control plane..."
+
+  if is_private_cluster; then false; return; fi
+  if is_autopilot; then false; return; fi
+  if ! is_supported_location; then false; return; fi
+
+  if [[ ! -f ./configuration_backup/default_iop ]]; then
+    istioctl profile dump >./configuration_backup/default_iop 2>/dev/null
+  fi
+
+  local ARGS; ARGS="-f ./configuration_backup/default_iop"
+  if [[ -f ./configuration_backup/iop_backup ]]; then
+    ARGS="-f ./configuration_backup/iop_backup"
+  fi
+
+  # shellcheck disable=SC2086
+  if ! istioctl asm mcp-migrate ${ARGS} > ./mcp_assess_out.log; then
+    info "Google recommends migrating your mesh to a Google-managed control plane."
+    info "However, the way your mesh is configured will change. Review the changes here:"
+
+    echo "**"
+    cat ./mcp_assess_out.log
+    echo "**"
+
+    info "If these are acceptable, enter Y to continue with installation of a Google-managed"
+    info "control plane. If you would like to continue to operate and maintain your own"
+    info "control plane, enter N to switch to an in-cluster control plane installation."
+
+    local response
+    read -rp "(Y/n)>" response
+
+    case "${response}" in
+      N* | n*)
+        touch ./configuration_backup/no_use_mcp
+        false
+        return
+        ;;
+    esac
+  fi
+
+  touch ./configuration_backup/use_mcp
 }
 
 main() {
@@ -1392,13 +1467,18 @@ main() {
     download_asm
     configure_kubectl
     pre_migrate
+    run_mcp_fit_assessment
   fi
   if [[ "${INSTALL_ASM}" -eq 1 ]]; then
     ensure_backup
     configure_kubectl
     download_asm
     configure_package
-    install_asm
+    if should_use_mcp; then
+      install_mcp
+    else
+      install_asm
+    fi
   fi
   if [[ "${RELABEL}" -eq 1 ]]; then
     ensure_backup
