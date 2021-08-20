@@ -6,6 +6,7 @@ x_install_subcommand() {
   prepare_environment
 
   x_validate_dependencies
+  x_configure_package
   x_install
 }
 
@@ -23,4 +24,13 @@ x_install() {
   outro
   info "Successfully installed ASM."
   return 0
+}
+
+x_configure_package() {
+  if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then
+    kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
+  fi
+  if [[ -n "${_CI_ASM_IMAGE_TAG}" ]]; then
+    kpt cfg set asm anthos.servicemesh.tag "${_CI_ASM_IMAGE_TAG}"
+  fi
 }

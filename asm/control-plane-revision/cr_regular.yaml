@@ -4,6 +4,8 @@ kind: ControlPlaneRevision
 metadata:
   name: asm-managed
   namespace: istio-system
+  annotations:
+    mesh.cloud.google.com/image: "" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-mcp-image"}
 spec:
   type: managed_service
   channel: regular
