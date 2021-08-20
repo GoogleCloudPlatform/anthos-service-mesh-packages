@@ -201,6 +201,9 @@ FLAGS:
   --enable-dependencies          Allow this tool to enable dependencies on
                                  your behalf.
   --no-gateways                  Skip upgrading gateways.
+  --no-mcp                       Always install the control plane into the
+                                 cluster instead of using a Google-managed
+                                 control plane.
   --dry-run                      Any commands that would have side effects
                                  are skipped and instead printed.
   --verbose                      Print all commands before running.
@@ -279,6 +282,10 @@ parse_args() {
         ;;
       --no-gateways | --no_gateways)
         UPGRADE_GATEWAYS=0
+        shift 1
+        ;;
+      --no-mcp | --no_mcp)
+        NO_MCP=1
         shift 1
         ;;
       --dry-run | --dry_run)
@@ -1480,7 +1487,9 @@ main() {
     download_asm
     configure_kubectl
     pre_migrate
-    run_mcp_fit_assessment
+    if should_use_mcp; then
+      run_mcp_fit_assessment
+    fi
   fi
   if [[ "${INSTALL_ASM}" -eq 1 ]]; then
     ensure_backup
