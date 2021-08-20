@@ -23,10 +23,10 @@ RELABEL=0
 FINALIZE=0
 ROLLBACK=0
 
-ASM_VERSION="1.10.2-asm.2"
+ASM_VERSION="1.10.4-asm.4"
 KPT_URL="https://github.com/GoogleCloudPlatform/anthos-service-mesh-packages"
 KPT_URL="${KPT_URL}.git/asm@release-1.10-asm"; readonly KPT_URL
-REVISION_LABEL="asm-1102-2"; readonly REVISION_LABEL
+REVISION_LABEL="asm-1104-4"; readonly REVISION_LABEL
 ISTIO_FOLDER_NAME="istio-${ASM_VERSION}"; readonly ISTIO_FOLDER_NAME;
 ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
 PACKAGE_DIRECTORY="asm/istio"; readonly PACKAGE_DIRECTORY;
@@ -658,6 +658,38 @@ gkehub.googleapis.com
 stackdriver.googleapis.com
 meshconfig.googleapis.com
 meshca.googleapis.com
+EOF
+}
+
+supported_mcp_regions() {
+  cat << EOF
+asia-east1
+asia-east2
+asia-northeast1
+asia-northeast2
+asia-northeast3
+asia-southeast1
+asia-southeast2
+asia-south1
+asia-south2
+australia-southeast1
+australia-southeast2
+europe-central2
+europe-north1
+europe-west1
+europe-west2
+europe-west3
+europe-west6
+europe-west4
+northamerica-northeast1
+southamerica-east1
+us-central1
+us-east1
+us-east4
+us-west1
+us-west2
+us-west3
+us-west4
 EOF
 }
 
