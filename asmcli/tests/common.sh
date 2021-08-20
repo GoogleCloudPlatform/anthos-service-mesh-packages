@@ -4,6 +4,7 @@ LT_CLUSTER_LOCATION="us-central1-c"
 LT_PROJECT_ID="asm-scriptaro-oss"
 LT_NAMESPACE=""
 OUTPUT_DIR=""
+SAMPLE_INGRESS_FILE="../../samples/gateways/istio-ingressgateway.yaml"
 
 ### vm related variables
 WORKLOAD_NAME="vm"
@@ -193,6 +194,17 @@ $(get_demo_yaml "istio" )
 EOF
 
   anneal_k8s "${NAMESPACE}"
+}
+
+install_sample_ingress() {
+  local NS; NS="${1}"
+  local REV; REV="${2}"
+
+  sed 's/GATEWAY_NAMESPACE/'"${NS}"'/g' <"${SAMPLE_INGRESS_FILE}" | \
+  sed 's/REVISION/'"${REV}"'/g' | \
+  kubectl apply
+
+  anneal_k8s "${NS}"
 }
 
 label_with_revision() {
@@ -738,6 +750,10 @@ run_basic_test() {
   REV="$(echo "${LABEL}" | cut -f 2 -d =)"
   echo "Got label ${LABEL}"
   rm "${LT_NAMESPACE}"
+
+  sleep 5
+  echo "Installing Istio ingress..."
+  install_sample_ingress "${LT_NAMESPACE}" "${REV}"
 
   sleep 5
   echo "Installing Istio manifests for demo app..."
