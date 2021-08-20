@@ -522,6 +522,8 @@ kube_ingress() {
 }
 
 istio_ingress() {
+  local NS; NS="${1}"
+  if [[ -z "${NS}" ]]; then NS="istio-system"; fi
   warn "Running kubectl get service istio-ingressgateway..."
   for _ in $(seq 1 30); do
     IP=$(kubectl -n "istio-system" \
@@ -770,7 +772,7 @@ run_basic_test() {
 
   local SUCCESS; SUCCESS=0;
   echo "Getting istio ingress IP..."
-  GATEWAY="$(istio_ingress)"
+  GATEWAY="$(istio_ingress "${LT_NAMESPACE}")"
   echo "Got ${GATEWAY}"
   echo "Verifying demo app via Istio ingress..."
   set +e
@@ -782,7 +784,7 @@ run_basic_test() {
     roll "${LT_NAMESPACE}"
 
     echo "Getting istio ingress IP..."
-    GATEWAY="$(istio_ingress)"
+    GATEWAY="$(istio_ingress "${LT_NAMESPACE}")"
     echo "Got ${GATEWAY}"
     echo "Verifying demo app via Istio ingress..."
     set +e
