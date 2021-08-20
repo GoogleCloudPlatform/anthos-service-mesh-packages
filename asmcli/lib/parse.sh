@@ -237,6 +237,7 @@ x_parse_install_args() {
   trap "$(shopt -p nocasematch)" RETURN
   shopt -s nocasematch
 
+  REVISION_LABEL="$(context_get-option "REVISION_LABEL")"
   while [[ $# != 0 ]]; do
     case "${1}" in
       -l | --cluster_location | --cluster-location)
