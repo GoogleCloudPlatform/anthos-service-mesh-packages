@@ -76,7 +76,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.tag
-          value: 1.10.3-asm.0
+          value: 1.10.4-asm.3
           isSet: true
     io.k8s.cli.setters.anthos.servicemesh.rev:
       x-k8s-cli:
