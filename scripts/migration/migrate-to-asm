@@ -30,9 +30,14 @@ KPT_URL="${KPT_URL}.git/asm@release-1.10-asm"; readonly KPT_URL
 
 REVISION_LABEL="asm-1104-4"; readonly REVISION_LABEL
 ISTIO_FOLDER_NAME="istio-${ASM_VERSION}"; readonly ISTIO_FOLDER_NAME;
+BASE_REL_PATH="${ISTIO_FOLDER_NAME}/manifests/charts/base/files/gen-istio-cluster.yaml"; readonly BASE_REL_PATH;
 ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
 PACKAGE_DIRECTORY="asm/istio"; readonly PACKAGE_DIRECTORY;
+CRD_CONTROL_PLANE_REVISION="asm/control-plane-revision/crd.yaml"; readonly CRD_CONTROL_PLANE_REVISION;
+CR_CONTROL_PLANE_REVISION_REGULAR="asm/control-plane-revision/cr_regular.yaml"; readonly CR_CONTROL_PLANE_REVISION_REGULAR;
 NO_DEFAULT_INGRESS="${PACKAGE_DIRECTORY}/options/no-default-ingress.yaml"; readonly NO_DEFAULT_INGRESS;
+MANAGED_CNI="${PACKAGE_DIRECTORY}/options/cni-managed.yaml"; readonly MANAGED_CNI;
+MANAGED_WEBHOOKS="${PACKAGE_DIRECTORY}/options/managed-control-plane-webhooks.yaml"; readonly MANAGED_WEBHOOKS;
 CNI_MANIFEST="${PACKAGE_DIRECTORY}/options/cni-gcp.yaml"; readonly CNI_MANIFEST;
 OPERATOR_MANIFEST="${PACKAGE_DIRECTORY}/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
 CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
@@ -1128,8 +1133,87 @@ configure_package() {
   info "Configured."
 }
 
+scrape_managed_urls() {
+  local URL
+  URL="$(kubectl get mutatingwebhookconfiguration istiod-asm-managed -ojson | jq .webhooks[0].clientConfig.url -r)"
+  # shellcheck disable=SC2001
+  VALIDATION_URL="$(echo "${URL}" | sed 's/inject.*$/validate/g')"
+  # shellcheck disable=SC2001
+  CLOUDRUN_ADDR=$(echo "${URL}" | cut -d'/' -f3)
+
+  echo "${VALIDATION_URL} ${CLOUDRUN_ADDR}"
+}
+
 install_mcp() {
   init_meshconfig
+
+  info "Configuring base installation for managed control plane..."
+  run kubectl apply --overwrite=true -f "${BASE_REL_PATH}"
+
+  info "Configuring ASM managed control plane revision CRD..."
+  run kubectl apply --overwrite=true -f "${CRD_CONTROL_PLANE_REVISION}"
+
+  local ASM_OPTS
+  ASM_OPTS="$(kubectl -n istio-system \
+    get --ignore-not-found cm asm-options \
+    -o jsonpath='{.data.ASM_OPTS}' || true)"
+
+  local CNI; CNI="off"
+  if [[ -z "${ASM_OPTS}" ]]; then CNI="on"; fi
+
+  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=${CNI}"* ]]; then
+    info "Configuring control plane options..."
+    run kubectl apply --overwrite=true -f - <<EOF
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: asm-options
+  namespace: istio-system
+data:
+  ASM_OPTS: "CNI=${CNI}"
+EOF
+  fi
+
+  info "Provisioning managed control plane..."
+  retry 2 run curl --request POST \
+    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}:runIstiod" \
+    --data "" \
+    --header "X-Server-Timeout: 600" \
+    --header "Content-Type: application/json" \
+    -K <(auth_header "$(get_auth_token)")
+
+  configure_package
+
+  local VALIDATION_URL; local CLOUDRUN_ADDR;
+  read -r VALIDATION_URL CLOUDRUN_ADDR <<EOF
+$(retry 5 scrape_managed_urls)
+EOF
+
+  if [[ -z "${VALIDATION_URL}" ]] || [[ -z "${CLOUDRUN_ADDR}" ]]; then
+    fatal "Failed to read configuration to install components for managed control plane!"
+  fi
+
+  kpt cfg set asm anthos.servicemesh.controlplane.validation-url "${VALIDATION_URL}"
+  kpt cfg set asm anthos.servicemesh.managed-controlplane.cloudrun-addr "${CLOUDRUN_ADDR}"
+
+  info "Installing CNI controller..."
+  run kubectl apply -f "${MANAGED_CNI}"
+
+  info "Configuring ASM managed control plane validating webhook config..."
+  run kubectl apply -f "${MANAGED_WEBHOOKS}"
+
+  info "Configuring ASM managed control plane revision CR for regular channel..."
+  run kubectl apply -f "${CR_CONTROL_PLANE_REVISION_REGULAR}"
+
+  info "Installing canonical service controller..."
+  run kubectl apply -f "${CANONICAL_CONTROLLER_MANIFEST}"
+  retry 2 run kubectl wait --for=condition=available --timeout=600s \
+      deployment/canonical-service-controller-manager -n asm-system
+
+  info ""
+  info "*******"
+  info "Control plane installation complete!"
 }
 
 install_asm() {
