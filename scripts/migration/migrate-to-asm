@@ -666,6 +666,9 @@ enable_dependencies() {
   enable_service_mesh_feature
   enable_stackdriver_kubernetes
   add_cluster_labels
+  if should_use_mcp; then
+    return # init meshconfig happens at install time
+  fi
   bind_user_to_cluster_admin
   init_meshconfig
 }
@@ -1125,6 +1128,10 @@ configure_package() {
   info "Configured."
 }
 
+install_mcp() {
+  init_meshconfig
+}
+
 install_asm() {
   local PARAMS
   PARAMS="-f ${OPERATOR_MANIFEST}"
@@ -1169,13 +1176,30 @@ install_asm() {
 }
 
 init_meshconfig() {
-  if [[ "${FLEET_PROJECT_ID}" != "${PROJECT_ID}" ]]; then return; fi
-
   info "Initializing meshconfig API..."
+  local POST_DATA
+
+  if should_use_mcp; then
+    POST_DATA='{"workloadIdentityPools":["'${FLEET_PROJECT_ID}'.hub.id.goog","'${FLEET_PROJECT_ID}'.svc.id.goog"], "prepare_istiod": true}'
+  else
+    POST_DATA='{"workloadIdentityPools":["'${FLEET_PROJECT_ID}'.hub.id.goog","'${FLEET_PROJECT_ID}'.svc.id.goog"], "prepare_istiod": false}'
+  fi
+
   run curl --request POST --fail \
-  --data '' -o /dev/null \
-  "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
-  -K <(auth_header "$(get_auth_token)")
+    --data "${POST_DATA}" -o /dev/null \
+    "https://meshconfig.googleapis.com/v1alpha1/projects/${FLEET_PROJECT_ID}:initialize" \
+    --header "X-Server-Timeout: 600" \
+    --header "Content-Type: application/json" \
+    -K <(auth_header "$(get_auth_token)")
+
+  if [[ "${FLEET_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
+    run curl --request POST --fail \
+      --data "${POST_DATA}" -o /dev/null \
+      "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
+      --header "X-Server-Timeout: 600" \
+      --header "Content-Type: application/json" \
+      -K <(auth_header "$(get_auth_token)")
+  fi
 }
 
 get_auth_token() {
