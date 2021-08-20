@@ -1396,23 +1396,36 @@ should_use_mcp() {
 }
 
 is_private_cluster() {
-  false
+  gcloud container clusters describe \
+    --region "${CLUSTER_LOCATION}" \
+    --project "${PROJECT_ID}" \
+    "${CLUSTER_NAME}" --format json \
+    | grep -q '"enablePrivateEndpoint": true,'
 }
 
 is_autopilot() {
-  false
+  gcloud container clusters describe \
+    --region "${CLUSTER_LOCATION}" \
+    --project "${PROJECT_ID}" \
+    "${CLUSTER_NAME}" --format json \
+    | grep -q 'autopilot'
 }
 
 is_supported_location() {
-  true
+  while read -r region; do
+    if [[ "${CLUSTER_LOCATION}" = "${region}"* ]]; then
+      return
+    fi
+  done <<< "$(supported_mcp_regions)"
+  false
 }
 
 run_mcp_fit_assessment() {
   echo "Analyzing cluster configuration to determine optimal control plane..."
 
+  if ! is_supported_location; then false; return; fi
   if is_private_cluster; then false; return; fi
   if is_autopilot; then false; return; fi
-  if ! is_supported_location; then false; return; fi
 
   if [[ ! -f ./configuration_backup/default_iop ]]; then
     istioctl profile dump >./configuration_backup/default_iop 2>/dev/null
