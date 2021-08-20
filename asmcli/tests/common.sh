@@ -747,12 +747,14 @@ run_basic_test() {
   REV="$(echo "${LABEL}" | cut -f 2 -d =)"
   echo "Got label ${LABEL}"
   rm "${LT_NAMESPACE}"
-
   sleep 5
-  echo "Installing Istio ingress..."
-  install_sample_ingress "${LT_NAMESPACE}" "${REV}"
 
-  sleep 5
+  if [[ "${EXTRA_FLAGS}" != *--managed* && "${SUBCOMMAND}" != *experimental* ]]; then
+    echo "Installing Istio ingress..."
+    install_sample_ingress "${LT_NAMESPACE}" "${REV}"
+    sleep 5
+  fi
+
   echo "Installing Istio manifests for demo app..."
   install_demo_app_istio_manifests "${LT_NAMESPACE}"
 
