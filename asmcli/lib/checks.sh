@@ -76,11 +76,12 @@ is_cluster_registered() {
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   populate_fleet_info
-  local LOCATION MEMBERSHIP WANT LIST
-  LOCATION="$(retry 2 kubectl get memberships.hub.gke.io membership -ojson 2>/dev/null \
+  local MEMBERSHIP_DATA MEMBERSHIP LOCATION WANT LIST
+  MEMBERSHIP_DATA="$(retry 2 kubectl get memberships.hub.gke.io membership -ojson 2>/dev/null)"
+  LOCATION="$(echo "${MEMBERSHIP_DATA}" \
     | jq -r .spec.owner.id \
     | sed -E 's/.*locations\/|\/memberships.*//g')"
-  MEMBERSHIP="$(retry 2 kubectl get memberships.hub.gke.io membership -ojson 2>/dev/null \
+  MEMBERSHIP="$(echo "${MEMBERSHIP_DATA}" \
     | jq -r .spec.owner.id \
     | sed -E 's/.*memberships\///g')"
   WANT="name.*projects/${FLEET_ID}/locations/${LOCATION}/memberships/${MEMBERSHIP}"
