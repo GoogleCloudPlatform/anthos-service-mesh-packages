@@ -26,6 +26,7 @@ metadata:
 spec:
   selector:
     matchLabels:
+      app: istio-egressgateway
       istio: egressgateway
   strategy:
     rollingUpdate:
@@ -38,6 +39,7 @@ spec:
         # required configuration.
         inject.istio.io/templates: gateway
       labels:
+        app: istio-egressgateway
         istio: egressgateway
         istio.io/rev: REVISION
     spec:
@@ -138,8 +140,8 @@ spec:
   minAvailable: 1
   selector:
     matchLabels:
-      app: istio-egressgateway
       istio: egressgateway
+      app: istio-egressgateway
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -203,6 +205,6 @@ spec:
     protocol: TCP
     targetPort: 15443
   selector:
-    app: istio-egressgateway
     istio: egressgateway
+    app: istio-egressgateway
 ---

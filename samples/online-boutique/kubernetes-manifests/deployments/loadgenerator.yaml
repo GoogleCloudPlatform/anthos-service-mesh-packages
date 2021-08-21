@@ -11,6 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: loadgenerator
+  namespace: loadgenerator
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -33,10 +39,10 @@ spec:
       restartPolicy: Always
       containers:
       - name: main
-        image: image: gcr.io/google-samples/microservices-demo/loadgenerator:v0.2.2
+        image: gcr.io/google-samples/microservices-demo/loadgenerator:v0.2.2
         env:
         - name: FRONTEND_ADDR
-          value: "frontend:80"
+          value: "frontend.frontend.svc.cluster.local:80"
         - name: USERS
           value: "10"
         resources:
