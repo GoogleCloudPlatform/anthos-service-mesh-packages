@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: frontend
+  namespace: frontend
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -54,19 +60,19 @@ spec:
           - name: PORT
             value: "8080"
           - name: PRODUCT_CATALOG_SERVICE_ADDR
-            value: "productcatalogservice:3550"
+            value: "productcatalogservice.product-catalog.svc.cluster.local:3550"
           - name: CURRENCY_SERVICE_ADDR
-            value: "currencyservice:7000"
+            value: "currencyservice.currency.svc.cluster.local:7000"
           - name: CART_SERVICE_ADDR
-            value: "cartservice:7070"
+            value: "cartservice.cart.svc.cluster.local:7070"
           - name: RECOMMENDATION_SERVICE_ADDR
-            value: "recommendationservice:8080"
+            value: "recommendationservice.recommendation.svc.cluster.local:8080"
           - name: SHIPPING_SERVICE_ADDR
-            value: "shippingservice:50051"
+            value: "shippingservice.shipping.svc.cluster.local:50051"
           - name: CHECKOUT_SERVICE_ADDR
-            value: "checkoutservice:5050"
+            value: "checkoutservice.checkout.svc.cluster.local:5050"
           - name: AD_SERVICE_ADDR
-            value: "adservice:9555"
+            value: "adservice.ad.svc.cluster.local:9555"
           # # ENV_PLATFORM: One of: local, gcp, aws, azure, onprem
           # # When not set, defaults to "local" unless running in GKE, otherwies auto-sets to gcp 
           # - name: ENV_PLATFORM 

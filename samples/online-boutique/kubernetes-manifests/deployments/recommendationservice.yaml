@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: recommendation
+  namespace: recommendation
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -45,7 +51,7 @@ spec:
         - name: PORT
           value: "8080"
         - name: PRODUCT_CATALOG_SERVICE_ADDR
-          value: "productcatalogservice:3550"
+          value: "productcatalogservice.product-catalog.svc.cluster.local:3550"
         # - name: DISABLE_TRACING
         #   value: "1"
         # - name: DISABLE_PROFILER
