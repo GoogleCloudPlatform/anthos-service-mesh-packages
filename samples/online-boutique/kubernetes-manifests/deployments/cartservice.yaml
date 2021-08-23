@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cart
+  namespace: cart
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -30,7 +36,7 @@ spec:
       terminationGracePeriodSeconds: 5
       containers:
       - name: server
-        image: image: gcr.io/google-samples/microservices-demo/cartservice:v0.2.2
+        image: gcr.io/google-samples/microservices-demo/cartservice:v0.2.2
         ports:
         - containerPort: 7070
         env:

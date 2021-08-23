@@ -39,6 +39,7 @@ spec:
         # required configuration.
         inject.istio.io/templates: gateway
       labels:
+        app: istio-ingressgateway
         istio: ingressgateway
         istio.io/rev: REVISION # This is required only if the namespace is not labeled.
     spec:
@@ -144,6 +145,7 @@ spec:
   selector:
     matchLabels:
       istio: ingressgateway
+      app: istio-ingressgateway
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -215,5 +217,6 @@ spec:
     targetPort: 15443
   selector:
     istio: ingressgateway
+    app: istio-ingressgateway
   type: LoadBalancer
 ---

@@ -12,11 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: shipping
+  namespace: shipping
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: shippingservice
-  namespace: cart
+  namespace: shipping
 spec:
   selector:
     matchLabels:
@@ -29,7 +35,7 @@ spec:
       serviceAccountName: shipping
       containers:
       - name: server
-        image: image: gcr.io/google-samples/microservices-demo/shippingservice:v0.2.2
+        image: gcr.io/google-samples/microservices-demo/shippingservice:v0.2.2
         ports:
         - containerPort: 50051
         env:
