@@ -76,7 +76,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.tag
-          value: 1.10.4-asm.3
+          value: 1.10.4-asm.6
           isSet: true
     io.k8s.cli.substitutions.gke-mcp-image:
       x-k8s-cli:
