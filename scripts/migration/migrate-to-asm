@@ -1538,12 +1538,24 @@ is_supported_location() {
 run_mcp_fit_assessment() {
   echo "Analyzing cluster configuration to determine optimal control plane..."
 
-  if ! is_supported_location; then false; return; fi
-  if is_private_cluster; then false; return; fi
-  if is_autopilot; then false; return; fi
+  if ! is_supported_location; then
+    info "Cluster not in MCP-supported location."
+    false
+    return
+  fi
+  if is_private_cluster; then
+    info "Cluster has private API server endpoints enabled,"
+    false
+    return
+  fi
+  if is_autopilot; then
+    info "Cluster is a GKE Autopilot cluster."
+    false
+    return
+  fi
 
   if [[ ! -f ./configuration_backup/default_iop ]]; then
-    istioctl profile dump >./configuration_backup/default_iop 2>/dev/null
+    istioctl profile dump empty >./configuration_backup/default_iop 2>/dev/null
   fi
 
   local ARGS; ARGS="-f ./configuration_backup/default_iop"
@@ -1596,7 +1608,7 @@ main() {
     configure_kubectl
     pre_migrate
     if should_use_mcp; then
-      run_mcp_fit_assessment
+      info "Configuration verified for MCP."
     fi
   fi
   if [[ "${INSTALL_ASM}" -eq 1 ]]; then
