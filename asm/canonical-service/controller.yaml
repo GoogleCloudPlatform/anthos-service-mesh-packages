@@ -11,6 +11,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
+    gke.io/cluster: "gke://PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
     controller-gen.kubebuilder.io/version: (unknown)
   creationTimestamp: null
   name: canonicalservices.anthos.cloud.google.com
@@ -119,6 +120,7 @@ status:
     plural: ""
   conditions: []
   storedVersions: []
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
