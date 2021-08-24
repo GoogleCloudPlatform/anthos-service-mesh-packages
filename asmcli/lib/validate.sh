@@ -506,6 +506,7 @@ validate_args() {
   local WI_ENABLED; WI_ENABLED="$(context_get-option "WI_ENABLED")"
   local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
+  local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
 
   if [[ -z "${CA}" ]]; then
     CA="mesh_ca"
@@ -543,6 +544,13 @@ validate_args() {
       gcp | multicloud);;
       *) fatal "PLATFORM must be one of 'gcp', 'multicloud'";;
   esac
+
+  if [[ -n "${CHANNEL}" ]]; then
+    case "${CHANNEL}" in
+      regular | stable | rapid);;
+      *) fatal "CHANNEL must be one of 'regular', 'stable', 'rapid'";;
+    esac
+  fi
 
   local MISSING_ARGS=0
 
@@ -734,6 +742,7 @@ x_validate_install_args() {
   local PRINT_VERSION; PRINT_VERSION="$(context_get-option "PRINT_VERSION")"
   local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
+  local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
 
   local MISSING_ARGS=0
 
@@ -750,6 +759,13 @@ PROJECT_ID
 CLUSTER_LOCATION
 CLUSTER_NAME
 EOF
+
+  if [[ -n "${CHANNEL}" ]]; then
+    case "${CHANNEL}" in
+      regular | stable | rapid);;
+      *) fatal "CHANNEL must be one of 'regular', 'stable', 'rapid'";;
+    esac
+  fi
 
   # Script will not infer the intent between the 2 use cases in case both values are provided
   if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 1 && "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then

@@ -118,6 +118,22 @@ OPTIONS:
                                       cluster. Defaults to "gcp" (for GKE clusters).
                                       For all other platforms use "multicloud".
                                       Allowed values for <PLATFORM> are {gcp|multicloud}.
+  --channel              <CHANNEL>    The release channel for the control plane revision.
+                                      If the user specifies the channel to be used, only
+                                      the Control Plane Revision associated with this
+                                      channel will be provisioned. Otherwise, the mapping
+                                      between Multicloud/GKE channel and the ASM Channel is
+                                      as following:
+                                      For Multicloud:
+                                        ASM provisions Regular, Rapid channels.
+                                      For GKE:
+                                        GKE Channel  |  ASM Channel
+                                        -------------|----------------
+                                        Rapid        |  Rapid
+                                        Regular      |  Regular, Rapid
+                                        Stable       |  Stable
+                                        Static       |  Regular, Rapid
+
   The following four options must be passed together and are only necessary
   for using a custom certificate for Citadel. Users that aren't sure whether
   they need this probably don't.
@@ -231,6 +247,7 @@ OPTIONS:
   --ca_name              <CA NAME>
   -r|--revision_name     <REVISION NAME>
   --platform             <PLATFORM>
+  --channel              <CHANNEL>
 
 FLAGS:
   -e|--enable_all

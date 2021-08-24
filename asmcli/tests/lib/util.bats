@@ -42,3 +42,70 @@ setup() {
 EOF
   assert_output "gke_gzip-dev_us-central1-c_cluster3"
 }
+
+@test "UTIL: channels should be determined by GKE release channel" {
+
+  ### [START] Specified by the users ###
+  context_set-option "CHANNEL" "regular"
+  run get_cr_channels
+  assert_output "regular"
+
+  context_set-option "CHANNEL" "stable"
+  run get_cr_channels
+  assert_output "stable"
+
+  context_set-option "CHANNEL" "rapid"
+  run get_cr_channels
+  assert_output "rapid"
+
+  context_set-option "CHANNEL" ""
+  ### [END] Specified by the users ###
+
+  ### [START] channel should be regular and rapid for on-prem ###
+  context_set-option "PLATFORM" "multicloud"
+  run get_cr_channels
+  assert_output --stdin <<EOF
+regular
+rapid
+EOF
+  context_set-option "PLATFORM" "gcp"
+  ### [END] channel should be regular and rapid for on-prem ###
+
+  ### [START] channel should be regular and rapid for static (no) GKE channel ###
+  get_gke_release_channel() {
+    echo ""
+  }
+  run get_cr_channels
+  assert_output --stdin <<EOF
+regular
+rapid
+EOF
+  ### [END] channel should be regular and rapid for static (no) GKE channel ###
+
+  ### [START] channel should be rapid for rapid GKE channel ###
+  get_gke_release_channel() {
+    echo "rapid"
+  }
+  run get_cr_channels
+  assert_output "rapid"
+  ### [END] channel should be rapid for rapid GKE channel ###
+
+  ### [START] channel should be regular and rapid for regular GKE channel ###
+  get_gke_release_channel() {
+    echo "regular"
+  }
+  run get_cr_channels
+  assert_output --stdin <<EOF
+rapid
+regular
+EOF
+  ### [END] channel should be regular and rapid for regular GKE channel ###
+
+  ### [START] channel should be stable for stable GKE channel ###
+  get_gke_release_channel() {
+    echo "stable"
+  }
+  run get_cr_channels
+  assert_output "stable"
+  ### [END] channel should be stable for stable GKE channel ###
+}

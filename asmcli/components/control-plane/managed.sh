@@ -50,11 +50,6 @@ EOF
   info "Configuring ASM managed control plane validating webhook config..."
   context_append "kubectlFiles" "${MANAGED_WEBHOOKS}"
 
-  info "Configuring ASM managed control plane revision CR for channels..."
-  context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_REGULAR}"
-  context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_RAPID}"
-  context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_STABLE}"
-
   local ASM_OPTS
   ASM_OPTS="$(kubectl -n istio-system \
     get --ignore-not-found cm asm-options \

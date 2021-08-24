@@ -196,6 +196,11 @@ parse_args() {
         context_set-option "PLATFORM" "$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
         shift 2
         ;;
+      --channel)
+        arg_required "${@}"
+        context_set-option "CHANNEL" "${2}"
+        shift 2
+        ;;
       -v | --verbose)
         context_set-option "VERBOSE" 1
         shift 1
@@ -326,6 +331,11 @@ x_parse_install_args() {
       --dry_run | --dry-run)
         context_set-option "DRY_RUN" 1
         shift 1
+        ;;
+      --channel)
+        arg_required "${@}"
+        context_set-option "CHANNEL" "${2}"
+        shift 2
         ;;
       -v | --verbose)
         context_set-option "VERBOSE" 1
