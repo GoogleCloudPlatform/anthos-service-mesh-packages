@@ -13,6 +13,10 @@ experimental_subcommand() {
       shift 1
       x_install_subcommand "${@}"
       ;;
+    mcp-migrate-check)
+      shift 1
+      x_mcp_migrate_check "${@}"
+      ;;
     *)
       x_help_subcommand "${@}"
       ;;
