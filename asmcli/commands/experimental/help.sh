@@ -15,5 +15,9 @@ SUBCOMMANDS:
                                       instead of client-side tools
   vm                                  Functions to configure a mesh to
                                       allow external VM workloads.
+  mcp-migrate-check                   Checks IstioOperator config for
+                                      compatibility with a Google managed
+                                      control plane and generates new config
+                                      where possible.
 EOF
 }
