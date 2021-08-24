@@ -3,6 +3,7 @@ x_mcp_migrate_check() {
   x_download_istioctl_tarball
   context_set-option "VERBOSE" 1
 
+  local PARAMS
   PARAMS=""
   for yaml_file in $(context_list "istioctlFiles"); do
     PARAMS="${PARAMS} -f ${yaml_file}"
@@ -35,6 +36,7 @@ x_parse_mcp_migrate_args() {
 }
 
 x_download_istioctl_tarball() {
+  local OS
   case "$(uname)" in
     Linux ) OS="linux-amd64";;
     Darwin) OS="osx";;
