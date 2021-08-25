@@ -33,9 +33,9 @@ _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=10}"; readonly MINOR;
-POINT="${POINT:=2}"; readonly POINT;
-REV="${REV:=3}"; readonly REV;
-CONFIG_VER="${CONFIG_VER:="2"}"; readonly CONFIG_VER;
+POINT="${POINT:=4}"; readonly POINT;
+REV="${REV:=6}"; readonly REV;
+CONFIG_VER="${CONFIG_VER:="1"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
 ### File related constants ###
@@ -344,6 +344,10 @@ init() {
   MANAGED_CNI="${OPTIONS_DIRECTORY}/cni-managed.yaml"; readonly MANAGED_CNI;
   EXPOSE_ISTIOD_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_SERVICE;
   CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
+  CRD_CONTROL_PLANE_REVISION="asm/control-plane-revision/crd.yaml"; readonly CRD_CONTROL_PLANE_REVISION;
+  CR_CONTROL_PLANE_REVISION_REGULAR="asm/control-plane-revision/cr_regular.yaml"; readonly CR_CONTROL_PLANE_REVISION_REGULAR;
+  CR_CONTROL_PLANE_REVISION_RAPID="asm/control-plane-revision/cr_rapid.yaml"; readonly CR_CONTROL_PLANE_REVISION_RAPID;
+  CR_CONTROL_PLANE_REVISION_STABLE="asm/control-plane-revision/cr_stable.yaml"; readonly CR_CONTROL_PLANE_REVISION_STABLE;
 
   AKUBECTL="$(which kubectl || true)"
   AGCLOUD="$(which gcloud || true)"
@@ -1092,10 +1096,6 @@ validate_args() {
       fatal "Citadel is not supported with managed control plane."
     fi
 
-    if [[ "${CA}" == "gcp_cas" ]]; then
-      fatal "Google Certificate Authority Service integration is not supported with managed control plane."
-    fi
-
     if [[ "${CUSTOM_CA}" -eq 1 ]]; then
       fatal "Specifying a custom CA with managed control plane is not supported."
     fi
@@ -1298,7 +1298,7 @@ validate_revision_label() {
 
 validate_gcp_cas_args() {
   local CA_NAME_TEMPLATE
-  CA_NAME_TEMPLATE="projects/project_name/locations/ca_region/certificateAuthorities/ca_name"
+  CA_NAME_TEMPLATE="projects/project_name/locations/ca_region/caPools/ca_pool"
   readonly CA_NAME_TEMPLATE
 
   if [[ -z ${CA_NAME} ]]; then
@@ -1887,9 +1887,10 @@ is_meshca_installed() {
 }
 
 is_gcp_cas_installed() {
-  local INSTALLED_CA; INSTALLED_CA="$(kubectl -n istio-system get pod -l istio=istiod \
-    -o jsonpath='{.items[].spec.containers[].env[?(@.name=="EXTERNAL_CA")].value}')"
-  [[ "${INSTALLED_CA}" = "ISTIOD_RA_CAS_API" ]] && return 0
+  local INSTALLED_CA_PROVIDER
+  INSTALLED_CA_PROVIDER="$(kubectl -n istio-system get pod -l istio=ingressgateway \
+    -o jsonpath='{.items[].spec.containers[].env[?(@.name=="CA_PROVIDER")].value}')"
+  [[ "${INSTALLED_CA_PROVIDER}" = "GoogleCAS" ]] && return 0
 }
 
 bind_user_to_iam_policy(){
@@ -2087,30 +2088,37 @@ init_meshconfig() {
   if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
     populate_environ_info
     info "Cluster has Membership ID ${HUB_MEMBERSHIP_ID} in the Hub of project ${ENVIRON_PROJECT_ID}"
-    if [[ "${ENVIRON_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
-      info "Skip initializing meshconfig API as the Hub is not hosted in the project ${PROJECT_ID}"
-      return 0
-    fi
     # initialize replaces the existing Workload Identity Pools in the IAM binding, so we need to support both Hub and GKE Workload Identity Pools
     local POST_DATA; POST_DATA='{"workloadIdentityPools":["'${ENVIRON_PROJECT_ID}'.hub.id.goog","'${ENVIRON_PROJECT_ID}'.svc.id.goog"]}'
-    run curl --request POST --fail \
-    --data "${POST_DATA}" -o /dev/null \
-    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
-    --header "Content-Type: application/json" \
-    -K <(auth_header "$(get_auth_token)")
+    init_meshconfig_curl "${POST_DATA}" "${PROJECT_ID}"
+    if [[ "${ENVIRON_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
+      init_meshconfig_curl "${POST_DATA}" "${ENVIRON_PROJECT_ID}"
+    fi
   else
-    run curl --request POST --fail \
-    --data '' -o /dev/null \
-    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
-    -K <(auth_header "$(get_auth_token)")
+    init_meshconfig_curl '' "${PROJECT_ID}"
   fi
 }
 
 init_meshconfig_managed() {
   info "Initializing meshconfig managed API..."
+  local POST_DATA
+  if [[ "${USE_HUB_WIP}" -eq 1 && -n "${ENVIRON_PROJECT_ID}" ]]; then
+    POST_DATA='{"workloadIdentityPools":["'${ENVIRON_PROJECT_ID}'.hub.id.goog","'${ENVIRON_PROJECT_ID}'.svc.id.goog"], "prepare_istiod": true}'
+  else
+    POST_DATA='{"workloadIdentityPools":["'${PROJECT_ID}'.hub.id.goog","'${PROJECT_ID}'.svc.id.goog"], "prepare_istiod": true}'
+  fi
+  init_meshconfig_curl "${POST_DATA}" "${PROJECT_ID}"
+  if [[ "${ENVIRON_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
+    init_meshconfig_curl "${POST_DATA}" "${ENVIRON_PROJECT_ID}"
+  fi
+}
+
+init_meshconfig_curl() {
+  local POST_DATA; POST_DATA="${1}"
+  local ID; ID="${2}"
   run curl --request POST --fail \
-    --data '{"prepare_istiod": true}' \
-    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}:initialize" \
+    --data "${POST_DATA}" -o /dev/null \
+    "https://meshconfig.googleapis.com/v1alpha1/projects/${ID}:initialize" \
     --header "X-Server-Timeout: 600" \
     --header "Content-Type: application/json" \
     -K <(auth_header "$(get_auth_token)")
@@ -2573,17 +2581,19 @@ install_secrets() {
 }
 
 init_gcp_cas() {
-  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="$PROJECT_ID.svc.id.goog[istio-system/istiod-service-account]"
-
-  local NAME; NAME=$(echo "${CA_NAME}" | cut -f6 -d/)
+  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${PROJECT_ID}.svc.id.goog[-/-]"
   local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
-  local CA_PROJECT; CA_PROJECT=$(echo "${CA_NAME}" | cut -f2 -d/)
 
-  retry 3 gcloud beta privateca subordinates add-iam-policy-binding "${NAME}" \
+  retry 3 gcloud privateca pools add-iam-policy-binding "${CA_NAME}" \
     --location "${CA_LOCATION}" \
-    --project "${CA_PROJECT}" \
     --member "serviceAccount:${WORKLOAD_IDENTITY}" \
-    --role "roles/privateca.certificateManager"
+    --role "roles/privateca.workloadCertificateRequester"
+
+  retry 3 gcloud privateca pools add-iam-policy-binding "${CA_NAME}" \
+    --location "${CA_LOCATION}" \
+    --member "serviceAccount:${WORKLOAD_IDENTITY}" \
+    --role "roles/privateca.auditor"
+
 }
 
 does_istiod_exist(){
@@ -2672,6 +2682,9 @@ start_managed_control_plane() {
   info "Configuring base installation for managed control plane..."
   run kubectl apply --overwrite=true -f "${BASE_REL_PATH}"
 
+  info "Configuring ASM managed control plane revision CRD..."
+  run kubectl apply --overwrite=true -f "${CRD_CONTROL_PLANE_REVISION}"
+
   local ASM_OPTS
   ASM_OPTS="$(kubectl -n istio-system \
     get --ignore-not-found cm asm-options \
@@ -2724,11 +2737,11 @@ scrape_managed_urls() {
 install_managed_components() {
   if [[ "${USE_MCP_CNI}" -eq 1 ]]; then
     info "Installing CNI into the cluster..."
-    kubectl apply -f "${MANAGED_CNI}"
+    run kubectl apply -f "${MANAGED_CNI}"
   fi
 
   info "Configuring ASM managed control plane validating webhook config..."
-  kubectl apply -f "${MANAGED_WEBHOOKS}"
+  run kubectl apply -f "${MANAGED_WEBHOOKS}"
 
   info "Configuring ASM managed control plane components..."
   print_config >| managed_control_plane_gateway.yaml
@@ -2737,6 +2750,15 @@ install_managed_components() {
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
     install_canonical_controller
   fi
+
+  info "Configuring ASM managed control plane revision CR for regular channel..."
+  run kubectl apply -f "${CR_CONTROL_PLANE_REVISION_REGULAR}"
+
+  info "Configuring ASM managed control plane revision CR for rapid channel..."
+  run kubectl apply -f "${CR_CONTROL_PLANE_REVISION_RAPID}"
+
+  info "Configuring ASM managed control plane revision CR for stable channel..."
+  run kubectl apply -f "${CR_CONTROL_PLANE_REVISION_STABLE}"
 }
 
 outro() {

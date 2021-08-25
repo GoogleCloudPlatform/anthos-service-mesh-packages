@@ -76,7 +76,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.tag
-          value: 1.10.2-asm.3
+          value: 1.10.4-asm.6
           isSet: true
     io.k8s.cli.setters.anthos.servicemesh.rev:
       x-k8s-cli:
@@ -162,6 +162,17 @@ openAPI:
         substitution:
           name: gke-cni-image
           pattern: "IMAGE_HUB/install-cni:IMAGE_TAG"
+          values:
+          - marker: IMAGE_HUB
+            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub'
+          - marker: IMAGE_TAG
+            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag'
+    io.k8s.cli.substitutions.gke-mdp-image:
+      type: string
+      x-k8s-cli:
+        substitution:
+          name: gke-mdp-image
+          pattern: "IMAGE_HUB/mdp:IMAGE_TAG"
           values:
           - marker: IMAGE_HUB
             ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub'

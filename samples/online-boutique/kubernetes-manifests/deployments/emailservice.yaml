@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: email
+  namespace: email
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -26,11 +32,10 @@ spec:
       labels:
         app: emailservice
     spec:
-      serviceAccountName: image: gcr.io/google-samples/microservices-demo/emailservice:v0.2.2
-      terminationGracePeriodSeconds: 5
+      serviceAccountName: email
       containers:
       - name: server
-        image: emailservice
+        image: gcr.io/google-samples/microservices-demo/emailservice:v0.2.2
         ports:
         - containerPort: 8080
         env:

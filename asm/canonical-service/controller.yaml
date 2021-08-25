@@ -310,6 +310,13 @@ spec:
         - --v=10
         image: gcr.io/kubebuilder/kube-rbac-proxy:v0.5.0
         name: kube-rbac-proxy
+        resources:
+          limits:
+            cpu: 100m
+            memory: 300Mi
+          requests:
+            cpu: 100m
+            memory: 20Mi
         ports:
         - containerPort: 8443
           name: https
@@ -323,7 +330,7 @@ spec:
         resources:
           limits:
             cpu: 100m
-            memory: 100Mi
+            memory: 300Mi
           requests:
             cpu: 100m
             memory: 20Mi
