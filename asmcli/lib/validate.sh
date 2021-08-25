@@ -521,10 +521,6 @@ validate_args() {
       fatal "Citadel is not supported with managed control plane."
     fi
 
-    if [[ "${CA}" == "gcp_cas" ]]; then
-      fatal "Google Certificate Authority Service integration is not supported with managed control plane."
-    fi
-
     if [[ "${CUSTOM_CA}" -eq 1 ]]; then
       fatal "Specifying a custom CA with managed control plane is not supported."
     fi

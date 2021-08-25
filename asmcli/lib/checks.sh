@@ -54,9 +54,10 @@ is_meshca_installed() {
 }
 
 is_gcp_cas_installed() {
-  local INSTALLED_CA; INSTALLED_CA="$(kubectl -n istio-system get pod -l istio=istiod \
-    -o jsonpath='{.items[].spec.containers[].env[?(@.name=="EXTERNAL_CA")].value}')"
-  [[ "${INSTALLED_CA}" = "ISTIOD_RA_CAS_API" ]] && return 0
+  local INSTALLED_CA_PROVIDER
+  INSTALLED_CA_PROVIDER="$(kubectl -n istio-system get pod -l istio=ingressgateway \
+    -o jsonpath='{.items[].spec.containers[].env[?(@.name=="CA_PROVIDER")].value}')"
+  [[ "${INSTALLED_CA_PROVIDER}" = "GoogleCAS" ]] && return 0
 }
 
 is_cluster_registered() {
