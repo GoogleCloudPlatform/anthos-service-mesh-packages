@@ -1761,16 +1761,22 @@ install_managed_control_plane() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
 
-  local CR_IMAGE_JSON; CR_IMAGE_JSON="";
+  local POST_DATA; POST_DATA="{}";
   if [[ -n "${_CI_CLOUDRUN_IMAGE_HUB}" ]]; then
-    CR_IMAGE_JSON="{\"image\": \"${_CI_CLOUDRUN_IMAGE_HUB}:${_CI_CLOUDRUN_IMAGE_TAG}\"}"
+    POST_DATA="$(echo "${POST_DATA}" | jq -r --arg IMAGE "${_CI_CLOUDRUN_IMAGE_HUB}:${_CI_CLOUDRUN_IMAGE_TAG}" '. + {image: $IMAGE}')"
+  fi
+
+  if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
+    POST_DATA="$(echo "${POST_DATA}" | jq -r --arg MEMBERSHIP "${HUB_IDP_URL/*projects/projects}" '. + {membership: $MEMBERSHIP}')"
   fi
 
   info "Provisioning control plane..."
   retry 2 run_command curl --request POST \
     "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}:runIstiod" \
-    --data "${CR_IMAGE_JSON}" \
+    --data "${POST_DATA}" \
     --header "X-Server-Timeout: 600" \
     --header "Content-Type: application/json" \
     -K <(auth_header "$(get_auth_token)")
