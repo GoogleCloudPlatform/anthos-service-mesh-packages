@@ -21,13 +21,17 @@ install_managed_control_plane() {
     POST_DATA="$(echo "${POST_DATA}" | jq -r --arg IMAGE "${_CI_CLOUDRUN_IMAGE_HUB}:${_CI_CLOUDRUN_IMAGE_TAG}" '. + {image: $IMAGE}')"
   fi
 
-  info "Provisioning control plane..."
-  runIstiod_meshconfig_curl "${POST_DATA}" "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
-
   if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
     POST_DATA="$(echo "${POST_DATA}" | jq -r --arg MEMBERSHIP "${HUB_IDP_URL/*projects/projects}" '. + {membership: $MEMBERSHIP}')"
-    runIstiod_meshconfig_curl "${POST_DATA}" "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
   fi
+
+  info "Provisioning control plane..."
+  retry 2 run_command curl --request POST \
+    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}:runIstiod" \
+    --data "${POST_DATA}" \
+    --header "X-Server-Timeout: 600" \
+    --header "Content-Type: application/json" \
+    -K <(auth_header "$(get_auth_token)")
 
   local VALIDATION_URL; local CLOUDRUN_ADDR;
   read -r VALIDATION_URL CLOUDRUN_ADDR <<EOF

@@ -589,17 +589,3 @@ init_meshconfig_curl() {
     --header "Content-Type: application/json" \
     -K <(auth_header "$(get_auth_token)")
 }
-
-runIstiod_meshconfig_curl() {
-  local POST_DATA; POST_DATA="${1}"
-  local PROJECT_ID; PROJECT_ID="${2}"
-  local CLUSTER_LOCATION; CLUSTER_LOCATION="${3}"
-  local CLUSTER_NAME; CLUSTER_NAME="${4}"
-
-  retry 2 run_command curl --request POST \
-    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}:runIstiod" \
-    --data "${POST_DATA}" \
-    --header "X-Server-Timeout: 600" \
-    --header "Content-Type: application/json" \
-    -K <(auth_header "$(get_auth_token)")
-}
