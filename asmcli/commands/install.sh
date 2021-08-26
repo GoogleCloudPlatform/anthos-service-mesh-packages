@@ -204,13 +204,12 @@ install_control_plane() {
   label_istio_namespace
   if [[ "${MANAGED}" -eq 1 ]]; then
     install_managed_control_plane
+    install_control_plane_revisions
   else
     install_in_cluster_control_plane
   fi
 
   apply_kube_yamls
-
-  install_control_plane_revisions
 
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
     install_canonical_controller

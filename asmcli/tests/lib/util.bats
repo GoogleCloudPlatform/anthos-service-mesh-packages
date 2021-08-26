@@ -77,8 +77,8 @@ EOF
   }
   run get_cr_channels
   assert_output --stdin <<EOF
-regular
 rapid
+regular
 EOF
   ### [END] channel should be regular and rapid for static (no) GKE channel ###
 

@@ -610,14 +610,21 @@ get_cr_channels() {
     echo rapid
   else
     local GKE_CHANNEL; GKE_CHANNEL="$(get_gke_release_channel)"
-    if [[ -z "${GKE_CHANNEL}" ]]; then
-      echo regular
-      echo rapid
-    else
-      if [[ "${GKE_CHANNEL}" == "regular" ]]; then
+    case "${GKE_CHANNEL}" in
+      regular)
         echo rapid
-      fi
-      echo "${GKE_CHANNEL}"
-    fi
+        echo regular
+        ;;
+      rapid)
+        echo rapid
+        ;;
+      stable)
+        echo stable
+        ;;
+      *)
+        echo rapid
+        echo regular
+        ;;
+    esac
   fi
 }
