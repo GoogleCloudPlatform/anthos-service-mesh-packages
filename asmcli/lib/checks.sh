@@ -68,17 +68,24 @@ is_cluster_registered() {
     return
   fi
 
-  local IDENTITY_PROVIDER
+  local MEMBERSHIP_DATA IDENTITY_PROVIDER
+  MEMBERSHIP_DATA="$(retry 2 kubectl get memberships.hub.gke.io membership -ojson 2>/dev/null)"
+  
   # expected value is the project id to which the cluster is registered
-  IDENTITY_PROVIDER="$(retry 2 kubectl get memberships.hub.gke.io membership -ojson 2>/dev/null \
+  IDENTITY_PROVIDER="$(echo "${MEMBERSHIP_DATA}" \
     | jq .spec.identity_provider \
     | sed -E 's/.*projects\/|\/locations.*//g')"
+  if [[ -z "${IDENTITY_PROVIDER}" || "${IDENTITY_PROVIDER}" == 'null' ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Cluster has memberships.hub.gke.io CRD but no identity provider specified. Please ensure that
+an identity provider is available for the registered cluster.
+EOF
+  fi
 
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   populate_fleet_info
-  local MEMBERSHIP_DATA MEMBERSHIP LOCATION WANT LIST
-  MEMBERSHIP_DATA="$(retry 2 kubectl get memberships.hub.gke.io membership -ojson 2>/dev/null)"
+  local MEMBERSHIP LOCATION WANT LIST
   LOCATION="$(echo "${MEMBERSHIP_DATA}" \
     | jq -r .spec.owner.id \
     | sed -E 's/.*locations\/|\/memberships.*//g')"
@@ -89,9 +96,7 @@ is_cluster_registered() {
   LIST="$(gcloud container hub memberships list --project "${FLEET_ID}" --format=json \
     | grep "${WANT}")"
 
-  if [[ -z "${IDENTITY_PROVIDER}" ]] || \
-     [[ "${IDENTITY_PROVIDER}" == 'null' ]] || \
-     [[ "${IDENTITY_PROVIDER}" != "${FLEET_ID}" ]] || \
+  if [[ "${IDENTITY_PROVIDER}" != "${FLEET_ID}" ]] || \
      [[ -z "${LIST}" ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Cluster is registered in the project ${IDENTITY_PROVIDER}, but the required Fleet project is ${FLEET_ID}.
