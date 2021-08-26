@@ -71,12 +71,12 @@ install_private_ca() {
   # user has taken care of this, else Istio setup will fail
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
 
-  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${WORKLOAD_POOL}[-/-]"
+  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${WORKLOAD_POOL}:/allAuthenticatedUsers/"
   local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
 
   retry 3 gcloud privateca pools add-iam-policy-binding "${CA_NAME}" \
     --location "${CA_LOCATION}" \
-    --member "serviceAccount:${WORKLOAD_IDENTITY}" \
+    --member "group:${WORKLOAD_IDENTITY}" \
     --role "roles/privateca.workloadCertificateRequester"
 
   retry 3 gcloud privateca pools add-iam-policy-binding "${CA_NAME}" \
