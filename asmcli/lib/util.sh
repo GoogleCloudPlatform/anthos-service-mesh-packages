@@ -558,12 +558,18 @@ populate_cluster_values() {
         --zone="${CLUSTER_LOCATION}" \
         --project="${PROJECT_ID}" \
         --format='value(selfLink, network)')"
-      read -r GKE_CLUSTER_URI NETWORK_ID <<EOF
+      read -r NEW_GKE_CLUSTER_URI NEW_NETWORK_ID <<EOF
 ${CLUSTER_DATA}
 EOF
 
-      context_set-option "NETWORK_ID" "${PROJECT_ID}-${NETWORK_ID}"
-      readonly GKE_CLUSTER_URI
+      if [[ -z "${GKE_CLUSTER_URI}" ]]; then
+        GKE_CLUSTER_URI="${NEW_GKE_CLUSTER_URI}"
+        readonly GKE_CLUSTER_URI
+      fi
+      
+      if [[ -z "${NETWORK_ID}" ]]; then
+        context_set-option "NETWORK_ID" "${PROJECT_ID}-${NEW_NETWORK_ID}"
+      fi
     fi
   else
     if [[ -z "${NETWORK_ID}" ]]; then
