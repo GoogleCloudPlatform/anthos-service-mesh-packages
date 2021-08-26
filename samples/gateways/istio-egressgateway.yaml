@@ -16,13 +16,11 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: istio-egressgateway-service-account
-  namespace: GATEWAY_NAMESPACE
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: istio-egressgateway
-  namespace: GATEWAY_NAMESPACE
 spec:
   selector:
     matchLabels:
@@ -39,7 +37,6 @@ spec:
         inject.istio.io/templates: gateway
       labels:
         istio: egressgateway
-        istio.io/rev: REVISION
     spec:
       affinity:
         nodeAffinity:
@@ -133,7 +130,6 @@ apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
 metadata:
   name: istio-egressgateway
-  namespace: GATEWAY_NAMESPACE
 spec:
   minAvailable: 1
   selector:
@@ -145,7 +141,6 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: istio-egressgateway-sds
-  namespace: GATEWAY_NAMESPACE
 rules:
 - apiGroups: [""]
   resources: ["secrets"]
@@ -155,7 +150,6 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: istio-egressgateway-sds
-  namespace: GATEWAY_NAMESPACE
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -168,7 +162,6 @@ apiVersion: autoscaling/v2beta1
 kind: HorizontalPodAutoscaler
 metadata:
   name: istio-egressgateway
-  namespace: GATEWAY_NAMESPACE
 spec:
   maxReplicas: 5
   metrics:
@@ -186,7 +179,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: istio-egressgateway
-  namespace: GATEWAY_NAMESPACE
 spec:
   type: ClusterIP
   ports:
