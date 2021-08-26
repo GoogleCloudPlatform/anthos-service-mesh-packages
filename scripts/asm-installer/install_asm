@@ -2225,28 +2225,40 @@ get_cluster_labels() {
 }
 
 is_cluster_registered() {
+  info "Checking for cluster membership..."
   if ! is_membership_crd_installed; then
     false
     return
   fi
 
-  local IDENTITY_PROVIDER
-  IDENTITY_PROVIDER="$(retry 2 kubectl get memberships.hub.gke.io \
-    membership -ojson 2>/dev/null | jq .spec.identity_provider)"
+  local MEMBERSHIP_DATA IDENTITY_PROVIDER
+  MEMBERSHIP_DATA="$(retry 2 kubectl get memberships.hub.gke.io membership -ojson 2>/dev/null)"
 
-  if [[ -z "${IDENTITY_PROVIDER}" ]] || [[ "${IDENTITY_PROVIDER}" == 'null' ]]; then
-    false
-    return
+  IDENTITY_PROVIDER="$(echo "${MEMBERSHIP_DATA}" \
+    | jq .spec.identity_provider \
+    | sed -E 's/.*projects\/|\/locations.*//g')"
+
+  if [[ -z "${IDENTITY_PROVIDER}" || "${IDENTITY_PROVIDER}" == 'null' ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Cluster has memberships.hub.gke.io CRD but no identity provider specified. Please ensure that
+an identity provider is available for the registered cluster.
+EOF
   fi
 
   populate_environ_info
 
-  local WANT
-  WANT="//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
-  local LIST
-  LIST="$(gcloud container hub memberships list --project "${ENVIRON_PROJECT_ID}" \
-    --format=json | grep "${WANT}")"
-  if [[ -z "${LIST}" ]]; then
+  LOCATION="$(echo "${MEMBERSHIP_DATA}" \
+    | jq -r .spec.owner.id \
+    | sed -E 's/.*locations\/|\/memberships.*//g')"
+  MEMBERSHIP="$(echo "${MEMBERSHIP_DATA}" \
+    | jq -r .spec.owner.id \
+    | sed -E 's/.*memberships\///g')"
+  WANT="name.*projects/${ENVIRON_PROJECT_ID}/locations/${LOCATION}/memberships/${MEMBERSHIP}"
+  LIST="$(gcloud container hub memberships list --project "${ENVIRON_PROJECT_ID}" --format=json \
+    | grep "${WANT}")"
+
+  if [[ "${IDENTITY_PROVIDER}" != "$ENVIRON_PROJECT_ID}" ]] || \
+     [[ -z "${LIST}" ]]; then
     { read -r -d '' MSG; warn "${MSG}"; } <<EOF || true
 Cluster is registered in the project ${ENVIRON_PROJECT_ID}, but the script is
 unable to verify in the project. The script will continue to execute.
