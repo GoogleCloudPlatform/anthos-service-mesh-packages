@@ -553,7 +553,7 @@ populate_cluster_values() {
   local CLUSTER_DATA
 
   if is_gcp; then
-    if [[ -z "${GKE_CLUSTER_URI}" && -z "${NETWORK_ID}" ]]; then
+    if [[ -z "${GKE_CLUSTER_URI}" || -z "${NETWORK_ID}" ]]; then
       CLUSTER_DATA="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
         --zone="${CLUSTER_LOCATION}" \
         --project="${PROJECT_ID}" \
