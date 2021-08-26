@@ -2123,9 +2123,11 @@ init_meshconfig() {
     populate_environ_info
     info "Cluster has Membership ID ${HUB_MEMBERSHIP_ID} in the Hub of project ${ENVIRON_PROJECT_ID}"
     # initialize replaces the existing Workload Identity Pools in the IAM binding, so we need to support both Hub and GKE Workload Identity Pools
-    local POST_DATA; POST_DATA='{"workloadIdentityPools":["'${ENVIRON_PROJECT_ID}'.hub.id.goog","'${ENVIRON_PROJECT_ID}'.svc.id.goog"]}'
+    local POST_DATA
+    POST_DATA='{"workloadIdentityPools":["'${PROJECT_ID}'.hub.id.goog","'${PROJECT_ID}'.svc.id.goog"]}'
     init_meshconfig_curl "${POST_DATA}" "${PROJECT_ID}"
-    if [[ "${ENVIRON_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
+    if [[ -n "${ENVIRON_PROJECT_ID}" && "${ENVIRON_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
+      POST_DATA='{"workloadIdentityPools":["'${ENVIRON_PROJECT_ID}'.hub.id.goog","'${ENVIRON_PROJECT_ID}'.svc.id.goog"]}'
       init_meshconfig_curl "${POST_DATA}" "${ENVIRON_PROJECT_ID}"
     fi
   else
@@ -2136,13 +2138,10 @@ init_meshconfig() {
 init_meshconfig_managed() {
   info "Initializing meshconfig managed API..."
   local POST_DATA
-  if [[ "${USE_HUB_WIP}" -eq 1 && -n "${ENVIRON_PROJECT_ID}" ]]; then
-    POST_DATA='{"workloadIdentityPools":["'${ENVIRON_PROJECT_ID}'.hub.id.goog","'${ENVIRON_PROJECT_ID}'.svc.id.goog"], "prepare_istiod": true}'
-  else
-    POST_DATA='{"workloadIdentityPools":["'${PROJECT_ID}'.hub.id.goog","'${PROJECT_ID}'.svc.id.goog"], "prepare_istiod": true}'
-  fi
+  POST_DATA='{"workloadIdentityPools":["'${PROJECT_ID}'.hub.id.goog","'${PROJECT_ID}'.svc.id.goog"], "prepare_istiod": true}'
   init_meshconfig_curl "${POST_DATA}" "${PROJECT_ID}"
-  if [[ "${ENVIRON_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
+  if [[ "${USE_HUB_WIP}" -eq 1 && -n "${ENVIRON_PROJECT_ID}" && "${ENVIRON_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
+    POST_DATA='{"workloadIdentityPools":["'${ENVIRON_PROJECT_ID}'.hub.id.goog","'${ENVIRON_PROJECT_ID}'.svc.id.goog"]}'
     init_meshconfig_curl "${POST_DATA}" "${ENVIRON_PROJECT_ID}"
   fi
 }
@@ -2743,17 +2742,19 @@ data:
 EOF
   fi
 
-  local CR_IMAGE_JSON; CR_IMAGE_JSON="";
+  local POST_DATA; POST_DATA="{}";
   if [[ -n "${_CI_CLOUDRUN_IMAGE_HUB}" ]]; then
-    CR_IMAGE_JSON=$(cat <<EOF
-{"image": "${_CI_CLOUDRUN_IMAGE_HUB}:${_CI_CLOUDRUN_IMAGE_TAG}"}
-EOF
-)
+    POST_DATA="$(echo "${POST_DATA}" | jq -r --arg IMAGE "${_CI_CLOUDRUN_IMAGE_HUB}:${_CI_CLOUDRUN_IMAGE_TAG}" '. + {image: $IMAGE}')"
   fi
+
+  if [[ -n "${ENVIRON_PROJECT_ID}" && "${ENVIRON_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
+    POST_DATA="$(echo "${POST_DATA}" | jq -r --arg MEMBERSHIP "${HUB_IDP_URL/*projects/projects}" '. + {membership: $MEMBERSHIP}')"
+  fi
+
   info "Provisioning managed control plane..."
   retry 2 run curl --request POST \
     "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}:runIstiod" \
-    --data "${CR_IMAGE_JSON}" \
+    --data "${POST_DATA}" \
     --header "X-Server-Timeout: 600" \
     --header "Content-Type: application/json" \
     -K <(auth_header "$(get_auth_token)")
