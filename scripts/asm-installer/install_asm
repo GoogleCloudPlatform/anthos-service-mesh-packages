@@ -129,6 +129,7 @@ HUB_MEMBERSHIP_ID=""
 CUSTOM_REVISION=0
 WI_ENABLED=0
 HAS_TS=0
+IS_REGISTERED=0
 
 main() {
   init
@@ -2138,7 +2139,11 @@ init_meshconfig() {
 init_meshconfig_managed() {
   info "Initializing meshconfig managed API..."
   local POST_DATA
-  POST_DATA='{"workloadIdentityPools":["'${PROJECT_ID}'.hub.id.goog","'${PROJECT_ID}'.svc.id.goog"], "prepare_istiod": true}'
+  if is_cluster_registered; then
+    POST_DATA='{"workloadIdentityPools":["'${PROJECT_ID}'.hub.id.goog","'${PROJECT_ID}'.svc.id.goog"], "prepare_istiod": true}'
+  else
+    POST_DATA='{"workloadIdentityPools":["'${PROJECT_ID}'.svc.id.goog"], "prepare_istiod": true}'
+  fi
   init_meshconfig_curl "${POST_DATA}" "${PROJECT_ID}"
   if [[ "${USE_HUB_WIP}" -eq 1 && -n "${ENVIRON_PROJECT_ID}" && "${ENVIRON_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
     POST_DATA='{"workloadIdentityPools":["'${ENVIRON_PROJECT_ID}'.hub.id.goog","'${ENVIRON_PROJECT_ID}'.svc.id.goog"]}'
@@ -2225,6 +2230,7 @@ get_cluster_labels() {
 }
 
 is_cluster_registered() {
+  if [[ "${IS_REGISTERED}" -eq 1]]; then return; fi
   info "Checking for cluster membership..."
   if ! is_membership_crd_installed; then
     false
@@ -2264,6 +2270,8 @@ Cluster is registered in the project ${ENVIRON_PROJECT_ID}, but the script is
 unable to verify in the project. The script will continue to execute.
 EOF
   fi
+
+  IS_REGISTERED=1
 }
 
 generate_membership_name() {
