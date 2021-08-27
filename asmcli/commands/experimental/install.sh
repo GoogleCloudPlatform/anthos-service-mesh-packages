@@ -17,9 +17,7 @@ x_install() {
 
   # TODO: MANAGED_CNI install should go here, if necessary
 
-  install_control_plane_revision "${CR_CONTROL_PLANE_REVISION_REGULAR}" "${REVISION_LABEL_REGULAR}"
-  install_control_plane_revision "${CR_CONTROL_PLANE_REVISION_RAPID}" "${REVISION_LABEL_RAPID}"
-  install_control_plane_revision "${CR_CONTROL_PLANE_REVISION_STABLE}" "${REVISION_LABEL_STABLE}"
+  install_control_plane_revisions
 
   outro
   info "Successfully installed ASM."

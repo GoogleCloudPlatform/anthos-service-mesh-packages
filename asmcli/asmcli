@@ -386,9 +386,7 @@ x_install() {
 
   # TODO: MANAGED_CNI install should go here, if necessary
 
-  install_control_plane_revision "${CR_CONTROL_PLANE_REVISION_REGULAR}" "${REVISION_LABEL_REGULAR}"
-  install_control_plane_revision "${CR_CONTROL_PLANE_REVISION_RAPID}" "${REVISION_LABEL_RAPID}"
-  install_control_plane_revision "${CR_CONTROL_PLANE_REVISION_STABLE}" "${REVISION_LABEL_STABLE}"
+  install_control_plane_revisions
 
   outro
   info "Successfully installed ASM."
@@ -1005,6 +1003,22 @@ OPTIONS:
                                       cluster. Defaults to "gcp" (for GKE clusters).
                                       For all other platforms use "multicloud".
                                       Allowed values for <PLATFORM> are {gcp|multicloud}.
+  --channel              <CHANNEL>    The release channel for the control plane revision.
+                                      If the user specifies the channel to be used, only
+                                      the Control Plane Revision associated with this
+                                      channel will be provisioned. Otherwise, the mapping
+                                      between Multicloud/GKE channel and the ASM Channel is
+                                      as following:
+                                      For Multicloud:
+                                        ASM provisions Regular, Rapid channels.
+                                      For GKE:
+                                        GKE Channel  |  ASM Channel
+                                        -------------|----------------
+                                        Rapid        |  Rapid
+                                        Regular      |  Regular, Rapid
+                                        Stable       |  Stable
+                                        Static       |  Regular, Rapid
+
   The following four options must be passed together and are only necessary
   for using a custom certificate for Citadel. Users that aren't sure whether
   they need this probably don't.
@@ -1118,6 +1132,7 @@ OPTIONS:
   --ca_name              <CA NAME>
   -r|--revision_name     <REVISION NAME>
   --platform             <PLATFORM>
+  --channel              <CHANNEL>
 
 FLAGS:
   -e|--enable_all
@@ -1219,7 +1234,6 @@ install_subcommand() {
 install() {
   install_ca
   install_control_plane
-  apply_kube_yamls
 
   outro
   info "Successfully installed ASM."
@@ -1308,14 +1322,28 @@ install_canonical_controller() {
   info "...done!"
 }
 
-install_control_plane_revision() {
-  local CR; CR="${1}"
-  local REVISION; REVISION="${2}"
-  info "Installing ASM Contro Plane Revision CR with ${REVISION} channel in istio-system namespace..."
-  retry 3 kubectl apply -f "${CR}"
-  info "Waiting for deployment..."
-  retry 3 kubectl wait --for=condition=ProvisioningFinished \
-    controlplanerevision "${REVISION}" -n istio-system
+install_control_plane_revisions() {
+  info "Configuring ASM managed control plane revision CR for channels..."
+  local CHANNEL CR REVISION
+  while read -r CHANNEL; do
+    if [[ "${CHANNEL}" == "regular" ]]; then
+      CR="${CR_CONTROL_PLANE_REVISION_REGULAR}"
+      REVISION="${REVISION_LABEL_REGULAR}"
+    elif [[ "${CHANNEL}" == "stable" ]]; then
+      CR="${CR_CONTROL_PLANE_REVISION_STABLE}"
+      REVISION="${REVISION_LABEL_STABLE}"
+    else
+      CR="${CR_CONTROL_PLANE_REVISION_RAPID}"
+      REVISION="${REVISION_LABEL_RAPID}"
+    fi
+    info "Installing ASM Control Plane Revision CR with ${REVISION} channel in istio-system namespace..."
+    retry 3 kubectl apply -f "${CR}"
+    info "Waiting for deployment..."
+    retry 3 kubectl wait --for=condition=ProvisioningFinished \
+      controlplanerevision "${REVISION}" -n istio-system
+  done <<EOF
+$(get_cr_channels)
+EOF
 }
 
 expose_istiod() {
@@ -1388,9 +1416,12 @@ install_control_plane() {
   label_istio_namespace
   if [[ "${MANAGED}" -eq 1 ]]; then
     install_managed_control_plane
+    install_control_plane_revisions
   else
     install_in_cluster_control_plane
   fi
+
+  apply_kube_yamls
 
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
     install_canonical_controller
@@ -1793,11 +1824,6 @@ EOF
 
   info "Configuring ASM managed control plane validating webhook config..."
   context_append "kubectlFiles" "${MANAGED_WEBHOOKS}"
-
-  info "Configuring ASM managed control plane revision CR for channels..."
-  context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_REGULAR}"
-  context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_RAPID}"
-  context_append "kubectlFiles" "${CR_CONTROL_PLANE_REVISION_STABLE}"
 
   local ASM_OPTS
   ASM_OPTS="$(kubectl -n istio-system \
@@ -2403,7 +2429,8 @@ context_init() {
     "WI_ENABLED": ${WI_ENABLED:-0},
     "HTTPS_PROXY": "${HTTPS_PROXY:-}",
     "INSTALL_EXPANSION_GATEWAY": ${INSTALL_EXPANSION_GATEWAY:-0},
-    "INSTALL_IDENTITY_PROVIDER": ${INSTALL_IDENTITY_PROVIDER:-0}
+    "INSTALL_IDENTITY_PROVIDER": ${INSTALL_IDENTITY_PROVIDER:-0},
+    "CHANNEL": "${CHANNEL:-}"
   },
   "istioctlFiles": [],
   "kubectlFiles": [],
@@ -3031,6 +3058,11 @@ parse_args() {
         context_set-option "PLATFORM" "$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
         shift 2
         ;;
+      --channel)
+        arg_required "${@}"
+        context_set-option "CHANNEL" "${2}"
+        shift 2
+        ;;
       -v | --verbose)
         context_set-option "VERBOSE" 1
         shift 1
@@ -3161,6 +3193,11 @@ x_parse_install_args() {
       --dry_run | --dry-run)
         context_set-option "DRY_RUN" 1
         shift 1
+        ;;
+      --channel)
+        arg_required "${@}"
+        context_set-option "CHANNEL" "${2}"
+        shift 2
         ;;
       -v | --verbose)
         context_set-option "VERBOSE" 1
@@ -3794,6 +3831,45 @@ init_meshconfig_curl() {
     --header "Content-Type: application/json" \
     -K <(auth_header "$(get_auth_token)")
 }
+
+get_gke_release_channel() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  gcloud container clusters describe \
+    --project="${PROJECT_ID}" \
+    --region "${CLUSTER_LOCATION}" \
+    "${CLUSTER_NAME}" \
+    --format="value(releaseChannel.channel)"
+}
+
+get_cr_channels() {
+  local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
+  if [[ -n "${CHANNEL}" ]]; then
+    echo "${CHANNEL}"
+  elif ! is_gcp; then
+    echo regular
+    echo rapid
+  else
+    local GKE_CHANNEL; GKE_CHANNEL="$(get_gke_release_channel)"
+    case "${GKE_CHANNEL}" in
+      regular)
+        echo rapid
+        echo regular
+        ;;
+      rapid)
+        echo rapid
+        ;;
+      stable)
+        echo stable
+        ;;
+      *)
+        echo rapid
+        echo regular
+        ;;
+    esac
+  fi
+}
 validate_revision_label() {
   # Matches DNS label formats of RFC 1123
   local DNS_1123_LABEL_MAX_LEN; DNS_1123_LABEL_MAX_LEN=63;
@@ -4302,6 +4378,7 @@ validate_args() {
   local WI_ENABLED; WI_ENABLED="$(context_get-option "WI_ENABLED")"
   local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
+  local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
 
   if [[ -z "${CA}" ]]; then
     CA="mesh_ca"
@@ -4339,6 +4416,13 @@ validate_args() {
       gcp | multicloud);;
       *) fatal "PLATFORM must be one of 'gcp', 'multicloud'";;
   esac
+
+  if [[ -n "${CHANNEL}" ]]; then
+    case "${CHANNEL}" in
+      regular | stable | rapid);;
+      *) fatal "CHANNEL must be one of 'regular', 'stable', 'rapid'";;
+    esac
+  fi
 
   local MISSING_ARGS=0
 
@@ -4530,6 +4614,7 @@ x_validate_install_args() {
   local PRINT_VERSION; PRINT_VERSION="$(context_get-option "PRINT_VERSION")"
   local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
+  local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
 
   local MISSING_ARGS=0
 
@@ -4546,6 +4631,13 @@ PROJECT_ID
 CLUSTER_LOCATION
 CLUSTER_NAME
 EOF
+
+  if [[ -n "${CHANNEL}" ]]; then
+    case "${CHANNEL}" in
+      regular | stable | rapid);;
+      *) fatal "CHANNEL must be one of 'regular', 'stable', 'rapid'";;
+    esac
+  fi
 
   # Script will not infer the intent between the 2 use cases in case both values are provided
   if [[ "${CLUSTER_DETAIL_SUPPLIED}" -eq 1 && "${KUBECONFIG_SUPPLIED}" -eq 1 ]]; then

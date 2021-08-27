@@ -595,3 +595,42 @@ init_meshconfig_curl() {
     --header "Content-Type: application/json" \
     -K <(auth_header "$(get_auth_token)")
 }
+
+get_gke_release_channel() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  gcloud container clusters describe \
+    --project="${PROJECT_ID}" \
+    --region "${CLUSTER_LOCATION}" \
+    "${CLUSTER_NAME}" \
+    --format="value(releaseChannel.channel)"
+}
+
+get_cr_channels() {
+  local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
+  if [[ -n "${CHANNEL}" ]]; then
+    echo "${CHANNEL}"
+  elif ! is_gcp; then
+    echo regular
+    echo rapid
+  else
+    local GKE_CHANNEL; GKE_CHANNEL="$(get_gke_release_channel)"
+    case "${GKE_CHANNEL}" in
+      regular)
+        echo rapid
+        echo regular
+        ;;
+      rapid)
+        echo rapid
+        ;;
+      stable)
+        echo stable
+        ;;
+      *)
+        echo rapid
+        echo regular
+        ;;
+    esac
+  fi
+}

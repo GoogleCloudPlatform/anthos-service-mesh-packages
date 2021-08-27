@@ -22,7 +22,6 @@ install_subcommand() {
 install() {
   install_ca
   install_control_plane
-  apply_kube_yamls
 
   outro
   info "Successfully installed ASM."
@@ -111,14 +110,28 @@ install_canonical_controller() {
   info "...done!"
 }
 
-install_control_plane_revision() {
-  local CR; CR="${1}"
-  local REVISION; REVISION="${2}"
-  info "Installing ASM Contro Plane Revision CR with ${REVISION} channel in istio-system namespace..."
-  retry 3 kubectl apply -f "${CR}"
-  info "Waiting for deployment..."
-  retry 3 kubectl wait --for=condition=ProvisioningFinished \
-    controlplanerevision "${REVISION}" -n istio-system
+install_control_plane_revisions() {
+  info "Configuring ASM managed control plane revision CR for channels..."
+  local CHANNEL CR REVISION
+  while read -r CHANNEL; do
+    if [[ "${CHANNEL}" == "regular" ]]; then
+      CR="${CR_CONTROL_PLANE_REVISION_REGULAR}"
+      REVISION="${REVISION_LABEL_REGULAR}"
+    elif [[ "${CHANNEL}" == "stable" ]]; then
+      CR="${CR_CONTROL_PLANE_REVISION_STABLE}"
+      REVISION="${REVISION_LABEL_STABLE}"
+    else
+      CR="${CR_CONTROL_PLANE_REVISION_RAPID}"
+      REVISION="${REVISION_LABEL_RAPID}"
+    fi
+    info "Installing ASM Control Plane Revision CR with ${REVISION} channel in istio-system namespace..."
+    retry 3 kubectl apply -f "${CR}"
+    info "Waiting for deployment..."
+    retry 3 kubectl wait --for=condition=ProvisioningFinished \
+      controlplanerevision "${REVISION}" -n istio-system
+  done <<EOF
+$(get_cr_channels)
+EOF
 }
 
 expose_istiod() {
@@ -191,9 +204,12 @@ install_control_plane() {
   label_istio_namespace
   if [[ "${MANAGED}" -eq 1 ]]; then
     install_managed_control_plane
+    install_control_plane_revisions
   else
     install_in_cluster_control_plane
   fi
+
+  apply_kube_yamls
 
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
     install_canonical_controller
