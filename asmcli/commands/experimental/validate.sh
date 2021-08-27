@@ -15,7 +15,9 @@ x_validate_dependencies() {
 
   if can_modify_gcp_components; then
     enable_workload_identity
-    enable_stackdriver_kubernetes
+    if ! is_stackdriver_enabled; then
+      enable_stackdriver_kubernetes
+    fi
     enable_service_mesh_feature
   else
     exit_if_no_workload_identity
