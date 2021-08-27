@@ -128,6 +128,7 @@ HUB_MEMBERSHIP_ID=""
 CUSTOM_REVISION=0
 WI_ENABLED=0
 HAS_TS=0
+IS_REGISTERED=0
 
 main() {
   init
@@ -190,7 +191,9 @@ main() {
   if is_managed; then
     if can_modify_gcp_components; then
       enable_workload_identity
-      enable_stackdriver_kubernetes
+      if ! is_stackdriver_enabled; then
+        enable_stackdriver_kubernetes
+      fi
     else
       exit_if_no_workload_identity
       exit_if_stackdriver_not_enabled
@@ -2089,9 +2092,11 @@ init_meshconfig() {
     populate_environ_info
     info "Cluster has Membership ID ${HUB_MEMBERSHIP_ID} in the Hub of project ${ENVIRON_PROJECT_ID}"
     # initialize replaces the existing Workload Identity Pools in the IAM binding, so we need to support both Hub and GKE Workload Identity Pools
-    local POST_DATA; POST_DATA='{"workloadIdentityPools":["'${ENVIRON_PROJECT_ID}'.hub.id.goog","'${ENVIRON_PROJECT_ID}'.svc.id.goog"]}'
+    local POST_DATA
+    POST_DATA='{"workloadIdentityPools":["'${PROJECT_ID}'.hub.id.goog","'${PROJECT_ID}'.svc.id.goog"]}'
     init_meshconfig_curl "${POST_DATA}" "${PROJECT_ID}"
-    if [[ "${ENVIRON_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
+    if [[ -n "${ENVIRON_PROJECT_ID}" && "${ENVIRON_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
+      POST_DATA='{"workloadIdentityPools":["'${ENVIRON_PROJECT_ID}'.hub.id.goog","'${ENVIRON_PROJECT_ID}'.svc.id.goog"]}'
       init_meshconfig_curl "${POST_DATA}" "${ENVIRON_PROJECT_ID}"
     fi
   else
@@ -2102,13 +2107,14 @@ init_meshconfig() {
 init_meshconfig_managed() {
   info "Initializing meshconfig managed API..."
   local POST_DATA
-  if [[ "${USE_HUB_WIP}" -eq 1 && -n "${ENVIRON_PROJECT_ID}" ]]; then
-    POST_DATA='{"workloadIdentityPools":["'${ENVIRON_PROJECT_ID}'.hub.id.goog","'${ENVIRON_PROJECT_ID}'.svc.id.goog"], "prepare_istiod": true}'
-  else
+  if is_cluster_registered; then
     POST_DATA='{"workloadIdentityPools":["'${PROJECT_ID}'.hub.id.goog","'${PROJECT_ID}'.svc.id.goog"], "prepare_istiod": true}'
+  else
+    POST_DATA='{"workloadIdentityPools":["'${PROJECT_ID}'.svc.id.goog"], "prepare_istiod": true}'
   fi
   init_meshconfig_curl "${POST_DATA}" "${PROJECT_ID}"
-  if [[ "${ENVIRON_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
+  if [[ "${USE_HUB_WIP}" -eq 1 && -n "${ENVIRON_PROJECT_ID}" && "${ENVIRON_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
+    POST_DATA='{"workloadIdentityPools":["'${ENVIRON_PROJECT_ID}'.hub.id.goog","'${ENVIRON_PROJECT_ID}'.svc.id.goog"]}'
     init_meshconfig_curl "${POST_DATA}" "${ENVIRON_PROJECT_ID}"
   fi
 }
@@ -2192,32 +2198,48 @@ get_cluster_labels() {
 }
 
 is_cluster_registered() {
+  if [[ "${IS_REGISTERED}" -eq 1 ]]; then return; fi
+  info "Checking for cluster membership..."
   if ! is_membership_crd_installed; then
     false
     return
   fi
 
-  local IDENTITY_PROVIDER
-  IDENTITY_PROVIDER="$(retry 2 kubectl get memberships.hub.gke.io \
-    membership -ojson 2>/dev/null | jq .spec.identity_provider)"
+  local MEMBERSHIP_DATA IDENTITY_PROVIDER
+  MEMBERSHIP_DATA="$(retry 2 kubectl get memberships.hub.gke.io membership -ojson 2>/dev/null)"
 
-  if [[ -z "${IDENTITY_PROVIDER}" ]] || [[ "${IDENTITY_PROVIDER}" == 'null' ]]; then
-    false
+  IDENTITY_PROVIDER="$(echo "${MEMBERSHIP_DATA}" \
+    | jq .spec.identity_provider \
+    | sed -E 's/.*projects\/|\/locations.*//g')"
+
+  if [[ -z "${IDENTITY_PROVIDER}" || "${IDENTITY_PROVIDER}" == 'null' ]]; then
+    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Cluster has memberships.hub.gke.io CRD but no identity provider specified. Please ensure that
+an identity provider is available for the registered cluster.
+EOF
   fi
 
   populate_environ_info
 
-  local WANT
-  WANT="//container.googleapis.com/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
-  local LIST
-  LIST="$(gcloud container hub memberships list --project "${ENVIRON_PROJECT_ID}" \
-    --format=json | grep "${WANT}")"
-  if [[ -z "${LIST}" ]]; then
+  LOCATION="$(echo "${MEMBERSHIP_DATA}" \
+    | jq -r .spec.owner.id \
+    | sed -E 's/.*locations\/|\/memberships.*//g')"
+  MEMBERSHIP="$(echo "${MEMBERSHIP_DATA}" \
+    | jq -r .spec.owner.id \
+    | sed -E 's/.*memberships\///g')"
+  WANT="name.*projects/${ENVIRON_PROJECT_ID}/locations/${LOCATION}/memberships/${MEMBERSHIP}"
+  LIST="$(gcloud container hub memberships list --project "${ENVIRON_PROJECT_ID}" --format=json \
+    | grep "${WANT}")"
+
+  if [[ "${IDENTITY_PROVIDER}" != "$ENVIRON_PROJECT_ID}" ]] || \
+     [[ -z "${LIST}" ]]; then
     { read -r -d '' MSG; warn "${MSG}"; } <<EOF || true
 Cluster is registered in the project ${ENVIRON_PROJECT_ID}, but the script is
 unable to verify in the project. The script will continue to execute.
 EOF
   fi
+
+  IS_REGISTERED=1
 }
 
 generate_membership_name() {
@@ -2707,17 +2729,19 @@ data:
 EOF
   fi
 
-  local CR_IMAGE_JSON; CR_IMAGE_JSON="";
+  local POST_DATA; POST_DATA="{}";
   if [[ -n "${_CI_CLOUDRUN_IMAGE_HUB}" ]]; then
-    CR_IMAGE_JSON=$(cat <<EOF
-{"image": "${_CI_CLOUDRUN_IMAGE_HUB}:${_CI_CLOUDRUN_IMAGE_TAG}"}
-EOF
-)
+    POST_DATA="$(echo "${POST_DATA}" | jq -r --arg IMAGE "${_CI_CLOUDRUN_IMAGE_HUB}:${_CI_CLOUDRUN_IMAGE_TAG}" '. + {image: $IMAGE}')"
   fi
+
+  if [[ -n "${ENVIRON_PROJECT_ID}" && "${ENVIRON_PROJECT_ID}" != "${PROJECT_ID}" ]]; then
+    POST_DATA="$(echo "${POST_DATA}" | jq -r --arg MEMBERSHIP "${HUB_IDP_URL/*projects/projects}" '. + {membership: $MEMBERSHIP}')"
+  fi
+
   info "Provisioning managed control plane..."
   retry 2 run curl --request POST \
     "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}:runIstiod" \
-    --data "${CR_IMAGE_JSON}" \
+    --data "${POST_DATA}" \
     --header "X-Server-Timeout: 600" \
     --header "Content-Type: application/json" \
     -K <(auth_header "$(get_auth_token)")
