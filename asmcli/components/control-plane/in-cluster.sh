@@ -36,9 +36,11 @@ init_meshconfig() {
     local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
     info "Cluster has Membership ID ${HUB_MEMBERSHIP_ID} in the Hub of project ${FLEET_ID}"
     # initialize replaces the existing Workload Identity Pools in the IAM binding, so we need to support both Hub and GKE Workload Identity Pools
-    local POST_DATA; POST_DATA='{"workloadIdentityPools":["'${FLEET_ID}'.hub.id.goog","'${FLEET_ID}'.svc.id.goog"]}'
+    local POST_DATA
+    POST_DATA='{"workloadIdentityPools":["'${PROJECT_ID}'.hub.id.goog","'${PROJECT_ID}'.svc.id.goog"]}'
     init_meshconfig_curl "${POST_DATA}" "${PROJECT_ID}"
     if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
+      POST_DATA='{"workloadIdentityPools":["'${FLEET_ID}'.hub.id.goog","'${FLEET_ID}'.svc.id.goog"]}'
       init_meshconfig_curl "${POST_DATA}" "${FLEET_ID}"
     fi
   else
