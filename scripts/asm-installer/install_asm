@@ -2230,7 +2230,7 @@ get_cluster_labels() {
 }
 
 is_cluster_registered() {
-  if [[ "${IS_REGISTERED}" -eq 1]]; then return; fi
+  if [[ "${IS_REGISTERED}" -eq 1 ]]; then return; fi
   info "Checking for cluster membership..."
   if ! is_membership_crd_installed; then
     false
