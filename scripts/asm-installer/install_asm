@@ -186,7 +186,9 @@ main() {
   if is_managed; then
     if can_modify_gcp_components; then
       enable_workload_identity
-      enable_stackdriver_kubernetes
+      if ! is_stackdriver_enabled; then
+        enable_stackdriver_kubernetes
+      fi
       if is_mcp_cni; then
         enable_network_policy
       fi
