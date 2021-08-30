@@ -54,6 +54,11 @@ parse_args() {
         shift 2
         ;;
       --ca_name | --ca-name)
+        warn "The --ca_name argument is deprecated and will be removed in the next minor release, please use --ca_pool instead."
+        warn "Execution will continue normally."
+        sleep 1
+        ;&
+      --ca_pool | --ca-pool)
         arg_required "${@}"
         context_set-option "CA_NAME" "${2}"
         shift 2

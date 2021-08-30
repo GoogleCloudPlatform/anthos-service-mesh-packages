@@ -105,11 +105,11 @@ OPTIONS:
                                       omitted if not installing optional
                                       features. To add multiple files, specify
                                       them with multiple options one at a time.
-  --ca_name              <CA NAME>    Required only if --ca option is gcp_cas.
-                                      Name of the ca in the GCP CAS service used to
+  --ca_pool              <CA POOL>    Required only if --ca option is gcp_cas.
+                                      Name of the ca pool in the GCP CAS service used to
                                       sign certificates in the format
                                       'projects/project_name/locations/ \
-                                      ca_region/certificateAuthorities/ca_name'.
+                                      ca_region/caPools/ca_pool'.
   -r|--revision_name <REVISION NAME>  Custom revision label. Label needs to follow DNS
                                       label formats (re: RFC 1123). Not supported if
                                       control plane is managed. Prefixing the revision
@@ -244,7 +244,7 @@ OPTIONS:
   --ca_key               <FILE PATH>
   --root_cert            <FILE PATH>
   --cert_chain           <FILE PATH>
-  --ca_name              <CA NAME>
+  --ca_pool              <CA POOL>
   -r|--revision_name     <REVISION NAME>
   --platform             <PLATFORM>
   --channel              <CHANNEL>
