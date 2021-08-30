@@ -1978,8 +1978,9 @@ is_cluster_registered() {
     | sed -E 's/.*projects\/|\/locations.*//g')"
   if [[ -z "${IDENTITY_PROVIDER}" || "${IDENTITY_PROVIDER}" == 'null' ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-Cluster has memberships.hub.gke.io CRD but no identity provider specified. Please ensure that
-an identity provider is available for the registered cluster.
+Cluster has memberships.hub.gke.io CRD but no identity provider specified.
+Please ensure that the registered cluster has fleet workload identity enabled:
+https://cloud.google.com/anthos/multicluster-management/fleets/workload-identity
 EOF
   fi
 
