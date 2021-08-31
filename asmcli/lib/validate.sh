@@ -720,6 +720,7 @@ x_validate_install_args() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
   local ENABLE_CLUSTER_ROLES; ENABLE_CLUSTER_ROLES="$(context_get-option "ENABLE_CLUSTER_ROLES")"
@@ -759,6 +760,10 @@ PROJECT_ID
 CLUSTER_LOCATION
 CLUSTER_NAME
 EOF
+
+  if [[ "${MANAGED}" -eq 0 ]]; then
+    fatal "Currently only managed control plane installation is supported by experimental install."
+  fi
 
   if [[ -n "${CHANNEL}" ]]; then
     case "${CHANNEL}" in

@@ -1,6 +1,5 @@
 x_install_subcommand() {
   x_parse_install_args "${@}"
-  context_set-option "MANAGED" 1
   context_set-option "PLATFORM" "gcp"
   x_validate_install_args
   prepare_environment
