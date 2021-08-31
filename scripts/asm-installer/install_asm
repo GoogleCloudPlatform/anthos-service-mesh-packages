@@ -694,7 +694,7 @@ OPTIONS:
   --ca_key               <FILE PATH>
   --root_cert            <FILE PATH>
   --cert_chain           <FILE PATH>
-  --ca_name              <CA NAME>
+  --ca_pool              <CA POOL>
   -r|--revision_name     <REVISION NAME>
 
 FLAGS:
@@ -780,11 +780,11 @@ OPTIONS:
                                       omitted if not installing optional
                                       features. To add multiple files, specify
                                       them with multiple options one at a time.
-  --ca_name              <CA NAME>    Required only if --ca option is gcp_cas.
-                                      Name of the ca in the GCP CAS service used to
+  --ca_pool              <CA POOL>    Required only if --ca option is gcp_cas.
+                                      Name of the ca pool in GCP CAS service used to
                                       sign certificates in the format
                                       'projects/project_name/locations/ \
-                                      ca_region/certificateAuthorities/ca_name'.
+                                      ca_region/caPools/ca_pool'.
   -r|--revision_name <REVISION NAME>  Custom revision label. Label needs to follow DNS
                                       label formats (re: RFC 1123). Not supported if
                                       control plane is managed. Prefixing the revision
@@ -919,6 +919,11 @@ parse_args() {
         shift 2
         ;;
       --ca_name | --ca-name)
+        warn "The --ca_name argument is deprecated and will be removed in the next minor release, please use --ca_pool instead."
+        warn "Execution will continue normally."
+        sleep 1
+        ;&
+      --ca_pool | --ca-pool)
         arg_required "${@}"
         CA_NAME="${2}"
         shift 2
@@ -2603,12 +2608,12 @@ install_secrets() {
 }
 
 init_gcp_cas() {
-  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${PROJECT_ID}.svc.id.goog[-/-]"
+  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${PROJECT_ID}.svc.id.goog:/allAuthenticatedUsers/"
   local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
 
   retry 3 gcloud privateca pools add-iam-policy-binding "${CA_NAME}" \
     --location "${CA_LOCATION}" \
-    --member "serviceAccount:${WORKLOAD_IDENTITY}" \
+    --member "group:${WORKLOAD_IDENTITY}" \
     --role "roles/privateca.workloadCertificateRequester"
 
   retry 3 gcloud privateca pools add-iam-policy-binding "${CA_NAME}" \
