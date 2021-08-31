@@ -21,7 +21,6 @@ sudo cp root-cert.pem /etc/certs/root-cert.pem
 sudo mkdir -p /var/run/secrets/tokens
 sudo cp istio-token /var/run/secrets/tokens/istio-token
 
-
 # Installing ASM agent (supports rpm or deb images).
 if [[ "${IMAGE}" == "rpm" ]]; then
   sudo rpm -ivh --force istio-sidecar.rpm

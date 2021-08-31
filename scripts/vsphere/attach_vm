@@ -78,6 +78,8 @@ configure_vm_transfer_file() {
 
   cd ${OUTPUT_DIR}/vm-${VM_APP}
 
+  multinicdetection
+
   ssh -i "${KEY_FILE}" -o StrictHostKeyChecking=no root@${VM_IP} mkdir "${VM_DIR}" || true
   scp -i "${KEY_FILE}" -o StrictHostKeyChecking=no cluster.env hosts istio-token mesh.yaml root-cert.pem root@${VM_IP}:"${VM_DIR}"
 
@@ -112,13 +114,13 @@ runagent() {
   # verify workload entry generation
   ENTRY="${VM_APP}-${VM_IP}-${VM_NETWORK}"
   sleep 2
-#  ENTRY_RES="$(kubectl get workloadentry ${ENTRY} -n ${VM_NAMESPACE})"
-  until [[ ! -z $(kubectl get workloadentry ${ENTRY} -n ${VM_NAMESPACE}) -o name ]]; do
+  # ENTRY_RES="$(kubectl get workloadentry ${ENTRY} -n ${VM_NAMESPACE})"
+  until [[ ! -z $(kubectl get workloadentry ${ENTRY} -n ${VM_NAMESPACE} -o name) ]]; do
     sleep 1
     kubectl get workloadentry ${ENTRY} -n ${VM_NAMESPACE}
   done
 
-  ENTRY_RES="$(kubectl get workloadentry ${ENTRY} -n ${VM_NAMESPACE}) -o name"
+  ENTRY_RES="$(kubectl get workloadentry ${ENTRY} -n ${VM_NAMESPACE} -o name)"
 
   if [[ ${ENTRY_RES} == *"Error"* ]]; then
     fatal "Failed to generate workloadentry for attached VM with context ${ENTRY_RES}. Please check trouble shooting section in user guide."
@@ -160,12 +162,95 @@ write_config_context_vm() {
 
   write_config_context
 
-
   echo "export VM_APP=${VM_APP}" >>${CONTEXT_FILE}
   echo "export VM_IP=${VM_IP}" >>${CONTEXT_FILE}
 
   rm ".attachConfig"
   cat ${OUTPUT_DIR}/vm-${VM_APP}/".context"
+}
+
+# multi nic support
+multinicdetection() {
+  # cache all VM ip table info for later use
+  IP_INFO=$(ssh -i "${KEY_FILE}" -o StrictHostKeyChecking=no root@${VM_IP} ip -j a )
+
+  NICCOUNTSTRING=$(echo "${IP_INFO}" | jq -jr '.[].ifname| type')
+  NICSTRING=$(echo "${IP_INFO}" | jq -jr '.[]|" ",.ifname')
+
+  # Case 1: VM has only one nic. fill in MANAGED_ADDR and MANAGED_NIC if unspecified.
+  if [[ ${#NICCOUNTSTRING} == 12 ]]; then
+    VMNICNAME=$(echo "${IP_INFO}"| jq -r '.[] | select(.ifname=="lo" | not) | .ifname')
+    VMNICIP=$(echo "${IP_INFO}"| jq -r '.[] | select(.ifname=="$(VMNICNAME) | .addr_info[] | select(.family == "inet") | select(.scope == "global") | .local')
+    if [[ -z "${MANAGED_NIC}" ]]; then
+      MANAGED_NIC="${VMNICNAME}"
+    elif [[ -z "${MANAGED_ADDR}" ]]; then
+      MANAGED_ADDR="${VMNICIP}"
+    fi
+
+    INPUTNICIP=$(echo "${IP_INFO}"| jq -r '.[] | select(.ifname=="$(MANAGED_ADDR) | .addr_info[] | select(.family == "inet") | select(.scope == "global") | .local')
+
+    if [[ "${MANAGED_ADDR}" != "${VMNICIP}" || "${MANAGED_NIC}" != "${VMNICNAME}" ]]; then
+      # User might input a wrong addr or nic which doesn't match MANAGED_ADDR or MANAGED_NIC filled in above.
+      fatal "The VM has only one nic. nic name: ${VMNICNAME}, nic address: ${VMNICIP}. But user is specifying some other nic name or nic address."
+    elif [[ "${INPUTNICIP}" != "${VMNICIP}" ]]; then
+      # User might input a unmatched addr and nic
+      fatal "The VM has only one nic. nic name: ${VMNICNAME}, nic address: ${VMNICIP}. But user input for nic name and nic address is not matched."
+    fi
+  fi
+
+  # Case 2: VM has multiple nic.
+  # if a VM has more than 2 nic like {lo ens192 ens224}, NICCOUNTSTRING="stringstringstring". User need to specify at least a --managed-nic or --managed-address
+  if [[ ${#NICCOUNTSTRING} > 12 ]]; then
+    if [[ -z "${MANAGED_ADDR}" && -z "${MANAGED_NIC}" ]]; then
+      fatal "Detect undefined behavior. The VM is has more than one Nic. User need to specify managed nic name with one nic name out of ${NICSTRING}. Please specify with --managed-nic and --managed-address in the attaching process"
+    fi
+
+    if [[ -z "${MANAGED_ADDR}" ]]; then
+      # unspecified MANAGED_ADDR
+      MANAGED_ADDR=$(echo "${IP_INFO}"| jq -r ".[] | select(.ifname == \"${MANAGED_NIC}\") | .addr_info[] | select(.family == \"inet\" and .scope == \"global\") | .local")
+      # TODO: xulingqing(linggg) deal with case when a nic corresponding to multiple IPs
+      if [[ -z "${MANAGED_ADDR}" ]]; then
+        fatal "There is no nic with name ${MANAGED_NIC} on VM."
+      fi
+    elif [[ -z "${MANAGED_NIC}" ]]; then
+      # unspecified MANAGED_NIC
+      MANAGED_NIC=$(echo "${IP_INFO}"| jq -r ".[] | select(.addr_info[].local == \"${MANAGED_ADDR}\") | .ifname")
+      if [[ -z "${MANAGED_NIC}" ]]; then
+        fatal "There is no nic with ipv4 addr ${MANAGED_ADDR} on VM."
+      fi
+    fi
+
+    # User might input a unmatched addr and nic
+    INPUTNICIP=$(echo "${IP_INFO}"| jq -r ".[] | select(.ifname == \"${MANAGED_NIC}\") | .addr_info[] | select(.family == \"inet\" and .scope == \"global\") | .local")
+
+    if [[ "${INPUTNICIP}" != "${MANAGED_ADDR}" ]]; then
+      IPNICNAME=$(echo "${IP_INFO}"| jq -r ".[] | select(.addr_info[].local == \"${MANAGED_ADDR}\") | .ifname")
+      fatal "User input for nic name and nic address is not matched.\n Input MANAGED_NIC: ${MANAGED_NIC} corresponding to IP address ${INPUTNICIP}. Input MANAGED_ADDR ${MANAGED_ADDR} corresponding to NIC name ${IPNICNAME}."
+    fi
+  fi
+
+  multinicsetup
+}
+
+multinicsetup() {
+  echo "Starting Multi-nic setup"
+
+  # adding 2 lines to cluster.env
+  # ISTIO_SVC_IP=${managed_address}
+  # ISTIO_EXCLUDE_INTERFACES=${NICs' name exclude the managed-nic}
+
+  echo "ISTIO_SVC_IP=${MANAGED_ADDR}" >> cluster.env
+  echo "export MANAGED_ADDR=${MANAGED_ADDR}" >>${CONTEXT_FILE}
+
+  # all NICs name exclude the $(managed-nic)  and "lo". Seperating with ","
+  EXCLUDE_NIC=$(echo "${IP_INFO}"| jq -jr ".[] | select(.ifname!=\"lo\" and .ifname!=\"${MANAGED_NIC}\") | .ifname,\",\"")
+
+  # remove last comma and write to cluster.env
+  echo "ISTIO_EXCLUDE_INTERFACES='${EXCLUDE_NIC%?}'" >> cluster.env
+
+  # record nic selection in .context
+  echo "export MANAGED_NIC=${MANAGED_NIC}" >>${CONTEXT_FILE}
+  echo "export ISTIO_EXCLUDE_INTERFACES='${EXCLUDE_NIC%?}'" >>${CONTEXT_FILE}
 }
 
 main "${@}"

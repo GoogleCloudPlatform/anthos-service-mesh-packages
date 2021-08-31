@@ -41,13 +41,16 @@ function fill_unspecified_context() {
   fi
 
   CLUSTER_NETWORK=$(kubectl -n istio-system get IstioOperator ${INSTALL_STATE} --output=json | jq -r '.spec.values.global.network')
+  if [[ -z "${VM_NETWORK}" ]]; then
+    VM_NETWORK="vmnet"
+    echo "VM Network      is not specified. Set VM Network as vmnet "
+  fi
+
   if [[ ${CLUSTER_NETWORK} == ${VM_NETWORK} ]]; then
-    echo "Using Single-Network Scenario. Cluster and VM are Running in Network: ${VM_NETWORK}"
-  elif [[ -z ${VM_NETWORK} ]]; then
-    echo "VM Network      is not specified. Set VM Network same as Cluster Network ${CLUSTER_NETWORK}. Single-Network Scenario"
-    VM_NETWORK=${CLUSTER_NETWORK}
+    VM_NETWORK=("${CLUSTER_NETWORK}""vmnet")
+    echo "VM Network should not be the same as Cluster Network. Set VM Network as ${VM_NETWORK} "
   else
-    echo "Using Multi-Network Scenario. Cluster Network: ${CLUSTER_NETWORK}, VM Network: ${VM_NETWORK}"
+    echo "Cluster Network: ${CLUSTER_NETWORK}, VM Network: ${VM_NETWORK}"
   fi
 
   if [[ -z "${REVISION}" ]]; then
@@ -199,6 +202,16 @@ function read_args() {
       echo "export IMAGE=${IMAGE}" >>".attachConfig"
       shift 2
       ;;
+    -nic | --managed-nic)
+      export MANAGED_NIC="${2}"
+      echo "export MANAGED_NIC=${MANAGED_NIC}" >>".attachConfig"
+      shift 2
+      ;;
+    -maddr | --managed-address)
+      export MANAGED_ADDR="${2}"
+      echo "export MANAGED_ADDR=${MANAGED_ADDR}" >>".attachConfig"
+      shift 2
+      ;;
     *)
       warn "Unknown option ${1}"
       exit 2
@@ -225,6 +238,8 @@ function  write_config_context() {
   echo "export SERVICE_ACCOUNT=${SERVICE_ACCOUNT}" >>${CONTEXT_FILE}
   echo "export VM_DIR=${VM_DIR}" >>${CONTEXT_FILE}
   echo "export IMAGE=${IMAGE}" >>${CONTEXT_FILE}
+  echo "export MANAGED_NIC=${MANAGED_NIC}" >>${CONTEXT_FILE}
+  echo "export MANAGED_ADDR=${MANAGED_ADDR}" >>${CONTEXT_FILE}
 
   if [[ ! -z "${LABELS}" ]]; then
     if [[ ${LABELS:0:1} != "\"" ]] ; then LABELS="\"${LABELS}\"";  fi
