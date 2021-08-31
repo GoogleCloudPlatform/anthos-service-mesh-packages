@@ -762,7 +762,7 @@ CLUSTER_NAME
 EOF
 
   if [[ "${MANAGED}" -eq 0 ]]; then
-    fatal "Only managed control plane installation is supported by experimental install."
+    fatal "Currently only managed control plane installation is supported by experimental install."
   fi
 
   if [[ -n "${CHANNEL}" ]]; then
