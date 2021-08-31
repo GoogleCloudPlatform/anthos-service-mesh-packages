@@ -19,15 +19,16 @@ kind: IstioOperator
 spec:
   components:
     cni:
+      k8s:
+        podAnnotations:
+          autopilot.gke.io/no-connect: "true"
+        env:
+        - name: CNI_ENABLE_REINSTALL  # disable reinstall to make migration easy
+          value: "false"
       enabled: true
       namespace: istio-system
   values:
     cni:
-      podAnnotations:
-        autopilot.gke.io/no-connect: "true"
-      env:
-        - name: CNI_ENABLE_REINSTALL  # disable reinstall to make migration easy
-          value: "false"
       cniBinDir: /home/kubernetes/bin
       excludeNamespaces:
         - istio-system
