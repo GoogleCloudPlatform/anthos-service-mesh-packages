@@ -16,13 +16,11 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: istio-ingressgateway-service-account
-  namespace: GATEWAY_NAMESPACE
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: istio-ingressgateway
-  namespace: GATEWAY_NAMESPACE
 spec:
   selector:
     matchLabels:
@@ -41,7 +39,6 @@ spec:
       labels:
         app: istio-ingressgateway
         istio: ingressgateway
-        istio.io/rev: REVISION # This is required only if the namespace is not labeled.
     spec:
       affinity:
         nodeAffinity:
@@ -139,7 +136,6 @@ apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
 metadata:
   name: istio-ingressgateway
-  namespace: GATEWAY_NAMESPACE
 spec:
   minAvailable: 1
   selector:
@@ -150,7 +146,6 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: istio-ingressgateway-sds
-  namespace: GATEWAY_NAMESPACE
 rules:
 - apiGroups: [""]
   resources: ["secrets"]
@@ -160,7 +155,6 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: istio-ingressgateway-sds
-  namespace: GATEWAY_NAMESPACE
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -173,7 +167,6 @@ apiVersion: autoscaling/v2beta1
 kind: HorizontalPodAutoscaler
 metadata:
   name: istio-ingressgateway
-  namespace: GATEWAY_NAMESPACE
 spec:
   maxReplicas: 5
   metrics:
@@ -191,7 +184,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: istio-ingressgateway
-  namespace: GATEWAY_NAMESPACE
 spec:
   ports:
   - name: status-port
