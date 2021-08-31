@@ -286,6 +286,10 @@ x_parse_install_args() {
         context_set-option "NETWORK_ID" "${2}"
         shift 2
         ;;
+      --managed)
+        context_set-option "MANAGED" 1
+        shift 1
+        ;;
       -e | --enable_all | --enable-all)
         context_set-option "ENABLE_ALL" 1
         shift 1
