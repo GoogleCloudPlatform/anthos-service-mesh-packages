@@ -1342,7 +1342,7 @@ install_control_plane_revisions() {
     retry 3 kubectl apply -f "${CR}"
     info "Waiting for deployment..."
     retry 3 kubectl wait --for=condition=ProvisioningFinished \
-      controlplanerevision "${REVISION}" -n istio-system
+      controlplanerevision "${REVISION}" -n istio-system --timeout 600s
   done <<EOF
 $(get_cr_channels)
 EOF
