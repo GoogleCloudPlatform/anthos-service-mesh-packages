@@ -338,7 +338,9 @@ needs_asm() {
 needs_service_mesh_feature() {
   local USE_VM; USE_VM="$(context_get-option "USE_VM")"
 
-  if [[ "${USE_VM}" -eq 0 ]]; then
+  if is_managed || [[ "${USE_VM}" -eq 1 ]]; then
+    true
+  else
     false
   fi
 }
