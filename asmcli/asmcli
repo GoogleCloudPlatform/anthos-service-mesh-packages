@@ -3405,6 +3405,16 @@ prompt_user_for_value() {
   fi
 }
 
+prompt() {
+  read -r -p "${1} [y/N] " response
+  case "$response" in
+      [yY][eE][sS]|[yY])
+          return
+          ;;
+  esac
+  false
+}
+
 starline() {
   echo "*****************************"
 }
@@ -3930,6 +3940,7 @@ validate_environment() {
   if is_gcp; then
     validate_expected_control_plane
   fi
+  validate_no_ingress_gateway
 }
 
 validate_cli_dependencies() {
@@ -4148,6 +4159,26 @@ validate_ca_consistency() {
   if [[ "${CA}" != "${CURRENT_CA}" ]]; then
     fatal "CA cannot be switched while performing upgrade. Please use ${CURRENT_CA} as the CA."
   fi
+}
+
+validate_no_ingress_gateway() {
+  local INGRESS_GATEWAY
+  INGRESS_GATEWAY="$(kubectl get deployments -n istio-system -l operator.istio.io/component=IngressGateways)"
+  if [[ -z "${INGRESS_GATEWAY}" ]]; then
+    return
+  fi
+
+  local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
+  if [[ "${CUSTOM_OVERLAY}" =~ "legacy-default-ingressgateway" ]]; then
+    return
+  fi
+
+  warn "Defaults have changed between previous installation methods and this tool."
+  warn "We detected an ASM ingress gateway currently running in the cluster that"
+  warn "would be disabled if continuing with default configuration."
+  warn "If this is intended, please enter Y. If this is not intended, please enter"
+  warn "N and re-run the tool with the '--option legacy-default-ingressgateway'."
+  if ! prompt "Continue?"; then fatal "Stopping installation at user request."; fi
 }
 
 exit_if_out_of_iam_policy() {

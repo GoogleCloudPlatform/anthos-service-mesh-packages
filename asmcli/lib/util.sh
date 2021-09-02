@@ -141,6 +141,16 @@ prompt_user_for_value() {
   fi
 }
 
+prompt() {
+  read -r -p "${1} [y/N] " response
+  case "$response" in
+      [yY][eE][sS]|[yY])
+          return
+          ;;
+  esac
+  false
+}
+
 starline() {
   echo "*****************************"
 }
