@@ -126,9 +126,13 @@ install_control_plane_revisions() {
     fi
     info "Installing ASM Control Plane Revision CR with ${REVISION} channel in istio-system namespace..."
     retry 3 kubectl apply -f "${CR}"
-    info "Waiting for deployment..."
-    retry 3 kubectl wait --for=condition=ProvisioningFinished \
-      controlplanerevision "${REVISION}" -n istio-system --timeout 600s
+
+    local EXPERIMENTAL; EXPERIMENTAL="$(context_get-option "EXPERIMENTAL")"
+    if [[ "${EXPERIMENTAL}" -eq 1 ]]; then
+      info "Waiting for deployment..."
+      retry 3 kubectl wait --for=condition=ProvisioningFinished \
+        controlplanerevision "${REVISION}" -n istio-system --timeout 600s
+    fi
   done <<EOF
 $(get_cr_channels)
 EOF
