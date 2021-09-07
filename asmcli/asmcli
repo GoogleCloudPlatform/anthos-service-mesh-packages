@@ -2324,7 +2324,11 @@ configure_package() {
     kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
   else
     kpt cfg set asm gcloud.core.project "${FLEET_ID}"
-    kpt cfg set asm gcloud.container.cluster "${HUB_MEMBERSHIP_ID}"
+    if [[ -n "${HUB_MEMBERSHIP_ID}" ]]; then
+      kpt cfg set asm gcloud.container.cluster "${HUB_MEMBERSHIP_ID}"
+    else
+      kpt cfg set asm gcloud.container.cluster "cluster" # default off-GCP cluster name
+    fi
     # us-central1 is the current dummy value in the user guide for on-prem
     kpt cfg set asm gcloud.compute.location "us-central1"
     if [[ "${CA}" == "citadel" ]]; then
