@@ -66,12 +66,6 @@ parse_args() {
       -o | --option)
         arg_required "${@}"
 
-        if [[ "${2}" == "cni-managed" ]]; then
-          context_set-option "USE_MCP_CNI" 1
-          shift 2
-          continue
-        fi
-
         if [[ "${2}" == "hub-meshca" ]]; then
           info "Fleet workload identity pool is used as default for Mesh CA. No need to specify hub-meshca option."
           shift 2

@@ -55,14 +55,7 @@ EOF
     get --ignore-not-found cm asm-options \
     -o jsonpath='{.data.ASM_OPTS}' || true)"
 
-  local USE_MCP_CNI; USE_MCP_CNI="$(context_get-option "USE_MCP_CNI")"
-  local CNI; CNI="off"
-  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then
-    info "Configuring CNI..."
-    CNI="on"
-  fi
-
-  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=${CNI}"* ]]; then
+  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=on"* ]]; then
     cat >mcp_configmap.yaml <<EOF
 ---
 apiVersion: v1
@@ -71,15 +64,13 @@ metadata:
   name: asm-options
   namespace: istio-system
 data:
-  ASM_OPTS: "CNI=${CNI}"
+  ASM_OPTS: "CNI=on"
 EOF
 
     context_append "kubectlFiles" "mcp_configmap.yaml"
   fi
 
-  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then
-    context_append "kubectlFiles" "${MANAGED_CNI}"
-  fi
+  context_append "kubectlFiles" "${MANAGED_CNI}"
 }
 
 configure_managed_control_plane() {
