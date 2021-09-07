@@ -4,6 +4,7 @@ configure_package() {
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
   local CA; CA="$(context_get-option "CA")"
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
   local USE_VM; USE_VM="$(context_get-option "USE_VM")"
@@ -15,13 +16,15 @@ configure_package() {
   local NETWORK_ID; NETWORK_ID="$(context_get-option "NETWORK_ID")"
   
   populate_fleet_info
+  local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
 
-  kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
   if is_gcp; then
+    kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
     kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
     kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
   else
     kpt cfg set asm gcloud.core.project "${FLEET_ID}"
+    kpt cfg set asm gcloud.container.cluster "${HUB_MEMBERSHIP_ID}"
     # us-central1 is the current dummy value in the user guide for on-prem
     kpt cfg set asm gcloud.compute.location "us-central1"
     if [[ "${CA}" == "citadel" ]]; then
