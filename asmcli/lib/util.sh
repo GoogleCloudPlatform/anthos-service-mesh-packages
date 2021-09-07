@@ -141,7 +141,7 @@ prompt_user_for_value() {
   fi
 }
 
-prompt() {
+prompt_default_no() {
   read -r -p "${1} [y/N] " response
   case "$response" in
       [yY][eE][sS]|[yY])

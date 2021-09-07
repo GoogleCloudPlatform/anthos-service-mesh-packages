@@ -252,14 +252,15 @@ validate_ca_consistency() {
 }
 
 validate_no_ingress_gateway() {
-  local INGRESS_GATEWAY
-  INGRESS_GATEWAY="$(kubectl get deployments -n istio-system -l operator.istio.io/component=IngressGateways)"
-  if [[ -z "${INGRESS_GATEWAY}" ]]; then
+  local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
+  if [[ "${CUSTOM_OVERLAY}" =~ "legacy-default-ingressgateway" ]]; then
     return
   fi
 
-  local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
-  if [[ "${CUSTOM_OVERLAY}" =~ "legacy-default-ingressgateway" ]]; then
+  local INGRESS_GATEWAY_SVC INGRESS_GATEWAY_DEP
+  INGRESS_GATEWAY_SVC="$(kubectl get svc istio-ingressgateway -n istio-system || true)"
+  INGRESS_GATEWAY_DEP="$(kubectl get deployments istio-ingressgateway -n istio-system || true)"
+  if [[ -z "${INGRESS_GATEWAY_SVC}" && -z "${INGRESS_GATEWAY_DEP}" ]]; then
     return
   fi
 
@@ -268,7 +269,7 @@ validate_no_ingress_gateway() {
   warn "would be disabled if continuing with default configuration."
   warn "If this is intended, please enter Y. If this is not intended, please enter"
   warn "N and re-run the tool with the '--option legacy-default-ingressgateway'."
-  if ! prompt "Continue?"; then fatal "Stopping installation at user request."; fi
+  if ! prompt_default_no "Continue?"; then fatal "Stopping installation at user request."; fi
 }
 
 exit_if_out_of_iam_policy() {
