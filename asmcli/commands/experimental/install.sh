@@ -17,6 +17,15 @@ x_install() {
 
   # TODO: MANAGED_CNI install should go here, if necessary
 
+  # `kubectl wait` for non-existent resources will return error directly so we wait in loop
+  info "Wait for the controlplanerevisions CRD to be installed by AFC. This should take a few minutes if cluster is newly registered."
+  for i in {1..10}; do
+    if kubectl wait --for condition=established --timeout=10s crd/controlplanerevisions.mesh.cloud.google.com 2>/dev/null; then
+      break
+    fi
+    sleep 10
+  done
+
   install_control_plane_revisions
 
   outro
