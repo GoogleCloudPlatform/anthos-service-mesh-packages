@@ -192,7 +192,7 @@ is_service_mesh_feature_enabled() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
 
   local RESPONSE
-  RESPONSE="$(run_command gcloud alpha container hub mesh describe --project="${PROJECT_ID}")"
+  RESPONSE="$(run_command gcloud beta container hub mesh describe --project="${PROJECT_ID}")"
 
   if [[ "$(echo "${RESPONSE}" | jq -r '.featureState.lifecycleState')" != "ENABLED" ]]; then
     false
