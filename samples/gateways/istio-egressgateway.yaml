@@ -179,6 +179,9 @@ apiVersion: v1
 kind: Service
 metadata:
   name: istio-egressgateway
+  labels:
+    app: istio-egressgateway
+    istio: egressgateway
 spec:
   type: ClusterIP
   ports:
