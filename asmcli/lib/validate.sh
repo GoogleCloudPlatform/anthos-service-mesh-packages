@@ -30,6 +30,7 @@ validate_environment() {
   if is_gcp; then
     validate_expected_control_plane
   fi
+  validate_no_ingress_gateway
 }
 
 validate_cli_dependencies() {
@@ -248,6 +249,27 @@ validate_ca_consistency() {
   if [[ "${CA}" != "${CURRENT_CA}" ]]; then
     fatal "CA cannot be switched while performing upgrade. Please use ${CURRENT_CA} as the CA."
   fi
+}
+
+validate_no_ingress_gateway() {
+  local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
+  if [[ "${CUSTOM_OVERLAY}" =~ "legacy-default-ingressgateway" ]]; then
+    return
+  fi
+
+  local INGRESS_GATEWAY_SVC INGRESS_GATEWAY_DEP
+  INGRESS_GATEWAY_SVC="$(kubectl get svc istio-ingressgateway -n istio-system || true)"
+  INGRESS_GATEWAY_DEP="$(kubectl get deployments istio-ingressgateway -n istio-system || true)"
+  if [[ -z "${INGRESS_GATEWAY_SVC}" && -z "${INGRESS_GATEWAY_DEP}" ]]; then
+    return
+  fi
+
+  warn "Defaults have changed between previous installation methods and this tool."
+  warn "We detected an ASM ingress gateway currently running in the cluster that"
+  warn "would be disabled if continuing with default configuration."
+  warn "If this is intended, please enter Y. If this is not intended, please enter"
+  warn "N and re-run the tool with the '--option legacy-default-ingressgateway'."
+  if ! prompt_default_no "Continue?"; then fatal "Stopping installation at user request."; fi
 }
 
 exit_if_out_of_iam_policy() {
