@@ -1852,14 +1852,7 @@ EOF
     get --ignore-not-found cm asm-options \
     -o jsonpath='{.data.ASM_OPTS}' || true)"
 
-  local USE_MCP_CNI; USE_MCP_CNI="$(context_get-option "USE_MCP_CNI")"
-  local CNI; CNI="off"
-  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then
-    info "Configuring CNI..."
-    CNI="on"
-  fi
-
-  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=${CNI}"* ]]; then
+  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=on"* ]]; then
     cat >mcp_configmap.yaml <<EOF
 ---
 apiVersion: v1
@@ -1868,15 +1861,13 @@ metadata:
   name: asm-options
   namespace: istio-system
 data:
-  ASM_OPTS: "CNI=${CNI}"
+  ASM_OPTS: "CNI=on"
 EOF
 
     context_append "kubectlFiles" "mcp_configmap.yaml"
   fi
 
-  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then
-    context_append "kubectlFiles" "${MANAGED_CNI}"
-  fi
+  context_append "kubectlFiles" "${MANAGED_CNI}"
 }
 
 configure_managed_control_plane() {
@@ -2449,7 +2440,6 @@ context_init() {
     "CUSTOM_CA": ${CUSTOM_CA:-0},
     "USE_HUB_WIP": ${USE_HUB_WIP:-1},
     "USE_VM": ${USE_VM:-0},
-    "USE_MCP_CNI": ${USE_MCP_CNI:-0},
     "HUB_MEMBERSHIP_ID": "${HUB_MEMBERSHIP_ID:-}",
     "CUSTOM_REVISION": ${CUSTOM_REVISION:-0},
     "TRUST_DOMAIN_ALIASES": "${TRUST_DOMAIN_ALIASES:-}",
@@ -2955,12 +2945,6 @@ parse_args() {
         ;;
       -o | --option)
         arg_required "${@}"
-
-        if [[ "${2}" == "cni-managed" ]]; then
-          context_set-option "USE_MCP_CNI" 1
-          shift 2
-          continue
-        fi
 
         if [[ "${2}" == "hub-meshca" ]]; then
           info "Fleet workload identity pool is used as default for Mesh CA. No need to specify hub-meshca option."

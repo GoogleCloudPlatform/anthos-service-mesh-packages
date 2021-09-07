@@ -45,7 +45,6 @@ context_init() {
     "CUSTOM_CA": ${CUSTOM_CA:-0},
     "USE_HUB_WIP": ${USE_HUB_WIP:-1},
     "USE_VM": ${USE_VM:-0},
-    "USE_MCP_CNI": ${USE_MCP_CNI:-0},
     "HUB_MEMBERSHIP_ID": "${HUB_MEMBERSHIP_ID:-}",
     "CUSTOM_REVISION": ${CUSTOM_REVISION:-0},
     "TRUST_DOMAIN_ALIASES": "${TRUST_DOMAIN_ALIASES:-}",
