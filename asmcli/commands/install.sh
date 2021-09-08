@@ -72,15 +72,19 @@ install_private_ca() {
 
   local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${WORKLOAD_POOL}:/allAuthenticatedUsers/"
   local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
+  local CA_POOL; CA_POOL=$(echo "${CA_NAME}" | cut -f6 -d/)
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
 
-  retry 3 gcloud privateca pools add-iam-policy-binding "${CA_NAME}" \
+  retry 3 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
+    --project "${PROJECT_ID}" \
     --location "${CA_LOCATION}" \
     --member "group:${WORKLOAD_IDENTITY}" \
     --role "roles/privateca.workloadCertificateRequester"
 
-  retry 3 gcloud privateca pools add-iam-policy-binding "${CA_NAME}" \
+  retry 3 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
+    --project "${PROJECT_ID}" \
     --location "${CA_LOCATION}" \
-    --member "serviceAccount:${WORKLOAD_IDENTITY}" \
+    --member "group:${WORKLOAD_IDENTITY}" \
     --role "roles/privateca.auditor"
 }
 
