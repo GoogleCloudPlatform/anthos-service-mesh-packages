@@ -121,7 +121,6 @@ PRINT_VERSION=0
 CUSTOM_CA=0
 USE_HUB_WIP=0
 TRUST_DOMAIN_ALIASES=""
-USE_MCP_CNI=0
 USE_VM=0
 ENVIRON_PROJECT_ID=""
 HUB_IDP_URL=""
@@ -960,12 +959,6 @@ parse_args() {
         ;;
       -o | --option)
         arg_required "${@}"
-
-        if [[ "${2}" == "cni-managed" ]]; then
-          USE_MCP_CNI=1
-          shift 2
-          continue
-        fi
 
         OPTIONAL_OVERLAY="${2},${OPTIONAL_OVERLAY}"
         if [[ "${2}" == "hub-meshca" ]]; then
@@ -2752,10 +2745,7 @@ start_managed_control_plane() {
     get --ignore-not-found cm asm-options \
     -o jsonpath='{.data.ASM_OPTS}' || true)"
 
-  local CNI; CNI="off"
-  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then CNI="on"; fi
-
-  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=${CNI}"* ]]; then
+  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=on"* ]]; then
     info "Configuring control plane options..."
     run kubectl apply --overwrite=true -f - <<EOF
 ---
@@ -2765,7 +2755,7 @@ metadata:
   name: asm-options
   namespace: istio-system
 data:
-  ASM_OPTS: "CNI=${CNI}"
+  ASM_OPTS: "CNI=on"
 EOF
   fi
 
@@ -2799,10 +2789,8 @@ scrape_managed_urls() {
 }
 
 install_managed_components() {
-  if [[ "${USE_MCP_CNI}" -eq 1 ]]; then
-    info "Installing CNI into the cluster..."
-    run kubectl apply -f "${MANAGED_CNI}"
-  fi
+  info "Installing CNI into the cluster..."
+  run kubectl apply -f "${MANAGED_CNI}"
 
   info "Configuring ASM managed control plane validating webhook config..."
   run kubectl apply -f "${MANAGED_WEBHOOKS}"
