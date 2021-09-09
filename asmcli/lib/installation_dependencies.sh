@@ -299,9 +299,7 @@ register_cluster() {
 add_cluster_labels(){
   local LABELS; LABELS="$(get_cluster_labels)";
 
-  local VERSION_TAG
-  VERSION_TAG="${RELEASE//\./-}"
-  local WANT; WANT="$(mesh_id_label; echo "asmv=${VERSION_TAG}")";
+  local WANT; WANT="$(mesh_id_label)"
 
   local NOTFOUND; NOTFOUND="$(find_missing_strings "${WANT}" "${LABELS}")"
 
