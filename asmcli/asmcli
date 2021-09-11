@@ -26,7 +26,6 @@ _CI_REVISION_PREFIX="${_CI_REVISION_PREFIX:=}"; readonly _CI_REVISION_PREFIX;
 _CI_NO_VALIDATE="${_CI_NO_VALIDATE:=0}"; readonly _CI_NO_VALIDATE;
 _CI_NO_REVISION="${_CI_NO_REVISION:=0}"; readonly _CI_NO_REVISION;
 _CI_ISTIOCTL_REL_PATH="${_CI_ISTIOCTL_REL_PATH:=}"; readonly _CI_ISTIOCTL_REL_PATH;
-_CI_TRUSTED_GCP_PROJECTS="${_CI_TRUSTED_GCP_PROJECTS:=}"; readonly _CI_TRUSTED_GCP_PROJECTS;
 _CI_CRC_VERSION="${_CI_CRC_VERSION:=0}"; readonly _CI_CRC_VERSION;
 _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"; readonly _CI_I_AM_A_TEST_ROBOT;
 
@@ -1020,6 +1019,10 @@ OPTIONS:
                                         Stable       |  Stable
                                         Static       |  Regular, Rapid
 
+  --trusted_gcp_projects <PROJECT_ID,PROJECT_ID...>
+                                      All Project IDs of a multi-cluster/multi-project service mesh.
+                                      This is used to configure trust domain aliases for upgrade.
+
   The following four options must be passed together and are only necessary
   for using a custom certificate for Citadel. Users that aren't sure whether
   they need this probably don't.
@@ -1067,6 +1070,11 @@ FLAGS:
      --disable_canonical_service      Do not install the CanonicalService
                                       controller. This is required for ASM UI to
                                       support various features.
+     --trust_fleet_identity           This flag is helpful for upgrade in a multi-cluster mesh.
+                                      It will patch all clusters in the fleet with the fleet
+                                      workload identity pool as the trust domain alias so that
+                                      there is no down time for cross-cluster load balancing.
+                                      It requires access to all clusters in the fleet.
   -v|--verbose                        Print commands before and after execution.
      --dry_run                        Print commands, but don't execute them.
      --only_validate                  Run validation, but don't install.
@@ -1134,6 +1142,7 @@ OPTIONS:
   -r|--revision_name     <REVISION NAME>
   --platform             <PLATFORM>
   --channel              <CHANNEL>
+  --trusted_gcp_projects <PROJECT_ID,PROJECT_ID...>
 
 FLAGS:
   -e|--enable_all
@@ -1149,6 +1158,7 @@ FLAGS:
 
      --print_config
      --disable_canonical_service
+     --trust_fleet_identity
   -v|--verbose
      --dry_run
      --only_validate
@@ -1679,11 +1689,9 @@ validate_meshca() {
 }
 
 configure_meshca() {
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
-  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
   local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
 
@@ -1693,21 +1701,132 @@ configure_meshca() {
     kpt cfg set asm anthos.servicemesh.idp-url "https://container.googleapis.com/v1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
   fi
 
-  # set the trust domain aliases to include both new Hub WIP and old Hub WIP to achieve no downtime upgrade.
+  configure_trust_domain_aliases
+}
+
+configure_trust_domain_aliases() {
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
+  local TRUSTED_GCP_PROJECTS; TRUSTED_GCP_PROJECTS="$(context_get-option "TRUSTED_GCP_PROJECTS")"
+
+  # Set the trust domain aliases to include both new Hub WIP and old Hub WIP to achieve no downtime upgrade.
   add_trust_domain_alias "${FLEET_ID}.svc.id.goog"
   add_trust_domain_alias "${FLEET_ID}.hub.id.goog"
   if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
     add_trust_domain_alias "${PROJECT_ID}.svc.id.goog"
   fi
-  if [[ -n "${_CI_TRUSTED_GCP_PROJECTS}" ]]; then
+  if [[ -n "${TRUSTED_GCP_PROJECTS}" ]]; then
     # Gather the trust domain aliases from projects.
-    while IFS=',' read -r trusted_gcp_project; do
-      add_trust_domain_alias "${trusted_gcp_project}.svc.id.goog"
+    while IFS=',' read -ra TRUSTED_GCP_PROJECT_IDS; do
+      for trusted_gcp_project_id in "${TRUSTED_GCP_PROJECT_IDS[@]}"; do
+        add_trust_domain_alias "${trusted_gcp_project_id}.svc.id.goog"
+      done
     done <<EOF
-${_CI_TRUSTED_GCP_PROJECTS}
+${TRUSTED_GCP_PROJECTS}
 EOF
   fi
+  local TRUST_FLEET_IDENTITY; TRUST_FLEET_IDENTITY="$(context_get-option "TRUST_FLEET_IDENTITY")"
+  # Patch all clusters in the fleet with fleet workload identity pool as the trust domain aliases
+  # for multi-cluster mesh upgrade
+  if [[ "$TRUST_FLEET_IDENTITY" -eq 1 ]]; then
+    local LOCAL_ORIGINAL_TRUST_DOMAIN;
+    local ISTIOD_COUNT; ISTIOD_COUNT="$(get_istio_deployment_count)";
+    # When it is the upgrade case, find the original trust domain in the local cluster
+    if [[ "$ISTIOD_COUNT" -ne 0 ]]; then
+      local REVISION; REVISION="$(retry 2 kubectl -n istio-system get pod -l istio=istiod \
+        -o jsonpath='{.items[].spec.containers[].env[?(@.name=="REVISION")].value}')"
+      LOCAL_ORIGINAL_TRUST_DOMAIN="$(retry 2 kubectl -n istio-system get configmap istio-"${REVISION}" \
+        -o 'go-template={{index .data "mesh" }}' \
+        | grep "trustDomain:" | sed -E 's/trustDomain: //g')"
+    fi
+    # When it is the upgrade case and the original trust domain is different from the new trust domain FLEET_ID.svc.id.goog
+    # we need to patch other clusters in the fleet to include FLEET_ID.svc.id.goog in the istiod's trust domain aliases
+    # this will make sure no downtime in cross-cluster load balancing
+    if [[ "${USE_HUB_WIP}" -eq 1 && "${LOCAL_ORIGINAL_TRUST_DOMAIN}" != "" && "${LOCAL_ORIGINAL_TRUST_DOMAIN}" != "${FLEET_ID}.svc.id.goog" ]]; then
+      local LOCAL_CLUSTER_CONTEXT; LOCAL_CLUSTER_CONTEXT="$(context_get-option "CONTEXT")"
+      for CLUSTER_ENDPOINT in $(retry 2 gcloud container hub memberships list --project="${FLEET_ID}" --format="value(endpoint.gkeCluster.resourceLink)"); do
+        # Patch only GCP clusters in the fleet
+        if [[ "${CLUSTER_ENDPOINT}" == //container.googleapis.com/* ]]; then
+          info "Found GCP cluster endpoint ${CLUSTER_ENDPOINT} in the Fleet ${FLEET_ID}"
+          local CLUSTER_META; CLUSTER_META="$(echo "${CLUSTER_ENDPOINT}" | sed 's/^\/\/container.googleapis.com\/projects\/\(.*\)\/locations\/\(.*\)\/clusters\/\(.*\)$/\1 \2 \3/g')"
+          local PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME;
+          read -r PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
+${CLUSTER_META}
+EOF
+          # Do not patch local cluster
+          if [[ "${LOCAL_CLUSTER_CONTEXT}" == "gke_${PROJECT_ID}_${CLUSTER_LOCATION}_${CLUSTER_NAME}" ]]; then
+            info "Skip patching for local cluster ${LOCAL_CLUSTER_CONTEXT}"
+            continue
+          fi
+          local EXITCODE; EXITCODE=0;
+          gcloud container clusters get-credentials "${CLUSTER_NAME}" \
+            --project="${PROJECT_ID}" \
+            --zone="${CLUSTER_LOCATION}" || EXITCODE=$?
+          if [[ "${EXITCODE}" -ne 0 ]]; then
+            info "No access to ${CLUSTER_ENDPOINT}. Please make sure the cluster exists and access to the cluster is granted"
+          else
+            configure_kubectl "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
+            local ISTIOD_COUNT; ISTIOD_COUNT="$(get_istio_deployment_count)";
+            # when a remote GCP cluster in the fleet has istiod installed
+            if [[ "$ISTIOD_COUNT" -ne 0 ]]; then
+              local REVISION; REVISION="$(retry 2 kubectl -n istio-system get pod -l istio=istiod \
+              -o jsonpath='{.items[].spec.containers[].env[?(@.name=="REVISION")].value}')"
+              # Find remote cluster trust domain
+              local REMOTE_TRUST_DOMAIN; REMOTE_TRUST_DOMAIN="$(retry 2 kubectl -n istio-system get configmap istio-"${REVISION}" \
+                -o 'go-template={{index .data "mesh" }}' \
+                | grep "trustDomain:" | sed -E 's/trustDomain: //g')"
+              # Find remote cluster trust domain aliases
+              local RAW_REMOTE_TRUST_DOMAINS_ALIASES; RAW_REMOTE_TRUST_DOMAINS_ALIASES="$(retry 2 kubectl -n istio-system get configmap istio-"${REVISION}" \
+                -o jsonpath='{.data.mesh}' | sed -e '1,/trustDomainAliases:/ d')"
+              local -a REMOTE_TRUST_DOMAIN_ALIASES
+              while IFS= read -r TRUST_DOMAINS_ALIAS; do
+                if [[ "$TRUST_DOMAINS_ALIAS" =~ "- " ]]; then
+                  REMOTE_TRUST_DOMAIN_ALIASES+=("$TRUST_DOMAINS_ALIAS")
+                else
+                  break
+                fi
+              done < <(printf '%s\n' "$RAW_REMOTE_TRUST_DOMAINS_ALIASES")
 
+              local FLEET_ALIAS_FOUND; FLEET_ALIAS_FOUND=0
+              local LOCAL_ORIGIN_ALIAS_FOUND; LOCAL_ORIGIN_ALIAS_FOUND=0
+              for REMOTE_TRUST_DOMAIN_ALIASES in "${REMOTE_TRUST_DOMAIN_ALIASES[@]}"; do
+                if [[ "${REMOTE_TRUST_DOMAIN_ALIASES}" == *"- ${FLEET_ID}.svc.id.goog"* ]]; then
+                  FLEET_ALIAS_FOUND=1
+                fi
+                if [[ "${REMOTE_TRUST_DOMAIN_ALIASES}" == *"- ${LOCAL_ORIGINAL_TRUST_DOMAIN}"* ]]; then
+                  LOCAL_ORIGIN_ALIAS_FOUND=1
+                fi
+              done
+              # When local cluster's original trust domain is found in the trust domain alias of the remote cluster
+              # it means cross-cluster load balancing works before the upgrade. Then it is needed to include the remote
+              # trust domain as the trust domain alias and patch the configmap of the remote cluster if the configmap
+              # does not have FLEET_ID.svc.id.goog in the trust domain aliases.
+              if [[ "${LOCAL_ORIGIN_ALIAS_FOUND}" -eq 1 ]]; then
+                add_trust_domain_alias "${REMOTE_TRUST_DOMAIN}"
+                if [[ "${FLEET_ALIAS_FOUND}" -eq 0 ]]; then
+                  info "Patch istio-${REVISION} configmap trustDomainAliases with ${FLEET_ID}.svc.id.goog"
+                  local CONFIGMAP_YAML; CONFIGMAP_YAML="$(retry 2 kubectl -n istio-system get configmap istio-"${REVISION}" -o yaml)"
+                  CONFIGMAP_YAML="$(echo "$CONFIGMAP_YAML" | sed '/^    trustDomainAliases:.*/a \    - '"${FLEET_ID}.svc.id.goog"'')"
+                  echo "$CONFIGMAP_YAML"| kubectl apply -f - || warn "failed to patch the configmap istio-${REVISION}"
+                fi
+              fi
+            else
+              info "Found no ASM deployment in cluster ${CLUSTER_NAME}"
+            fi
+          fi
+        fi
+      done
+      # Restore to the local cluster's kubernetes context
+      local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+      local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+      local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+      gcloud container clusters get-credentials "${CLUSTER_NAME}" \
+        --project="${PROJECT_ID}" \
+        --zone="${CLUSTER_LOCATION}"
+      configure_kubectl "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
+    fi
+  fi
   # shellcheck disable=SC2046
   kpt cfg set asm anthos.servicemesh.trustDomainAliases $(context_get-option "TRUST_DOMAIN_ALIASES")
 }
@@ -2398,6 +2517,7 @@ context_init() {
     "KUBECONFIG": "${KUBECONFIG_FILE:-}",
     "KUBECONFIG_SUPPLIED": "${KUBECONFIG_SUPPLIED:-0}",
     "FLEET_ID": "${FLEET_ID:-}",
+    "TRUSTED_GCP_PROJECTS": "${TRUSTED_GCP_PROJECTS:-}",
     "CA": "${CA:-}",
     "PLATFORM": "${PLATFORM:-}",
     "CONTEXT": "${CONTEXT:-}",
@@ -2413,6 +2533,7 @@ context_init() {
     "ENABLE_REGISTRATION": ${ENABLE_REGISTRATION:-0},
     "ENABLE_NAMESPACE_CREATION": ${ENABLE_NAMESPACE_CREATION:-0},
     "DISABLE_CANONICAL_SERVICE": ${DISABLE_CANONICAL_SERVICE:-0},
+    "TRUST_FLEET_IDENTITY": ${TRUST_FLEET_IDENTITY:-0},
     "PRINT_CONFIG": ${PRINT_CONFIG:-0},
     "NON_INTERACTIVE": ${NON_INTERACTIVE:-0},
     "SERVICE_ACCOUNT": "${SERVICE_ACCOUNT:-}",
@@ -3008,6 +3129,10 @@ parse_args() {
         context_set-option "DISABLE_CANONICAL_SERVICE" 1
         shift 1
         ;;
+      --trust_fleet_identity | --trust-fleet-identity)
+        context_set-option "TRUST_FLEET_IDENTITY" 1
+        shift 1
+        ;;
       --print_config | --print-config)
         context_set-option "PRINT_CONFIG" 1
         shift 1
@@ -3079,6 +3204,11 @@ parse_args() {
       --channel)
         arg_required "${@}"
         context_set-option "CHANNEL" "${2}"
+        shift 2
+        ;;
+      --trusted_gcp_projects | --trusted-gcp-projects)
+        arg_required "${@}"
+        context_set-option "TRUSTED_GCP_PROJECTS" "${2}"
         shift 2
         ;;
       -v | --verbose)
@@ -4376,6 +4506,7 @@ validate_args() {
   local ENABLE_REGISTRATION; ENABLE_REGISTRATION="$(context_get-option "ENABLE_REGISTRATION")"
   local ENABLE_NAMESPACE_CREATION; ENABLE_NAMESPACE_CREATION="$(context_get-option "ENABLE_NAMESPACE_CREATION")"
   local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
+  local TRUST_FLEET_IDENTITY; TRUST_FLEET_IDENTITY="$(context_get-option "TRUST_FLEET_IDENTITY")"
   local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
   local SERVICE_ACCOUNT; SERVICE_ACCOUNT="$(context_get-option "SERVICE_ACCOUNT")"
   local KEY_FILE; KEY_FILE="$(context_get-option "KEY_FILE")"
@@ -4558,6 +4689,7 @@ ENABLE_GCP_COMPONENTS
 ENABLE_REGISTRATION
 MANAGED
 DISABLE_CANONICAL_SERVICE
+TRUST_FLEET_IDENTITY
 ONLY_VALIDATE
 ONLY_ENABLE
 VERBOSE

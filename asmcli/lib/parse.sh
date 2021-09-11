@@ -133,6 +133,10 @@ parse_args() {
         context_set-option "DISABLE_CANONICAL_SERVICE" 1
         shift 1
         ;;
+      --trust_fleet_identity | --trust-fleet-identity)
+        context_set-option "TRUST_FLEET_IDENTITY" 1
+        shift 1
+        ;;
       --print_config | --print-config)
         context_set-option "PRINT_CONFIG" 1
         shift 1
@@ -204,6 +208,11 @@ parse_args() {
       --channel)
         arg_required "${@}"
         context_set-option "CHANNEL" "${2}"
+        shift 2
+        ;;
+      --trusted_gcp_projects | --trusted-gcp-projects)
+        arg_required "${@}"
+        context_set-option "TRUSTED_GCP_PROJECTS" "${2}"
         shift 2
         ;;
       -v | --verbose)

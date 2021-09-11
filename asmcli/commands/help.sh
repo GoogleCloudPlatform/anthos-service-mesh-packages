@@ -134,6 +134,10 @@ OPTIONS:
                                         Stable       |  Stable
                                         Static       |  Regular, Rapid
 
+  --trusted_gcp_projects <PROJECT_ID,PROJECT_ID...>
+                                      All Project IDs of a multi-cluster/multi-project service mesh.
+                                      This is used to configure trust domain aliases for upgrade.
+
   The following four options must be passed together and are only necessary
   for using a custom certificate for Citadel. Users that aren't sure whether
   they need this probably don't.
@@ -181,6 +185,11 @@ FLAGS:
      --disable_canonical_service      Do not install the CanonicalService
                                       controller. This is required for ASM UI to
                                       support various features.
+     --trust_fleet_identity           This flag is helpful for upgrade in a multi-cluster mesh.
+                                      It will patch all clusters in the fleet with the fleet
+                                      workload identity pool as the trust domain alias so that
+                                      there is no down time for cross-cluster load balancing.
+                                      It requires access to all clusters in the fleet.
   -v|--verbose                        Print commands before and after execution.
      --dry_run                        Print commands, but don't execute them.
      --only_validate                  Run validation, but don't install.
@@ -248,6 +257,7 @@ OPTIONS:
   -r|--revision_name     <REVISION NAME>
   --platform             <PLATFORM>
   --channel              <CHANNEL>
+  --trusted_gcp_projects <PROJECT_ID,PROJECT_ID...>
 
 FLAGS:
   -e|--enable_all
@@ -263,6 +273,7 @@ FLAGS:
 
      --print_config
      --disable_canonical_service
+     --trust_fleet_identity
   -v|--verbose
      --dry_run
      --only_validate
