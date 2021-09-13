@@ -61,7 +61,7 @@ EOF
 
 is_proper_tag() {
   local TAG; TAG="${1}"
-  if [[ ! "${TAG}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-asm\.[0-9]+\+config[0-9]+$ ]]; then false; fi
+  if [[ ! "${TAG}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-asm\.[0-9]+\+config[0-9]+(-staging)?$ ]]; then false; fi
 }
 
 is_on_hold() {
