@@ -102,7 +102,7 @@ EOF
       context_append "clusterRegistrations" "${CTX_CLUSTER} ${GKE_CLUSTER_URI}"
     else
       exit_if_cluster_registered_to_another_fleet "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
-      warn "Cluster ${CLUSTER_NAME} is already registered with project ${PROJECT_ID}. Skipping."
+      warn "Cluster ${CLUSTER_NAME} is already registered with fleet ${FLEET_ID}. Skipping."
     fi
     context_append "clusterContexts" "${CTX_CLUSTER}"
   done <<EOF
@@ -125,13 +125,14 @@ add_one_to_mesh() {
   local GKE_CLUSTER_URI; GKE_CLUSTER_URI="${2}"
   local PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME MEMBERSHIP_NAME
   IFS='_' read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME < <(echo "$CTX_CLUSTER")
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   MEMBERSHIP_NAME="$(generate_membership_name "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}")"
 
   info "Registering the cluster ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME} as ${MEMBERSHIP_NAME}..."
 
   retry 2 gcloud container hub memberships register "${MEMBERSHIP_NAME}" \
-    --project="${PROJECT_ID}" \
+    --project="${FLEET_ID}" \
     --gke-uri="${GKE_CLUSTER_URI}" \
     --enable-workload-identity
 }
