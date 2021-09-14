@@ -34,7 +34,7 @@ _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=9}"; readonly MINOR;
 POINT="${POINT:=8}"; readonly POINT;
-REV="${REV:=1}"; readonly REV;
+REV="${REV:=3}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
@@ -186,7 +186,9 @@ main() {
   if is_managed; then
     if can_modify_gcp_components; then
       enable_workload_identity
-      enable_stackdriver_kubernetes
+      if ! is_stackdriver_enabled; then
+        enable_stackdriver_kubernetes
+      fi
       if is_mcp_cni; then
         enable_network_policy
       fi
