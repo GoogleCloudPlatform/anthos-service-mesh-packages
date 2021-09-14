@@ -6,6 +6,7 @@ create-mesh_subcommand() {
 
   ### Registration ###
   create_mesh
+  patch_trust_domain_aliases
   install_all_remote_secrets
 }
 
@@ -31,6 +32,10 @@ create-mesh_parse_args() {
         ;;
       --version)
         context_set-option "PRINT_VERSION" 1
+        shift 1
+        ;;
+      --no_auto_trusting_fleet_identity | --no-auto-trusting-fleet-identity)
+        context_set-option "TRUST_FLEET_IDENTITY" 0
         shift 1
         ;;
       *)
@@ -188,4 +193,49 @@ create-mesh_prepare_environment() {
     fi
     organize_kpt_files
   fi
+}
+
+patch_trust_domain_aliases() {
+  local PROJECT_ID
+  local CLUSTER_LOCATION
+  local CLUSTER_NAME
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  local TRUST_FLEET_IDENTITY; TRUST_FLEET_IDENTITY="$(context_get-option "TRUST_FLEET_IDENTITY")"
+  if [[ "$TRUST_FLEET_IDENTITY" -eq 0 ]]; then
+    return
+  fi
+  while read -r PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME; do
+    configure_kubectl "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
+    local ISTIOD_COUNT; ISTIOD_COUNT="$(get_istio_deployment_count)";
+    if [[ "$ISTIOD_COUNT" -ne 0 ]]; then
+      info "Check trust domain aliases of cluster gke_${PROJECT_ID}_${CLUSTER_LOCATION}_${CLUSTER_NAME}"
+      local REVISION; REVISION="$(retry 2 kubectl -n istio-system get pod -l istio=istiod \
+        -o jsonpath='{.items[].spec.containers[].env[?(@.name=="REVISION")].value}')"
+      # Find the trust domain aliases
+      local RAW_TRUST_DOMAIN_ALIASES; RAW_TRUST_DOMAIN_ALIASES="$(retry 2 kubectl -n istio-system get configmap istio-"${REVISION}" \
+        -o jsonpath='{.data.mesh}' | sed -e '1,/trustDomainAliases:/ d')"
+      local RAW_TRUST_DOMAIN_ALIAS
+      local FLEET_ALIAS_FOUND; FLEET_ALIAS_FOUND=0
+      while IFS= read -r RAW_TRUST_DOMAIN_ALIAS; do
+        if [[ "${RAW_TRUST_DOMAIN_ALIAS}" =~ "- " ]]; then
+          if [[ "${RAW_TRUST_DOMAIN_ALIAS}" == *"- ${FLEET_ID}.svc.id.goog"* ]]; then
+            FLEET_ALIAS_FOUND=1
+          fi
+        else
+          break
+        fi
+      done < <(printf '%s\n' "$RAW_TRUST_DOMAIN_ALIASES")
+
+      # Patch the configmap of the cluster if it does not include FLEET_ID.svc.id.goog
+      if [[ "${FLEET_ALIAS_FOUND}" -eq 0 ]]; then
+        info "Patch istio-${REVISION} configmap trustDomainAliases with ${FLEET_ID}.svc.id.goog"
+        local CONFIGMAP_YAML; CONFIGMAP_YAML="$(retry 2 kubectl -n istio-system get configmap istio-"${REVISION}" -o yaml)"
+        CONFIGMAP_YAML="$(echo "$CONFIGMAP_YAML" | sed '/^    trustDomainAliases:.*/a \    - '"${FLEET_ID}.svc.id.goog"'')"
+        echo "$CONFIGMAP_YAML"| kubectl apply -f - || warn "failed to patch the configmap istio-${REVISION}"
+      fi
+    fi
+
+  done <<EOF
+$(context_list "clustersInfo")
+EOF
 }
