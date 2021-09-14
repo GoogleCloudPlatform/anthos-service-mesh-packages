@@ -217,9 +217,12 @@ EOF
   fi
 
   ln -s "${ISTIOCTL_REL_PATH}" .
+  local SAMPLES_URL
+  SAMPLES_URL="${KPT_URL/asm@/samples@}"
 
   info "Downloading ASM kpt package..."
   retry 3 kpt pkg get --auto-set=false "${KPT_URL}" asm
+  retry 3 kpt pkg get --auto-set=false "${SAMPLES_URL}" samples
   version_message > "${ASM_VERSION_FILE}"
 }
 
