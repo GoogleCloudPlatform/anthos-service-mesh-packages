@@ -2034,7 +2034,7 @@ is_workload_identity_enabled() {
     --format=json | \
     jq .workloadIdentityConfig)"
 
-  if [[ "${ENABLED}" = 'null' ]]; then
+  if [[ "${ENABLED}" = 'null' || "${ENABLED}" = '{}' ]]; then
     false;
   else
     WI_ENABLED=1;
