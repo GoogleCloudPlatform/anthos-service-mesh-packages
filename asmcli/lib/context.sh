@@ -110,6 +110,15 @@ context_append() {
   && mv "${TEMP_FILE}" "${context_FILE_LOCATION}"
 }
 
+context_remove() {
+  local KEY; KEY="${1}"
+  local VALUE; VALUE="${2}"
+  local TEMP_FILE; TEMP_FILE="$(mktemp)"
+
+  jq -S --arg KEY "${KEY}" --arg VALUE "${VALUE}" '.[$KEY] -= [$VALUE]' "${context_FILE_LOCATION}" >| "${TEMP_FILE}" \
+  && mv "${TEMP_FILE}" "${context_FILE_LOCATION}"
+}
+
 context_list() {
   local KEY; KEY="${1}"
   jq -S -r --arg KEY "${KEY}" '.[$KEY][]' "${context_FILE_LOCATION}"
