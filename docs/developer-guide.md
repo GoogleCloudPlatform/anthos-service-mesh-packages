@@ -29,7 +29,7 @@ To maintain the most up-to-date script at all times, we require the merged scrip
 The merged script should either be moved or copied to the package root `asmcli/` and commit manually.
 We provide a simple script to perform the merge and copy for you, simply run:
 ```shell
-./script/release-asm/precommit
+./scripts/release-asm/precommit
 ```
 and commit the changes. 
 
