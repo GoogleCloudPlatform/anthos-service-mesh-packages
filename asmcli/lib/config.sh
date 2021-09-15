@@ -66,14 +66,15 @@ configure_package() {
 }
 
 configure_kubectl(){
-  local PROJECT_ID; PROJECT_ID="${1}"
-  local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}"
-  local CLUSTER_NAME; CLUSTER_NAME="${3}"
   local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
   local KUBECONFIG; KUBECONFIG="$(context_get-option "KUBECONFIG")"
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
 
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
+    local PROJECT_ID; PROJECT_ID="${1}"
+    local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}"
+    local CLUSTER_NAME; CLUSTER_NAME="${3}"
+    
     info "Fetching/writing GCP credentials to kubeconfig file..."
     KUBECONFIG="${KUBECONFIG}" retry 2 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
       --project="${PROJECT_ID}" \
