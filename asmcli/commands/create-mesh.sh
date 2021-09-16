@@ -3,8 +3,6 @@ create-mesh_subcommand() {
 
   # using kubeconfig globally for create-mesh sub-command
   context_set-option "KUBECONFIG_SUPPLIED" 1
-  # setting same behavior for all environments
-  context_set-option "PLATFORM" "multicloud"
 
   create-mesh_parse_args "$@"
   create-mesh_prepare_environment
@@ -73,12 +71,9 @@ create-mesh_parse_args() {
 
 create-mesh_validate_args() {
   local KCF
-  local CONTEXT_PREFIX
   local PROJECT_ID
   local CLUSTER_LOCATION
   local CLUSTER_NAME
-  local CTX_CLUSTER
-  local GKE_CLUSTER_URI
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   # validate fleet id is valid
@@ -101,6 +96,9 @@ create-mesh_validate_args() {
 $(context_list "clustersInfo")
 EOF
 
+  # required because registration command is diffv2com  erent for GKE vs off-GKE
+  create-mesh_set_platform
+
   # validate clusters are valid
   while read -r KCF; do
     context_set-option "KUBECONFIG" "${KCF}"
@@ -109,6 +107,21 @@ EOF
   done <<EOF
 $(context_list "kubeconfigFiles")
 EOF
+}
+
+create-mesh_set_platform() {
+  while read -r KCF; do
+    context_set-option "KUBECONFIG" "${KCF}"
+    if [[ "$(kubectl config current-context)" =~ "gke_" ]]; then
+      context_set-option "PLATFORM" "gcp"
+    else
+      context_set-option "PLATFORM" "multicloud"
+    fi
+    break
+  done <<EOF
+$(context_list "kubeconfigFiles")
+EOF
+  context_set-option "PLATFORM" "multicloud"
 }
 
 create-mesh_register() {
@@ -131,10 +144,10 @@ install_all_remote_secrets() {
         install_one_remote_secret "${KCF1}" "${KCF2}"
       fi
     done <<EOF
-$(m1context_list "kubeconfigFiles")
+$(context_list "kubeconfigFiles")
 EOF
   done <<EOF
-$(m1context_list "kubeconfigFiles")
+$(context_list "kubeconfigFiles")
 EOF
 }
 
