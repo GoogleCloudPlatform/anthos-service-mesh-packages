@@ -204,12 +204,9 @@ create-mesh_parse_args() {
 
 create-mesh_validate_args() {
   local KCF
-  local CONTEXT_PREFIX
   local PROJECT_ID
   local CLUSTER_LOCATION
   local CLUSTER_NAME
-  local CTX_CLUSTER
-  local GKE_CLUSTER_URI
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   # validate fleet id is valid
