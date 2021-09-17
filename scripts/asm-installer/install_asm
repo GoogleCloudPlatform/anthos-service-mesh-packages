@@ -2577,7 +2577,7 @@ configure_package() {
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${REVISION_LABEL}"
   fi
 
-  if [[ "${CA}" == "mesh_ca" ]]; then
+  if [[ "${CA}" == "mesh_ca" || "${CA}" == "gcp_cas" ]]; then
     # set the trust domain aliases to include both new Hub WIP and old Hub WIP to achieve no downtime upgrade.
     add_trust_domain_alias "${PROJECT_ID}.svc.id.goog"
     add_trust_domain_alias "${PROJECT_ID}.hub.id.goog"
@@ -2639,15 +2639,16 @@ init_gcp_cas() {
   local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${PROJECT_ID}.svc.id.goog:/allAuthenticatedUsers/"
   local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
   local CA_POOL; CA_POOL=$(echo "${CA_NAME}" | cut -f6 -d/)
+  local PROJECT; PROJECT=$(echo "${CA_NAME}" | cut -f2 -d/)
 
   retry 3 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
-    --project="${PROJECT_ID}" \
+    --project="${PROJECT}" \
     --location "${CA_LOCATION}" \
     --member "group:${WORKLOAD_IDENTITY}" \
     --role "roles/privateca.workloadCertificateRequester"
 
   retry 3 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
-    --project="${PROJECT_ID}" \
+    --project="${PROJECT}" \
     --location "${CA_LOCATION}" \
     --member "group:${WORKLOAD_IDENTITY}" \
     --role "roles/privateca.auditor"
