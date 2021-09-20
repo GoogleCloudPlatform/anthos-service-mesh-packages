@@ -325,7 +325,7 @@ spec:
         - --enable-leader-election
         command:
         - /manager
-        image: gcr.io/gke-release/asm/canonical-service-controller:1.7.3-asm.6 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.canonicalServiceHub"}
+        image: gcr.io/gke-release/asm/canonical-service-controller:1.10.3-asm.16 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.canonicalServiceHub"}
         name: manager
         resources:
           limits:
