@@ -282,6 +282,8 @@ register_cluster() {
   local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}")"
   info "Registering the cluster as ${MEMBERSHIP_NAME}..."
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  local KCF; KCF="$(context_get-option "KUBECONFIG")"
+  local KCC; KCC="$(context_get-option "CONTEXT")"
 
   local CMD
   CMD="gcloud container hub memberships register ${MEMBERSHIP_NAME}"
