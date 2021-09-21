@@ -110,28 +110,20 @@ EOF
 }
 
 create-mesh_set_platform() {
-  while read -r KCF; do
-    context_set-option "KUBECONFIG" "${KCF}"
-    if [[ "$(kubectl config current-context)" =~ "gke_" ]]; then
-      context_set-option "PLATFORM" "gcp"
-    else
-      context_set-option "PLATFORM" "multicloud"
-    fi
-    break
-  done <<EOF
-$(context_list "kubeconfigFiles")
-EOF
-  context_set-option "PLATFORM" "multicloud"
+  local FIRST_KCF; FIRST_KCF="$(context_list "kubeconfigFiles" | head -n 1)"
+  context_set-option "KUBECONFIG" "${FIRST_KCF}"
+  if [[ "$(kubectl config current-context)" =~ "gke_" ]]; then
+    context_set-option "PLATFORM" "gcp"
+  else
+    context_set-option "PLATFORM" "multicloud"
+  fi
 }
 
 create-mesh_register() {
   while read -r KCF; do
     context_set-option "KUBECONFIG" "${KCF}"
     context_set-option "CONTEXT" "$(kubectl config current-context)"
-    is_cluster_registered
-    if ! is_membership_crd_installed; then
-      register_cluster
-    fi
+    register_cluster
   done <<EOF
 $(context_list "kubeconfigFiles")
 EOF
