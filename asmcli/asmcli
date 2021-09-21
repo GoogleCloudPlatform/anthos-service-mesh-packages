@@ -1597,7 +1597,7 @@ validate_dependencies() {
     fi
   fi
 
-  if can_register_cluster && is_gcp; then
+  if can_register_cluster; then
     register_cluster
   elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 || "${USE_VM}" -eq 1 ]]; then
     exit_if_cluster_unregistered
@@ -2881,6 +2881,8 @@ register_cluster() {
   local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}")"
   info "Registering the cluster as ${MEMBERSHIP_NAME}..."
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  local KCF; KCF="$(context_get-option "KUBECONFIG")"
+  local KCC; KCC="$(context_get-option "CONTEXT")"
 
   local CMD
   CMD="gcloud container hub memberships register ${MEMBERSHIP_NAME}"

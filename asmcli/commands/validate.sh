@@ -62,7 +62,7 @@ validate_dependencies() {
     fi
   fi
 
-  if can_register_cluster && is_gcp; then
+  if can_register_cluster; then
     register_cluster
   elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 || "${USE_VM}" -eq 1 ]]; then
     exit_if_cluster_unregistered
