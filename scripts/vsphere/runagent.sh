@@ -28,7 +28,7 @@ else
   sudo dpkg -i istio-sidecar.deb
 fi
 
-sudo cp cluster.env /var/lib/istio/envoy/cluster.env
+sudo cp *.env /var/lib/istio/envoy/
 
 sudo cp mesh.yaml /etc/istio/config/mesh
 

@@ -207,7 +207,7 @@ function read_args() {
       echo "export MANAGED_NIC=${MANAGED_NIC}" >>".attachConfig"
       shift 2
       ;;
-    -maddr | --managed-address)
+    -maddr | --managed-addr | --managed-address)
       export MANAGED_ADDR="${2}"
       echo "export MANAGED_ADDR=${MANAGED_ADDR}" >>".attachConfig"
       shift 2
@@ -238,8 +238,6 @@ function  write_config_context() {
   echo "export SERVICE_ACCOUNT=${SERVICE_ACCOUNT}" >>${CONTEXT_FILE}
   echo "export VM_DIR=${VM_DIR}" >>${CONTEXT_FILE}
   echo "export IMAGE=${IMAGE}" >>${CONTEXT_FILE}
-  echo "export MANAGED_NIC=${MANAGED_NIC}" >>${CONTEXT_FILE}
-  echo "export MANAGED_ADDR=${MANAGED_ADDR}" >>${CONTEXT_FILE}
 
   if [[ ! -z "${LABELS}" ]]; then
     if [[ ${LABELS:0:1} != "\"" ]] ; then LABELS="\"${LABELS}\"";  fi
