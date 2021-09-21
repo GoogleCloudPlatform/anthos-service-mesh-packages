@@ -96,7 +96,7 @@ create-mesh_validate_args() {
 $(context_list "clustersInfo")
 EOF
 
-  # required because registration command is diffv2com  erent for GKE vs off-GKE
+  # required because registration command is different for GCP vs off-GCP clusters
   create-mesh_set_platform
 
   # validate clusters are valid
@@ -109,6 +109,10 @@ $(context_list "kubeconfigFiles")
 EOF
 }
 
+# Sets the PLATFORM context variable to either {gke|multicloud}
+# depending on the kubectl context.
+# For a homogeneous mesh, need to be called only once.
+# For a hybrid mesh, need to be called for each context change.
 create-mesh_set_platform() {
   local FIRST_KCF; FIRST_KCF="$(context_list "kubeconfigFiles" | head -n 1)"
   context_set-option "KUBECONFIG" "${FIRST_KCF}"
