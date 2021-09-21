@@ -140,7 +140,7 @@ create-mesh_subcommand() {
   create-mesh_validate_args
 
   ### Registration ###
-  create_mesh_register
+  create-mesh_register
   patch_trust_domain_aliases
   install_all_remote_secrets
 }
@@ -223,9 +223,7 @@ create-mesh_validate_args() {
     
     # save the kubeconfig to context
     context_append "kubeconfigFiles" "${KCF}"
-  done <<EOF
-$(context_list "clustersInfo")
-EOF
+  done < <(context_list "clustersInfo")
 
   # required because registration command is different for GCP vs off-GCP clusters
   create-mesh_set_platform
@@ -281,14 +279,26 @@ EOF
 install_one_remote_secret() {
   local KCF1; KCF1="${1}"
   local KCF2; KCF2="${2}"
-  local SECRET_NAME; SECRET_NAME="$(generate_secret_name "${KCF1//_/-}")"
+  local CTX1
+  local CTX2
+  local SECRET_NAME
+  
+  context_set-option "KUBECONFIG" "${KCF1}"
+  CTX1="$(kubectl config current-context)"
+  SECRET_NAME="${CTX1//_/-}"
+  SECRET_NAME="${SECRET_NAME//\./-}"
+  SECRET_NAME="${SECRET_NAME//@/-}"
+  SECRET_NAME="$(generate_secret_name "${SECRET_NAME}")"
+  context_set-option "KUBECONFIG" "${KCF2}"
+  local CTX2; CTX2="$(kubectl config current-context)"
 
   info "Installing remote secret ${SECRET_NAME} on ${KCF2}..."
 
   retry 2 istioctl x create-remote-secret \
     --kubeconfig="${KCF1}" \
+    --context="${CTX1}" \
     --name="${SECRET_NAME}" | \
-    kubectl apply --kubeconfig="${KCF2}" -f -
+    kubectl apply --kubeconfig="${KCF2}" --context="${CTX2}" -f -
 }
 
 # Need to prepare differently under multicluster environment
