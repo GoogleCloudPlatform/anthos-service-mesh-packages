@@ -21,10 +21,6 @@ spec:
     matchLabels:
       app: istio-ingressgateway
       istio: ingressgateway
-  strategy:
-    rollingUpdate:
-      maxSurge: 100%
-      maxUnavailable: 25%
   template:
     metadata:
       annotations:
@@ -35,98 +31,21 @@ spec:
         app: istio-ingressgateway
         istio: ingressgateway
     spec:
-      affinity:
-        nodeAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - preference:
-                matchExpressions:
-                  - key: kubernetes.io/arch
-                    operator: In
-                    values:
-                      - amd64
-              weight: 2
-            - preference:
-                matchExpressions:
-                  - key: kubernetes.io/arch
-                    operator: In
-                    values:
-                      - ppc64le
-              weight: 2
-            - preference:
-                matchExpressions:
-                  - key: kubernetes.io/arch
-                    operator: In
-                    values:
-                      - s390x
-              weight: 2
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: kubernetes.io/arch
-                    operator: In
-                    values:
-                      - amd64
-                      - ppc64le
-                      - s390x
       containers:
-        - env:
-            - name: ISTIO_META_UNPRIVILEGED_POD
-              value: "true"
-            - name: ISTIO_META_ROUTER_MODE
-              value: standard
-          image: auto # The image will automatically update each time the pod starts.
-          name: istio-proxy
-          ports:
-            - containerPort: 15021
-              protocol: TCP
-            - containerPort: 8080
-              protocol: TCP
-            - containerPort: 8443
-              protocol: TCP
-            - containerPort: 15012
-              protocol: TCP
-            - containerPort: 15443
-              protocol: TCP
-            - containerPort: 15090
-              name: http-envoy-prom
-              protocol: TCP
-          resources:
-            limits:
-              cpu: 2000m
-              memory: 1024Mi
-            requests:
-              cpu: 100m
-              memory: 128Mi
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-            privileged: false
-            readOnlyRootFilesystem: true
-          volumeMounts:
-            - mountPath: /etc/istio/ingressgateway-certs
-              name: ingressgateway-certs
-              readOnly: true
-            - mountPath: /etc/istio/ingressgateway-ca-certs
-              name: ingressgateway-ca-certs
-              readOnly: true
-      securityContext:
-        fsGroup: 1337
-        runAsGroup: 1337
-        runAsNonRoot: true
-        runAsUser: 1337
-      serviceAccountName: istio-ingressgateway-service-account
-      volumes:
-        - name: ingressgateway-certs
-          secret:
-            optional: true
-            secretName: istio-ingressgateway-certs
-        - name: ingressgateway-ca-certs
-          secret:
-            optional: true
-            secretName: istio-ingressgateway-ca-certs
+      - name: istio-proxy
+        image: auto # The image will automatically update each time the pod starts.
+        resources:
+          limits:
+            cpu: 2000m
+            memory: 1024Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+      serviceAccountName: istio-ingressgateway
+
 ---
+# Optional: PodDisruptionBudget will instruct Kubernetes to ensure at least 1 replica
+# is available when possible
 apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
 metadata:
@@ -138,6 +57,8 @@ spec:
       istio: ingressgateway
       app: istio-ingressgateway
 ---
+# Optional: HorizontalPodAutoscaler will automatically scale the gateway replica count based on
+# CPU utilization
 apiVersion: autoscaling/v2beta1
 kind: HorizontalPodAutoscaler
 metadata:
@@ -145,10 +66,10 @@ metadata:
 spec:
   maxReplicas: 5
   metrics:
-    - resource:
-        name: cpu
-        targetAverageUtilization: 80
-      type: Resource
+  - resource:
+      name: cpu
+      targetAverageUtilization: 80
+    type: Resource
   minReplicas: 2
   scaleTargetRef:
     apiVersion: apps/v1
