@@ -20,20 +20,12 @@ metadata:
     app: istio-egressgateway
     istio: egressgateway
 spec:
-  type: ClusterIP
   ports:
-    - name: http2
-      port: 80
-      protocol: TCP
-      targetPort: 8080
-    - name: https
-      port: 443
-      protocol: TCP
-      targetPort: 8443
-    - name: tls
-      port: 15443
-      protocol: TCP
-      targetPort: 15443
+  # Any ports exposed in Gateway resources should be exposed here.
+  - name: http2
+    port: 80
+  - name: https
+    port: 443
   selector:
     istio: egressgateway
     app: istio-egressgateway

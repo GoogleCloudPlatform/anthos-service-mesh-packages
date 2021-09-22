@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 apiVersion: v1
 kind: Service
 metadata:
@@ -21,26 +20,16 @@ metadata:
     istio: ingressgateway
 spec:
   ports:
-    - name: status-port
-      port: 15021
-      protocol: TCP
-      targetPort: 15021
-    - name: http2
-      port: 80
-      protocol: TCP
-      targetPort: 8080
-    - name: https
-      port: 443
-      protocol: TCP
-      targetPort: 8443
-    - name: tcp-istiod
-      port: 15012
-      protocol: TCP
-      targetPort: 15012
-    - name: tls
-      port: 15443
-      protocol: TCP
-      targetPort: 15443
+  # status-port exposes a /healthz/ready endpoint that can be used with GKE Ingress health checks
+  - name: status-port
+    port: 15021
+    protocol: TCP
+    targetPort: 15021
+  # Any ports exposed in Gateway resources should be exposed here.
+  - name: http2
+    port: 80
+  - name: https
+    port: 443
   selector:
     istio: ingressgateway
     app: istio-ingressgateway
