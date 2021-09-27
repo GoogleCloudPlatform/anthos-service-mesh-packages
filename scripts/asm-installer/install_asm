@@ -24,7 +24,7 @@ PREVIOUS_RELEASE_LINE="${MAJOR}.$(( MINOR - 1 ))."
 REVISION_LABEL="asm-${MAJOR}${MINOR}${POINT}-${REV}"
 KPT_BRANCH="release-${MAJOR}.${MINOR}-asm"
 readonly RELEASE; readonly RELEASE_LINE; readonly REVISION_LABEL; readonly KPT_BRANCH;
-CONFIG_VER="${CONFIG_VER:="1"}"; readonly CONFIG_VER;
+CONFIG_VER="${CONFIG_VER:="2"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
 ### These are hooks for Cloud Build to be able to use debug/staging images
