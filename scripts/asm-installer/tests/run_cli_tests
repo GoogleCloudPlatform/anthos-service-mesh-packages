@@ -63,6 +63,13 @@ tar() {
   return 0
 }
 
+kpt() {
+  if [[ "${1}" = "version" ]]; then
+    echo "1.0.0"
+  fi
+  return 0
+}
+
 test_main() {
   local FAILURES; FAILURES=0;
 
@@ -262,6 +269,18 @@ test_main() {
     echo "Fails on migrating with Istio outside of istio-system: FAIL"
     ((++FAILURES))
   fi
+
+  #################
+  # kpt should be downloaded if the environment version is not 0.x
+  #################
+
+  if ! needs_kpt; then
+    echo "needs_kpt is true when kpt is too new: FAIL"
+    ((++FAILURES))
+  else
+    echo "needs_kpt is true when kpt is too new: PASS"
+  fi
+  echo "***"
 
   #################
   echo "There were ${FAILURES} failures."
