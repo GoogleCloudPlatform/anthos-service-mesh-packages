@@ -70,7 +70,7 @@ is_cluster_registered() {
 
   local MEMBERSHIP_DATA IDENTITY_PROVIDER
   MEMBERSHIP_DATA="$(retry 2 kubectl get memberships.hub.gke.io membership -ojson 2>/dev/null)"
-  
+
   # expected value is the project id to which the cluster is registered
   IDENTITY_PROVIDER="$(echo "${MEMBERSHIP_DATA}" \
     | jq .spec.identity_provider \
@@ -189,10 +189,10 @@ is_user_cluster_admin() {
 }
 
 is_service_mesh_feature_enabled() {
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   local RESPONSE
-  RESPONSE="$(run_command gcloud beta container hub mesh describe --project="${PROJECT_ID}")"
+  RESPONSE="$(run_command gcloud beta container hub mesh describe --project="${FLEET_ID}")"
 
   if [[ "$(echo "${RESPONSE}" | jq -r '.featureState.lifecycleState')" != "ENABLED" ]]; then
     false

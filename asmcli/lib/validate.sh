@@ -457,11 +457,11 @@ enable_stackdriver_kubernetes(){
 }
 
 enable_service_mesh_feature() {
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   info "Enabling the service mesh feature..."
 
-  retry 2 run_command gcloud beta container hub mesh enable --project="${PROJECT_ID}"
+  retry 2 run_command gcloud beta container hub mesh enable --project="${FLEET_ID}"
 }
 
 check_istio_deployed(){
