@@ -42,6 +42,30 @@ run_command() {
   return $RETVAL
 }
 
+######
+# check_curl calls curl and returns non-zero if the http code is not 200 or the
+# curl command fails.
+######
+check_curl() {
+  local TMPFILE; TMPFILE=$(mktemp)
+
+  local HTTPCODE;
+  local RETVAL;
+  HTTPCODE=$(run_command curl --write-out '%{http_code}' --silent --show-error --output "$TMPFILE" "${@}")
+  RETVAL="$?"
+  if [[ "$RETVAL" != "0" ]] ; then
+    return "$RETVAL"
+  fi
+  if [[ "$HTTPCODE" != "200" ]] ; then
+    warn "HTTP response code: ${HTTPCODE}"
+  fi
+  cat "$TMPFILE"
+  if [[ "$HTTPCODE" != "200" ]] ; then
+    false
+    return
+  fi
+}
+
 #######
 # retry takes an integer N as the first argument, and a list of arguments
 # representing a command afterwards. It will retry the given command up to N
