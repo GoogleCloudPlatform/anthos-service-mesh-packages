@@ -435,6 +435,7 @@ x_install() {
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
 
+  # TODO: remove this manual step when managed backend is ready
   install_mananged_cni
   apply_kube_yamls
 
@@ -455,6 +456,7 @@ x_install() {
 }
 
 x_configure_package() {
+  kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
   if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then
     kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
   fi
