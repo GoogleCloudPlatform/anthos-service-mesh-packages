@@ -871,12 +871,14 @@ check_cni_ready() {
   if ! kubectl get daemonset istio-cni-node -n kube-system 2>/dev/null; then
     false; return
   fi
-  
+
   local NUMBER_READY NUMBER_DESIRED
   NUMBER_READY="$(kubectl get daemonset istio-cni-node -n kube-system -o jsonpath='{.status.numberReady}')"
   NUMBER_DESIRED="$(kubectl get daemonset istio-cni-node -n kube-system -o jsonpath='{.status.desiredNumberScheduled}')"
 
+
   if [[ "${NUMBER_DESIRED}" -eq 0 ]] || [[ "${NUMBER_READY}" -ne "${NUMBER_DESIRED}" ]]; then
+    warn "Found ${NUMBER_READY} ready of ${NUMBER_DESIRED} wanted from CNI daemonset."
     false
   fi
 }
