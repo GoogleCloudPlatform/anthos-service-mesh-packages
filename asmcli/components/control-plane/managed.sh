@@ -50,6 +50,11 @@ EOF
   info "Configuring ASM managed control plane validating webhook config..."
   context_append "kubectlFiles" "${MANAGED_WEBHOOKS}"
 
+  install_mananged_cni
+}
+
+install_mananged_cni() {
+  info "Configuring CNI..."
   local ASM_OPTS
   ASM_OPTS="$(kubectl -n istio-system \
     get --ignore-not-found cm asm-options \

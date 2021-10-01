@@ -15,7 +15,9 @@ x_install() {
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
 
-  # TODO: MANAGED_CNI install should go here, if necessary
+  # TODO: remove this manual step when managed backend is ready
+  install_mananged_cni
+  apply_kube_yamls
 
   # `kubectl wait` for non-existent resources will return error directly so we wait in loop
   info "Wait for the controlplanerevisions CRD to be installed by AFC. This should take a few minutes if cluster is newly registered."
@@ -34,6 +36,7 @@ x_install() {
 }
 
 x_configure_package() {
+  kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
   if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then
     kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
   fi

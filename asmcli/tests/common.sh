@@ -323,6 +323,8 @@ cleanup_lt_cluster() {
   # Remove managed control plane webhooks
   kubectl delete mutatingwebhookconfigurations istiod-asm-managed istiod-asmca istiod-ossmanaged || true
   kubectl delete validatingwebhookconfigurations istiod-istio-system || true
+  # Remove managed CNI resources
+  kubectl delete -f "${DIR}"/asm/istio/options/cni-managed.yaml || true
   set -e
 }
 
@@ -763,6 +765,16 @@ run_basic_test() {
   label_with_revision "${LT_NAMESPACE}" "${LABEL}"
   roll "${LT_NAMESPACE}"
 
+  if [[ "${EXTRA_FLAGS}" = *--managed* || "${SUBCOMMAND}" = *experimental* ]]; then
+    local READY; READY=0
+    for _ in {1..5}; do
+      check_cni_ready && READY=1 && break || echo "Retrying checking CNI..." && sleep 10
+    done
+    if [[ "${READY}" -eq 0 ]]; then
+      fatal "CNI daemonset never becomes ready."
+    fi
+  fi
+
   return # see above for @zerobfd
 
   # MCP doesn't install Ingress
@@ -853,4 +865,18 @@ EOF
 
   if [[ -n "${NOTFOUND}" ]]; then NOTFOUND="$(strip_trailing_commas "${NOTFOUND}")"; fi
   echo "${NOTFOUND}"
+}
+
+check_cni_ready() {
+  if ! kubectl get daemonset istio-cni-node -n kube-system 2>/dev/null; then
+    false; return
+  fi
+  
+  local NUMBER_READY NUMBER_DESIRED
+  NUMBER_READY="$(kubectl get daemonset istio-cni-node -n kube-system -o jsonpath='{.status.numberReady}')"
+  NUMBER_DESIRED="$(kubectl get daemonset istio-cni-node -n kube-system -o jsonpath='{.status.desiredNumberScheduled}')"
+
+  if [[ "${NUMBER_DESIRED}" -eq 0 ]] || [[ "${NUMBER_READY}" -ne "${NUMBER_DESIRED}" ]]; then
+    false
+  fi
 }
