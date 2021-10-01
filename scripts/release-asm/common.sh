@@ -33,7 +33,7 @@ staging_releases() {
 
 other_releases() {
   cat << EOF
-main alpha
+asmcli-staging-1.10 alpha
 EOF
 }
 
