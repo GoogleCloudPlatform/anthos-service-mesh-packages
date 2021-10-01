@@ -99,10 +99,18 @@ init_meshconfig_managed() {
 
   info "Initializing meshconfig managed API..."
   local POST_DATA
-  POST_DATA='{"workloadIdentityPools":["'${PROJECT_ID}'.hub.id.goog","'${PROJECT_ID}'.svc.id.goog"], "prepare_istiod": true}'
-  init_meshconfig_curl "${POST_DATA}" "${PROJECT_ID}"
-  if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
+  # When cluster local project is the same as the Hub Hosting Project
+  # Initialize the project with Hub WIP and prepare istiod
+  if [[ "${FLEET_ID}" == "${PROJECT_ID}" ]]; then
+    POST_DATA='{"workloadIdentityPools":["'${FLEET_ID}'.hub.id.goog","'${FLEET_ID}'.svc.id.goog"], "prepare_istiod": true}'
+    init_meshconfig_curl "${POST_DATA}" "${FLEET_ID}"
+  # When cluster local project is different from the Hub Hosting Project
+  # Initialize the Hub Hosting project with Hub WIP
+  # Initialize the cluster local project with Hub WIP & GKE WIP and prepare istiod
+  else
     POST_DATA='{"workloadIdentityPools":["'${FLEET_ID}'.hub.id.goog","'${FLEET_ID}'.svc.id.goog"]}'
     init_meshconfig_curl "${POST_DATA}" "${FLEET_ID}"
+    POST_DATA='{"workloadIdentityPools":["'${FLEET_ID}'.hub.id.goog","'${FLEET_ID}'.svc.id.goog","'${PROJECT_ID}'.svc.id.goog"], "prepare_istiod": true}'
+    init_meshconfig_curl "${POST_DATA}" "${PROJECT_ID}"
   fi
 }
