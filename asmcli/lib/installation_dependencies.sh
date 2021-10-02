@@ -285,6 +285,10 @@ register_cluster() {
   local KCF; KCF="$(context_get-option "KUBECONFIG")"
   local KCC; KCC="$(context_get-option "CONTEXT")"
 
+  if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
+    ensure_cross_project_fleet_sa "${FLEET_ID}" "${PROJECT_ID}"
+  fi
+
   local CMD
   CMD="gcloud container hub memberships register ${MEMBERSHIP_NAME}"
   CMD="${CMD} --project=${FLEET_ID}"
