@@ -101,7 +101,7 @@ create-mesh_validate_args() {
   while read -r KCF; do
     context_set-option "KUBECONFIG" "${KCF}"
     context_set-option "CONTEXT" "$(kubectl config current-context)"
-    is_cluster_registered
+    is_cluster_registered || true
   done <<EOF
 $(context_list "kubeconfigFiles")
 EOF
