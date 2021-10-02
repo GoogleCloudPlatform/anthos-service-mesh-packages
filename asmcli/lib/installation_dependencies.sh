@@ -12,9 +12,9 @@ required_iam_roles() {
   # meshconfig.admin - required for init, stackdriver, UI elements, etc.
   # servicemanagement.admin/serviceusage.serviceUsageAdmin - enables APIs
   local CA; CA="$(context_get-option "CA")"
-  if can_modify_gcp_components || \
+  if is_gcp && { can_modify_gcp_components || \
      can_modify_cluster_labels || \
-     can_modify_cluster_roles; then
+     can_modify_cluster_roles; }; then
     echo roles/container.admin
   fi
   if can_modify_gcp_components; then
