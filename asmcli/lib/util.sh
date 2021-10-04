@@ -346,10 +346,21 @@ kubectl() {
     KCF="${KUBECONFIG}"
   fi
 
+  local CMD
+  CMD="${AKUBECTL}"
+  if [[ -n "${KCF}" ]]; then
+    CMD="${CMD} --kubeconfig ${KCF}"
+  fi
+  if [[ -n "${KCC}" ]]; then
+    CMD="${CMD} --context ${KCC}"
+  fi
+
   if [[ -n "${HTTPS_PROXY}" ]]; then
-    HTTPS_PROXY="${HTTPS_PROXY}" run_command "${AKUBECTL}" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
+    # shellcheck disable=SC2086
+    HTTPS_PROXY="${HTTPS_PROXY}" ${CMD} "${@}"
   else
-    run_command "${AKUBECTL}" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
+    # shellcheck disable=SC2086
+    run_command ${CMD} "${@}"
   fi
 }
 
@@ -463,8 +474,12 @@ set_up_local_workspace() {
   context_set-option "OUTPUT_DIR" "${OUTPUT_DIR}"
 
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
-    KUBECONFIG="asm_kubeconfig"
+    KUBECONFIG="$(pwd)/asm_kubeconfig"
     context_set-option "KUBECONFIG" "${KUBECONFIG}"
+  fi
+
+  if [[ ! -f "${KUBECONFIG}" ]]; then
+    touch "${KUBECONFIG}"
   fi
 
   info "Using ${KUBECONFIG} as the kubeconfig..."
