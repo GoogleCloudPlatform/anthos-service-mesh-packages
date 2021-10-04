@@ -346,10 +346,19 @@ kubectl() {
     KCF="${KUBECONFIG}"
   fi
 
+  local CMD
+  CMD="${AKUBECTL}"
+  if [[ -n "${KCF}" ]]; then
+    CMD="${CMD} --kubeconfig ${KCF}"
+  fi
+  if [[ -n "${KCC}" ]]; then
+    CMD="${CMD} --context ${KCC}"
+  fi
+
   if [[ -n "${HTTPS_PROXY}" ]]; then
-    HTTPS_PROXY="${HTTPS_PROXY}" run_command "${AKUBECTL}" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
+    HTTPS_PROXY="${HTTPS_PROXY}" "${CMD}" "${@}"
   else
-    run_command "${AKUBECTL}" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
+    run_command "${CMD}" "${@}"
   fi
 }
 
