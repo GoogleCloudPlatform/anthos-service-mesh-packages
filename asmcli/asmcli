@@ -3740,8 +3740,15 @@ kubectl() {
   KCF="$(context_get-option "KUBECONFIG")"
   KCC="$(context_get-option "CONTEXT")"
   HTTPS_PROXY="$(context_get-option "HTTPS_PROXY")"
+
+  # Catch old codepaths that don't use context_set
   if [[ -z "${KCF}" ]]; then
     KCF="${KUBECONFIG}"
+  fi
+
+  # If we still
+  if [[ -z "${KCF}" ]]; then
+    KCF="$(mktemp)"
   fi
 
   local CMD
@@ -3876,7 +3883,7 @@ set_up_local_workspace() {
     context_set-option "KUBECONFIG" "${KUBECONFIG}"
   fi
 
-  if [[ ! -f "${KUBECONFIG}" ]]; then
+  if [[ -n "${KUBECONFIG}" && ! -f "${KUBECONFIG}" ]]; then
     touch "${KUBECONFIG}"
   fi
 
