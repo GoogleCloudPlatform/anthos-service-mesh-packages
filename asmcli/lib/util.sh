@@ -473,8 +473,11 @@ set_up_local_workspace() {
 
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
     KUBECONFIG="asm_kubeconfig"
-    touch "${KUBECONFIG}"
     context_set-option "KUBECONFIG" "${KUBECONFIG}"
+  fi
+
+  if [[ ! -f "${KUBECONFIG}" ]]; then
+    touch "${KUBECONFIG}"
   fi
 
   info "Using ${KUBECONFIG} as the kubeconfig..."
