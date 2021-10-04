@@ -579,7 +579,7 @@ EOF
         GKE_CLUSTER_URI="${NEW_GKE_CLUSTER_URI}"
         readonly GKE_CLUSTER_URI
       fi
-      
+
       if [[ -z "${NETWORK_ID}" ]]; then
         context_set-option "NETWORK_ID" "${PROJECT_ID}-${NEW_NETWORK_ID}"
       fi

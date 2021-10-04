@@ -89,7 +89,7 @@ create-mesh_validate_args() {
     KUBECONFIG="${KCF}" retry 2 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
       --project="${PROJECT_ID}" \
       --zone="${CLUSTER_LOCATION}"
-    
+
     # save the kubeconfig to context
     context_append "kubeconfigFiles" "${KCF}"
   done < <(context_list "clustersInfo")
@@ -151,7 +151,7 @@ install_one_remote_secret() {
   local CTX1
   local CTX2
   local SECRET_NAME
-  
+
   context_set-option "KUBECONFIG" "${KCF1}"
   CTX1="$(kubectl config current-context)"
   SECRET_NAME="${CTX1//_/-}"

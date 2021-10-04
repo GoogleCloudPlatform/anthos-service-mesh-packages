@@ -220,7 +220,7 @@ create-mesh_validate_args() {
     KUBECONFIG="${KCF}" retry 2 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
       --project="${PROJECT_ID}" \
       --zone="${CLUSTER_LOCATION}"
-    
+
     # save the kubeconfig to context
     context_append "kubeconfigFiles" "${KCF}"
   done < <(context_list "clustersInfo")
@@ -282,7 +282,7 @@ install_one_remote_secret() {
   local CTX1
   local CTX2
   local SECRET_NAME
-  
+
   context_set-option "KUBECONFIG" "${KCF1}"
   CTX1="$(kubectl config current-context)"
   SECRET_NAME="${CTX1//_/-}"
@@ -610,7 +610,7 @@ prepare_cluster_subcommand() {
   fi
 
   validate_vm_dependencies
-  
+
   local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
   if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
     info "Successfully validated all prerequistes from this shell."
@@ -646,7 +646,7 @@ prepare_cluster_subcommand() {
 
 validate_vm_dependencies() {
   validate_cli_dependencies
-  
+
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local FLEET_ID; FLEET_ID="${PROJECT_ID}"
   context_set-option "FLEET_ID" "${FLEET_ID}"
@@ -662,9 +662,9 @@ validate_asm_cluster() {
 
   validate_cluster "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
   configure_kubectl "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
-  
+
   exit_if_cluster_unregistered
-  
+
   validate_asm_installation
   validate_google_identity_provider
 }
@@ -821,7 +821,7 @@ EOF
 
 validate_asm_installation() {
   local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
-  
+
   info "Checking for istio-system namespace..."
   if [ "$(retry 2 kubectl get ns | grep -c istio-system || true)" -eq 0 ]; then
     fatal "istio-system namespace cannot be found in the cluster. Please install Anthos Service Mesh and retry."
@@ -2426,7 +2426,7 @@ configure_package() {
 
   populate_cluster_values
   local NETWORK_ID; NETWORK_ID="$(context_get-option "NETWORK_ID")"
-  
+
   populate_fleet_info
 
   if is_gcp; then
@@ -2486,7 +2486,7 @@ configure_kubectl(){
     local PROJECT_ID; PROJECT_ID="${1}"
     local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}"
     local CLUSTER_NAME; CLUSTER_NAME="${3}"
-    
+
     info "Fetching/writing GCP credentials to kubeconfig file..."
     KUBECONFIG="${KUBECONFIG}" retry 2 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
       --project="${PROJECT_ID}" \
@@ -3953,7 +3953,7 @@ EOF
         GKE_CLUSTER_URI="${NEW_GKE_CLUSTER_URI}"
         readonly GKE_CLUSTER_URI
       fi
-      
+
       if [[ -z "${NETWORK_ID}" ]]; then
         context_set-option "NETWORK_ID" "${PROJECT_ID}-${NEW_NETWORK_ID}"
       fi
@@ -4125,7 +4125,7 @@ validate_cluster() {
   local PROJECT_ID; PROJECT_ID="${1}"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}"
   local CLUSTER_NAME; CLUSTER_NAME="${3}"
-  
+
   local RESULT; RESULT=""
 
   RESULT="$(gcloud container clusters list \
