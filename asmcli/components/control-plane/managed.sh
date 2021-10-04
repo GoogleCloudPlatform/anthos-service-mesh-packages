@@ -26,7 +26,7 @@ install_managed_control_plane() {
   fi
 
   info "Provisioning control plane..."
-  retry 2 run_command curl --request POST \
+  retry 2 check_curl --request POST \
     "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}:runIstiod" \
     --data "${POST_DATA}" \
     --header "X-Server-Timeout: 600" \

@@ -1922,7 +1922,7 @@ install_managed_control_plane() {
   fi
 
   info "Provisioning control plane..."
-  retry 2 run_command curl --request POST \
+  retry 2 check_curl --request POST \
     "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}:runIstiod" \
     --data "${POST_DATA}" \
     --header "X-Server-Timeout: 600" \
@@ -3414,6 +3414,30 @@ run_command() {
   local RETVAL
   { "${@}"; RETVAL="$?"; } || true
   return $RETVAL
+}
+
+######
+# check_curl calls curl and returns non-zero if the http code is not 200 or the
+# curl command fails.
+######
+check_curl() {
+  local TMPFILE; TMPFILE=$(mktemp)
+
+  local HTTPCODE;
+  local RETVAL;
+  HTTPCODE=$(run_command curl --write-out '%{http_code}' --silent --show-error --output "$TMPFILE" "${@}")
+  RETVAL="$?"
+  if [[ "$RETVAL" != "0" ]] ; then
+    return "$RETVAL"
+  fi
+  if [[ "$HTTPCODE" != "200" ]] ; then
+    warn "HTTP response code: ${HTTPCODE}"
+  fi
+  cat "$TMPFILE"
+  if [[ "$HTTPCODE" != "200" ]] ; then
+    false
+    return
+  fi
 }
 
 #######
