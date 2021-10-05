@@ -33,10 +33,16 @@ install_managed_control_plane() {
     --header "Content-Type: application/json" \
     -K <(auth_header "$(get_auth_token)")
 
-  local VALIDATION_URL; local CLOUDRUN_ADDR;
-  read -r VALIDATION_URL CLOUDRUN_ADDR <<EOF
-$(scrape_managed_urls)
-EOF
+  local MUTATING_WEBHOOK_URL
+  MUTATING_WEBHOOK_URL=$(get_managed_mutating_webhook_url)
+
+  local VALIDATION_URL
+  # shellcheck disable=SC2001
+  VALIDATION_URL="$(echo "${MUTATING_WEBHOOK_URL}" | sed 's/inject.*$/validate/g')"
+
+  local CLOUDRUN_ADDR
+  # shellcheck disable=SC2001
+  CLOUDRUN_ADDR=$(echo "${MUTATING_WEBHOOK_URL}" | cut -d'/' -f3)
 
   kpt cfg set asm anthos.servicemesh.controlplane.validation-url "${VALIDATION_URL}"
   kpt cfg set asm anthos.servicemesh.managed-controlplane.cloudrun-addr "${CLOUDRUN_ADDR}"
@@ -82,19 +88,20 @@ configure_managed_control_plane() {
   :
 }
 
-scrape_managed_urls() {
-  local URL
-  URL="$(kubectl get mutatingwebhookconfiguration istiod-asm-managed -ojson | jq .webhooks[0].clientConfig.url -r)"
+get_managed_mutating_webhook_url() {
+  # Get the url for the most up to date channel that the cluster is using.
+  local WEBHOOKS; WEBHOOKS="istiod-asm-managed-rapid istiod-asm-managed istiod-asm-managed-stable"
+  local WEBHOOK_JSON
 
-  local VALIDATION_URL
-  # shellcheck disable=SC2001
-  VALIDATION_URL="$(echo "${URL}" | sed 's/inject.*$/validate/g')"
+  for WEBHOOK in $WEBHOOKS; do
+    if WEBHOOK_JSON="$(kubectl get mutatingwebhookconfiguration "${WEBHOOK}" -ojson)" ; then
+      info "Using the following managed revision for validating webhook: ${WEBHOOK#'istiod-'}"
+      echo "$WEBHOOK_JSON" | jq .webhooks[0].clientConfig.url -r
+      return
+    fi
+  done
 
-  local CLOUDRUN_ADDR
-  # shellcheck disable=SC2001
-  CLOUDRUN_ADDR=$(echo "${URL}" | cut -d'/' -f3)
-
-  echo "${VALIDATION_URL} ${CLOUDRUN_ADDR}"
+  fatal "Could not find managed config map."
 }
 
 
