@@ -27,7 +27,7 @@ MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=10}"; readonly MINOR;
 POINT="${POINT:=4}"; readonly POINT;
 REV="${REV:=14}"; readonly REV;
-CONFIG_VER="${CONFIG_VER:="1"}"; readonly CONFIG_VER;
+CONFIG_VER="${CONFIG_VER:="2"}"; readonly CONFIG_VER;
 ASM_RELEASE="${MAJOR}.${MINOR}"
 ASM_META_VERSION="${ASM_RELEASE}.0"
 ASM_FULL_VERSION="${MAJOR}.${MINOR}.${POINT}"
