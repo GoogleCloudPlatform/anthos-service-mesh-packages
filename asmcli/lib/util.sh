@@ -669,3 +669,53 @@ get_cr_channels() {
     esac
   fi
 }
+
+ensure_cross_project_fleet_sa() {
+  local FLEET_ID; FLEET_ID="${1}"
+  local PROJECT_ID; PROJECT_ID="${2}"
+
+  if ! is_gcp; then return; fi
+
+  local FLEET_POLICIES
+  FLEET_POLICIES="$(gcloud projects get-iam-policy "${FLEET_ID}" --format=json)"
+
+  if [[ -z "${FLEET_POLICIES}" ]]; then
+    warn "Unable to verify cross-project Fleet permissions. Installation will continue."
+    warn "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
+    warn "if cross-project traffic doesn't work."
+    return
+  fi
+
+  if ! echo "${FLEET_POLICIES}" | grep -q "gcp-sa-gkehub"; then
+    error "The Fleet service account has not been created for the Fleet hosted in ${FLEET_ID}."
+    error "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
+    fatal "for information on how to create the identity and grant permissions."
+  fi
+
+  local FLEET_HOST_PROJECT_NUMBER
+  local FLEET_SA
+  FLEET_HOST_PROJECT_NUMBER="$(gcloud projects describe "${FLEET_ID}" --format "value(projectNumber)")"
+  FLEET_SA="serviceAccount:service-${FLEET_HOST_PROJECT_NUMBER}@gcp-sa-gkehub.iam.gserviceaccount.com"
+
+  local PROJECT_POLICY_MEMBERS
+  PROJECT_POLICY_MEMBERS="$(gcloud projects get-iam-policy "${PROJECT_ID}" --format=json)"
+
+  if [[ -z "${PROJECT_POLICY_MEMBERS}" ]]; then
+    warn "Unable to verify cross-project Fleet permissions. Installation will continue."
+    warn "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
+    warn "if cross-project traffic doesn't work."
+    return
+  fi
+
+  PROJECT_POLICY_MEMBERS="$(echo "${PROJECT_POLICY_MEMBERS}" | jq '.bindings[] | select(.role == "roles/gkehub.serviceAgent")')"
+
+  if [[ -n "${PROJECT_POLICY_MEMBERS}" ]]; then
+    PROJECT_POLICY_MEMBERS="$(echo "${PROJECT_POLICY_MEMBERS}" | jq '.members[]')"
+  fi
+
+  if [[ "${PROJECT_POLICY_MEMBERS}" = *"${FLEET_SA}"* ]]; then return; fi
+
+  error "The Fleet service account for the Fleet hosted in ${FLEET_ID} needs permissions on ${PROJECT_ID}."
+  error "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
+  fatal "for information on how to grant permissions."
+}
