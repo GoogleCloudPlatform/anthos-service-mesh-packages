@@ -336,6 +336,9 @@ patch_trust_domain_aliases() {
     return
   fi
   while read -r PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME; do
+    # Off-GCP clusters won't have this info
+    if [[ -z "${PROJECT_ID}" || -z "${CLUSTER_LOCATION}" || -z "${CLUSTER_NAME}" ]]; then continue; fi
+
     configure_kubectl "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
     local ISTIOD_COUNT; ISTIOD_COUNT="$(get_istio_deployment_count)";
     if [[ "$ISTIOD_COUNT" -ne 0 ]]; then
