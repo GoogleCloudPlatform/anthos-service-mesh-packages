@@ -210,7 +210,18 @@ patch_trust_domain_aliases() {
     if [[ "$ISTIOD_COUNT" -ne 0 ]]; then
       info "Check trust domain aliases of cluster gke_${PROJECT_ID}_${CLUSTER_LOCATION}_${CLUSTER_NAME}"
       local REVISION; REVISION="$(retry 2 kubectl -n istio-system get pod -l istio=istiod \
-        -o jsonpath='{.items[].spec.containers[].env[?(@.name=="REVISION")].value}')"
+        -o jsonpath='{.items[].spec.containers[].env[?(@.name=="REVISION")].value}' 2>/dev/null)"
+
+      if [[ -z "${REVISION}" ]]; then
+        warn "$(starline)"
+        warn "Couldn't automatically determine the revision for the cluster."
+        warn "This is normally benign, but in certain multi-project scenarios cross-project traffic"
+        warn "may behave unexpectedly. If this is the case, you may need to re-initialize ASM"
+        warn "installations (e.g. by re-running 'asmcli install') to ensure that Fleet workload"
+        warn "identity is set up properly."
+        warn "$(starline)"
+        return
+      fi
 
       # Patch the configmap of the cluster if it does not include FLEET_ID.svc.id.goog
       if ! has_fleet_alias "${FLEET_ID}" "${REVISION}"; then
