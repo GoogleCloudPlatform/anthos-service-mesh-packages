@@ -125,10 +125,19 @@ create-mesh_register() {
   while read -r KCF; do
     context_set-option "KUBECONFIG" "${KCF}"
     context_set-option "CONTEXT" "$(kubectl config current-context)"
+    if is_gcp; then parse_context; fi
     register_cluster
   done <<EOF
 $(context_list "kubeconfigFiles")
 EOF
+}
+
+parse_context() {
+    local PROJECT LOCATION CLUSTER
+    IFS="_" read -r _ PROJECT LOCATION CLUSTER <<<"$(context_get-option "CONTEXT")"
+    context_set-option "PROJECT_ID" "${PROJECT}"
+    context_set-option "CLUSTER_LOCATION" "${LOCATION}"
+    context_set-option "CLUSTER_NAME" "${CLUSTER}"
 }
 
 install_all_remote_secrets() {
