@@ -42,7 +42,7 @@ prepare_cluster_subcommand() {
   fi
 
   validate_vm_dependencies
-  
+
   local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
   if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
     info "Successfully validated all prerequistes from this shell."
@@ -78,7 +78,7 @@ prepare_cluster_subcommand() {
 
 validate_vm_dependencies() {
   validate_cli_dependencies
-  
+
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local FLEET_ID; FLEET_ID="${PROJECT_ID}"
   context_set-option "FLEET_ID" "${FLEET_ID}"
@@ -94,9 +94,9 @@ validate_asm_cluster() {
 
   validate_cluster "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
   configure_kubectl "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
-  
+
   exit_if_cluster_unregistered
-  
+
   validate_asm_installation
   validate_google_identity_provider
 }
@@ -253,7 +253,7 @@ EOF
 
 validate_asm_installation() {
   local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
-  
+
   info "Checking for istio-system namespace..."
   if [ "$(retry 2 kubectl get ns | grep -c istio-system || true)" -eq 0 ]; then
     fatal "istio-system namespace cannot be found in the cluster. Please install Anthos Service Mesh and retry."

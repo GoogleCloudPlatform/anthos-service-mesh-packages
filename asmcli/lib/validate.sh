@@ -102,7 +102,7 @@ validate_cluster() {
   local PROJECT_ID; PROJECT_ID="${1}"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}"
   local CLUSTER_NAME; CLUSTER_NAME="${3}"
-  
+
   local RESULT; RESULT=""
 
   RESULT="$(gcloud container clusters list \

@@ -32,4 +32,4 @@ roleRef:
   name: istio-ingressgateway-sds
 subjects:
 - kind: ServiceAccount
-  name: istio-ingressgateway-service-account
+  name: istio-ingressgateway

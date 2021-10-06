@@ -173,7 +173,7 @@ openAPI:
           - marker: PROJECT_ID
             ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
           - marker: PROJECT_NUMBER
-            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectNumber'
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.projectNumber'
           - marker: asm-cluster
             ref: '#/definitions/io.k8s.cli.setters.gcloud.container.cluster'
           - marker: us-central1-c

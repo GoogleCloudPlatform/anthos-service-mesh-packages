@@ -14,7 +14,7 @@ configure_package() {
 
   populate_cluster_values
   local NETWORK_ID; NETWORK_ID="$(context_get-option "NETWORK_ID")"
-  
+
   populate_fleet_info
 
   if is_gcp; then
@@ -74,7 +74,7 @@ configure_kubectl(){
     local PROJECT_ID; PROJECT_ID="${1}"
     local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}"
     local CLUSTER_NAME; CLUSTER_NAME="${3}"
-    
+
     info "Fetching/writing GCP credentials to kubeconfig file..."
     KUBECONFIG="${KUBECONFIG}" retry 2 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
       --project="${PROJECT_ID}" \

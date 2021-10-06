@@ -42,6 +42,30 @@ run_command() {
   return $RETVAL
 }
 
+######
+# check_curl calls curl and returns non-zero if the http code is not 200 or the
+# curl command fails.
+######
+check_curl() {
+  local TMPFILE; TMPFILE=$(mktemp)
+
+  local HTTPCODE;
+  local RETVAL;
+  HTTPCODE=$(run_command curl --write-out '%{http_code}' --silent --show-error --output "$TMPFILE" "${@}")
+  RETVAL="$?"
+  if [[ "$RETVAL" != "0" ]] ; then
+    return "$RETVAL"
+  fi
+  if [[ "$HTTPCODE" != "200" ]] ; then
+    warn "HTTP response code: ${HTTPCODE}"
+  fi
+  cat "$TMPFILE"
+  if [[ "$HTTPCODE" != "200" ]] ; then
+    false
+    return
+  fi
+}
+
 #######
 # retry takes an integer N as the first argument, and a list of arguments
 # representing a command afterwards. It will retry the given command up to N
@@ -342,14 +366,32 @@ kubectl() {
   KCF="$(context_get-option "KUBECONFIG")"
   KCC="$(context_get-option "CONTEXT")"
   HTTPS_PROXY="$(context_get-option "HTTPS_PROXY")"
+
+  # Catch old codepaths that don't use context_set
   if [[ -z "${KCF}" ]]; then
     KCF="${KUBECONFIG}"
   fi
 
+  # If we still
+  if [[ -z "${KCF}" ]]; then
+    KCF="$(mktemp)"
+  fi
+
+  local CMD
+  CMD="${AKUBECTL}"
+  if [[ -n "${KCF}" ]]; then
+    CMD="${CMD} --kubeconfig ${KCF}"
+  fi
+  if [[ -n "${KCC}" ]]; then
+    CMD="${CMD} --context ${KCC}"
+  fi
+
   if [[ -n "${HTTPS_PROXY}" ]]; then
-    HTTPS_PROXY="${HTTPS_PROXY}" run_command "${AKUBECTL}" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
+    # shellcheck disable=SC2086
+    HTTPS_PROXY="${HTTPS_PROXY}" ${CMD} "${@}"
   else
-    run_command "${AKUBECTL}" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
+    # shellcheck disable=SC2086
+    run_command ${CMD} "${@}"
   fi
 }
 
@@ -463,8 +505,12 @@ set_up_local_workspace() {
   context_set-option "OUTPUT_DIR" "${OUTPUT_DIR}"
 
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
-    KUBECONFIG="asm_kubeconfig"
+    KUBECONFIG="$(pwd)/asm_kubeconfig"
     context_set-option "KUBECONFIG" "${KUBECONFIG}"
+  fi
+
+  if [[ -n "${KUBECONFIG}" && ! -f "${KUBECONFIG}" ]]; then
+    touch "${KUBECONFIG}"
   fi
 
   info "Using ${KUBECONFIG} as the kubeconfig..."
@@ -562,33 +608,25 @@ populate_cluster_values() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
-  local NETWORK_ID; NETWORK_ID="$(context_get-option "NETWORK_ID")"
   local CLUSTER_DATA
 
   if is_gcp; then
-    if [[ -z "${GKE_CLUSTER_URI}" || -z "${NETWORK_ID}" ]]; then
-      CLUSTER_DATA="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
-        --zone="${CLUSTER_LOCATION}" \
-        --project="${PROJECT_ID}" \
-        --format='value(selfLink, network)')"
-      read -r NEW_GKE_CLUSTER_URI NEW_NETWORK_ID <<EOF
+    CLUSTER_DATA="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
+      --zone="${CLUSTER_LOCATION}" \
+      --project="${PROJECT_ID}" \
+      --format='value(selfLink, network)')"
+    read -r NEW_GKE_CLUSTER_URI NEW_NETWORK_ID <<EOF
 ${CLUSTER_DATA}
 EOF
 
-      if [[ -z "${GKE_CLUSTER_URI}" ]]; then
-        GKE_CLUSTER_URI="${NEW_GKE_CLUSTER_URI}"
-        readonly GKE_CLUSTER_URI
-      fi
-      
-      if [[ -z "${NETWORK_ID}" ]]; then
-        context_set-option "NETWORK_ID" "${PROJECT_ID}-${NEW_NETWORK_ID}"
-      fi
+    if [[ -n "${NEW_GKE_CLUSTER_URI}" ]]; then
+      context_set-option "GKE_CLUSTER_URI" "${NEW_GKE_CLUSTER_URI}"
+    fi
+    if [[ -n "${NEW_NETWORK_ID}" ]]; then
+      context_set-option "NETWORK_ID" "${PROJECT_ID}-${NEW_NETWORK_ID}"
     fi
   else
-    if [[ -z "${NETWORK_ID}" ]]; then
-      NETWORK_ID="default"
-      context_set-option "NETWORK_ID" "${NETWORK_ID}"
-    fi
+    context_set-option "NETWORK_ID" "default"
   fi
 }
 
@@ -646,4 +684,54 @@ get_cr_channels() {
         ;;
     esac
   fi
+}
+
+ensure_cross_project_fleet_sa() {
+  local FLEET_ID; FLEET_ID="${1}"
+  local PROJECT_ID; PROJECT_ID="${2}"
+
+  if ! is_gcp; then return; fi
+
+  local FLEET_POLICIES
+  FLEET_POLICIES="$(gcloud projects get-iam-policy "${FLEET_ID}" --format=json)"
+
+  if [[ -z "${FLEET_POLICIES}" ]]; then
+    warn "Unable to verify cross-project Fleet permissions. Installation will continue."
+    warn "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
+    warn "if cross-project traffic doesn't work."
+    return
+  fi
+
+  if ! echo "${FLEET_POLICIES}" | grep -q "gcp-sa-gkehub"; then
+    error "The Fleet service account has not been created for the Fleet hosted in ${FLEET_ID}."
+    error "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
+    fatal "for information on how to create the identity and grant permissions."
+  fi
+
+  local FLEET_HOST_PROJECT_NUMBER
+  local FLEET_SA
+  FLEET_HOST_PROJECT_NUMBER="$(gcloud projects describe "${FLEET_ID}" --format "value(projectNumber)")"
+  FLEET_SA="serviceAccount:service-${FLEET_HOST_PROJECT_NUMBER}@gcp-sa-gkehub.iam.gserviceaccount.com"
+
+  local PROJECT_POLICY_MEMBERS
+  PROJECT_POLICY_MEMBERS="$(gcloud projects get-iam-policy "${PROJECT_ID}" --format=json)"
+
+  if [[ -z "${PROJECT_POLICY_MEMBERS}" ]]; then
+    warn "Unable to verify cross-project Fleet permissions. Installation will continue."
+    warn "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
+    warn "if cross-project traffic doesn't work."
+    return
+  fi
+
+  PROJECT_POLICY_MEMBERS="$(echo "${PROJECT_POLICY_MEMBERS}" | jq '.bindings[] | select(.role == "roles/gkehub.serviceAgent")')"
+
+  if [[ -n "${PROJECT_POLICY_MEMBERS}" ]]; then
+    PROJECT_POLICY_MEMBERS="$(echo "${PROJECT_POLICY_MEMBERS}" | jq '.members[]')"
+  fi
+
+  if [[ "${PROJECT_POLICY_MEMBERS}" = *"${FLEET_SA}"* ]]; then return; fi
+
+  error "The Fleet service account for the Fleet hosted in ${FLEET_ID} needs permissions on ${PROJECT_ID}."
+  error "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
+  fatal "for information on how to grant permissions."
 }

@@ -35,7 +35,7 @@ MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=11}"; readonly MINOR;
 POINT="${POINT:=2}"; readonly POINT;
 REV="${REV:=17}"; readonly REV;
-CONFIG_VER="${CONFIG_VER:="1-unstable"}"; readonly CONFIG_VER;
+CONFIG_VER="${CONFIG_VER:="1-staging"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
 ### File related constants ###
@@ -66,7 +66,6 @@ CR_CONTROL_PLANE_REVISION_STABLE=""
 SCRIPT_NAME="${0##*/}"; readonly SCRIPT_NAME
 
 PROJECT_NUMBER=""
-GKE_CLUSTER_URI=""
 GCLOUD_USER_OR_SA="${GCLOUD_USER_OR_SA:=}"
 KPT_URL=""
 KUBECONFIG=""
@@ -220,7 +219,7 @@ create-mesh_validate_args() {
     KUBECONFIG="${KCF}" retry 2 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
       --project="${PROJECT_ID}" \
       --zone="${CLUSTER_LOCATION}"
-    
+
     # save the kubeconfig to context
     context_append "kubeconfigFiles" "${KCF}"
   done < <(context_list "clustersInfo")
@@ -232,7 +231,7 @@ create-mesh_validate_args() {
   while read -r KCF; do
     context_set-option "KUBECONFIG" "${KCF}"
     context_set-option "CONTEXT" "$(kubectl config current-context)"
-    is_cluster_registered
+    is_cluster_registered || true
   done <<EOF
 $(context_list "kubeconfigFiles")
 EOF
@@ -256,10 +255,19 @@ create-mesh_register() {
   while read -r KCF; do
     context_set-option "KUBECONFIG" "${KCF}"
     context_set-option "CONTEXT" "$(kubectl config current-context)"
+    if is_gcp; then parse_context; fi
     register_cluster
   done <<EOF
 $(context_list "kubeconfigFiles")
 EOF
+}
+
+parse_context() {
+    local PROJECT LOCATION CLUSTER
+    IFS="_" read -r _ PROJECT LOCATION CLUSTER <<<"$(context_get-option "CONTEXT")"
+    context_set-option "PROJECT_ID" "${PROJECT}"
+    context_set-option "CLUSTER_LOCATION" "${LOCATION}"
+    context_set-option "CLUSTER_NAME" "${CLUSTER}"
 }
 
 install_all_remote_secrets() {
@@ -282,7 +290,7 @@ install_one_remote_secret() {
   local CTX1
   local CTX2
   local SECRET_NAME
-  
+
   context_set-option "KUBECONFIG" "${KCF1}"
   CTX1="$(kubectl config current-context)"
   SECRET_NAME="${CTX1//_/-}"
@@ -336,12 +344,26 @@ patch_trust_domain_aliases() {
     return
   fi
   while read -r PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME; do
+    # Off-GCP clusters won't have this info
+    if [[ -z "${PROJECT_ID}" || -z "${CLUSTER_LOCATION}" || -z "${CLUSTER_NAME}" ]]; then continue; fi
+
     configure_kubectl "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
     local ISTIOD_COUNT; ISTIOD_COUNT="$(get_istio_deployment_count)";
     if [[ "$ISTIOD_COUNT" -ne 0 ]]; then
       info "Check trust domain aliases of cluster gke_${PROJECT_ID}_${CLUSTER_LOCATION}_${CLUSTER_NAME}"
       local REVISION; REVISION="$(retry 2 kubectl -n istio-system get pod -l istio=istiod \
-        -o jsonpath='{.items[].spec.containers[].env[?(@.name=="REVISION")].value}')"
+        -o jsonpath='{.items[].spec.containers[].env[?(@.name=="REVISION")].value}' 2>/dev/null)"
+
+      if [[ -z "${REVISION}" ]]; then
+        warn "$(starline)"
+        warn "Couldn't automatically determine the revision for the cluster."
+        warn "This is normally benign, but in certain multi-project scenarios cross-project traffic"
+        warn "may behave unexpectedly. If this is the case, you may need to re-initialize ASM"
+        warn "installations (e.g. by re-running 'asmcli install') to ensure that Fleet workload"
+        warn "identity is set up properly."
+        warn "$(starline)"
+        return
+      fi
 
       # Patch the configmap of the cluster if it does not include FLEET_ID.svc.id.goog
       if ! has_fleet_alias "${FLEET_ID}" "${REVISION}"; then
@@ -610,7 +632,7 @@ prepare_cluster_subcommand() {
   fi
 
   validate_vm_dependencies
-  
+
   local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
   if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then
     info "Successfully validated all prerequistes from this shell."
@@ -646,7 +668,7 @@ prepare_cluster_subcommand() {
 
 validate_vm_dependencies() {
   validate_cli_dependencies
-  
+
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local FLEET_ID; FLEET_ID="${PROJECT_ID}"
   context_set-option "FLEET_ID" "${FLEET_ID}"
@@ -662,9 +684,9 @@ validate_asm_cluster() {
 
   validate_cluster "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
   configure_kubectl "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
-  
+
   exit_if_cluster_unregistered
-  
+
   validate_asm_installation
   validate_google_identity_provider
 }
@@ -821,7 +843,7 @@ EOF
 
 validate_asm_installation() {
   local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
-  
+
   info "Checking for istio-system namespace..."
   if [ "$(retry 2 kubectl get ns | grep -c istio-system || true)" -eq 0 ]; then
     fatal "istio-system namespace cannot be found in the cluster. Please install Anthos Service Mesh and retry."
@@ -1882,11 +1904,13 @@ init_meshconfig() {
     info "Cluster has Membership ID ${HUB_MEMBERSHIP_ID} in the Hub of project ${FLEET_ID}"
     # initialize replaces the existing Workload Identity Pools in the IAM binding, so we need to support both Hub and GKE Workload Identity Pools
     local POST_DATA
-    POST_DATA='{"workloadIdentityPools":["'${PROJECT_ID}'.hub.id.goog","'${PROJECT_ID}'.svc.id.goog"]}'
-    init_meshconfig_curl "${POST_DATA}" "${PROJECT_ID}"
+    # Initialize the Hub Hosting project with Hub WIP
+    POST_DATA='{"workloadIdentityPools":["'${FLEET_ID}'.hub.id.goog","'${FLEET_ID}'.svc.id.goog"]}'
+    init_meshconfig_curl "${POST_DATA}" "${FLEET_ID}"
     if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
-      POST_DATA='{"workloadIdentityPools":["'${FLEET_ID}'.hub.id.goog","'${FLEET_ID}'.svc.id.goog"]}'
-      init_meshconfig_curl "${POST_DATA}" "${FLEET_ID}"
+      # Initialize the cluster local project with both Hub WIP and GKE WIP
+      POST_DATA='{"workloadIdentityPools":["'${FLEET_ID}'.hub.id.goog","'${FLEET_ID}'.svc.id.goog","'${PROJECT_ID}'.svc.id.goog"]}'
+      init_meshconfig_curl "${POST_DATA}" "${PROJECT_ID}"
     fi
   else
     init_meshconfig_curl '' "${PROJECT_ID}"
@@ -1920,17 +1944,23 @@ install_managed_control_plane() {
   fi
 
   info "Provisioning control plane..."
-  retry 2 run_command curl --request POST \
+  retry 2 check_curl --request POST \
     "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}:runIstiod" \
     --data "${POST_DATA}" \
     --header "X-Server-Timeout: 600" \
     --header "Content-Type: application/json" \
     -K <(auth_header "$(get_auth_token)")
 
-  local VALIDATION_URL; local CLOUDRUN_ADDR;
-  read -r VALIDATION_URL CLOUDRUN_ADDR <<EOF
-$(scrape_managed_urls)
-EOF
+  local MUTATING_WEBHOOK_URL
+  MUTATING_WEBHOOK_URL=$(get_managed_mutating_webhook_url)
+
+  local VALIDATION_URL
+  # shellcheck disable=SC2001
+  VALIDATION_URL="$(echo "${MUTATING_WEBHOOK_URL}" | sed 's/inject.*$/validate/g')"
+
+  local CLOUDRUN_ADDR
+  # shellcheck disable=SC2001
+  CLOUDRUN_ADDR=$(echo "${MUTATING_WEBHOOK_URL}" | cut -d'/' -f3)
 
   kpt cfg set asm anthos.servicemesh.controlplane.validation-url "${VALIDATION_URL}"
   kpt cfg set asm anthos.servicemesh.managed-controlplane.cloudrun-addr "${CLOUDRUN_ADDR}"
@@ -1976,19 +2006,20 @@ configure_managed_control_plane() {
   :
 }
 
-scrape_managed_urls() {
-  local URL
-  URL="$(kubectl get mutatingwebhookconfiguration istiod-asm-managed -ojson | jq .webhooks[0].clientConfig.url -r)"
+get_managed_mutating_webhook_url() {
+  # Get the url for the most up to date channel that the cluster is using.
+  local WEBHOOKS; WEBHOOKS="istiod-asm-managed-rapid istiod-asm-managed istiod-asm-managed-stable"
+  local WEBHOOK_JSON
 
-  local VALIDATION_URL
-  # shellcheck disable=SC2001
-  VALIDATION_URL="$(echo "${URL}" | sed 's/inject.*$/validate/g')"
+  for WEBHOOK in $WEBHOOKS; do
+    if WEBHOOK_JSON="$(kubectl get mutatingwebhookconfiguration "${WEBHOOK}" -ojson)" ; then
+      info "Using the following managed revision for validating webhook: ${WEBHOOK#'istiod-'}"
+      echo "$WEBHOOK_JSON" | jq .webhooks[0].clientConfig.url -r
+      return
+    fi
+  done
 
-  local CLOUDRUN_ADDR
-  # shellcheck disable=SC2001
-  CLOUDRUN_ADDR=$(echo "${URL}" | cut -d'/' -f3)
-
-  echo "${VALIDATION_URL} ${CLOUDRUN_ADDR}"
+  fatal "Could not find managed config map."
 }
 
 
@@ -1998,11 +2029,19 @@ init_meshconfig_managed() {
 
   info "Initializing meshconfig managed API..."
   local POST_DATA
-  POST_DATA='{"workloadIdentityPools":["'${PROJECT_ID}'.hub.id.goog","'${PROJECT_ID}'.svc.id.goog"], "prepare_istiod": true}'
-  init_meshconfig_curl "${POST_DATA}" "${PROJECT_ID}"
-  if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
+  # When cluster local project is the same as the Hub Hosting Project
+  # Initialize the project with Hub WIP and prepare istiod
+  if [[ "${FLEET_ID}" == "${PROJECT_ID}" ]]; then
+    POST_DATA='{"workloadIdentityPools":["'${FLEET_ID}'.hub.id.goog","'${FLEET_ID}'.svc.id.goog"], "prepare_istiod": true}'
+    init_meshconfig_curl "${POST_DATA}" "${FLEET_ID}"
+  # When cluster local project is different from the Hub Hosting Project
+  # Initialize the Hub Hosting project with Hub WIP
+  # Initialize the cluster local project with Hub WIP & GKE WIP and prepare istiod
+  else
     POST_DATA='{"workloadIdentityPools":["'${FLEET_ID}'.hub.id.goog","'${FLEET_ID}'.svc.id.goog"]}'
     init_meshconfig_curl "${POST_DATA}" "${FLEET_ID}"
+    POST_DATA='{"workloadIdentityPools":["'${FLEET_ID}'.hub.id.goog","'${FLEET_ID}'.svc.id.goog","'${PROJECT_ID}'.svc.id.goog"], "prepare_istiod": true}'
+    init_meshconfig_curl "${POST_DATA}" "${PROJECT_ID}"
   fi
 }
 has_value() {
@@ -2140,15 +2179,25 @@ is_workload_identity_enabled() {
 }
 
 is_membership_crd_installed() {
-  if [[ "$(retry 2 kubectl get crd memberships.hub.gke.io -ojsonpath="{..metadata.name}" \
-    | grep -w -c memberships || true)" -eq 0 ]]; then
+  local OUTPUT
+  if ! OUTPUT="$(retry 2 kubectl get crd memberships.hub.gke.io -ojsonpath="{..metadata.name}" 2>/dev/null)"; then
     false
     return
   fi
 
-  if [[ "$(retry 2 kubectl get memberships.hub.gke.io -ojsonpath="{..metadata.name}" \
-    | grep -w -c membership || true)" -eq 0 ]]; then
+  if [[ "$(echo "${OUTPUT}" | grep -w -c memberships || true)" -eq 0 ]]; then
     false
+    return
+  fi
+
+  if ! OUTPUT="$(retry 2 kubectl get memberships.hub.gke.io -ojsonpath="{..metadata.name}" 2>/dev/null)"; then
+    false
+    return
+  fi
+
+  if [[ "$(echo "${OUTPUT}" | grep -w -c membership || true)" -eq 0 ]]; then
+    false
+    return
   fi
 }
 
@@ -2416,7 +2465,7 @@ configure_package() {
 
   populate_cluster_values
   local NETWORK_ID; NETWORK_ID="$(context_get-option "NETWORK_ID")"
-  
+
   populate_fleet_info
 
   if is_gcp; then
@@ -2476,7 +2525,7 @@ configure_kubectl(){
     local PROJECT_ID; PROJECT_ID="${1}"
     local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}"
     local CLUSTER_NAME; CLUSTER_NAME="${3}"
-    
+
     info "Fetching/writing GCP credentials to kubeconfig file..."
     KUBECONFIG="${KUBECONFIG}" retry 2 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
       --project="${PROJECT_ID}" \
@@ -2506,6 +2555,7 @@ context_init() {
     "PROJECT_ID": "${PROJECT_ID:-}",
     "CLUSTER_NAME": "${CLUSTER_NAME:-}",
     "CLUSTER_LOCATION": "${CLUSTER_LOCATION:-}",
+    "GKE_CLUSTER_URI": "${GKE_CLUSTER_URI:-}",
     "KUBECONFIG": "${KUBECONFIG_FILE:-}",
     "KUBECONFIG_SUPPLIED": "${KUBECONFIG_SUPPLIED:-0}",
     "FLEET_ID": "${FLEET_ID:-}",
@@ -2629,9 +2679,9 @@ required_iam_roles() {
   # meshconfig.admin - required for init, stackdriver, UI elements, etc.
   # servicemanagement.admin/serviceusage.serviceUsageAdmin - enables APIs
   local CA; CA="$(context_get-option "CA")"
-  if can_modify_gcp_components || \
+  if is_gcp && { can_modify_gcp_components || \
      can_modify_cluster_labels || \
-     can_modify_cluster_roles; then
+     can_modify_cluster_roles; }; then
     echo roles/container.admin
   fi
   if can_modify_gcp_components; then
@@ -2896,11 +2946,16 @@ register_cluster() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local GKE_CLUSTER_URI; GKE_CLUSTER_URI="$(context_get-option "GKE_CLUSTER_URI")"
   local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}")"
   info "Registering the cluster as ${MEMBERSHIP_NAME}..."
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local KCF; KCF="$(context_get-option "KUBECONFIG")"
   local KCC; KCC="$(context_get-option "CONTEXT")"
+
+  if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
+    ensure_cross_project_fleet_sa "${FLEET_ID}" "${PROJECT_ID}"
+  fi
 
   local CMD
   CMD="gcloud container hub memberships register ${MEMBERSHIP_NAME}"
@@ -3044,7 +3099,7 @@ parse_args() {
         warn "The --ca_name argument is deprecated and will be removed in the next minor release, please use --ca_pool instead."
         warn "Execution will continue normally."
         sleep 1
-        ;&
+        ;;
       --ca_pool | --ca-pool)
         arg_required "${@}"
         context_set-option "CA_NAME" "${2}"
@@ -3406,6 +3461,30 @@ run_command() {
   return $RETVAL
 }
 
+######
+# check_curl calls curl and returns non-zero if the http code is not 200 or the
+# curl command fails.
+######
+check_curl() {
+  local TMPFILE; TMPFILE=$(mktemp)
+
+  local HTTPCODE;
+  local RETVAL;
+  HTTPCODE=$(run_command curl --write-out '%{http_code}' --silent --show-error --output "$TMPFILE" "${@}")
+  RETVAL="$?"
+  if [[ "$RETVAL" != "0" ]] ; then
+    return "$RETVAL"
+  fi
+  if [[ "$HTTPCODE" != "200" ]] ; then
+    warn "HTTP response code: ${HTTPCODE}"
+  fi
+  cat "$TMPFILE"
+  if [[ "$HTTPCODE" != "200" ]] ; then
+    false
+    return
+  fi
+}
+
 #######
 # retry takes an integer N as the first argument, and a list of arguments
 # representing a command afterwards. It will retry the given command up to N
@@ -3706,14 +3785,32 @@ kubectl() {
   KCF="$(context_get-option "KUBECONFIG")"
   KCC="$(context_get-option "CONTEXT")"
   HTTPS_PROXY="$(context_get-option "HTTPS_PROXY")"
+
+  # Catch old codepaths that don't use context_set
   if [[ -z "${KCF}" ]]; then
     KCF="${KUBECONFIG}"
   fi
 
+  # If we still
+  if [[ -z "${KCF}" ]]; then
+    KCF="$(mktemp)"
+  fi
+
+  local CMD
+  CMD="${AKUBECTL}"
+  if [[ -n "${KCF}" ]]; then
+    CMD="${CMD} --kubeconfig ${KCF}"
+  fi
+  if [[ -n "${KCC}" ]]; then
+    CMD="${CMD} --context ${KCC}"
+  fi
+
   if [[ -n "${HTTPS_PROXY}" ]]; then
-    HTTPS_PROXY="${HTTPS_PROXY}" run_command "${AKUBECTL}" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
+    # shellcheck disable=SC2086
+    HTTPS_PROXY="${HTTPS_PROXY}" ${CMD} "${@}"
   else
-    run_command "${AKUBECTL}" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
+    # shellcheck disable=SC2086
+    run_command ${CMD} "${@}"
   fi
 }
 
@@ -3827,8 +3924,12 @@ set_up_local_workspace() {
   context_set-option "OUTPUT_DIR" "${OUTPUT_DIR}"
 
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
-    KUBECONFIG="asm_kubeconfig"
+    KUBECONFIG="$(pwd)/asm_kubeconfig"
     context_set-option "KUBECONFIG" "${KUBECONFIG}"
+  fi
+
+  if [[ -n "${KUBECONFIG}" && ! -f "${KUBECONFIG}" ]]; then
+    touch "${KUBECONFIG}"
   fi
 
   info "Using ${KUBECONFIG} as the kubeconfig..."
@@ -3926,33 +4027,25 @@ populate_cluster_values() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
-  local NETWORK_ID; NETWORK_ID="$(context_get-option "NETWORK_ID")"
   local CLUSTER_DATA
 
   if is_gcp; then
-    if [[ -z "${GKE_CLUSTER_URI}" || -z "${NETWORK_ID}" ]]; then
-      CLUSTER_DATA="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
-        --zone="${CLUSTER_LOCATION}" \
-        --project="${PROJECT_ID}" \
-        --format='value(selfLink, network)')"
-      read -r NEW_GKE_CLUSTER_URI NEW_NETWORK_ID <<EOF
+    CLUSTER_DATA="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
+      --zone="${CLUSTER_LOCATION}" \
+      --project="${PROJECT_ID}" \
+      --format='value(selfLink, network)')"
+    read -r NEW_GKE_CLUSTER_URI NEW_NETWORK_ID <<EOF
 ${CLUSTER_DATA}
 EOF
 
-      if [[ -z "${GKE_CLUSTER_URI}" ]]; then
-        GKE_CLUSTER_URI="${NEW_GKE_CLUSTER_URI}"
-        readonly GKE_CLUSTER_URI
-      fi
-      
-      if [[ -z "${NETWORK_ID}" ]]; then
-        context_set-option "NETWORK_ID" "${PROJECT_ID}-${NEW_NETWORK_ID}"
-      fi
+    if [[ -n "${NEW_GKE_CLUSTER_URI}" ]]; then
+      context_set-option "GKE_CLUSTER_URI" "${NEW_GKE_CLUSTER_URI}"
+    fi
+    if [[ -n "${NEW_NETWORK_ID}" ]]; then
+      context_set-option "NETWORK_ID" "${PROJECT_ID}-${NEW_NETWORK_ID}"
     fi
   else
-    if [[ -z "${NETWORK_ID}" ]]; then
-      NETWORK_ID="default"
-      context_set-option "NETWORK_ID" "${NETWORK_ID}"
-    fi
+    context_set-option "NETWORK_ID" "default"
   fi
 }
 
@@ -4010,6 +4103,56 @@ get_cr_channels() {
         ;;
     esac
   fi
+}
+
+ensure_cross_project_fleet_sa() {
+  local FLEET_ID; FLEET_ID="${1}"
+  local PROJECT_ID; PROJECT_ID="${2}"
+
+  if ! is_gcp; then return; fi
+
+  local FLEET_POLICIES
+  FLEET_POLICIES="$(gcloud projects get-iam-policy "${FLEET_ID}" --format=json)"
+
+  if [[ -z "${FLEET_POLICIES}" ]]; then
+    warn "Unable to verify cross-project Fleet permissions. Installation will continue."
+    warn "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
+    warn "if cross-project traffic doesn't work."
+    return
+  fi
+
+  if ! echo "${FLEET_POLICIES}" | grep -q "gcp-sa-gkehub"; then
+    error "The Fleet service account has not been created for the Fleet hosted in ${FLEET_ID}."
+    error "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
+    fatal "for information on how to create the identity and grant permissions."
+  fi
+
+  local FLEET_HOST_PROJECT_NUMBER
+  local FLEET_SA
+  FLEET_HOST_PROJECT_NUMBER="$(gcloud projects describe "${FLEET_ID}" --format "value(projectNumber)")"
+  FLEET_SA="serviceAccount:service-${FLEET_HOST_PROJECT_NUMBER}@gcp-sa-gkehub.iam.gserviceaccount.com"
+
+  local PROJECT_POLICY_MEMBERS
+  PROJECT_POLICY_MEMBERS="$(gcloud projects get-iam-policy "${PROJECT_ID}" --format=json)"
+
+  if [[ -z "${PROJECT_POLICY_MEMBERS}" ]]; then
+    warn "Unable to verify cross-project Fleet permissions. Installation will continue."
+    warn "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
+    warn "if cross-project traffic doesn't work."
+    return
+  fi
+
+  PROJECT_POLICY_MEMBERS="$(echo "${PROJECT_POLICY_MEMBERS}" | jq '.bindings[] | select(.role == "roles/gkehub.serviceAgent")')"
+
+  if [[ -n "${PROJECT_POLICY_MEMBERS}" ]]; then
+    PROJECT_POLICY_MEMBERS="$(echo "${PROJECT_POLICY_MEMBERS}" | jq '.members[]')"
+  fi
+
+  if [[ "${PROJECT_POLICY_MEMBERS}" = *"${FLEET_SA}"* ]]; then return; fi
+
+  error "The Fleet service account for the Fleet hosted in ${FLEET_ID} needs permissions on ${PROJECT_ID}."
+  error "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
+  fatal "for information on how to grant permissions."
 }
 validate_revision_label() {
   # Matches DNS label formats of RFC 1123
@@ -4115,7 +4258,7 @@ validate_cluster() {
   local PROJECT_ID; PROJECT_ID="${1}"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}"
   local CLUSTER_NAME; CLUSTER_NAME="${3}"
-  
+
   local RESULT; RESULT=""
 
   RESULT="$(gcloud container clusters list \

@@ -12,9 +12,9 @@ required_iam_roles() {
   # meshconfig.admin - required for init, stackdriver, UI elements, etc.
   # servicemanagement.admin/serviceusage.serviceUsageAdmin - enables APIs
   local CA; CA="$(context_get-option "CA")"
-  if can_modify_gcp_components || \
+  if is_gcp && { can_modify_gcp_components || \
      can_modify_cluster_labels || \
-     can_modify_cluster_roles; then
+     can_modify_cluster_roles; }; then
     echo roles/container.admin
   fi
   if can_modify_gcp_components; then
@@ -279,11 +279,16 @@ register_cluster() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local GKE_CLUSTER_URI; GKE_CLUSTER_URI="$(context_get-option "GKE_CLUSTER_URI")"
   local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}")"
   info "Registering the cluster as ${MEMBERSHIP_NAME}..."
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local KCF; KCF="$(context_get-option "KUBECONFIG")"
   local KCC; KCC="$(context_get-option "CONTEXT")"
+
+  if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
+    ensure_cross_project_fleet_sa "${FLEET_ID}" "${PROJECT_ID}"
+  fi
 
   local CMD
   CMD="gcloud container hub memberships register ${MEMBERSHIP_NAME}"

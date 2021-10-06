@@ -89,7 +89,7 @@ create-mesh_validate_args() {
     KUBECONFIG="${KCF}" retry 2 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
       --project="${PROJECT_ID}" \
       --zone="${CLUSTER_LOCATION}"
-    
+
     # save the kubeconfig to context
     context_append "kubeconfigFiles" "${KCF}"
   done < <(context_list "clustersInfo")
@@ -101,7 +101,7 @@ create-mesh_validate_args() {
   while read -r KCF; do
     context_set-option "KUBECONFIG" "${KCF}"
     context_set-option "CONTEXT" "$(kubectl config current-context)"
-    is_cluster_registered
+    is_cluster_registered || true
   done <<EOF
 $(context_list "kubeconfigFiles")
 EOF
@@ -125,10 +125,19 @@ create-mesh_register() {
   while read -r KCF; do
     context_set-option "KUBECONFIG" "${KCF}"
     context_set-option "CONTEXT" "$(kubectl config current-context)"
+    if is_gcp; then parse_context; fi
     register_cluster
   done <<EOF
 $(context_list "kubeconfigFiles")
 EOF
+}
+
+parse_context() {
+    local PROJECT LOCATION CLUSTER
+    IFS="_" read -r _ PROJECT LOCATION CLUSTER <<<"$(context_get-option "CONTEXT")"
+    context_set-option "PROJECT_ID" "${PROJECT}"
+    context_set-option "CLUSTER_LOCATION" "${LOCATION}"
+    context_set-option "CLUSTER_NAME" "${CLUSTER}"
 }
 
 install_all_remote_secrets() {
@@ -151,7 +160,7 @@ install_one_remote_secret() {
   local CTX1
   local CTX2
   local SECRET_NAME
-  
+
   context_set-option "KUBECONFIG" "${KCF1}"
   CTX1="$(kubectl config current-context)"
   SECRET_NAME="${CTX1//_/-}"
@@ -205,12 +214,26 @@ patch_trust_domain_aliases() {
     return
   fi
   while read -r PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME; do
+    # Off-GCP clusters won't have this info
+    if [[ -z "${PROJECT_ID}" || -z "${CLUSTER_LOCATION}" || -z "${CLUSTER_NAME}" ]]; then continue; fi
+
     configure_kubectl "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
     local ISTIOD_COUNT; ISTIOD_COUNT="$(get_istio_deployment_count)";
     if [[ "$ISTIOD_COUNT" -ne 0 ]]; then
       info "Check trust domain aliases of cluster gke_${PROJECT_ID}_${CLUSTER_LOCATION}_${CLUSTER_NAME}"
       local REVISION; REVISION="$(retry 2 kubectl -n istio-system get pod -l istio=istiod \
-        -o jsonpath='{.items[].spec.containers[].env[?(@.name=="REVISION")].value}')"
+        -o jsonpath='{.items[].spec.containers[].env[?(@.name=="REVISION")].value}' 2>/dev/null)"
+
+      if [[ -z "${REVISION}" ]]; then
+        warn "$(starline)"
+        warn "Couldn't automatically determine the revision for the cluster."
+        warn "This is normally benign, but in certain multi-project scenarios cross-project traffic"
+        warn "may behave unexpectedly. If this is the case, you may need to re-initialize ASM"
+        warn "installations (e.g. by re-running 'asmcli install') to ensure that Fleet workload"
+        warn "identity is set up properly."
+        warn "$(starline)"
+        return
+      fi
 
       # Patch the configmap of the cluster if it does not include FLEET_ID.svc.id.goog
       if ! has_fleet_alias "${FLEET_ID}" "${REVISION}"; then

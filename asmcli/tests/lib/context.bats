@@ -149,7 +149,7 @@ EOF
 
   run context_append "clustersInfo" "my-project us-central1-c my-cluster"
   assert_success
-  
+
   local PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME
   read -r PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
 $(context_list "clustersInfo")
