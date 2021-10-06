@@ -409,6 +409,30 @@ istioctl_path() {
 }
 
 
+######
+# check_curl calls curl and returns non-zero if the http code is not 200 or the
+# curl command fails.
+######
+check_curl() {
+  local TMPFILE; TMPFILE=$(mktemp)
+
+  local HTTPCODE;
+  local RETVAL;
+  HTTPCODE=$(run curl --write-out '%{http_code}' --silent --show-error --output "$TMPFILE" "${@}")
+  RETVAL="$?"
+  if [[ "$RETVAL" != "0" ]] ; then
+    return "$RETVAL"
+  fi
+  if [[ "$HTTPCODE" != "200" ]] ; then
+    warn "HTTP response code: ${HTTPCODE}"
+  fi
+  cat "$TMPFILE"
+  if [[ "$HTTPCODE" != "200" ]] ; then
+    false
+    return
+  fi
+}
+
 #######
 # retry takes an integer N as the first argument, and a list of arguments
 # representing a command afterwards. It will retry the given command up to N
@@ -2568,10 +2592,16 @@ EOF
   fi
 
   if [[ "${MANAGED}" -eq 1 ]]; then
-    local VALIDATION_URL; local CLOUDRUN_ADDR;
-    read -r VALIDATION_URL CLOUDRUN_ADDR <<EOF
-$(retry 5 fail_if_empty scrape_managed_urls)
-EOF
+    local MUTATING_WEBHOOK_URL
+    MUTATING_WEBHOOK_URL=$(get_managed_mutating_webhook_url)
+
+    local VALIDATION_URL
+    # shellcheck disable=SC2001
+    VALIDATION_URL="$(echo "${MUTATING_WEBHOOK_URL}" | sed 's/inject.*$/validate/g')"
+
+    local CLOUDRUN_ADDR
+    # shellcheck disable=SC2001
+    CLOUDRUN_ADDR=$(echo "${MUTATING_WEBHOOK_URL}" | cut -d'/' -f3)
 
     if [[ -z "${VALIDATION_URL}" ]] || [[ -z "${CLOUDRUN_ADDR}" ]]; then
       fatal "Failed to read configuration to install components for managed control plane!"
@@ -2747,7 +2777,7 @@ EOF
   fi
 
   info "Provisioning managed control plane..."
-  retry 2 run curl --request POST \
+  retry 2 check_curl --request POST \
     "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}:runIstiod" \
     --data "${POST_DATA}" \
     --header "X-Server-Timeout: 600" \
@@ -2755,15 +2785,20 @@ EOF
     -K <(auth_header "$(get_auth_token)")
 }
 
-scrape_managed_urls() {
-  local URL
-  URL="$(kubectl get mutatingwebhookconfiguration istiod-asm-managed -ojson | jq .webhooks[0].clientConfig.url -r)"
-  # shellcheck disable=SC2001
-  VALIDATION_URL="$(echo "${URL}" | sed 's/inject.*$/validate/g')"
-  # shellcheck disable=SC2001
-  CLOUDRUN_ADDR=$(echo "${URL}" | cut -d'/' -f3)
+get_managed_mutating_webhook_url() {
+  # Get the url for the most up to date channel that the cluster is using.
+  local WEBHOOKS; WEBHOOKS="istiod-asm-managed-rapid istiod-asm-managed istiod-asm-managed-stable"
+  local WEBHOOK_JSON
 
-  echo "${VALIDATION_URL} ${CLOUDRUN_ADDR}"
+  for WEBHOOK in $WEBHOOKS; do
+    if WEBHOOK_JSON="$(kubectl get mutatingwebhookconfiguration "${WEBHOOK}" -ojson)" ; then
+      info "Using the following managed revision for validating webhook: ${WEBHOOK#'istiod-'}"
+      echo "$WEBHOOK_JSON" | jq .webhooks[0].clientConfig.url -r
+      return
+    fi
+  done
+
+  fatal "Could not find managed config map."
 }
 
 install_managed_components() {
