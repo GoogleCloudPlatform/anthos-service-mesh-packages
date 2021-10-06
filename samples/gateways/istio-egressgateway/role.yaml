@@ -32,4 +32,4 @@ roleRef:
   name: istio-egressgateway-sds
 subjects:
 - kind: ServiceAccount
-  name: istio-egressgateway-service-account
+  name: istio-egressgateway
