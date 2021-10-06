@@ -160,6 +160,7 @@ enable_gcloud_apis(){
   retry 3 gcloud services enable --project="${PROJECT_ID}" $(required_apis | tr '\n' ' ')
 
   if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
+    # shellcheck disable=SC2046
     retry 3 gcloud services enable --project="${FLEET_ID}" $(required_fleet_apis | tr '\n' ' ')
   fi
 }
