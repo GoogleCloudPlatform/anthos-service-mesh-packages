@@ -524,7 +524,7 @@ kube_ingress() {
 }
 
 istio_ingress() {
-  local NS; NS="${1}"
+  local NS; NS="${1:=}"
   if [[ -z "${NS}" ]]; then NS="istio-system"; fi
   warn "Running kubectl get service istio-ingressgateway..."
   for _ in $(seq 1 30); do
