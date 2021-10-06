@@ -133,15 +133,25 @@ is_workload_identity_enabled() {
 }
 
 is_membership_crd_installed() {
-  if [[ "$(retry 2 kubectl get crd memberships.hub.gke.io -ojsonpath="{..metadata.name}" \
-    | grep -w -c memberships || true)" -eq 0 ]]; then
+  local OUTPUT
+  if ! OUTPUT="$(retry 2 kubectl get crd memberships.hub.gke.io -ojsonpath="{..metadata.name}" 2>/dev/null)"; then
     false
     return
   fi
 
-  if [[ "$(retry 2 kubectl get memberships.hub.gke.io -ojsonpath="{..metadata.name}" \
-    | grep -w -c membership || true)" -eq 0 ]]; then
+  if [[ "$(echo "${OUTPUT}" | grep -w -c memberships || true)" -eq 0 ]]; then
     false
+    return
+  fi
+
+  if ! OUTPUT="$(retry 2 kubectl get memberships.hub.gke.io -ojsonpath="{..metadata.name}" 2>/dev/null)"; then
+    false
+    return
+  fi
+
+  if [[ "$(echo "${OUTPUT}" | grep -w -c membership || true)" -eq 0 ]]; then
+    false
+    return
   fi
 }
 
