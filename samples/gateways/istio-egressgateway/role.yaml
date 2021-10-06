@@ -29,7 +29,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: istio-egressgateway-sds
+  name: istio-egressgateway
 subjects:
 - kind: ServiceAccount
   name: istio-egressgateway
