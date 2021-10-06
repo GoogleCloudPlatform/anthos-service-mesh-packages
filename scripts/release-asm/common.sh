@@ -39,6 +39,7 @@ EOF
 other_releases() {
   cat << EOF
 master unstable
+legacy-release-1.11 1.11
 EOF
 }
 
