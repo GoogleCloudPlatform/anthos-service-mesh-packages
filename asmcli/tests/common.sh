@@ -751,12 +751,11 @@ run_basic_test() {
   rm "${LT_NAMESPACE}"
   sleep 5
 
-  # @zerobfd to suggest fix for failing GW
-  # if [[ "${EXTRA_FLAGS}" != *--managed* && "${SUBCOMMAND}" != *experimental* ]]; then
-  #   echo "Installing Istio ingress..."
-  #   install_sample_ingress "${LT_NAMESPACE}" "${REV}"
-  #   sleep 5
-  # fi
+  if [[ "${EXTRA_FLAGS}" != *--managed* && "${SUBCOMMAND}" != *experimental* ]]; then
+    echo "Installing Istio ingress..."
+    install_sample_ingress "${LT_NAMESPACE}" "${REV}"
+    sleep 5
+  fi
 
   echo "Installing Istio manifests for demo app..."
   install_demo_app_istio_manifests "${LT_NAMESPACE}"
