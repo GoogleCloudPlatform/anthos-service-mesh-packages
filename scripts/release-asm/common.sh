@@ -24,16 +24,20 @@ HOLD_TYPE="temp"; readonly HOLD_TYPE
 trap 'gsutil retention "${HOLD_TYPE}" release gs://"${STABLE_VERSION_FILE_PATH}"' ERR # hope that the hold is cleared
 
 prod_releases() {
-  :
+  cat << EOF
+release 1.11
+EOF
 }
 
 staging_releases() {
-  :
+  cat << EOF
+staging 1.11
+EOF
 }
 
 other_releases() {
   cat << EOF
-asmcli-staging-1.10 alpha
+main alpha
 EOF
 }
 
@@ -42,16 +46,16 @@ EOF
 # e.g. the pair "branch" "demo" will check out the git branch "branch" and
 # upload a file called "<SCRIPT_NAME>_demo" to the GCS bucket.
 all_releases() {
-#  while read -r type version; do
-#    echo "${type}-${version}-asm" "${version}"
-#  done <<EOF
-#$(prod_releases)
-#EOF
-#  while read -r type version; do
-#    echo "${type}-${version}-asm" "staging_${version}"
-#  done <<EOF
-#$(staging_releases)
-#EOF
+  while read -r type version; do
+    echo "${type}-${version}" "${version}"
+  done <<EOF
+$(prod_releases)
+EOF
+  while read -r type version; do
+    echo "${type}-${version}" "staging_${version}"
+  done <<EOF
+$(staging_releases)
+EOF
   while read -r type version; do
     echo "${type}" "${version}"
   done <<EOF
@@ -229,8 +233,6 @@ setup() {
   git clone git@github.com:GoogleCloudPlatform/anthos-service-mesh-packages.git
   if [[ "${_DEBUG}" -ne 1 ]]; then
     cd anthos-service-mesh-packages
-    # remove this after the default branch is switched
-    git checkout main
     cd asmcli
   else
     touch asmcli
