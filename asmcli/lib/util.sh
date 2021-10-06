@@ -608,33 +608,25 @@ populate_cluster_values() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
-  local NETWORK_ID; NETWORK_ID="$(context_get-option "NETWORK_ID")"
   local CLUSTER_DATA
 
   if is_gcp; then
-    if [[ -z "${GKE_CLUSTER_URI}" || -z "${NETWORK_ID}" ]]; then
-      CLUSTER_DATA="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
-        --zone="${CLUSTER_LOCATION}" \
-        --project="${PROJECT_ID}" \
-        --format='value(selfLink, network)')"
-      read -r NEW_GKE_CLUSTER_URI NEW_NETWORK_ID <<EOF
+    CLUSTER_DATA="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
+      --zone="${CLUSTER_LOCATION}" \
+      --project="${PROJECT_ID}" \
+      --format='value(selfLink, network)')"
+    read -r NEW_GKE_CLUSTER_URI NEW_NETWORK_ID <<EOF
 ${CLUSTER_DATA}
 EOF
 
-      if [[ -z "${GKE_CLUSTER_URI}" ]]; then
-        GKE_CLUSTER_URI="${NEW_GKE_CLUSTER_URI}"
-        readonly GKE_CLUSTER_URI
-      fi
-
-      if [[ -z "${NETWORK_ID}" ]]; then
-        context_set-option "NETWORK_ID" "${PROJECT_ID}-${NEW_NETWORK_ID}"
-      fi
+    if [[ -n "${NEW_GKE_CLUSTER_URI}" ]]; then
+      context_set-option "GKE_CLUSTER_URI" "${NEW_GKE_CLUSTER_URI}"
+    fi
+    if [[ -n "${NEW_NETWORK_ID}" ]]; then
+      context_set-option "NETWORK_ID" "${PROJECT_ID}-${NEW_NETWORK_ID}"
     fi
   else
-    if [[ -z "${NETWORK_ID}" ]]; then
-      NETWORK_ID="default"
-      context_set-option "NETWORK_ID" "${NETWORK_ID}"
-    fi
+    context_set-option "NETWORK_ID" "default"
   fi
 }
 

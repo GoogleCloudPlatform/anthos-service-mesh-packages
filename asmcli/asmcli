@@ -66,7 +66,6 @@ CR_CONTROL_PLANE_REVISION_STABLE=""
 SCRIPT_NAME="${0##*/}"; readonly SCRIPT_NAME
 
 PROJECT_NUMBER=""
-GKE_CLUSTER_URI=""
 GCLOUD_USER_OR_SA="${GCLOUD_USER_OR_SA:=}"
 KPT_URL=""
 KUBECONFIG=""
@@ -2556,6 +2555,7 @@ context_init() {
     "PROJECT_ID": "${PROJECT_ID:-}",
     "CLUSTER_NAME": "${CLUSTER_NAME:-}",
     "CLUSTER_LOCATION": "${CLUSTER_LOCATION:-}",
+    "GKE_CLUSTER_URI": "${GKE_CLUSTER_URI:-}",
     "KUBECONFIG": "${KUBECONFIG_FILE:-}",
     "KUBECONFIG_SUPPLIED": "${KUBECONFIG_SUPPLIED:-0}",
     "FLEET_ID": "${FLEET_ID:-}",
@@ -2946,6 +2946,7 @@ register_cluster() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local GKE_CLUSTER_URI; GKE_CLUSTER_URI="$(context_get-option "GKE_CLUSTER_URI")"
   local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}")"
   info "Registering the cluster as ${MEMBERSHIP_NAME}..."
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
@@ -4026,33 +4027,25 @@ populate_cluster_values() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
-  local NETWORK_ID; NETWORK_ID="$(context_get-option "NETWORK_ID")"
   local CLUSTER_DATA
 
   if is_gcp; then
-    if [[ -z "${GKE_CLUSTER_URI}" || -z "${NETWORK_ID}" ]]; then
-      CLUSTER_DATA="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
-        --zone="${CLUSTER_LOCATION}" \
-        --project="${PROJECT_ID}" \
-        --format='value(selfLink, network)')"
-      read -r NEW_GKE_CLUSTER_URI NEW_NETWORK_ID <<EOF
+    CLUSTER_DATA="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
+      --zone="${CLUSTER_LOCATION}" \
+      --project="${PROJECT_ID}" \
+      --format='value(selfLink, network)')"
+    read -r NEW_GKE_CLUSTER_URI NEW_NETWORK_ID <<EOF
 ${CLUSTER_DATA}
 EOF
 
-      if [[ -z "${GKE_CLUSTER_URI}" ]]; then
-        GKE_CLUSTER_URI="${NEW_GKE_CLUSTER_URI}"
-        readonly GKE_CLUSTER_URI
-      fi
-
-      if [[ -z "${NETWORK_ID}" ]]; then
-        context_set-option "NETWORK_ID" "${PROJECT_ID}-${NEW_NETWORK_ID}"
-      fi
+    if [[ -n "${NEW_GKE_CLUSTER_URI}" ]]; then
+      context_set-option "GKE_CLUSTER_URI" "${NEW_GKE_CLUSTER_URI}"
+    fi
+    if [[ -n "${NEW_NETWORK_ID}" ]]; then
+      context_set-option "NETWORK_ID" "${PROJECT_ID}-${NEW_NETWORK_ID}"
     fi
   else
-    if [[ -z "${NETWORK_ID}" ]]; then
-      NETWORK_ID="default"
-      context_set-option "NETWORK_ID" "${NETWORK_ID}"
-    fi
+    context_set-option "NETWORK_ID" "default"
   fi
 }
 
