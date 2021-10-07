@@ -175,6 +175,7 @@ create-mesh_parse_args() {
       *)
         if [ -f "$1" ]; then
           local KCF; KCF="${1}"
+          KCF="$(apath -f "${KCF}")" || fatal "Couldn't find file ${KCF}"
           context_append "kubeconfigFiles" "${KCF}"
         else
           local CLUSTER; CLUSTER="${1}"
