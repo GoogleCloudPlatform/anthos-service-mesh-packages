@@ -51,7 +51,6 @@ container.googleapis.com
 monitoring.googleapis.com
 logging.googleapis.com
 cloudtrace.googleapis.com
-meshtelemetry.googleapis.com
 meshconfig.googleapis.com
 iamcredentials.googleapis.com
 gkeconnect.googleapis.com
