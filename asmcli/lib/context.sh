@@ -59,6 +59,7 @@ context_init() {
   },
   "istioctlFiles": [],
   "kubectlFiles": [],
+  "mcpOptions": [],
   "clustersInfo": [],
   "clusterRegistrations": [],
   "clusterContexts": [],
