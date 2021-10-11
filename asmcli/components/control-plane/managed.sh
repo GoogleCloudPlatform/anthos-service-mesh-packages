@@ -15,6 +15,7 @@ install_managed_control_plane() {
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
+  local CA; CA="$(context_get-option "CA")"
 
   local POST_DATA; POST_DATA="{}";
   if [[ -n "${_CI_CLOUDRUN_IMAGE_HUB}" ]]; then
@@ -57,6 +58,35 @@ install_managed_control_plane() {
   context_append "kubectlFiles" "${MANAGED_WEBHOOKS}"
 
   install_mananged_cni
+
+  if [[ "${CA}" = "gcp_cas" ]]; then
+    install_managed_privateca
+  fi
+
+  install_managed_startup_config
+}
+
+install_managed_startup_config() {
+  local ASM_OPTS=""
+  local MCP_CONFIG
+
+  for MCP_CONFIG in $(context_list "mcpOptions"); do
+    ASM_OPTS="${MCP_CONFIG};${ASM_OPTS}"
+  done
+
+  cat >mcp_configmap.yaml <<EOF
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: asm-options
+  namespace: istio-system
+data:
+  ASM_OPTS: "${ASM_OPTS}"
+EOF
+
+  context_append "kubectlFiles" "mcp_configmap.yaml"
+
 }
 
 install_mananged_cni() {
@@ -67,21 +97,17 @@ install_mananged_cni() {
     -o jsonpath='{.data.ASM_OPTS}' || true)"
 
   if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=on"* ]]; then
-    cat >mcp_configmap.yaml <<EOF
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: asm-options
-  namespace: istio-system
-data:
-  ASM_OPTS: "CNI=on"
-EOF
-
-    context_append "kubectlFiles" "mcp_configmap.yaml"
+    context_append "mcpOptions" "CNI=on"
   fi
-
   context_append "kubectlFiles" "${MANAGED_CNI}"
+}
+
+install_managed_privateca() {
+  info "Configuring GCP CAS with managed control plane..."
+
+  local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
+  context_append "mcpOptions" "CA=PRIVATECA"
+  context_append "mcpOptions" "CAAddr=${CA_NAME}"
 }
 
 configure_managed_control_plane() {
