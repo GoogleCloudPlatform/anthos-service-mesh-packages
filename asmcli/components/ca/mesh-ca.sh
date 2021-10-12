@@ -46,7 +46,7 @@ EOF
     local REVISION; REVISION="$(retry 2 kubectl -n istio-system get pod -l app=istiod \
       -o jsonpath='{.items[].spec.containers[].env[?(@.name=="REVISION")].value}')"
 
-    if [[ -z "${REVISION}" || "${REVISION}" = istio-default ]]; then
+    if [[ -z "${REVISION}" || "${REVISION}" = default ]]; then
       REVISION=""
     else
       REVISION="-${REVISION}"
