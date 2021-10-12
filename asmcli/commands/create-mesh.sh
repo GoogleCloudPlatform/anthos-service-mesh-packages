@@ -222,7 +222,7 @@ patch_trust_domain_aliases() {
     local ISTIOD_COUNT; ISTIOD_COUNT="$(get_istio_deployment_count)";
     if [[ "$ISTIOD_COUNT" -ne 0 ]]; then
       info "Check trust domain aliases of cluster gke_${PROJECT_ID}_${CLUSTER_LOCATION}_${CLUSTER_NAME}"
-      local REVISION; REVISION="$(retry 2 kubectl -n istio-system get pod -l istio=istiod \
+      local REVISION; REVISION="$(retry 2 kubectl -n istio-system get pod -l app=istiod \
         -o jsonpath='{.items[].spec.containers[].env[?(@.name=="REVISION")].value}' 2>/dev/null)"
 
       if [[ -z "${REVISION}" ]]; then
