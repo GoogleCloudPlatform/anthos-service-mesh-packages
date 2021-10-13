@@ -75,6 +75,7 @@ EOF
 # [END required_apis]
 
 required_fleet_apis() {
+  local CA; CA="$(context_get-option "CA")"
   case "${CA}" in
    mesh_ca)
      echo meshca.googleapis.com
