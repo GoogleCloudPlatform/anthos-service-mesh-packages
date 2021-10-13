@@ -1928,6 +1928,20 @@ validate_managed_control_plane() {
   fi
 }
 
+call_runIstiod() {
+  local PROJECT_ID; PROJECT_ID="${1}";
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}";
+  local CLUSTER_NAME; CLUSTER_NAME="${3}";
+  local POST_DATA; POST_DATA="${4}";
+
+  check_curl --request POST \
+    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}:runIstiod" \
+    --data "${POST_DATA}" \
+    --header "X-Server-Timeout: 600" \
+    --header "Content-Type: application/json" \
+    -K <(auth_header "$(get_auth_token)")
+}
+
 install_managed_control_plane() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
@@ -1946,12 +1960,7 @@ install_managed_control_plane() {
   fi
 
   info "Provisioning control plane..."
-  retry 2 check_curl --request POST \
-    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}:runIstiod" \
-    --data "${POST_DATA}" \
-    --header "X-Server-Timeout: 600" \
-    --header "Content-Type: application/json" \
-    -K <(auth_header "$(get_auth_token)")
+  retry 2 call_runIstiod "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}" "${POST_DATA}"
 
   local MUTATING_WEBHOOK_URL
   MUTATING_WEBHOOK_URL=$(get_managed_mutating_webhook_url)
