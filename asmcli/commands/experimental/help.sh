@@ -19,5 +19,11 @@ SUBCOMMANDS:
                                       compatibility with a Google managed
                                       control plane and generates new config
                                       where possible.
+
+FLAGS:
+
+  --use_vpcsc                         Install Google-managed control plane in
+                                      a VPC Service Control restricted
+                                      environment.
 EOF
 }
