@@ -625,8 +625,6 @@ EOF
     if [[ -n "${NEW_NETWORK_ID}" ]]; then
       context_set-option "NETWORK_ID" "${PROJECT_ID}-${NEW_NETWORK_ID}"
     fi
-  else
-    context_set-option "NETWORK_ID" "default"
   fi
 }
 
