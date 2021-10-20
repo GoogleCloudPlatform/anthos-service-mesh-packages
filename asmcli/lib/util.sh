@@ -687,6 +687,39 @@ get_cr_channels() {
   fi
 }
 
+get_cr_yaml() {
+  local CHANNEL; CHANNEL="${1}"
+  local EXPERIMENTAL; EXPERIMENTAL="$(context_get-option "EXPERIMENTAL")"
+  local CR REVISION
+  case "${CHANNEL}" in
+    regular)
+      if [[ "${EXPERIMENTAL}" -eq 1 ]]; then
+        CR="${CR_CONTROL_PLANE_REVISION_REGULAR}"
+      else
+        CR="${CR_CONTROL_PLANE_REVISION_REGULAR_RECONCILED}"
+      fi
+      REVISION="${REVISION_LABEL_REGULAR}"
+      ;;
+    stable)
+      if [[ "${EXPERIMENTAL}" -eq 1 ]]; then
+        CR="${CR_CONTROL_PLANE_REVISION_STABLE}"
+      else
+        CR="${CR_CONTROL_PLANE_REVISION_STABLE_RECONCILED}"
+      fi
+      REVISION="${REVISION_LABEL_STABLE}"
+      ;;
+    *)
+      if [[ "${EXPERIMENTAL}" -eq 1 ]]; then
+        CR="${CR_CONTROL_PLANE_REVISION_RAPID}"
+      else
+        CR="${CR_CONTROL_PLANE_REVISION_RAPID_RECONCILED}"
+      fi
+      REVISION="${REVISION_LABEL_RAPID}"
+      ;;
+  esac
+  echo "${CR} ${REVISION}"
+}
+
 ensure_cross_project_fleet_sa() {
   local FLEET_ID; FLEET_ID="${1}"
   local PROJECT_ID; PROJECT_ID="${2}"

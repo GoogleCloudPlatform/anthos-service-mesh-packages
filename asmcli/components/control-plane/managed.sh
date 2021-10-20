@@ -83,7 +83,7 @@ install_managed_startup_config() {
     ASM_OPTS="${MCP_CONFIG};${ASM_OPTS}"
   done
 
-  cat >mcp_configmap.yaml <<EOF
+  cat >|mcp_configmap.yaml <<EOF
 ---
 apiVersion: v1
 kind: ConfigMap
