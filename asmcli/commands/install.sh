@@ -116,22 +116,34 @@ install_canonical_controller() {
 
 install_control_plane_revisions() {
   info "Configuring ASM managed control plane revision CR for channels..."
+  local EXPERIMENTAL; EXPERIMENTAL="$(context_get-option "EXPERIMENTAL")"
   local CHANNEL CR REVISION
   while read -r CHANNEL; do
     if [[ "${CHANNEL}" == "regular" ]]; then
-      CR="${CR_CONTROL_PLANE_REVISION_REGULAR}"
+      if [[ "${EXPERIMENTAL}" -eq 1 ]]; then
+        CR="${CR_CONTROL_PLANE_REVISION_REGULAR}"
+      else
+        CR="${CR_CONTROL_PLANE_REVISION_REGULAR_RECONCILED}"
+      fi
       REVISION="${REVISION_LABEL_REGULAR}"
     elif [[ "${CHANNEL}" == "stable" ]]; then
-      CR="${CR_CONTROL_PLANE_REVISION_STABLE}"
+      if [[ "${EXPERIMENTAL}" -eq 1 ]]; then
+        CR="${CR_CONTROL_PLANE_REVISION_STABLE}"
+      else
+        CR="${CR_CONTROL_PLANE_REVISION_STABLE_RECONCILED}"
+      fi
       REVISION="${REVISION_LABEL_STABLE}"
     else
-      CR="${CR_CONTROL_PLANE_REVISION_RAPID}"
+      if [[ "${EXPERIMENTAL}" -eq 1 ]]; then
+        CR="${CR_CONTROL_PLANE_REVISION_RAPID}"
+      else
+        CR="${CR_CONTROL_PLANE_REVISION_RAPID_RECONCILED}"
+      fi
       REVISION="${REVISION_LABEL_RAPID}"
     fi
     info "Installing ASM Control Plane Revision CR with ${REVISION} channel in istio-system namespace..."
     retry 3 kubectl apply -f "${CR}"
 
-    local EXPERIMENTAL; EXPERIMENTAL="$(context_get-option "EXPERIMENTAL")"
     if [[ "${EXPERIMENTAL}" -eq 1 ]]; then
       info "Waiting for deployment..."
       retry 3 kubectl wait --for=condition=ProvisioningFinished \
