@@ -342,6 +342,9 @@ init() {
   CR_CONTROL_PLANE_REVISION_REGULAR="asm/control-plane-revision/cr_regular.yaml"; readonly CR_CONTROL_PLANE_REVISION_REGULAR;
   CR_CONTROL_PLANE_REVISION_RAPID="asm/control-plane-revision/cr_rapid.yaml"; readonly CR_CONTROL_PLANE_REVISION_RAPID;
   CR_CONTROL_PLANE_REVISION_STABLE="asm/control-plane-revision/cr_stable.yaml"; readonly CR_CONTROL_PLANE_REVISION_STABLE;
+  CR_CONTROL_PLANE_REVISION_REGULAR_RECONCILED="asm/control-plane-revision/cr_regular_reconciled.yaml"; readonly CR_CONTROL_PLANE_REVISION_REGULAR_RECONCILED;
+  CR_CONTROL_PLANE_REVISION_RAPID_RECONCILED="asm/control-plane-revision/cr_rapid_reconciled.yaml"; readonly CR_CONTROL_PLANE_REVISION_RAPID_RECONCILED;
+  CR_CONTROL_PLANE_REVISION_STABLE_RECONCILED="asm/control-plane-revision/cr_stable_reconciled.yaml"; readonly CR_CONTROL_PLANE_REVISION_STABLE_RECONCILED;
   REVISION_LABEL_REGULAR="asm-managed"; readonly REVISION_LABEL_REGULAR
   REVISION_LABEL_RAPID="asm-managed-rapid"; readonly REVISION_LABEL_RAPID
   REVISION_LABEL_STABLE="asm-managed-stable"; readonly REVISION_LABEL_STABLE
@@ -682,6 +685,39 @@ get_cr_channels() {
         ;;
     esac
   fi
+}
+
+get_cr_yaml() {
+  local CHANNEL; CHANNEL="${1}"
+  local EXPERIMENTAL; EXPERIMENTAL="$(context_get-option "EXPERIMENTAL")"
+  local CR REVISION
+  case "${CHANNEL}" in
+    regular)
+      if [[ "${EXPERIMENTAL}" -eq 1 ]]; then
+        CR="${CR_CONTROL_PLANE_REVISION_REGULAR}"
+      else
+        CR="${CR_CONTROL_PLANE_REVISION_REGULAR_RECONCILED}"
+      fi
+      REVISION="${REVISION_LABEL_REGULAR}"
+      ;;
+    stable)
+      if [[ "${EXPERIMENTAL}" -eq 1 ]]; then
+        CR="${CR_CONTROL_PLANE_REVISION_STABLE}"
+      else
+        CR="${CR_CONTROL_PLANE_REVISION_STABLE_RECONCILED}"
+      fi
+      REVISION="${REVISION_LABEL_STABLE}"
+      ;;
+    *)
+      if [[ "${EXPERIMENTAL}" -eq 1 ]]; then
+        CR="${CR_CONTROL_PLANE_REVISION_RAPID}"
+      else
+        CR="${CR_CONTROL_PLANE_REVISION_RAPID_RECONCILED}"
+      fi
+      REVISION="${REVISION_LABEL_RAPID}"
+      ;;
+  esac
+  echo "${CR} ${REVISION}"
 }
 
 ensure_cross_project_fleet_sa() {
