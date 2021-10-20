@@ -312,6 +312,10 @@ x_parse_install_args() {
         context_set-option "ENABLE_NAMESPACE_CREATION" 1
         shift 1
         ;;
+      --use_managed_cni | --use-managed-cni)
+        context_set-option "USE_MANAGED_CNI" 1
+        shift 1
+        ;;
       --disable_canonical_service | --disable-canonical-service)
         context_set-option "DISABLE_CANONICAL_SERVICE" 1
         shift 1

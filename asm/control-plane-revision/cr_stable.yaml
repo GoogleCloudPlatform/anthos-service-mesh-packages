@@ -4,6 +4,8 @@ kind: ControlPlaneRevision
 metadata:
   name: asm-managed-stable
   namespace: istio-system
+  labels:
+    mesh.cloud.google.com/managed-cni-enabled: "false" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.use-managed-cni"}
   annotations:
     mesh.cloud.google.com/image: "" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-mcp-image"}
 spec:

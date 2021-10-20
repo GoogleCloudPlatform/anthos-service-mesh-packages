@@ -169,6 +169,9 @@ FLAGS:
                                       to a fleet
      --enable_namespace_creation      Allow the script to create the istio-system
                                       namespace for the user
+     --use_managed_cni                Use managed CNI experience. Experimental install
+                                      only. If not passed, asmcli will apply the static
+                                      CNI manifests.
 
      --managed                        Provision a remote, managed control plane
                                       instead of installing one in-cluster.
@@ -258,6 +261,7 @@ FLAGS:
      --enable_gcp_components
      --enable_registration
      --enable_namespace_creation
+     --use_managed_cni
 
      --managed
 

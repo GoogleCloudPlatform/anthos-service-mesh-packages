@@ -457,9 +457,11 @@ x_install() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
 
-  # TODO: remove this manual step when managed backend is ready
-  install_mananged_cni
+  if [[ "${USE_MANAGED_CNI}" -eq 0 ]]; then
+    install_mananged_cni_static
+  fi
   apply_kube_yamls
 
   # `kubectl wait` for non-existent resources will return error directly so we wait in loop
@@ -479,12 +481,16 @@ x_install() {
 }
 
 x_configure_package() {
+  local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
   kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
   if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then
     kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
   fi
   if [[ -n "${_CI_ASM_IMAGE_TAG}" ]]; then
     kpt cfg set asm anthos.servicemesh.tag "${_CI_ASM_IMAGE_TAG}"
+  fi
+  if [[ "${USE_MANAGED_CNI}" -eq 1 ]]; then
+    kpt cfg set asm anthos.servicemesh.use-managed-cni "true"
   fi
 }
 x_mcp_migrate_check() {
@@ -1142,6 +1148,9 @@ FLAGS:
                                       to a fleet
      --enable_namespace_creation      Allow the script to create the istio-system
                                       namespace for the user
+     --use_managed_cni                Use managed CNI experience. Experimental install
+                                      only. If not passed, asmcli will apply the static
+                                      CNI manifests.
 
      --managed                        Provision a remote, managed control plane
                                       instead of installing one in-cluster.
@@ -1231,6 +1240,7 @@ FLAGS:
      --enable_gcp_components
      --enable_registration
      --enable_namespace_creation
+     --use_managed_cni
 
      --managed
 
@@ -1985,7 +1995,7 @@ install_managed_control_plane() {
   info "Configuring ASM managed control plane validating webhook config..."
   context_append "kubectlFiles" "${MANAGED_WEBHOOKS}"
 
-  install_mananged_cni
+  install_mananged_cni_static
 
   if [[ "${CA}" = "gcp_cas" ]]; then
     install_managed_privateca
@@ -2017,7 +2027,7 @@ EOF
 
 }
 
-install_mananged_cni() {
+install_mananged_cni_static() {
   info "Configuring CNI..."
   local ASM_OPTS
   ASM_OPTS="$(kubectl -n istio-system \
@@ -2609,6 +2619,7 @@ context_init() {
     "ENABLE_GCP_COMPONENTS": ${ENABLE_GCP_COMPONENTS:-0},
     "ENABLE_REGISTRATION": ${ENABLE_REGISTRATION:-0},
     "ENABLE_NAMESPACE_CREATION": ${ENABLE_NAMESPACE_CREATION:-0},
+    "USE_MANAGED_CNI": ${USE_MANAGED_CNI:-0},
     "DISABLE_CANONICAL_SERVICE": ${DISABLE_CANONICAL_SERVICE:-0},
     "TRUST_FLEET_IDENTITY": ${TRUST_FLEET_IDENTITY:-1},
     "PRINT_CONFIG": ${PRINT_CONFIG:-0},
@@ -3407,6 +3418,10 @@ x_parse_install_args() {
         ;;
       --enable_namespace_creation | --enable-namespace-creation)
         context_set-option "ENABLE_NAMESPACE_CREATION" 1
+        shift 1
+        ;;
+      --use_managed_cni | --use-managed-cni)
+        context_set-option "USE_MANAGED_CNI" 1
         shift 1
         ;;
       --disable_canonical_service | --disable-canonical-service)

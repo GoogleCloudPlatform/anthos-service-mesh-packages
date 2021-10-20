@@ -66,7 +66,7 @@ install_managed_control_plane() {
   info "Configuring ASM managed control plane validating webhook config..."
   context_append "kubectlFiles" "${MANAGED_WEBHOOKS}"
 
-  install_mananged_cni
+  install_mananged_cni_static
 
   if [[ "${CA}" = "gcp_cas" ]]; then
     install_managed_privateca
@@ -98,7 +98,7 @@ EOF
 
 }
 
-install_mananged_cni() {
+install_mananged_cni_static() {
   info "Configuring CNI..."
   local ASM_OPTS
   ASM_OPTS="$(kubectl -n istio-system \
