@@ -4,6 +4,8 @@ kind: ControlPlaneRevision
 metadata:
   name: asm-managed
   namespace: istio-system
+  labels:
+    app.kubernetes.io/created-by: "asmcli"
   annotations:
     mesh.cloud.google.com/image: "" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-mcp-image"}
 spec:
