@@ -317,3 +317,9 @@ openAPI:
             ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.rev'
           - marker: INGRESSGATEWAY_NAME
             ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.custom-ingressgateway-name'
+    io.k8s.cli.setters.anthos.servicemesh.use-managed-cni:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.use-managed-cni
+          value: "false"
