@@ -442,6 +442,12 @@ SUBCOMMANDS:
                                       compatibility with a Google managed
                                       control plane and generates new config
                                       where possible.
+
+FLAGS:
+
+  --use_vpcsc                         Install Google-managed control plane in
+                                      a VPC Service Control restricted
+                                      environment.
 EOF
 }
 x_install_subcommand() {
@@ -485,6 +491,7 @@ x_install() {
 
 x_configure_package() {
   local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
+  local USE_VPCSC; USE_VPCSC="$(context_get-option "USE_VPCSC")"
   kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
   if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then
     kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
@@ -494,6 +501,9 @@ x_configure_package() {
   fi
   if [[ "${USE_MANAGED_CNI}" -eq 1 ]]; then
     kpt cfg set asm anthos.servicemesh.use-managed-cni "true"
+  fi
+  if [[ -n "${USE_VPCSC}" ]]; then
+    kpt cfg set asm anthos.servicemesh.managed-controlplane.vpcsc.enabled "true"
   fi
 }
 x_mcp_migrate_check() {
@@ -2622,6 +2632,7 @@ context_init() {
     "ENABLE_REGISTRATION": ${ENABLE_REGISTRATION:-0},
     "ENABLE_NAMESPACE_CREATION": ${ENABLE_NAMESPACE_CREATION:-0},
     "USE_MANAGED_CNI": ${USE_MANAGED_CNI:-0},
+    "USE_VPCSC": ${USE_VPCSC:-0},
     "DISABLE_CANONICAL_SERVICE": ${DISABLE_CANONICAL_SERVICE:-0},
     "TRUST_FLEET_IDENTITY": ${TRUST_FLEET_IDENTITY:-1},
     "PRINT_CONFIG": ${PRINT_CONFIG:-0},
@@ -3395,6 +3406,10 @@ x_parse_install_args() {
         ;;
       --managed)
         context_set-option "MANAGED" 1
+        shift 1
+        ;;
+      --use_vpcsc | --use-vpcsc)
+        context_set-option "USE_VPCSC" 1
         shift 1
         ;;
       -e | --enable_all | --enable-all)
@@ -5017,6 +5032,7 @@ x_validate_install_args() {
   local ENABLE_GCP_COMPONENTS; ENABLE_GCP_COMPONENTS="$(context_get-option "ENABLE_GCP_COMPONENTS")"
   local ENABLE_REGISTRATION; ENABLE_REGISTRATION="$(context_get-option "ENABLE_REGISTRATION")"
   local ENABLE_NAMESPACE_CREATION; ENABLE_NAMESPACE_CREATION="$(context_get-option "ENABLE_NAMESPACE_CREATION")"
+  local USE_VPCSC; USE_VPCSC="$(context_get-option "USE_VPCSC")"
   local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
   local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
   local SERVICE_ACCOUNT; SERVICE_ACCOUNT="$(context_get-option "SERVICE_ACCOUNT")"
@@ -5137,6 +5153,7 @@ ENABLE_GCP_APIS
 ENABLE_GCP_IAM_ROLES
 ENABLE_GCP_COMPONENTS
 ENABLE_REGISTRATION
+USE_VPCSC
 DISABLE_CANONICAL_SERVICE
 ONLY_VALIDATE
 ONLY_ENABLE
