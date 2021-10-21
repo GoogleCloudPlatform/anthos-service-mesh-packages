@@ -284,6 +284,10 @@ x_parse_install_args() {
         context_set-option "MANAGED" 1
         shift 1
         ;;
+      --use_vpcsc | --use-vpcsc)
+        context_set-option "USE_VPCSC" 1
+        shift 1
+        ;;
       -e | --enable_all | --enable-all)
         context_set-option "ENABLE_ALL" 1
         shift 1

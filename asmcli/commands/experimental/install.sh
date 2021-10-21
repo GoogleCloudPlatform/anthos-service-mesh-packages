@@ -39,6 +39,7 @@ x_install() {
 
 x_configure_package() {
   local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
+  local USE_VPCSC; USE_VPCSC="$(context_get-option "USE_VPCSC")"
   kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
   if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then
     kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
@@ -48,5 +49,8 @@ x_configure_package() {
   fi
   if [[ "${USE_MANAGED_CNI}" -eq 1 ]]; then
     kpt cfg set asm anthos.servicemesh.use-managed-cni "true"
+  fi
+  if [[ -n "${USE_VPCSC}" ]]; then
+    kpt cfg set asm anthos.servicemesh.managed-controlplane.vpcsc.enabled "true"
   fi
 }
