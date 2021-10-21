@@ -6,6 +6,7 @@ metadata:
   namespace: istio-system
   annotations:
     mesh.cloud.google.com/image: "" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-mcp-image"}
+    mesh.cloud.google.com/vpcsc: "false" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.managed-controlplane.vpcsc.enabled"}
 spec:
   type: managed_service
   channel: regular
