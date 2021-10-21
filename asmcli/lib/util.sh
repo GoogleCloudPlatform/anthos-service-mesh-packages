@@ -611,6 +611,7 @@ populate_cluster_values() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local NETWORK_ID; NETWORK_ID="$(context_get-option "NETWORK_ID")"
   local CLUSTER_DATA
 
   if is_gcp; then
@@ -627,6 +628,10 @@ EOF
     fi
     if [[ -n "${NEW_NETWORK_ID}" ]]; then
       context_set-option "NETWORK_ID" "${PROJECT_ID}-${NEW_NETWORK_ID}"
+    fi
+  else
+    if [[ -z "${NETWORK_ID}" ]]; then
+      context_set-option "NETWORK_ID" "default"
     fi
   fi
 }
