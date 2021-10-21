@@ -88,6 +88,13 @@ openAPI:
             ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub'
           - marker: IMAGE_TAG
             ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag'
+    io.k8s.cli.setters.anthos.servicemesh.managed-controlplane.vpcsc.enabled:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.managed-controlplane.vpcsc.enabled
+          value: "false"
+          isSet: true
     io.k8s.cli.setters.anthos.servicemesh.rev:
       x-k8s-cli:
         setter:
