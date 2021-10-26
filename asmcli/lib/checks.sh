@@ -15,6 +15,11 @@ has_value() {
   false
 }
 
+not_null() {
+  local VALUE; VALUE="$1";
+  [[ -n "${VALUE}" && "${VALUE}" != "null" ]]
+}
+
 is_managed() {
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
 
