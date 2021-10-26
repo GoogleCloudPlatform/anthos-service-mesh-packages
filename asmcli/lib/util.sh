@@ -623,10 +623,10 @@ populate_cluster_values() {
 ${CLUSTER_DATA}
 EOF
 
-    if [[ -n "${NEW_GKE_CLUSTER_URI}" ]]; then
+    if not_null "${NEW_GKE_CLUSTER_URI}"; then
       context_set-option "GKE_CLUSTER_URI" "${NEW_GKE_CLUSTER_URI}"
     fi
-    if [[ -n "${NEW_NETWORK_ID}" ]]; then
+    if not_null "${NEW_NETWORK_ID}"; then
       context_set-option "NETWORK_ID" "${PROJECT_ID}-${NEW_NETWORK_ID}"
     fi
   else
