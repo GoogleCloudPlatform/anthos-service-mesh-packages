@@ -744,6 +744,7 @@ x_validate_install_args() {
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  local CA; CA="$(context_get-option "CA")"
   local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
   local ENABLE_CLUSTER_ROLES; ENABLE_CLUSTER_ROLES="$(context_get-option "ENABLE_CLUSTER_ROLES")"
   local ENABLE_CLUSTER_LABELS; ENABLE_CLUSTER_LABELS="$(context_get-option "ENABLE_CLUSTER_LABELS")"
@@ -767,6 +768,11 @@ x_validate_install_args() {
   local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
   local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
+
+  if [[ -z "${CA}" ]]; then
+    CA="mesh_ca"
+    context_set-option "CA" "${CA}"
+  fi
 
   local MISSING_ARGS=0
 
