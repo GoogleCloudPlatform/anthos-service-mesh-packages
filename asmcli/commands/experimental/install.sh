@@ -30,6 +30,9 @@ x_install() {
     sleep 10
   done
 
+  # Temporary fix for bug bash
+  bind_user_to_iam_policy "roles/gkehub.serviceAgent" "serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-servicemesh.iam.gserviceaccount.com"
+
   install_control_plane_revisions
 
   outro
