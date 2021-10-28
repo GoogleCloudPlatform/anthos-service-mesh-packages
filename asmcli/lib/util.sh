@@ -272,7 +272,7 @@ prepare_environment() {
 
   if should_validate || can_modify_at_all; then
     local_iam_user > /dev/null
-    if is_gcp; then
+    if is_gcp && ! using_connect_gateway; then
       validate_gcp_resources
     fi
   fi
