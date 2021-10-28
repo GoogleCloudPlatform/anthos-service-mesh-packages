@@ -1536,7 +1536,7 @@ is_supported_location() {
 }
 
 run_mcp_fit_assessment() {
-  echo "Analyzing cluster configuration to determine optimal control plane..."
+  info "Analyzing cluster configuration to determine optimal control plane..."
 
   if ! is_supported_location; then
     info "Cluster not in MCP-supported location."
