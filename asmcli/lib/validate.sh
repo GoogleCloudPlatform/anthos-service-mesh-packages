@@ -621,14 +621,7 @@ EOF
     info "Reading cluster information for ${CONTEXT}"
     local CONTEXT_CLUSTER;
     CONTEXT_CLUSTER="$(kubectl config get-contexts --no-headers | get_context_cluster)"
-    IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
-${CONTEXT_CLUSTER}
-EOF
-    if is_gcp; then
-      context_set-option "PROJECT_ID" "${PROJECT_ID}"
-      context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
-      context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
-    fi
+    validate_kubeconfig_context "${CONTEXT_CLUSTER}"
   fi
 
   if is_gcp; then
@@ -729,6 +722,25 @@ EOF
   context_set-option "CUSTOM_OVERLAY" "${CUSTOM_OVERLAY}"
 
   WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"; readonly WORKLOAD_POOL
+}
+
+validate_kubeconfig_context() {
+  local CONTEXT_CLUSTER; CONTEXT_CLUSTER="${1}"
+
+  # we don't get any info from the kubeconfig file if it's via the gateway
+  if [[ "${CONTEXT_CLUSTER}" = connectgateway* ]]; then
+    context_set-option "KC_VIA_CONNECT" 1
+    return
+  fi
+
+  IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
+${CONTEXT_CLUSTER}
+EOF
+  if is_gcp; then
+    context_set-option "PROJECT_ID" "${PROJECT_ID}"
+    context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
+    context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
+  fi
 }
 
 arg_required() {
