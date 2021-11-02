@@ -14,9 +14,11 @@ x_install() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
 
-  # TODO: remove this manual step when managed backend is ready
-  install_mananged_cni
+  if [[ "${USE_MANAGED_CNI}" -eq 0 ]]; then
+    install_mananged_cni_static
+  fi
   apply_kube_yamls
 
   # `kubectl wait` for non-existent resources will return error directly so we wait in loop
@@ -36,11 +38,19 @@ x_install() {
 }
 
 x_configure_package() {
+  local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
+  local USE_VPCSC; USE_VPCSC="$(context_get-option "USE_VPCSC")"
   kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
   if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then
     kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
   fi
   if [[ -n "${_CI_ASM_IMAGE_TAG}" ]]; then
     kpt cfg set asm anthos.servicemesh.tag "${_CI_ASM_IMAGE_TAG}"
+  fi
+  if [[ "${USE_MANAGED_CNI}" -eq 1 ]]; then
+    kpt cfg set asm anthos.servicemesh.use-managed-cni "true"
+  fi
+  if [[ "${USE_VPCSC}" -eq 1 ]]; then
+    kpt cfg set asm anthos.servicemesh.managed-controlplane.vpcsc.enabled "true"
   fi
 }

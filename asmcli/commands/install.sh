@@ -69,8 +69,8 @@ install_private_ca() {
   # If modify_gcp_component permissions are not granted, it is assumed that the
   # user has taken care of this, else Istio setup will fail
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
-
-  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${WORKLOAD_POOL}:/allAuthenticatedUsers/"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${FLEET_ID}.svc.id.goog:/allAuthenticatedUsers/"
   local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
   local CA_POOL; CA_POOL=$(echo "${CA_NAME}" | cut -f6 -d/)
   local PROJECT; PROJECT=$(echo "${CA_NAME}" | cut -f2 -d/)
@@ -116,18 +116,12 @@ install_canonical_controller() {
 
 install_control_plane_revisions() {
   info "Configuring ASM managed control plane revision CR for channels..."
+  
   local CHANNEL CR REVISION
   while read -r CHANNEL; do
-    if [[ "${CHANNEL}" == "regular" ]]; then
-      CR="${CR_CONTROL_PLANE_REVISION_REGULAR}"
-      REVISION="${REVISION_LABEL_REGULAR}"
-    elif [[ "${CHANNEL}" == "stable" ]]; then
-      CR="${CR_CONTROL_PLANE_REVISION_STABLE}"
-      REVISION="${REVISION_LABEL_STABLE}"
-    else
-      CR="${CR_CONTROL_PLANE_REVISION_RAPID}"
-      REVISION="${REVISION_LABEL_RAPID}"
-    fi
+    read -r CR REVISION<<EOF
+$(get_cr_yaml "${CHANNEL}")
+EOF
     info "Installing ASM Control Plane Revision CR with ${REVISION} channel in istio-system namespace..."
     retry 3 kubectl apply -f "${CR}"
 

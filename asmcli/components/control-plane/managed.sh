@@ -9,12 +9,27 @@ validate_managed_control_plane() {
   fi
 }
 
+call_runIstiod() {
+  local PROJECT_ID; PROJECT_ID="${1}";
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}";
+  local CLUSTER_NAME; CLUSTER_NAME="${3}";
+  local POST_DATA; POST_DATA="${4}";
+
+  check_curl --request POST \
+    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}:runIstiod" \
+    --data "${POST_DATA}" \
+    --header "X-Server-Timeout: 600" \
+    --header "Content-Type: application/json" \
+    -K <(auth_header "$(get_auth_token)")
+}
+
 install_managed_control_plane() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
+  local CA; CA="$(context_get-option "CA")"
 
   local POST_DATA; POST_DATA="{}";
   if [[ -n "${_CI_CLOUDRUN_IMAGE_HUB}" ]]; then
@@ -26,12 +41,7 @@ install_managed_control_plane() {
   fi
 
   info "Provisioning control plane..."
-  retry 2 check_curl --request POST \
-    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}:runIstiod" \
-    --data "${POST_DATA}" \
-    --header "X-Server-Timeout: 600" \
-    --header "Content-Type: application/json" \
-    -K <(auth_header "$(get_auth_token)")
+  retry 2 call_runIstiod "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}" "${POST_DATA}"
 
   local MUTATING_WEBHOOK_URL
   MUTATING_WEBHOOK_URL=$(get_managed_mutating_webhook_url)
@@ -56,18 +66,24 @@ install_managed_control_plane() {
   info "Configuring ASM managed control plane validating webhook config..."
   context_append "kubectlFiles" "${MANAGED_WEBHOOKS}"
 
-  install_mananged_cni
+  install_mananged_cni_static
+
+  if [[ "${CA}" = "gcp_cas" ]]; then
+    install_managed_privateca
+  fi
+
+  install_managed_startup_config
 }
 
-install_mananged_cni() {
-  info "Configuring CNI..."
-  local ASM_OPTS
-  ASM_OPTS="$(kubectl -n istio-system \
-    get --ignore-not-found cm asm-options \
-    -o jsonpath='{.data.ASM_OPTS}' || true)"
+install_managed_startup_config() {
+  local ASM_OPTS=""
+  local MCP_CONFIG
 
-  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=on"* ]]; then
-    cat >mcp_configmap.yaml <<EOF
+  for MCP_CONFIG in $(context_list "mcpOptions"); do
+    ASM_OPTS="${MCP_CONFIG};${ASM_OPTS}"
+  done
+
+  cat >|mcp_configmap.yaml <<EOF
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -75,13 +91,32 @@ metadata:
   name: asm-options
   namespace: istio-system
 data:
-  ASM_OPTS: "CNI=on"
+  ASM_OPTS: "${ASM_OPTS}"
 EOF
 
-    context_append "kubectlFiles" "mcp_configmap.yaml"
-  fi
+  context_append "kubectlFiles" "mcp_configmap.yaml"
 
+}
+
+install_mananged_cni_static() {
+  info "Configuring CNI..."
+  local ASM_OPTS
+  ASM_OPTS="$(kubectl -n istio-system \
+    get --ignore-not-found cm asm-options \
+    -o jsonpath='{.data.ASM_OPTS}' || true)"
+
+  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=on"* ]]; then
+    context_append "mcpOptions" "CNI=on"
+  fi
   context_append "kubectlFiles" "${MANAGED_CNI}"
+}
+
+install_managed_privateca() {
+  info "Configuring GCP CAS with managed control plane..."
+
+  local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
+  context_append "mcpOptions" "CA=PRIVATECA"
+  context_append "mcpOptions" "CAAddr=${CA_NAME}"
 }
 
 configure_managed_control_plane() {

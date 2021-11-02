@@ -15,6 +15,11 @@ has_value() {
   false
 }
 
+not_null() {
+  local VALUE; VALUE="$1";
+  [[ -n "${VALUE}" && "${VALUE}" != "null" ]]
+}
+
 is_managed() {
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
 
@@ -30,6 +35,15 @@ is_interactive() {
 is_gcp() {
   local PLATFORM; PLATFORM="$(context_get-option "PLATFORM")"
   if [[ "${PLATFORM}" == "gcp" ]]; then
+    true
+  else
+    false
+  fi
+}
+
+using_connect_gateway() {
+  local KVC; KVC="$(context_get-option "KC_VIA_CONNECT")"
+  if [[ "${KVC}" -eq 1 ]]; then
     true
   else
     false

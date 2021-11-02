@@ -45,7 +45,7 @@ required_iam_roles() {
 
 # [START required_apis]
 required_apis() {
-    local CA; CA="$(context_get-option "CA")"
+  local CA; CA="$(context_get-option "CA")"
     cat << EOF
 container.googleapis.com
 monitoring.googleapis.com
@@ -73,6 +73,19 @@ EOF
   fi
 }
 # [END required_apis]
+
+required_fleet_apis() {
+  local CA; CA="$(context_get-option "CA")"
+  case "${CA}" in
+   mesh_ca)
+     echo meshca.googleapis.com
+     ;;
+   gcp_cas)
+     echo privateca.googleapis.com
+     ;;
+    *);;
+  esac
+}
 
 bind_user_to_cluster_admin(){
   info "Querying for core/account..."
@@ -140,10 +153,19 @@ EOF
 
 enable_gcloud_apis(){
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   info "Enabling required APIs..."
   # shellcheck disable=SC2046
   retry 3 gcloud services enable --project="${PROJECT_ID}" $(required_apis | tr '\n' ' ')
+
+  if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
+    local REQUIRED_FLEET_APIS; REQUIRED_FLEET_APIS="$(required_fleet_apis | tr '\n' ' ')"
+    if [[ -n "${REQUIRED_FLEET_APIS// }" ]]; then
+      # shellcheck disable=SC2086
+      retry 3 gcloud services enable --project="${FLEET_ID}" ${REQUIRED_FLEET_APIS}
+    fi
+  fi
 }
 
 #######

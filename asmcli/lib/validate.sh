@@ -621,14 +621,7 @@ EOF
     info "Reading cluster information for ${CONTEXT}"
     local CONTEXT_CLUSTER;
     CONTEXT_CLUSTER="$(kubectl config get-contexts --no-headers | get_context_cluster)"
-    IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
-${CONTEXT_CLUSTER}
-EOF
-    if is_gcp; then
-      context_set-option "PROJECT_ID" "${PROJECT_ID}"
-      context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
-      context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
-    fi
+    validate_kubeconfig_context "${CONTEXT_CLUSTER}"
   fi
 
   if is_gcp; then
@@ -731,6 +724,25 @@ EOF
   WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"; readonly WORKLOAD_POOL
 }
 
+validate_kubeconfig_context() {
+  local CONTEXT_CLUSTER; CONTEXT_CLUSTER="${1}"
+
+  # we don't get any info from the kubeconfig file if it's via the gateway
+  if [[ "${CONTEXT_CLUSTER}" = connectgateway* ]]; then
+    context_set-option "KC_VIA_CONNECT" 1
+    return
+  fi
+
+  IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
+${CONTEXT_CLUSTER}
+EOF
+  if is_gcp; then
+    context_set-option "PROJECT_ID" "${PROJECT_ID}"
+    context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
+    context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
+  fi
+}
+
 arg_required() {
   if [[ ! "${2:-}" || "${2:0:1}" = '-' ]]; then
     fatal "Option ${1} requires an argument."
@@ -752,6 +764,7 @@ x_validate_install_args() {
   local ENABLE_GCP_COMPONENTS; ENABLE_GCP_COMPONENTS="$(context_get-option "ENABLE_GCP_COMPONENTS")"
   local ENABLE_REGISTRATION; ENABLE_REGISTRATION="$(context_get-option "ENABLE_REGISTRATION")"
   local ENABLE_NAMESPACE_CREATION; ENABLE_NAMESPACE_CREATION="$(context_get-option "ENABLE_NAMESPACE_CREATION")"
+  local USE_VPCSC; USE_VPCSC="$(context_get-option "USE_VPCSC")"
   local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
   local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
   local SERVICE_ACCOUNT; SERVICE_ACCOUNT="$(context_get-option "SERVICE_ACCOUNT")"
@@ -872,6 +885,7 @@ ENABLE_GCP_APIS
 ENABLE_GCP_IAM_ROLES
 ENABLE_GCP_COMPONENTS
 ENABLE_REGISTRATION
+USE_VPCSC
 DISABLE_CANONICAL_SERVICE
 ONLY_VALIDATE
 ONLY_ENABLE

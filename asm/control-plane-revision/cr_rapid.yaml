@@ -4,8 +4,11 @@ kind: ControlPlaneRevision
 metadata:
   name: asm-managed-rapid
   namespace: istio-system
+  labels:
+    mesh.cloud.google.com/managed-cni-enabled: "false" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.use-managed-cni"}
   annotations:
     mesh.cloud.google.com/image: "" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-mcp-image"}
+    mesh.cloud.google.com/vpcsc: "false" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.managed-controlplane.vpcsc.enabled"}
 spec:
   type: managed_service
   channel: rapid

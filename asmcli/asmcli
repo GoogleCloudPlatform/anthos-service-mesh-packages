@@ -62,6 +62,9 @@ CRD_CONTROL_PLANE_REVISION=""
 CR_CONTROL_PLANE_REVISION_REGULAR=""
 CR_CONTROL_PLANE_REVISION_RAPID=""
 CR_CONTROL_PLANE_REVISION_STABLE=""
+CR_CONTROL_PLANE_REVISION_REGULAR_RECONCILED=""
+CR_CONTROL_PLANE_REVISION_RAPID_RECONCILED=""
+CR_CONTROL_PLANE_REVISION_STABLE_RECONCILED=""
 
 SCRIPT_NAME="${0##*/}"; readonly SCRIPT_NAME
 
@@ -175,6 +178,7 @@ create-mesh_parse_args() {
       *)
         if [ -f "$1" ]; then
           local KCF; KCF="${1}"
+          KCF="$(apath -f "${KCF}")" || fatal "Couldn't find file ${KCF}"
           context_append "kubeconfigFiles" "${KCF}"
         else
           local CLUSTER; CLUSTER="${1}"
@@ -351,7 +355,7 @@ patch_trust_domain_aliases() {
     local ISTIOD_COUNT; ISTIOD_COUNT="$(get_istio_deployment_count)";
     if [[ "$ISTIOD_COUNT" -ne 0 ]]; then
       info "Check trust domain aliases of cluster gke_${PROJECT_ID}_${CLUSTER_LOCATION}_${CLUSTER_NAME}"
-      local REVISION; REVISION="$(retry 2 kubectl -n istio-system get pod -l istio=istiod \
+      local REVISION; REVISION="$(retry 2 kubectl -n istio-system get pod -l app=istiod \
         -o jsonpath='{.items[].spec.containers[].env[?(@.name=="REVISION")].value}' 2>/dev/null)"
 
       if [[ -z "${REVISION}" ]]; then
@@ -438,6 +442,12 @@ SUBCOMMANDS:
                                       compatibility with a Google managed
                                       control plane and generates new config
                                       where possible.
+
+FLAGS:
+
+  --use_vpcsc                         Install Google-managed control plane in
+                                      a VPC Service Control restricted
+                                      environment.
 EOF
 }
 x_install_subcommand() {
@@ -456,9 +466,11 @@ x_install() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
 
-  # TODO: remove this manual step when managed backend is ready
-  install_mananged_cni
+  if [[ "${USE_MANAGED_CNI}" -eq 0 ]]; then
+    install_mananged_cni_static
+  fi
   apply_kube_yamls
 
   # `kubectl wait` for non-existent resources will return error directly so we wait in loop
@@ -478,12 +490,20 @@ x_install() {
 }
 
 x_configure_package() {
+  local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
+  local USE_VPCSC; USE_VPCSC="$(context_get-option "USE_VPCSC")"
   kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
   if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then
     kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
   fi
   if [[ -n "${_CI_ASM_IMAGE_TAG}" ]]; then
     kpt cfg set asm anthos.servicemesh.tag "${_CI_ASM_IMAGE_TAG}"
+  fi
+  if [[ "${USE_MANAGED_CNI}" -eq 1 ]]; then
+    kpt cfg set asm anthos.servicemesh.use-managed-cni "true"
+  fi
+  if [[ "${USE_VPCSC}" -eq 1 ]]; then
+    kpt cfg set asm anthos.servicemesh.managed-controlplane.vpcsc.enabled "true"
   fi
 }
 x_mcp_migrate_check() {
@@ -1141,6 +1161,9 @@ FLAGS:
                                       to a fleet
      --enable_namespace_creation      Allow the script to create the istio-system
                                       namespace for the user
+     --use_managed_cni                Use managed CNI experience. Experimental install
+                                      only. If not passed, asmcli will apply the static
+                                      CNI manifests.
 
      --managed                        Provision a remote, managed control plane
                                       instead of installing one in-cluster.
@@ -1230,6 +1253,7 @@ FLAGS:
      --enable_gcp_components
      --enable_registration
      --enable_namespace_creation
+     --use_managed_cni
 
      --managed
 
@@ -1368,8 +1392,8 @@ install_private_ca() {
   # If modify_gcp_component permissions are not granted, it is assumed that the
   # user has taken care of this, else Istio setup will fail
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
-
-  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${WORKLOAD_POOL}:/allAuthenticatedUsers/"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${FLEET_ID}.svc.id.goog:/allAuthenticatedUsers/"
   local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
   local CA_POOL; CA_POOL=$(echo "${CA_NAME}" | cut -f6 -d/)
   local PROJECT; PROJECT=$(echo "${CA_NAME}" | cut -f2 -d/)
@@ -1415,18 +1439,12 @@ install_canonical_controller() {
 
 install_control_plane_revisions() {
   info "Configuring ASM managed control plane revision CR for channels..."
+  
   local CHANNEL CR REVISION
   while read -r CHANNEL; do
-    if [[ "${CHANNEL}" == "regular" ]]; then
-      CR="${CR_CONTROL_PLANE_REVISION_REGULAR}"
-      REVISION="${REVISION_LABEL_REGULAR}"
-    elif [[ "${CHANNEL}" == "stable" ]]; then
-      CR="${CR_CONTROL_PLANE_REVISION_STABLE}"
-      REVISION="${REVISION_LABEL_STABLE}"
-    else
-      CR="${CR_CONTROL_PLANE_REVISION_RAPID}"
-      REVISION="${REVISION_LABEL_RAPID}"
-    fi
+    read -r CR REVISION<<EOF
+$(get_cr_yaml "${CHANNEL}")
+EOF
     info "Installing ASM Control Plane Revision CR with ${REVISION} channel in istio-system namespace..."
     retry 3 kubectl apply -f "${CR}"
 
@@ -1813,7 +1831,7 @@ EOF
   local ISTIOD_COUNT; ISTIOD_COUNT="$(get_istio_deployment_count)";
   # When it is the upgrade case, include the original trust domain aliases
   if [[ "$ISTIOD_COUNT" -ne 0 ]]; then
-    local REVISION; REVISION="$(retry 2 kubectl -n istio-system get pod -l istio=istiod \
+    local REVISION; REVISION="$(retry 2 kubectl -n istio-system get pod -l app=istiod \
       -o jsonpath='{.items[].spec.containers[].env[?(@.name=="REVISION")].value}')"
     local RAW_TRUST_DOMAINS_ALIASES; RAW_TRUST_DOMAINS_ALIASES="$(retry 2 kubectl -n istio-system get configmap istio-"${REVISION}" \
       -o jsonpath='{.data.mesh}' | sed -e '1,/trustDomainAliases:/ d')"
@@ -1927,12 +1945,27 @@ validate_managed_control_plane() {
   fi
 }
 
+call_runIstiod() {
+  local PROJECT_ID; PROJECT_ID="${1}";
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}";
+  local CLUSTER_NAME; CLUSTER_NAME="${3}";
+  local POST_DATA; POST_DATA="${4}";
+
+  check_curl --request POST \
+    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}:runIstiod" \
+    --data "${POST_DATA}" \
+    --header "X-Server-Timeout: 600" \
+    --header "Content-Type: application/json" \
+    -K <(auth_header "$(get_auth_token)")
+}
+
 install_managed_control_plane() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
+  local CA; CA="$(context_get-option "CA")"
 
   local POST_DATA; POST_DATA="{}";
   if [[ -n "${_CI_CLOUDRUN_IMAGE_HUB}" ]]; then
@@ -1944,12 +1977,7 @@ install_managed_control_plane() {
   fi
 
   info "Provisioning control plane..."
-  retry 2 check_curl --request POST \
-    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}:runIstiod" \
-    --data "${POST_DATA}" \
-    --header "X-Server-Timeout: 600" \
-    --header "Content-Type: application/json" \
-    -K <(auth_header "$(get_auth_token)")
+  retry 2 call_runIstiod "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}" "${POST_DATA}"
 
   local MUTATING_WEBHOOK_URL
   MUTATING_WEBHOOK_URL=$(get_managed_mutating_webhook_url)
@@ -1974,18 +2002,24 @@ install_managed_control_plane() {
   info "Configuring ASM managed control plane validating webhook config..."
   context_append "kubectlFiles" "${MANAGED_WEBHOOKS}"
 
-  install_mananged_cni
+  install_mananged_cni_static
+
+  if [[ "${CA}" = "gcp_cas" ]]; then
+    install_managed_privateca
+  fi
+
+  install_managed_startup_config
 }
 
-install_mananged_cni() {
-  info "Configuring CNI..."
-  local ASM_OPTS
-  ASM_OPTS="$(kubectl -n istio-system \
-    get --ignore-not-found cm asm-options \
-    -o jsonpath='{.data.ASM_OPTS}' || true)"
+install_managed_startup_config() {
+  local ASM_OPTS=""
+  local MCP_CONFIG
 
-  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=on"* ]]; then
-    cat >mcp_configmap.yaml <<EOF
+  for MCP_CONFIG in $(context_list "mcpOptions"); do
+    ASM_OPTS="${MCP_CONFIG};${ASM_OPTS}"
+  done
+
+  cat >|mcp_configmap.yaml <<EOF
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -1993,13 +2027,32 @@ metadata:
   name: asm-options
   namespace: istio-system
 data:
-  ASM_OPTS: "CNI=on"
+  ASM_OPTS: "${ASM_OPTS}"
 EOF
 
-    context_append "kubectlFiles" "mcp_configmap.yaml"
-  fi
+  context_append "kubectlFiles" "mcp_configmap.yaml"
 
+}
+
+install_mananged_cni_static() {
+  info "Configuring CNI..."
+  local ASM_OPTS
+  ASM_OPTS="$(kubectl -n istio-system \
+    get --ignore-not-found cm asm-options \
+    -o jsonpath='{.data.ASM_OPTS}' || true)"
+
+  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=on"* ]]; then
+    context_append "mcpOptions" "CNI=on"
+  fi
   context_append "kubectlFiles" "${MANAGED_CNI}"
+}
+
+install_managed_privateca() {
+  info "Configuring GCP CAS with managed control plane..."
+
+  local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
+  context_append "mcpOptions" "CA=PRIVATECA"
+  context_append "mcpOptions" "CAAddr=${CA_NAME}"
 }
 
 configure_managed_control_plane() {
@@ -2061,6 +2114,11 @@ has_value() {
   false
 }
 
+not_null() {
+  local VALUE; VALUE="$1";
+  [[ -n "${VALUE}" && "${VALUE}" != "null" ]]
+}
+
 is_managed() {
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
 
@@ -2076,6 +2134,15 @@ is_interactive() {
 is_gcp() {
   local PLATFORM; PLATFORM="$(context_get-option "PLATFORM")"
   if [[ "${PLATFORM}" == "gcp" ]]; then
+    true
+  else
+    false
+  fi
+}
+
+using_connect_gateway() {
+  local KVC; KVC="$(context_get-option "KC_VIA_CONNECT")"
+  if [[ "${KVC}" -eq 1 ]]; then
     true
   else
     false
@@ -2573,6 +2640,8 @@ context_init() {
     "ENABLE_GCP_COMPONENTS": ${ENABLE_GCP_COMPONENTS:-0},
     "ENABLE_REGISTRATION": ${ENABLE_REGISTRATION:-0},
     "ENABLE_NAMESPACE_CREATION": ${ENABLE_NAMESPACE_CREATION:-0},
+    "USE_MANAGED_CNI": ${USE_MANAGED_CNI:-0},
+    "USE_VPCSC": ${USE_VPCSC:-0},
     "DISABLE_CANONICAL_SERVICE": ${DISABLE_CANONICAL_SERVICE:-0},
     "TRUST_FLEET_IDENTITY": ${TRUST_FLEET_IDENTITY:-1},
     "PRINT_CONFIG": ${PRINT_CONFIG:-0},
@@ -2605,10 +2674,12 @@ context_init() {
     "INSTALL_EXPANSION_GATEWAY": ${INSTALL_EXPANSION_GATEWAY:-0},
     "INSTALL_IDENTITY_PROVIDER": ${INSTALL_IDENTITY_PROVIDER:-0},
     "EXPERIMENTAL": ${EXPERIMENTAL:-0},
+    "KC_VIA_CONNECT": ${KC_VIA_CONNECT:-0},
     "CHANNEL": "${CHANNEL:-}"
   },
   "istioctlFiles": [],
   "kubectlFiles": [],
+  "mcpOptions": [],
   "clustersInfo": [],
   "clusterRegistrations": [],
   "clusterContexts": [],
@@ -2712,7 +2783,7 @@ required_iam_roles() {
 
 # [START required_apis]
 required_apis() {
-    local CA; CA="$(context_get-option "CA")"
+  local CA; CA="$(context_get-option "CA")"
     cat << EOF
 container.googleapis.com
 monitoring.googleapis.com
@@ -2740,6 +2811,19 @@ EOF
   fi
 }
 # [END required_apis]
+
+required_fleet_apis() {
+  local CA; CA="$(context_get-option "CA")"
+  case "${CA}" in
+   mesh_ca)
+     echo meshca.googleapis.com
+     ;;
+   gcp_cas)
+     echo privateca.googleapis.com
+     ;;
+    *);;
+  esac
+}
 
 bind_user_to_cluster_admin(){
   info "Querying for core/account..."
@@ -2807,10 +2891,19 @@ EOF
 
 enable_gcloud_apis(){
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   info "Enabling required APIs..."
   # shellcheck disable=SC2046
   retry 3 gcloud services enable --project="${PROJECT_ID}" $(required_apis | tr '\n' ' ')
+
+  if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
+    local REQUIRED_FLEET_APIS; REQUIRED_FLEET_APIS="$(required_fleet_apis | tr '\n' ' ')"
+    if [[ -n "${REQUIRED_FLEET_APIS// }" ]]; then
+      # shellcheck disable=SC2086
+      retry 3 gcloud services enable --project="${FLEET_ID}" ${REQUIRED_FLEET_APIS}
+    fi
+  fi
 }
 
 #######
@@ -3325,6 +3418,10 @@ x_parse_install_args() {
         context_set-option "MANAGED" 1
         shift 1
         ;;
+      --use_vpcsc | --use-vpcsc)
+        context_set-option "USE_VPCSC" 1
+        shift 1
+        ;;
       -e | --enable_all | --enable-all)
         context_set-option "ENABLE_ALL" 1
         shift 1
@@ -3351,6 +3448,10 @@ x_parse_install_args() {
         ;;
       --enable_namespace_creation | --enable-namespace-creation)
         context_set-option "ENABLE_NAMESPACE_CREATION" 1
+        shift 1
+        ;;
+      --use_managed_cni | --use-managed-cni)
+        context_set-option "USE_MANAGED_CNI" 1
         shift 1
         ;;
       --disable_canonical_service | --disable-canonical-service)
@@ -3690,7 +3791,7 @@ prepare_environment() {
 
   if should_validate || can_modify_at_all; then
     local_iam_user > /dev/null
-    if is_gcp; then
+    if is_gcp && ! using_connect_gateway; then
       validate_gcp_resources
     fi
   fi
@@ -3760,6 +3861,9 @@ init() {
   CR_CONTROL_PLANE_REVISION_REGULAR="asm/control-plane-revision/cr_regular.yaml"; readonly CR_CONTROL_PLANE_REVISION_REGULAR;
   CR_CONTROL_PLANE_REVISION_RAPID="asm/control-plane-revision/cr_rapid.yaml"; readonly CR_CONTROL_PLANE_REVISION_RAPID;
   CR_CONTROL_PLANE_REVISION_STABLE="asm/control-plane-revision/cr_stable.yaml"; readonly CR_CONTROL_PLANE_REVISION_STABLE;
+  CR_CONTROL_PLANE_REVISION_REGULAR_RECONCILED="asm/control-plane-revision/cr_regular_reconciled.yaml"; readonly CR_CONTROL_PLANE_REVISION_REGULAR_RECONCILED;
+  CR_CONTROL_PLANE_REVISION_RAPID_RECONCILED="asm/control-plane-revision/cr_rapid_reconciled.yaml"; readonly CR_CONTROL_PLANE_REVISION_RAPID_RECONCILED;
+  CR_CONTROL_PLANE_REVISION_STABLE_RECONCILED="asm/control-plane-revision/cr_stable_reconciled.yaml"; readonly CR_CONTROL_PLANE_REVISION_STABLE_RECONCILED;
   REVISION_LABEL_REGULAR="asm-managed"; readonly REVISION_LABEL_REGULAR
   REVISION_LABEL_RAPID="asm-managed-rapid"; readonly REVISION_LABEL_RAPID
   REVISION_LABEL_STABLE="asm-managed-stable"; readonly REVISION_LABEL_STABLE
@@ -4026,6 +4130,7 @@ populate_cluster_values() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local NETWORK_ID; NETWORK_ID="$(context_get-option "NETWORK_ID")"
   local CLUSTER_DATA
 
   if is_gcp; then
@@ -4037,14 +4142,16 @@ populate_cluster_values() {
 ${CLUSTER_DATA}
 EOF
 
-    if [[ -n "${NEW_GKE_CLUSTER_URI}" ]]; then
+    if not_null "${NEW_GKE_CLUSTER_URI}"; then
       context_set-option "GKE_CLUSTER_URI" "${NEW_GKE_CLUSTER_URI}"
     fi
-    if [[ -n "${NEW_NETWORK_ID}" ]]; then
+    if not_null "${NEW_NETWORK_ID}"; then
       context_set-option "NETWORK_ID" "${PROJECT_ID}-${NEW_NETWORK_ID}"
     fi
   else
-    context_set-option "NETWORK_ID" "default"
+    if [[ -z "${NETWORK_ID}" ]]; then
+      context_set-option "NETWORK_ID" "default"
+    fi
   fi
 }
 
@@ -4102,6 +4209,39 @@ get_cr_channels() {
         ;;
     esac
   fi
+}
+
+get_cr_yaml() {
+  local CHANNEL; CHANNEL="${1}"
+  local EXPERIMENTAL; EXPERIMENTAL="$(context_get-option "EXPERIMENTAL")"
+  local CR REVISION
+  case "${CHANNEL}" in
+    regular)
+      if [[ "${EXPERIMENTAL}" -eq 1 ]]; then
+        CR="${CR_CONTROL_PLANE_REVISION_REGULAR}"
+      else
+        CR="${CR_CONTROL_PLANE_REVISION_REGULAR_RECONCILED}"
+      fi
+      REVISION="${REVISION_LABEL_REGULAR}"
+      ;;
+    stable)
+      if [[ "${EXPERIMENTAL}" -eq 1 ]]; then
+        CR="${CR_CONTROL_PLANE_REVISION_STABLE}"
+      else
+        CR="${CR_CONTROL_PLANE_REVISION_STABLE_RECONCILED}"
+      fi
+      REVISION="${REVISION_LABEL_STABLE}"
+      ;;
+    *)
+      if [[ "${EXPERIMENTAL}" -eq 1 ]]; then
+        CR="${CR_CONTROL_PLANE_REVISION_RAPID}"
+      else
+        CR="${CR_CONTROL_PLANE_REVISION_RAPID_RECONCILED}"
+      fi
+      REVISION="${REVISION_LABEL_RAPID}"
+      ;;
+  esac
+  echo "${CR} ${REVISION}"
 }
 
 ensure_cross_project_fleet_sa() {
@@ -4776,14 +4916,7 @@ EOF
     info "Reading cluster information for ${CONTEXT}"
     local CONTEXT_CLUSTER;
     CONTEXT_CLUSTER="$(kubectl config get-contexts --no-headers | get_context_cluster)"
-    IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
-${CONTEXT_CLUSTER}
-EOF
-    if is_gcp; then
-      context_set-option "PROJECT_ID" "${PROJECT_ID}"
-      context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
-      context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
-    fi
+    validate_kubeconfig_context "${CONTEXT_CLUSTER}"
   fi
 
   if is_gcp; then
@@ -4886,6 +5019,25 @@ EOF
   WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"; readonly WORKLOAD_POOL
 }
 
+validate_kubeconfig_context() {
+  local CONTEXT_CLUSTER; CONTEXT_CLUSTER="${1}"
+
+  # we don't get any info from the kubeconfig file if it's via the gateway
+  if [[ "${CONTEXT_CLUSTER}" = connectgateway* ]]; then
+    context_set-option "KC_VIA_CONNECT" 1
+    return
+  fi
+
+  IFS="_" read -r _ PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME <<EOF
+${CONTEXT_CLUSTER}
+EOF
+  if is_gcp; then
+    context_set-option "PROJECT_ID" "${PROJECT_ID}"
+    context_set-option "CLUSTER_LOCATION" "${CLUSTER_LOCATION}"
+    context_set-option "CLUSTER_NAME" "${CLUSTER_NAME}"
+  fi
+}
+
 arg_required() {
   if [[ ! "${2:-}" || "${2:0:1}" = '-' ]]; then
     fatal "Option ${1} requires an argument."
@@ -4907,6 +5059,7 @@ x_validate_install_args() {
   local ENABLE_GCP_COMPONENTS; ENABLE_GCP_COMPONENTS="$(context_get-option "ENABLE_GCP_COMPONENTS")"
   local ENABLE_REGISTRATION; ENABLE_REGISTRATION="$(context_get-option "ENABLE_REGISTRATION")"
   local ENABLE_NAMESPACE_CREATION; ENABLE_NAMESPACE_CREATION="$(context_get-option "ENABLE_NAMESPACE_CREATION")"
+  local USE_VPCSC; USE_VPCSC="$(context_get-option "USE_VPCSC")"
   local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
   local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
   local SERVICE_ACCOUNT; SERVICE_ACCOUNT="$(context_get-option "SERVICE_ACCOUNT")"
@@ -5027,6 +5180,7 @@ ENABLE_GCP_APIS
 ENABLE_GCP_IAM_ROLES
 ENABLE_GCP_COMPONENTS
 ENABLE_REGISTRATION
+USE_VPCSC
 DISABLE_CANONICAL_SERVICE
 ONLY_VALIDATE
 ONLY_ENABLE

@@ -284,6 +284,10 @@ x_parse_install_args() {
         context_set-option "MANAGED" 1
         shift 1
         ;;
+      --use_vpcsc | --use-vpcsc)
+        context_set-option "USE_VPCSC" 1
+        shift 1
+        ;;
       -e | --enable_all | --enable-all)
         context_set-option "ENABLE_ALL" 1
         shift 1
@@ -310,6 +314,10 @@ x_parse_install_args() {
         ;;
       --enable_namespace_creation | --enable-namespace-creation)
         context_set-option "ENABLE_NAMESPACE_CREATION" 1
+        shift 1
+        ;;
+      --use_managed_cni | --use-managed-cni)
+        context_set-option "USE_MANAGED_CNI" 1
         shift 1
         ;;
       --disable_canonical_service | --disable-canonical-service)
