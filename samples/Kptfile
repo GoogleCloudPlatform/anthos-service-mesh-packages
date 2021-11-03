@@ -1,0 +1,20 @@
+apiVersion: kpt.dev/v1alpha1
+kind: Kptfile
+metadata:
+  name: samples
+packageMetadata:
+  shortDescription: configuring servicemesh samples
+openAPI:
+  definitions:
+    io.k8s.cli.setters.gateways.ingress.name:
+      x-k8s-cli:
+        setter:
+          name: gateways.ingress.name
+          value: istio-ingressgateway
+          isSet: true
+    io.k8s.cli.setters.gateways.ingress.rev:
+      x-k8s-cli:
+        setter:
+          name: gateways.ingress.rev
+          value: ASM_REV
+          isSet: true
