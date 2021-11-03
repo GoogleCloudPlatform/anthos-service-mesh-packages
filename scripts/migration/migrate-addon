@@ -31,6 +31,7 @@ set -o pipefail
 # can be cleaned up using the cleanup() routine
 
 TMP_DIR="$(mktemp -d)"
+
 ISTIOCTL_BIN="istioctl"
 SKIP_CONFIRM=""
 CONTEXT=""
@@ -89,7 +90,7 @@ CLEANUP_RESOURCES=(
   "ConfigMap/promsd/istio-system"
   "ConfigMap/promsd-rules/istio-system"
   "ConfigMap/promsd-sidecar/istio-system"
-  "Service/istio-operator.istio-operator"
+  "Service/istio-operator/istio-operator"
   "Service/istio-citadel/istio-system"
   "Service/istio-galley/istio-system"
   "Service/istio-pilot/istio-system"
@@ -183,17 +184,54 @@ check_prerequisites() {
 }
 
 configure_mesh_ca() {
-  prompt "Configuring Istio Addon to trust Anthos Service Mesh..."
-  pushd "${TMP_DIR}" > /dev/null
-  kube -n istio-system apply -f - << EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: meshca-root
-data:
-  meshca-root.pem: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUdsRENDQkh5Z0F3SUJBZ0lRRVcyNUFQYTdTOVNqL05qNlY2R3hRVEFOQmdrcWhraUc5dzBCQVFzRkFEQ0IKd1RFTE1Ba0dBMVVFQmhNQ1ZWTXhFekFSQmdOVkJBZ1RDa05oYkdsbWIzSnVhV0V4RmpBVUJnTlZCQWNURFUxdgpkVzUwWVdsdUlGWnBaWGN4RXpBUkJnTlZCQW9UQ2tkdmIyZHNaU0JNVEVNeERqQU1CZ05WQkFzVEJVTnNiM1ZrCk1XQXdYZ1lEVlFRRERGZHBjM1JwYjE5Mk1WOWpiRzkxWkY5M2IzSnJiRzloWkY5eWIyOTBMWE5wWjI1bGNpMHcKTFRJd01UZ3RNRFF0TWpWVU1UUTZNVEU2TXpNdE1EYzZNREFnU3pveExDQXhPa2cxTW5abmQwVnRNM1JqT2pBNgpNVGd3SUJjTk1UZ3dOREkxTWpFeE1UTXpXaGdQTWpFeE9EQTBNalV5TWpFeE16TmFNSUhCTVFzd0NRWURWUVFHCkV3SlZVekVUTUJFR0ExVUVDQk1LUTJGc2FXWnZjbTVwWVRFV01CUUdBMVVFQnhNTlRXOTFiblJoYVc0Z1ZtbGwKZHpFVE1CRUdBMVVFQ2hNS1IyOXZaMnhsSUV4TVF6RU9NQXdHQTFVRUN4TUZRMnh2ZFdReFlEQmVCZ05WQkFNTQpWMmx6ZEdsdlgzWXhYMk5zYjNWa1gzZHZjbXRzYjJGa1gzSnZiM1F0YzJsbmJtVnlMVEF0TWpBeE9DMHdOQzB5Ck5WUXhORG94TVRvek15MHdOem93TUNCTE9qRXNJREU2U0RVeWRtZDNSVzB6ZEdNNk1Eb3hPRENDQWlJd0RRWUoKS29aSWh2Y05BUUVCQlFBRGdnSVBBRENDQWdvQ2dnSUJBSzlkRnRpSEkwL3I3MGs2V2hiRXVEZ0hEemwvTzVNUApzeW1iaVlGNGNRNFpEa01nWFQyYVZIeXVCL01tZHF0ZUMyc3B1RzVvakM2SENIaGorOUpGRjNLZlUrRWovajlBCjVnVXo4ZDRWWUQ5MkxYaDgyaXJJMnRPZWxiUTdQWkFMbjVoUm5wazBnbnB6TGUya3BhOGxHeTBUdEIvdi8zMDMKalpBbDBlN2lLS2tYMU9veTlKemVCQVlkTnF1OXVJaHJsK25hU1hFR3B1V3hDWTZ1aXArRWN1S3A5Y1IxNmtGegpPS05uK3NRMDlkN0tlRk45ckxhWmlvZEJ6bmRWbGlxOUZrV0p3SWVCcDA2Q3E5dFVNa21ZdlVGazNtdDg2bmhaCnJZdmlMSTR0WFNtWklHUU5rdlBRWFUxa2kzdWt2L1pWZEpyWFY3dzJrL0VabWlGKzlveFB3RzRaMjFHRmZPS1QKV0wvazlpN1NDcUl1VDQxcE5LMm1tS0hzUUk3UWxvcnR6NTRzOFkyRHB6Y0tjNEVEZlVJZjYyTm83KytISU14dQpkUHhiZFFlMTFJbXBEUmNRSWc5Wk9xVGJvcnVMYUdOQkxPNnJkY25xbWd0czNDTHJsZXgxTDlRR3hRWkNIUmVhCnJpUjFiV2VRQk5UQW9kWXFTejZ2cFNJNWhYVUNra1hXN0xGY1BNcXZSYlJWY2xhazgvUnAwTGFITFFpRHhrS3AKaVExcHJmQk80SXhZY0hsRUtQbnhvQnJrNVdVWmZYNGowT3Biajhoa05WaStzQisvUnZYcnVGTFpvRkF6Y0t1NQpLV0t0UHpVT2I4UDlWa0VtTnk3RDNKWHlzNUdmaThOa1ZYbi9raFZWYjFCVEhIZjl3QzNuaEo1MG51QmttUHU3CjNiajFBQk9hakIrekFnTUJBQUdqZ1lNd2dZQXdEZ1lEVlIwUEFRSC9CQVFEQWdFR01CMEdBMVVkSlFRV01CUUcKQ0NzR0FRVUZCd01CQmdnckJnRUZCUWNEQWpBUEJnTlZIUk1CQWY4RUJUQURBUUgvTUIwR0ExVWREZ1FXQkJRLwpWc3V5amdSREFFbWNaanlKNzc2MTlKczlpakFmQmdOVkhTTUVHREFXZ0JRL1ZzdXlqZ1JEQUVtY1pqeUo3NzYxCjlKczlpakFOQmdrcWhraUc5dzBCQVFzRkFBT0NBZ0VBVWM1UUpPcXhtTUpZMEUycmNIRVdRWVJhaDF2YXQzd3UKSUh0RVozU2tTdW15ait5OWV5SUhiOVhUVHljNFN5R3lYMW44UmFyeThvU2dRVjRjYnlKVEZYRUVRT0dMSEI5Lwo5OEVLVGhnSnRmUHNvczJXS2UvNTlTOHlOMDVvbnB4Y2FMOXk0UzI5NUt2OWtjU1F4TG01VWZqbHFzS2VISlp5Cm12eGlZem1Cb3g3TEExenFjTFladnNsSk5rSnhLQWs1SkE2Nml5RFNRcU9LN2pJaXhuOHBpMzA1ZEZHQ1pnbFUKRlN0d1dxWTZSYzlyUjhFeWNWaFN4MkFocnZUN09RVFZkS0xmb0tBODREOEpaSlBCN2hyeHFLZjdKSkZzODdLagp0N2MvNWJYUEZKMm9zbWpvTlluYkhqaXE2NGJoMjBzU0NkNjMwcXZoaGVQTHdqak9sQlBpRnlLMzZvL2hRTjg3CjFBRW0xU0NIeSthUWNmSnFGNUtUZ1BuWlF5NUQrRC9DR2F1K0Jma08rV0NHRFZ4UmxlWUJKNGcyTmJBVG9seWcKQjJLV1hyajA3VS9XYVdxVjJoRVJia214WEZoNmNVZGxrWDJNZW9HNHY2WkQyT0tBUHg1RHBKQ2ZwMFRFcTZQegpuUCtaMW1MZC9aakdzT0Y4UjJXR1FKRXVVOEhSenZzcjB3c1g5VXlMTXFmNVhWaURLMTFWL1crZGNJdmpIQ2F5CkJwWDJzZTNkZmV4NWpGaHQrSmNRYytpd0I4Y2FTWGtSNnRHU2lhcmdFdFNKT0RPUmFjTzlJQjhiNlc4U20vL0oKV2YvOHp5aUNjTW0xaTJ5VlZwaHdFMWtjekZ3dW5BaDBKQjg5NlZhWEdWeFhlS0VBTVFvWEhqZ0RkQ1lwOC9FdAp4amI4VWtDbXlqVT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
-EOF
+  configure_mesh_ca_14
+  configure_mesh_ca_16
+}
 
+MESH_CA_ROOT="
+-----BEGIN CERTIFICATE-----
+MIIGlDCCBHygAwIBAgIQEW25APa7S9Sj/Nj6V6GxQTANBgkqhkiG9w0BAQsFADCB
+wTELMAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDU1v
+dW50YWluIFZpZXcxEzARBgNVBAoTCkdvb2dsZSBMTEMxDjAMBgNVBAsTBUNsb3Vk
+MWAwXgYDVQQDDFdpc3Rpb192MV9jbG91ZF93b3JrbG9hZF9yb290LXNpZ25lci0w
+LTIwMTgtMDQtMjVUMTQ6MTE6MzMtMDc6MDAgSzoxLCAxOkg1MnZnd0VtM3RjOjA6
+MTgwIBcNMTgwNDI1MjExMTMzWhgPMjExODA0MjUyMjExMzNaMIHBMQswCQYDVQQG
+EwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNTW91bnRhaW4gVmll
+dzETMBEGA1UEChMKR29vZ2xlIExMQzEOMAwGA1UECxMFQ2xvdWQxYDBeBgNVBAMM
+V2lzdGlvX3YxX2Nsb3VkX3dvcmtsb2FkX3Jvb3Qtc2lnbmVyLTAtMjAxOC0wNC0y
+NVQxNDoxMTozMy0wNzowMCBLOjEsIDE6SDUydmd3RW0zdGM6MDoxODCCAiIwDQYJ
+KoZIhvcNAQEBBQADggIPADCCAgoCggIBAK9dFtiHI0/r70k6WhbEuDgHDzl/O5MP
+symbiYF4cQ4ZDkMgXT2aVHyuB/MmdqteC2spuG5ojC6HCHhj+9JFF3KfU+Ej/j9A
+5gUz8d4VYD92LXh82irI2tOelbQ7PZALn5hRnpk0gnpzLe2kpa8lGy0TtB/v/303
+jZAl0e7iKKkX1Ooy9JzeBAYdNqu9uIhrl+naSXEGpuWxCY6uip+EcuKp9cR16kFz
+OKNn+sQ09d7KeFN9rLaZiodBzndVliq9FkWJwIeBp06Cq9tUMkmYvUFk3mt86nhZ
+rYviLI4tXSmZIGQNkvPQXU1ki3ukv/ZVdJrXV7w2k/EZmiF+9oxPwG4Z21GFfOKT
+WL/k9i7SCqIuT41pNK2mmKHsQI7Qlortz54s8Y2DpzcKc4EDfUIf62No7++HIMxu
+dPxbdQe11ImpDRcQIg9ZOqTboruLaGNBLO6rdcnqmgts3CLrlex1L9QGxQZCHRea
+riR1bWeQBNTAodYqSz6vpSI5hXUCkkXW7LFcPMqvRbRVclak8/Rp0LaHLQiDxkKp
+iQ1prfBO4IxYcHlEKPnxoBrk5WUZfX4j0Opbj8hkNVi+sB+/RvXruFLZoFAzcKu5
+KWKtPzUOb8P9VkEmNy7D3JXys5Gfi8NkVXn/khVVb1BTHHf9wC3nhJ50nuBkmPu7
+3bj1ABOajB+zAgMBAAGjgYMwgYAwDgYDVR0PAQH/BAQDAgEGMB0GA1UdJQQWMBQG
+CCsGAQUFBwMBBggrBgEFBQcDAjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBQ/
+VsuyjgRDAEmcZjyJ77619Js9ijAfBgNVHSMEGDAWgBQ/VsuyjgRDAEmcZjyJ7761
+9Js9ijANBgkqhkiG9w0BAQsFAAOCAgEAUc5QJOqxmMJY0E2rcHEWQYRah1vat3wu
+IHtEZ3SkSumyj+y9eyIHb9XTTyc4SyGyX1n8Rary8oSgQV4cbyJTFXEEQOGLHB9/
+98EKThgJtfPsos2WKe/59S8yN05onpxcaL9y4S295Kv9kcSQxLm5UfjlqsKeHJZy
+mvxiYzmBox7LA1zqcLYZvslJNkJxKAk5JA66iyDSQqOK7jIixn8pi305dFGCZglU
+FStwWqY6Rc9rR8EycVhSx2AhrvT7OQTVdKLfoKA84D8JZJPB7hrxqKf7JJFs87Kj
+t7c/5bXPFJ2osmjoNYnbHjiq64bh20sSCd630qvhhePLwjjOlBPiFyK36o/hQN87
+1AEm1SCHy+aQcfJqF5KTgPnZQy5D+D/CGau+BfkO+WCGDVxRleYBJ4g2NbATolyg
+B2KWXrj07U/WaWqV2hERbkmxXFh6cUdlkX2MeoG4v6ZD2OKAPx5DpJCfp0TEq6Pz
+nP+Z1mLd/ZjGsOF8R2WGQJEuU8HRzvsr0wsX9UyLMqf5XViDK11V/W+dcIvjHCay
+BpX2se3dfex5jFht+JcQc+iwB8caSXkR6tGSiargEtSJODORacO9IB8b6W8Sm//J
+Wf/8zyiCcMm1i2yVVphwE1kczFwunAh0JB896VaXGVxXeKEAMQoXHjgDdCYp8/Et
+xjb8UkCmyjU=
+-----END CERTIFICATE-----
+"
+
+configure_mesh_ca_16() {
+  # TODO: skip when there is no 1.6 usage at all
+  prompt "Configuring Istio Addon 1.6 to trust Anthos Service Mesh..."
   HUB_WIP="$(kube get cm -n istio-system env-asm-managed -ojsonpath='{.data.TRUST_DOMAIN}' --ignore-not-found)"
   if [[ -z ${HUB_WIP} ]]; then
     HUB_WIP="$(kube get cm -n istio-system istio-asm-managed -oyaml | grep 'trustDomain: .*' | cut -d':' -f2 | xargs)"
@@ -203,7 +241,90 @@ EOF
     die "Could not determine trust domain for Anthos Service Mesh"
   fi
 
-  kube get cm istio -n istio-system -o yaml > configure_mesh_ca_istio_cm.yaml
+  # Update the trust domain aliases
+  kube get cm istio-istio-1611 -n istio-system -o yaml | sed "s/trustDomainAliases\:.*$/trustDomainAliases\: [\"${HUB_WIP}\"]/g" | kube replace -f -
+
+  # Patch the Istiod image to a version that has support for trust domain alias.
+  # The operator probably won't actually update Istiod faster than we will manually below, but this ensures it
+  # will not be reverted back
+  kube patch -n istio-system  istiooperators.install.istio.io istio-1-6-11-gke-0 --type=merge -p='{"spec":{
+    "components":{"pilot":{"hub":"gcr.io/gke-release/istio","tag":"1.6.14-gke.7"}}}
+  }'
+
+  # Next we insert the mesh ca root cert so that it is trusted
+  orig="$(kube -n istio-system get secret istio-ca-secret -ojsonpath='{.data.ca-cert\.pem}' | base64 -d)"
+  encoded="$(echo "${orig}" "${MESH_CA_ROOT}" | base64 -w 0)"
+  kube -n istio-system patch secret istio-ca-secret -p="{\"data\":{\"ca-cert.pem\":\"${encoded}\"}}"
+
+  # We need to restart Istiod to pick up the new image, the TD alias, and the new root cert.
+  # Patch the new image, in case operator isn't fast enough, and insert an annotation to make sure we are change something
+  kube patch deploy istiod-istio-1611 -n istio-system -p='{"spec":{"template":{"spec":{"containers":[{
+    "name":"discovery",
+    "image":"gcr.io/gke-release/istio/pilot:1.6.14-gke.7"
+  }]}}},
+  "metadata":{"annotations":{"istio-addon-migrate-start":"true"}}}'
+  kube rollout status -w deployment/istiod-istio-1611 -n istio-system
+
+  # Next, we need to convince pods to send new CSR's. Our options are to restart all pods, wait 12-24hrs,
+  # or trick Envoy to send a new SDS request. We will do the latter
+  # We add `workloadSelector: {}` because 1.4 doesn't support istio.io/rev filtering, but we don't want
+  # this to apply to 1.4 proxies or they will NACK. Instead, we abuse the fact that 1.4 rejected it,
+  # which will cause pilot to silently drop the config.
+  kube apply -f - -n istio-system << EOF
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: trigger-root-cert
+  namespace: istio-system
+  labels:
+    istio.io/rev: istio-1611
+spec:
+  workloadSelector: {}
+  configPatches:
+  - applyTo: CLUSTER
+    match:
+      context: SIDECAR_OUTBOUND
+    patch:
+      operation: ADD
+      value:
+        name: "trigger-root-cert"
+        type: STATIC
+        connect_timeout: 0.5s
+        lb_policy: ROUND_ROBIN
+        load_assignment:
+          cluster_name: trigger-root-cert
+          endpoints: []
+        transportSocket:
+          name: envoy.transport_sockets.tls
+          typedConfig:
+            '@type': type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+            common_tls_context:
+              validation_context_sds_secret_config:
+                name: trigger-root-cert
+                sdsConfig:
+                  initialFetchTimeout: 1s
+                  apiConfigSource:
+                    apiType: GRPC
+                    grpcServices:
+                    - envoyGrpc:
+                        clusterName: sds-grpc
+EOF
+  echo "Waiting for proxies to pick up the new root certificate..."; sleep 15
+  kube delete envoyfilter trigger-root-cert -n istio-system
+  echo -e "${green}OK${clr}"
+}
+
+configure_mesh_ca_14() {
+  prompt "Configuring Istio Addon 1.4 to trust Anthos Service Mesh..."
+  pushd "${TMP_DIR}" > /dev/null
+  kube -n istio-system apply -f - << EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: meshca-root
+data:
+  meshca-root.pem: $(echo "${MESH_CA_ROOT}" | base64 -w 0)
+EOF
 
   HUB_WIP="$(kube get cm -n istio-system env-asm-managed -ojsonpath='{.data.TRUST_DOMAIN}' --ignore-not-found)"
   if [[ -z ${HUB_WIP} ]]; then
@@ -447,7 +568,8 @@ config_check_custom_mixer() {
   declare -A rsHashMap=(
     ['handler']="127b052edcf2acf7e8450dcb17fd4d308cc659e05ef376999cd6e5dda51ef232
      32bcba96c417ca31ea042b638ce28bc715803fe3b47861c5ac4156886339acc0
-     3a91158c4c66aa475bac17df36be6ac512ef82255a497e15e5006910c5c358e3"
+     3a91158c4c66aa475bac17df36be6ac512ef82255a497e15e5006910c5c358e3
+     caf6300212b812a119fe8b959aa4f0b16b1881e1b8952662f4d9a6b73b0fa46e"
     ['instance']="04c441249eb53b14970c17c93b536cd2e26d8bfe1ea56c0efe2b07c4a6d20fa3
 169f9dd50634d3b848126a2c8d6b8b5fc51083c9ee2dc554f8db19950a4f4a7d
 17c3e8dad1d902b794764601a06df9e519d5a28b27b86bd0cacd0f77632f518d
@@ -498,7 +620,7 @@ efb2f225194335ceffb158f73bd14ac85c7bb473797d75914179660c9c2db967
 facc7fd2599994a7c92a4cc66bac9061b64d71be106e2bb639066969273d4fb8"
   )
   CUSTOM_MIXER="false"
-  for type in handler rule handler; do
+  for type in handler rule instance; do
     names=$(kube get "${type}" -oname -n istio-system)
     for rn in ${names}; do
       hd=$(kube get "${rn}" -n istio-system -o jsonpath='{.spec}')
@@ -648,6 +770,7 @@ run_all() {
   disable_galley_webhook
   migrate_configs
   if [[ -n $ZERO_DOWNTIME ]]; then
+    configure_mesh_ca_16
     configure_mesh_ca
   fi
   replace_gateway
