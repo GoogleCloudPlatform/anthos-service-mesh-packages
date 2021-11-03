@@ -1,5 +1,5 @@
 ---
-apiVersion: mesh.cloud.google.com/v1alpha1
+apiVersion: mesh.cloud.google.com/v1beta1
 kind: ControlPlaneRevision
 metadata:
   name: asm-managed-rapid
