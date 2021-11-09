@@ -201,6 +201,9 @@ create-mesh_prepare_environment() {
     if ! necessary_files_exist; then
       download_asm
     fi
+    if should_download_kpt_package; then
+      download_kpt_package
+    fi
     organize_kpt_files
   fi
 }
