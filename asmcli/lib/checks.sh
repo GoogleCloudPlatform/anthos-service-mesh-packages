@@ -100,7 +100,7 @@ EOF
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   populate_fleet_info
-  local MEMBERSHIP LOCATION WANT LIST
+  local MEMBERSHIP LOCATION WANT LIST G_DATA
   LOCATION="$(echo "${MEMBERSHIP_DATA}" \
     | jq -r .spec.owner.id \
     | sed -E 's/.*locations\/|\/memberships.*//g')"
@@ -108,8 +108,8 @@ EOF
     | jq -r .spec.owner.id \
     | sed -E 's/.*memberships\///g')"
   WANT="name.*projects/${FLEET_ID}/locations/${LOCATION}/memberships/${MEMBERSHIP}"
-  LIST="$(gcloud container hub memberships list --project "${FLEET_ID}" --format=json \
-    | grep "${WANT}")"
+  G_DATA="$(gcloud container hub memberships list --project "${FLEET_ID}" --format=json)"
+  LIST="$(echo "${G_DATA}" | grep "${WANT}")"
 
   if [[ "${IDENTITY_PROVIDER}" != "${FLEET_ID}" ]] || \
      [[ -z "${LIST}" ]]; then
@@ -117,6 +117,20 @@ EOF
 Cluster is registered in the project ${IDENTITY_PROVIDER}, but the required Fleet project is ${FLEET_ID}.
 Please ensure that the cluster is registered to the ${FLEET_ID} project.
 EOF
+  fi
+
+  if using_connect_gateway && is_gcp; then
+    local ENDPOINT C_PROJ C_LOC C_NAME
+    ENDPOINT="$(echo "${G_DATA}" | \
+      jq -r '.[] | select(.name=="'"${WANT#??????}"'") | .endpoint.gkeCluster.resourceLink')"
+
+    read -r C_PROJ C_LOC C_NAME <<EOF
+$(echo "${ENDPOINT}" | sed 's/\/\/container.googleapis.com\/projects\/\(.*\)\/locations\/\(.*\)\/clusters\/\(.*\)$/\1 \2 \3/g')
+EOF
+
+    context_set-option "PROJECT_ID" "${C_PROJ}"
+    context_set-option "CLUSTER_LOCATION" "${C_LOC}"
+    context_set-option "CLUSTER_NAME" "${C_NAME}"
   fi
 
   info "Verified cluster is registered to ${IDENTITY_PROVIDER}"
