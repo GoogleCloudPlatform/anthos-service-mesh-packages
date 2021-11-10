@@ -40,12 +40,22 @@ ${_CI_TRUSTED_GCP_PROJECTS}
 EOF
   fi
 
+  local CONFIGMAP;
+
+  # If the REVISION is currently empty or set to 'default', use the
+  # backward-compatible configmap name 'istio'; otherwise, use 'istio-${REVISION}'
+  if [[ "${REVISION:-default}" == "default" ]]; then {
+    CONFIGMAP="istio"
+  } else {
+    CONFIGMAP="istio-${REVISION}"
+  }
+
   local ISTIOD_COUNT; ISTIOD_COUNT="$(get_istio_deployment_count)";
   # When it is the upgrade case, include the original trust domain aliases
   if [[ "$ISTIOD_COUNT" -ne 0 ]]; then
     local REVISION; REVISION="$(retry 2 kubectl -n istio-system get pod -l app=istiod \
       -o jsonpath='{.items[].spec.containers[].env[?(@.name=="REVISION")].value}')"
-    local RAW_TRUST_DOMAINS_ALIASES; RAW_TRUST_DOMAINS_ALIASES="$(retry 2 kubectl -n istio-system get configmap istio-"${REVISION}" \
+    local RAW_TRUST_DOMAINS_ALIASES; RAW_TRUST_DOMAINS_ALIASES="$(retry 2 kubectl -n istio-system get configmap "${CONFIGMAP}" \
       -o jsonpath='{.data.mesh}' | sed -e '1,/trustDomainAliases:/ d')"
     local RAW_TRUST_DOMAINS_ALIAS;
     while IFS= read -r RAW_TRUST_DOMAINS_ALIAS; do

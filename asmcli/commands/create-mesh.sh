@@ -217,6 +217,17 @@ patch_trust_domain_aliases() {
   if [[ "$TRUST_FLEET_IDENTITY" -eq 0 ]]; then
     return
   fi
+
+  local CONFIGMAP;
+
+  # If the REVISION is currently empty or set to 'default', use the
+  # backward-compatible configmap name 'istio'; otherwise, use 'istio-${REVISION}'
+  if [[ "${REVISION:-default}" == "default" ]]; then {
+    CONFIGMAP="istio"
+  } else {
+    CONFIGMAP="istio-${REVISION}"
+  }
+
   while read -r PROJECT_ID CLUSTER_LOCATION CLUSTER_NAME; do
     # Off-GCP clusters won't have this info
     if [[ -z "${PROJECT_ID}" || -z "${CLUSTER_LOCATION}" || -z "${CLUSTER_NAME}" ]]; then continue; fi
@@ -241,10 +252,10 @@ patch_trust_domain_aliases() {
 
       # Patch the configmap of the cluster if it does not include FLEET_ID.svc.id.goog
       if ! has_fleet_alias "${FLEET_ID}" "${REVISION}"; then
-        info "Patching istio-${REVISION} configmap trustDomainAliases on cluster ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME} with ${FLEET_ID}.svc.id.goog"
-        local CONFIGMAP_YAML; CONFIGMAP_YAML="$(retry 2 kubectl -n istio-system get configmap istio-"${REVISION}" -o yaml)"
+        info "Patching ${CONFIGMAP} configmap trustDomainAliases on cluster ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME} with ${FLEET_ID}.svc.id.goog"
+        local CONFIGMAP_YAML; CONFIGMAP_YAML="$(retry 2 kubectl -n istio-system get configmap "${CONFIGMAP}" -o yaml)"
         CONFIGMAP_YAML="$(echo "$CONFIGMAP_YAML" | sed '/^    trustDomainAliases:.*/a \    - '"${FLEET_ID}.svc.id.goog"'')"
-        echo "$CONFIGMAP_YAML"| kubectl apply -f - || warn "failed to patch the configmap istio-${REVISION}"
+        echo "$CONFIGMAP_YAML"| kubectl apply -f - || warn "failed to patch the configmap ${CONFIGMAP}"
       fi
     fi
 
@@ -256,7 +267,15 @@ EOF
 has_fleet_alias() {
   local FLEET_ID; FLEET_ID="${1}"
   local REVISION; REVISION="${2}"
-  local RAW_TRUST_DOMAIN_ALIASES; RAW_TRUST_DOMAIN_ALIASES="$(retry 2 kubectl -n istio-system get configmap istio-"${REVISION}" \
+  local CONFIGMAP;
+  # If the REVISION is currently empty or set to 'default', use the
+  # backward-compatible configmap name 'istio'; otherwise, use 'istio-${REVISION}'
+  if [[ "${REVISION:-default}" == "default" ]]; then {
+    CONFIGMAP="istio"
+  } else {
+    CONFIGMAP="istio-${REVISION}"
+  }
+  local RAW_TRUST_DOMAIN_ALIASES; RAW_TRUST_DOMAIN_ALIASES="$(retry 2 kubectl -n istio-system get configmap "${CONFIGMAP}" \
     -o jsonpath='{.data.mesh}' | sed -e '1,/trustDomainAliases:/ d')"
   local RAW_TRUST_DOMAIN_ALIAS
   while IFS= read -r RAW_TRUST_DOMAIN_ALIAS; do
