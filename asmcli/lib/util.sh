@@ -35,7 +35,13 @@ run_command() {
     "${@}" 2>/dev/null
     return "$?"
   fi
+
+  if [[ -n "${BASH_VERSION}" ]]; then
+  info "${BASH_LINENO[0]} Running: '${*}'"
+  else
   info "Running: '${*}'"
+  fi
+
   info "-------------"
   local RETVAL
   { "${@}"; RETVAL="$?"; } || true
