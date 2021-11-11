@@ -366,7 +366,7 @@ spec:
       # and CNI network config file on each node.
       - name: install-cni
         # yamllint disable-line rule:line-length
-        image: "gcr.io/gke-release/asm/install-cni:1.11.2-asm.18"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cni-image"}
+        image: "gcr.io/gke-release/asm/install-cni:1.11.2-asm.18"
         livenessProbe:
           httpGet:
             path: /healthz
@@ -419,7 +419,7 @@ spec:
           name: cni-log-dir
       - name: mdp-controller
         # yamllint disable-line rule:line-length
-        image: "gcr.io/gke-release/asm/mdp:1.11.2-asm.18"  # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-mdp-image"}
+        image: "gcr.io/gke-release/asm/mdp:1.11.2-asm.18"
         command:
         - mdp
         - server
