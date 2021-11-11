@@ -373,12 +373,17 @@ patch_trust_domain_aliases() {
         return
       fi
 
+      local REV_NAME; REV_NAME="istio-${REVISION}"
+      if [[ "${REVISION}" = default ]]; then
+        REV_NAME="istio"
+      fi
+
       # Patch the configmap of the cluster if it does not include FLEET_ID.svc.id.goog
-      if ! has_fleet_alias "${FLEET_ID}" "${REVISION}"; then
-        info "Patching istio-${REVISION} configmap trustDomainAliases on cluster ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME} with ${FLEET_ID}.svc.id.goog"
-        local CONFIGMAP_YAML; CONFIGMAP_YAML="$(retry 2 kubectl -n istio-system get configmap istio-"${REVISION}" -o yaml)"
+      if ! has_fleet_alias "${FLEET_ID}" "${REV_NAME}"; then
+        info "Patching ${REV_NAME} configmap trustDomainAliases on cluster ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME} with ${FLEET_ID}.svc.id.goog"
+        local CONFIGMAP_YAML; CONFIGMAP_YAML="$(retry 2 kubectl -n istio-system get configmap "${REV_NAME}" -o yaml)"
         CONFIGMAP_YAML="$(echo "$CONFIGMAP_YAML" | sed '/^    trustDomainAliases:.*/a \    - '"${FLEET_ID}.svc.id.goog"'')"
-        echo "$CONFIGMAP_YAML"| kubectl apply -f - || warn "failed to patch the configmap istio-${REVISION}"
+        echo "$CONFIGMAP_YAML"| kubectl apply -f - || warn "failed to patch the configmap ${REV_NAME}"
       fi
     fi
 
@@ -389,8 +394,8 @@ EOF
 
 has_fleet_alias() {
   local FLEET_ID; FLEET_ID="${1}"
-  local REVISION; REVISION="${2}"
-  local RAW_TRUST_DOMAIN_ALIASES; RAW_TRUST_DOMAIN_ALIASES="$(retry 2 kubectl -n istio-system get configmap istio-"${REVISION}" \
+  local REV_NAME; REV_NAME="${2}"
+  local RAW_TRUST_DOMAIN_ALIASES; RAW_TRUST_DOMAIN_ALIASES="$(retry 2 kubectl -n istio-system get configmap "${REV_NAME}" \
     -o jsonpath='{.data.mesh}' | sed -e '1,/trustDomainAliases:/ d')"
   local RAW_TRUST_DOMAIN_ALIAS
   while IFS= read -r RAW_TRUST_DOMAIN_ALIAS; do
@@ -1837,7 +1842,11 @@ EOF
   if [[ "$ISTIOD_COUNT" -ne 0 ]]; then
     local REVISION; REVISION="$(retry 2 kubectl -n istio-system get pod -l app=istiod \
       -o jsonpath='{.items[].spec.containers[].env[?(@.name=="REVISION")].value}')"
-    local RAW_TRUST_DOMAINS_ALIASES; RAW_TRUST_DOMAINS_ALIASES="$(retry 2 kubectl -n istio-system get configmap istio-"${REVISION}" \
+    local REV_NAME; REV_NAME="istio-${REVISION}"
+    if [[ "${REVISION}" = default ]]; then
+      REV_NAME="istio"
+    fi
+    local RAW_TRUST_DOMAINS_ALIASES; RAW_TRUST_DOMAINS_ALIASES="$(retry 2 kubectl -n istio-system get configmap "${REV_NAME}" \
       -o jsonpath='{.data.mesh}' | sed -e '1,/trustDomainAliases:/ d')"
     local RAW_TRUST_DOMAINS_ALIAS;
     while IFS= read -r RAW_TRUST_DOMAINS_ALIAS; do

@@ -45,7 +45,11 @@ EOF
   if [[ "$ISTIOD_COUNT" -ne 0 ]]; then
     local REVISION; REVISION="$(retry 2 kubectl -n istio-system get pod -l app=istiod \
       -o jsonpath='{.items[].spec.containers[].env[?(@.name=="REVISION")].value}')"
-    local RAW_TRUST_DOMAINS_ALIASES; RAW_TRUST_DOMAINS_ALIASES="$(retry 2 kubectl -n istio-system get configmap istio-"${REVISION}" \
+    local REV_NAME; REV_NAME="istio-${REVISION}"
+    if [[ "${REVISION}" = default ]]; then
+      REV_NAME="istio"
+    fi
+    local RAW_TRUST_DOMAINS_ALIASES; RAW_TRUST_DOMAINS_ALIASES="$(retry 2 kubectl -n istio-system get configmap "${REV_NAME}" \
       -o jsonpath='{.data.mesh}' | sed -e '1,/trustDomainAliases:/ d')"
     local RAW_TRUST_DOMAINS_ALIAS;
     while IFS= read -r RAW_TRUST_DOMAINS_ALIAS; do
