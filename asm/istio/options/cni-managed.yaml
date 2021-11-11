@@ -379,10 +379,10 @@ spec:
         command: ["install-cni"]
         resources:
           limits:
-            cpu: 200m
+            cpu: 100m
             memory: 256Mi
           requests:
-            cpu: 200m
+            cpu: 100m
             memory: 256Mi
         env:
         # The CNI network config to install on each node.
@@ -424,46 +424,6 @@ spec:
           name: cni-net-dir
         - mountPath: /var/run/istio-cni
           name: cni-log-dir
-      - name: mdp-controller
-        # yamllint disable-line rule:line-length
-        image: "gcr.io/gke-release/asm/mdp:1.11.2-asm.18"
-        command:
-        - mdp
-        - server
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-          privileged: false
-          readOnlyRootFilesystem: true
-          runAsGroup: 1337
-          runAsUser: 1337
-          runAsNonRoot: true
-        imagePullPolicy: IfNotPresent
-        resources:
-          limits:
-            cpu: 200m
-            memory: 256Mi
-          requests:
-            cpu: 200m
-            memory: 256Mi
-        env:
-        - name: WATCH_NAMESPACE
-          value: "istio-system"
-        - name: LEADER_ELECTION_NAMESPACE
-          value: "istio-system"
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        - name: POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        volumeMounts:
-        - mountPath: /var/run/secrets/tokens
-          name: istio-token
       volumes:
       # Used to install CNI.
       - name: cni-bin-dir
