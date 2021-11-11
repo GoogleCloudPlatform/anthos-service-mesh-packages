@@ -379,11 +379,11 @@ spec:
         command: ["install-cni"]
         resources:
           limits:
-            cpu: 500m
-            memory: 512Mi
+            cpu: 200m
+            memory: 256Mi
           requests:
-            cpu: 500m
-            memory: 512Mi
+            cpu: 200m
+            memory: 256Mi
         env:
         # The CNI network config to install on each node.
         - name: CNI_NETWORK_CONFIG
@@ -443,11 +443,11 @@ spec:
         imagePullPolicy: IfNotPresent
         resources:
           limits:
-            cpu: 500m
-            memory: 512Mi
+            cpu: 200m
+            memory: 256Mi
           requests:
-            cpu: 500m
-            memory: 512Mi
+            cpu: 200m
+            memory: 256Mi
         env:
         - name: WATCH_NAMESPACE
           value: "istio-system"
