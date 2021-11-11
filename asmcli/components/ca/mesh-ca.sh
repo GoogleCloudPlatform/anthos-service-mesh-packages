@@ -49,7 +49,7 @@ EOF
     if [[ "${REVISION}" = default ]]; then
       REV_NAME="istio"
     fi
-    local RAW_TRUST_DOMAINS_ALIASES; RAW_TRUST_DOMAINS_ALIASES="$(retry 2 kubectl -n istio-system get configmap istio-"${REVISION}" \
+    local RAW_TRUST_DOMAINS_ALIASES; RAW_TRUST_DOMAINS_ALIASES="$(retry 2 kubectl -n istio-system get configmap "${REV_NAME}" \
       -o jsonpath='{.data.mesh}' | sed -e '1,/trustDomainAliases:/ d')"
     local RAW_TRUST_DOMAINS_ALIAS;
     while IFS= read -r RAW_TRUST_DOMAINS_ALIAS; do

@@ -260,8 +260,8 @@ EOF
 
 has_fleet_alias() {
   local FLEET_ID; FLEET_ID="${1}"
-  local REVISION; REVISION="${2}"
-  local RAW_TRUST_DOMAIN_ALIASES; RAW_TRUST_DOMAIN_ALIASES="$(retry 2 kubectl -n istio-system get configmap "${REVISION}" \
+  local REV_NAME; REV_NAME="${2}"
+  local RAW_TRUST_DOMAIN_ALIASES; RAW_TRUST_DOMAIN_ALIASES="$(retry 2 kubectl -n istio-system get configmap "${REV_NAME}" \
     -o jsonpath='{.data.mesh}' | sed -e '1,/trustDomainAliases:/ d')"
   local RAW_TRUST_DOMAIN_ALIAS
   while IFS= read -r RAW_TRUST_DOMAIN_ALIAS; do
