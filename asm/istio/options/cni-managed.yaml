@@ -377,6 +377,13 @@ spec:
             path: /readyz
             port: 8000
         command: ["install-cni"]
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 500m
+            memory: 512Mi
         env:
         # The CNI network config to install on each node.
         - name: CNI_NETWORK_CONFIG
@@ -436,11 +443,11 @@ spec:
         imagePullPolicy: IfNotPresent
         resources:
           limits:
-            cpu: 200m
-            memory: 256Mi
+            cpu: 500m
+            memory: 512Mi
           requests:
-            cpu: 50m
-            memory: 128Mi
+            cpu: 500m
+            memory: 512Mi
         env:
         - name: WATCH_NAMESPACE
           value: "istio-system"
