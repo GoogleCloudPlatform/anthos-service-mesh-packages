@@ -108,6 +108,7 @@ install_mananged_cni_static() {
   if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=on"* ]]; then
     context_append "mcpOptions" "CNI=on"
   fi
+  context_append "kubectlFiles" "${MANAGED_CNI}"
 }
 
 install_managed_privateca() {
