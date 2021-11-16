@@ -31,7 +31,7 @@ MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=11}"; readonly MINOR;
 POINT="${POINT:=2}"; readonly POINT;
 REV="${REV:=17}"; readonly REV;
-CONFIG_VER="${CONFIG_VER:="3"}"; readonly CONFIG_VER;
+CONFIG_VER="${CONFIG_VER:="4"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
 ### File related constants ###
