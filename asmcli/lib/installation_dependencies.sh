@@ -308,7 +308,7 @@ register_cluster() {
   local KCC; KCC="$(context_get-option "CONTEXT")"
 
   if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
-    ensure_cross_project_fleet_sa "${FLEET_ID}" "${PROJECT_ID}"
+    ensure_cross_project_service_accounts "${FLEET_ID}" "${PROJECT_ID}"
   fi
 
   local CMD
