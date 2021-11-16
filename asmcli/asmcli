@@ -41,6 +41,7 @@ K8S_MINOR=0
 ### File related constants ###
 VALIDATION_FIX_FILE_NAME=""
 ASM_VERSION_FILE=""
+ASM_SETTINGS_FILE=""
 ISTIO_FOLDER_NAME=""
 ISTIOCTL_REL_PATH=""
 BASE_REL_PATH=""
@@ -334,6 +335,9 @@ create-mesh_prepare_environment() {
     if ! necessary_files_exist; then
       download_asm
     fi
+    if should_download_kpt_package; then
+      download_kpt_package
+    fi
     organize_kpt_files
   fi
 }
@@ -369,12 +373,17 @@ patch_trust_domain_aliases() {
         return
       fi
 
+      local REV_NAME; REV_NAME="istio-${REVISION}"
+      if [[ "${REVISION}" = default ]]; then
+        REV_NAME="istio"
+      fi
+
       # Patch the configmap of the cluster if it does not include FLEET_ID.svc.id.goog
-      if ! has_fleet_alias "${FLEET_ID}" "${REVISION}"; then
-        info "Patching istio-${REVISION} configmap trustDomainAliases on cluster ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME} with ${FLEET_ID}.svc.id.goog"
-        local CONFIGMAP_YAML; CONFIGMAP_YAML="$(retry 2 kubectl -n istio-system get configmap istio-"${REVISION}" -o yaml)"
+      if ! has_fleet_alias "${FLEET_ID}" "${REV_NAME}"; then
+        info "Patching ${REV_NAME} configmap trustDomainAliases on cluster ${PROJECT_ID}/${CLUSTER_LOCATION}/${CLUSTER_NAME} with ${FLEET_ID}.svc.id.goog"
+        local CONFIGMAP_YAML; CONFIGMAP_YAML="$(retry 2 kubectl -n istio-system get configmap "${REV_NAME}" -o yaml)"
         CONFIGMAP_YAML="$(echo "$CONFIGMAP_YAML" | sed '/^    trustDomainAliases:.*/a \    - '"${FLEET_ID}.svc.id.goog"'')"
-        echo "$CONFIGMAP_YAML"| kubectl apply -f - || warn "failed to patch the configmap istio-${REVISION}"
+        echo "$CONFIGMAP_YAML"| kubectl apply -f - || warn "failed to patch the configmap ${REV_NAME}"
       fi
     fi
 
@@ -385,8 +394,8 @@ EOF
 
 has_fleet_alias() {
   local FLEET_ID; FLEET_ID="${1}"
-  local REVISION; REVISION="${2}"
-  local RAW_TRUST_DOMAIN_ALIASES; RAW_TRUST_DOMAIN_ALIASES="$(retry 2 kubectl -n istio-system get configmap istio-"${REVISION}" \
+  local REV_NAME; REV_NAME="${2}"
+  local RAW_TRUST_DOMAIN_ALIASES; RAW_TRUST_DOMAIN_ALIASES="$(retry 2 kubectl -n istio-system get configmap "${REV_NAME}" \
     -o jsonpath='{.data.mesh}' | sed -e '1,/trustDomainAliases:/ d')"
   local RAW_TRUST_DOMAIN_ALIAS
   while IFS= read -r RAW_TRUST_DOMAIN_ALIAS; do
@@ -1833,7 +1842,11 @@ EOF
   if [[ "$ISTIOD_COUNT" -ne 0 ]]; then
     local REVISION; REVISION="$(retry 2 kubectl -n istio-system get pod -l app=istiod \
       -o jsonpath='{.items[].spec.containers[].env[?(@.name=="REVISION")].value}')"
-    local RAW_TRUST_DOMAINS_ALIASES; RAW_TRUST_DOMAINS_ALIASES="$(retry 2 kubectl -n istio-system get configmap istio-"${REVISION}" \
+    local REV_NAME; REV_NAME="istio-${REVISION}"
+    if [[ "${REVISION}" = default ]]; then
+      REV_NAME="istio"
+    fi
+    local RAW_TRUST_DOMAINS_ALIASES; RAW_TRUST_DOMAINS_ALIASES="$(retry 2 kubectl -n istio-system get configmap "${REV_NAME}" \
       -o jsonpath='{.data.mesh}' | sed -e '1,/trustDomainAliases:/ d')"
     local RAW_TRUST_DOMAINS_ALIAS;
     while IFS= read -r RAW_TRUST_DOMAINS_ALIAS; do
@@ -2199,7 +2212,7 @@ EOF
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   populate_fleet_info
-  local MEMBERSHIP LOCATION WANT LIST
+  local MEMBERSHIP LOCATION WANT LIST G_DATA
   LOCATION="$(echo "${MEMBERSHIP_DATA}" \
     | jq -r .spec.owner.id \
     | sed -E 's/.*locations\/|\/memberships.*//g')"
@@ -2207,8 +2220,8 @@ EOF
     | jq -r .spec.owner.id \
     | sed -E 's/.*memberships\///g')"
   WANT="name.*projects/${FLEET_ID}/locations/${LOCATION}/memberships/${MEMBERSHIP}"
-  LIST="$(gcloud container hub memberships list --project "${FLEET_ID}" --format=json \
-    | grep "${WANT}")"
+  G_DATA="$(gcloud container hub memberships list --project "${FLEET_ID}" --format=json)"
+  LIST="$(echo "${G_DATA}" | grep "${WANT}")"
 
   if [[ "${IDENTITY_PROVIDER}" != "${FLEET_ID}" ]] || \
      [[ -z "${LIST}" ]]; then
@@ -2216,6 +2229,20 @@ EOF
 Cluster is registered in the project ${IDENTITY_PROVIDER}, but the required Fleet project is ${FLEET_ID}.
 Please ensure that the cluster is registered to the ${FLEET_ID} project.
 EOF
+  fi
+
+  if using_connect_gateway && is_gcp; then
+    local ENDPOINT C_PROJ C_LOC C_NAME
+    ENDPOINT="$(echo "${G_DATA}" | \
+      jq -r '.[] | select(.name=="'"${WANT#??????}"'") | .endpoint.gkeCluster.resourceLink')"
+
+    read -r C_PROJ C_LOC C_NAME <<EOF
+$(echo "${ENDPOINT}" | sed 's/\/\/container.googleapis.com\/projects\/\(.*\)\/locations\/\(.*\)\/clusters\/\(.*\)$/\1 \2 \3/g')
+EOF
+
+    context_set-option "PROJECT_ID" "${C_PROJ}"
+    context_set-option "CLUSTER_LOCATION" "${C_LOC}"
+    context_set-option "CLUSTER_NAME" "${C_NAME}"
   fi
 
   info "Verified cluster is registered to ${IDENTITY_PROVIDER}"
@@ -3046,7 +3073,7 @@ register_cluster() {
   local KCC; KCC="$(context_get-option "CONTEXT")"
 
   if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
-    ensure_cross_project_fleet_sa "${FLEET_ID}" "${PROJECT_ID}"
+    ensure_cross_project_service_accounts "${FLEET_ID}" "${PROJECT_ID}"
   fi
 
   local CMD
@@ -3760,13 +3787,38 @@ EOF
   fi
 
   ln -s "${ISTIOCTL_REL_PATH}" .
+  version_message > "${ASM_VERSION_FILE}"
+}
+
+download_kpt_package() {
   local SAMPLES_URL
   SAMPLES_URL="${KPT_URL/asm@/samples@}"
 
   info "Downloading ASM kpt package..."
   retry 3 kpt pkg get --auto-set=false "${KPT_URL}" asm
   retry 3 kpt pkg get --auto-set=false "${SAMPLES_URL}" samples
-  version_message > "${ASM_VERSION_FILE}"
+
+  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
+  local CA; CA="$(context_get-option "CA")"
+
+  echo "${MANAGED} ${CA}" >| "${ASM_SETTINGS_FILE}"
+}
+
+should_download_kpt_package() {
+  if [[ ! -f "${ASM_SETTINGS_FILE}" ]]; then return; fi
+
+  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
+  local CA; CA="$(context_get-option "CA")"
+
+  local PREV_MANAGED PREV_CA
+  read -r PREV_MANAGED PREV_CA <"${ASM_SETTINGS_FILE}"
+
+  if [[ "${MANAGED}" -ne "${PREV_MANAGED}" || "${PREV_CA}" != "${CA}" ]]; then
+    warn "Configuration has changed since last run, scheduling re-download of kpt package"
+    return
+  fi
+
+  false
 }
 
 # LTS releases don't have curl 7.55 so we can't use the @- construction,
@@ -3804,6 +3856,9 @@ prepare_environment() {
   if needs_asm; then
     if ! necessary_files_exist; then
       download_asm
+    fi
+    if should_download_kpt_package; then
+      download_kpt_package
     fi
     organize_kpt_files
   fi
@@ -3856,6 +3911,7 @@ init() {
   EXPANSION_GATEWAY_FILE="${PACKAGE_DIRECTORY}/expansion/vm-eastwest-gateway.yaml"; readonly EXPANSION_GATEWAY_FILE;
   CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
   ASM_VERSION_FILE=".asm_version"; readonly ASM_VERSION_FILE;
+  ASM_SETTINGS_FILE=".asm_settings"; readonly ASM_SETTINGS_FILE;
 
   CRD_CONTROL_PLANE_REVISION="asm/control-plane-revision/crd.yaml"; readonly CRD_CONTROL_PLANE_REVISION;
   CR_CONTROL_PLANE_REVISION_REGULAR="asm/control-plane-revision/cr_regular.yaml"; readonly CR_CONTROL_PLANE_REVISION_REGULAR;
@@ -4244,55 +4300,83 @@ get_cr_yaml() {
   echo "${CR} ${REVISION}"
 }
 
-ensure_cross_project_fleet_sa() {
+ensure_cross_project_service_accounts() {
   local FLEET_ID; FLEET_ID="${1}"
   local PROJECT_ID; PROJECT_ID="${2}"
 
   if ! is_gcp; then return; fi
 
+  local FLEET_HOST_PROJECT_NUMBER
+  FLEET_HOST_PROJECT_NUMBER="$(gcloud projects describe "${FLEET_ID}" --format "value(projectNumber)")"
+
+  local FLEET_SA
+  local MESH_SA
+  FLEET_SA="serviceAccount:service-${FLEET_HOST_PROJECT_NUMBER}@gcp-sa-gkehub.iam.gserviceaccount.com"
+  MESH_SA="serviceAccount:service-${FLEET_HOST_PROJECT_NUMBER}@gcp-sa-servicemesh.iam.gserviceaccount.com"
+
+  if ! ensure_cross_project_sa "${FLEET_ID}" "${PROJECT_ID}" "${FLEET_SA}" "roles/gkehub.serviceAgent"; then
+    warn "The Fleet service account may not have been created for the Fleet hosted in ${FLEET_ID}."
+    warn "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
+    warn "for information on how to create the identity and grant permissions. You may also re-run this command"
+    warn "with either the --enable-all or --enable-gcp-iam-roles flag to automatically create the IAM bindings."
+  fi
+
+  if ! ensure_cross_project_sa "${FLEET_ID}" "${PROJECT_ID}" "${MESH_SA}" "roles/anthosservicemesh.serviceAgent"; then
+    warn "The Mesh service account may not have been created for the Fleet hosted in ${FLEET_ID}."
+    warn "Please add an IAM binding for service-${FLEET_HOST_PROJECT_NUMBER}@gcp-sa-servicemesh.iam.gserviceaccount.com"
+    warn "with a role binding for roles/anthosservicemesh.serviceAgent. You may also re-run this command"
+    warn "with either the --enable-all or --enable-gcp-iam-roles flag to automatically create the IAM bindings."
+  fi
+}
+
+ensure_cross_project_sa() {
+  local FLEET_ID; FLEET_ID="${1}"
+  local PROJECT_ID; PROJECT_ID="${2}"
+  local SA_NAME; SA_NAME="${3}"
+  local ROLE; ROLE="${4}"
+  local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
+  local ENABLE_GCP_IAM_ROLES; ENABLE_GCP_IAM_ROLES="$(context_get-option "ENABLE_GCP_IAM_ROLES")"
+
   local FLEET_POLICIES
   FLEET_POLICIES="$(gcloud projects get-iam-policy "${FLEET_ID}" --format=json)"
 
   if [[ -z "${FLEET_POLICIES}" ]]; then
-    warn "Unable to verify cross-project Fleet permissions. Installation will continue."
-    warn "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
-    warn "if cross-project traffic doesn't work."
+    false
     return
   fi
 
-  if ! echo "${FLEET_POLICIES}" | grep -q "gcp-sa-gkehub"; then
-    error "The Fleet service account has not been created for the Fleet hosted in ${FLEET_ID}."
-    error "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
-    fatal "for information on how to create the identity and grant permissions."
+  if ! echo "${FLEET_POLICIES}" | grep -q "${SA_NAME}"; then
+    false
+    return
   fi
-
-  local FLEET_HOST_PROJECT_NUMBER
-  local FLEET_SA
-  FLEET_HOST_PROJECT_NUMBER="$(gcloud projects describe "${FLEET_ID}" --format "value(projectNumber)")"
-  FLEET_SA="serviceAccount:service-${FLEET_HOST_PROJECT_NUMBER}@gcp-sa-gkehub.iam.gserviceaccount.com"
 
   local PROJECT_POLICY_MEMBERS
   PROJECT_POLICY_MEMBERS="$(gcloud projects get-iam-policy "${PROJECT_ID}" --format=json)"
 
   if [[ -z "${PROJECT_POLICY_MEMBERS}" ]]; then
-    warn "Unable to verify cross-project Fleet permissions. Installation will continue."
-    warn "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
-    warn "if cross-project traffic doesn't work."
+    false
     return
   fi
 
-  PROJECT_POLICY_MEMBERS="$(echo "${PROJECT_POLICY_MEMBERS}" | jq '.bindings[] | select(.role == "roles/gkehub.serviceAgent")')"
+  PROJECT_POLICY_MEMBERS="$(echo "${PROJECT_POLICY_MEMBERS}" | jq '.bindings[] | select(.role == "'"${ROLE}"'")')"
 
   if [[ -n "${PROJECT_POLICY_MEMBERS}" ]]; then
     PROJECT_POLICY_MEMBERS="$(echo "${PROJECT_POLICY_MEMBERS}" | jq '.members[]')"
   fi
 
-  if [[ "${PROJECT_POLICY_MEMBERS}" = *"${FLEET_SA}"* ]]; then return; fi
+  if [[ "${PROJECT_POLICY_MEMBERS}" == *"${SA_NAME}"* ]]; then
+    return
+  fi
 
-  error "The Fleet service account for the Fleet hosted in ${FLEET_ID} needs permissions on ${PROJECT_ID}."
-  error "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
-  fatal "for information on how to grant permissions."
+
+  if [[ "${ENABLE_ALL}" -eq 1 || "${ENABLE_GCP_IAM_ROLES}" -eq 1 ]]; then
+    bind_user_to_iam_policy "${ROLE}" "${SA_NAME}"
+    true
+    return
+  fi
+  false
 }
+
 validate_revision_label() {
   # Matches DNS label formats of RFC 1123
   local DNS_1123_LABEL_MAX_LEN; DNS_1123_LABEL_MAX_LEN=63;

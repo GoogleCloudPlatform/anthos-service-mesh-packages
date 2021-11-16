@@ -241,13 +241,38 @@ EOF
   fi
 
   ln -s "${ISTIOCTL_REL_PATH}" .
+  version_message > "${ASM_VERSION_FILE}"
+}
+
+download_kpt_package() {
   local SAMPLES_URL
   SAMPLES_URL="${KPT_URL/asm@/samples@}"
 
   info "Downloading ASM kpt package..."
   retry 3 kpt pkg get --auto-set=false "${KPT_URL}" asm
   retry 3 kpt pkg get --auto-set=false "${SAMPLES_URL}" samples
-  version_message > "${ASM_VERSION_FILE}"
+
+  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
+  local CA; CA="$(context_get-option "CA")"
+
+  echo "${MANAGED} ${CA}" >| "${ASM_SETTINGS_FILE}"
+}
+
+should_download_kpt_package() {
+  if [[ ! -f "${ASM_SETTINGS_FILE}" ]]; then return; fi
+
+  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
+  local CA; CA="$(context_get-option "CA")"
+
+  local PREV_MANAGED PREV_CA
+  read -r PREV_MANAGED PREV_CA <"${ASM_SETTINGS_FILE}"
+
+  if [[ "${MANAGED}" -ne "${PREV_MANAGED}" || "${PREV_CA}" != "${CA}" ]]; then
+    warn "Configuration has changed since last run, scheduling re-download of kpt package"
+    return
+  fi
+
+  false
 }
 
 # LTS releases don't have curl 7.55 so we can't use the @- construction,
@@ -285,6 +310,9 @@ prepare_environment() {
   if needs_asm; then
     if ! necessary_files_exist; then
       download_asm
+    fi
+    if should_download_kpt_package; then
+      download_kpt_package
     fi
     organize_kpt_files
   fi
@@ -337,6 +365,7 @@ init() {
   EXPANSION_GATEWAY_FILE="${PACKAGE_DIRECTORY}/expansion/vm-eastwest-gateway.yaml"; readonly EXPANSION_GATEWAY_FILE;
   CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
   ASM_VERSION_FILE=".asm_version"; readonly ASM_VERSION_FILE;
+  ASM_SETTINGS_FILE=".asm_settings"; readonly ASM_SETTINGS_FILE;
 
   CRD_CONTROL_PLANE_REVISION="asm/control-plane-revision/crd.yaml"; readonly CRD_CONTROL_PLANE_REVISION;
   CR_CONTROL_PLANE_REVISION_REGULAR="asm/control-plane-revision/cr_regular.yaml"; readonly CR_CONTROL_PLANE_REVISION_REGULAR;
@@ -725,52 +754,80 @@ get_cr_yaml() {
   echo "${CR} ${REVISION}"
 }
 
-ensure_cross_project_fleet_sa() {
+ensure_cross_project_service_accounts() {
   local FLEET_ID; FLEET_ID="${1}"
   local PROJECT_ID; PROJECT_ID="${2}"
 
   if ! is_gcp; then return; fi
 
+  local FLEET_HOST_PROJECT_NUMBER
+  FLEET_HOST_PROJECT_NUMBER="$(gcloud projects describe "${FLEET_ID}" --format "value(projectNumber)")"
+
+  local FLEET_SA
+  local MESH_SA
+  FLEET_SA="serviceAccount:service-${FLEET_HOST_PROJECT_NUMBER}@gcp-sa-gkehub.iam.gserviceaccount.com"
+  MESH_SA="serviceAccount:service-${FLEET_HOST_PROJECT_NUMBER}@gcp-sa-servicemesh.iam.gserviceaccount.com"
+
+  if ! ensure_cross_project_sa "${FLEET_ID}" "${PROJECT_ID}" "${FLEET_SA}" "roles/gkehub.serviceAgent"; then
+    warn "The Fleet service account may not have been created for the Fleet hosted in ${FLEET_ID}."
+    warn "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
+    warn "for information on how to create the identity and grant permissions. You may also re-run this command"
+    warn "with either the --enable-all or --enable-gcp-iam-roles flag to automatically create the IAM bindings."
+  fi
+
+  if ! ensure_cross_project_sa "${FLEET_ID}" "${PROJECT_ID}" "${MESH_SA}" "roles/anthosservicemesh.serviceAgent"; then
+    warn "The Mesh service account may not have been created for the Fleet hosted in ${FLEET_ID}."
+    warn "Please add an IAM binding for service-${FLEET_HOST_PROJECT_NUMBER}@gcp-sa-servicemesh.iam.gserviceaccount.com"
+    warn "with a role binding for roles/anthosservicemesh.serviceAgent. You may also re-run this command"
+    warn "with either the --enable-all or --enable-gcp-iam-roles flag to automatically create the IAM bindings."
+  fi
+}
+
+ensure_cross_project_sa() {
+  local FLEET_ID; FLEET_ID="${1}"
+  local PROJECT_ID; PROJECT_ID="${2}"
+  local SA_NAME; SA_NAME="${3}"
+  local ROLE; ROLE="${4}"
+  local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
+  local ENABLE_GCP_IAM_ROLES; ENABLE_GCP_IAM_ROLES="$(context_get-option "ENABLE_GCP_IAM_ROLES")"
+
   local FLEET_POLICIES
   FLEET_POLICIES="$(gcloud projects get-iam-policy "${FLEET_ID}" --format=json)"
 
   if [[ -z "${FLEET_POLICIES}" ]]; then
-    warn "Unable to verify cross-project Fleet permissions. Installation will continue."
-    warn "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
-    warn "if cross-project traffic doesn't work."
+    false
     return
   fi
 
-  if ! echo "${FLEET_POLICIES}" | grep -q "gcp-sa-gkehub"; then
-    error "The Fleet service account has not been created for the Fleet hosted in ${FLEET_ID}."
-    error "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
-    fatal "for information on how to create the identity and grant permissions."
+  if ! echo "${FLEET_POLICIES}" | grep -q "${SA_NAME}"; then
+    false
+    return
   fi
-
-  local FLEET_HOST_PROJECT_NUMBER
-  local FLEET_SA
-  FLEET_HOST_PROJECT_NUMBER="$(gcloud projects describe "${FLEET_ID}" --format "value(projectNumber)")"
-  FLEET_SA="serviceAccount:service-${FLEET_HOST_PROJECT_NUMBER}@gcp-sa-gkehub.iam.gserviceaccount.com"
 
   local PROJECT_POLICY_MEMBERS
   PROJECT_POLICY_MEMBERS="$(gcloud projects get-iam-policy "${PROJECT_ID}" --format=json)"
 
   if [[ -z "${PROJECT_POLICY_MEMBERS}" ]]; then
-    warn "Unable to verify cross-project Fleet permissions. Installation will continue."
-    warn "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
-    warn "if cross-project traffic doesn't work."
+    false
     return
   fi
 
-  PROJECT_POLICY_MEMBERS="$(echo "${PROJECT_POLICY_MEMBERS}" | jq '.bindings[] | select(.role == "roles/gkehub.serviceAgent")')"
+  PROJECT_POLICY_MEMBERS="$(echo "${PROJECT_POLICY_MEMBERS}" | jq '.bindings[] | select(.role == "'"${ROLE}"'")')"
 
   if [[ -n "${PROJECT_POLICY_MEMBERS}" ]]; then
     PROJECT_POLICY_MEMBERS="$(echo "${PROJECT_POLICY_MEMBERS}" | jq '.members[]')"
   fi
 
-  if [[ "${PROJECT_POLICY_MEMBERS}" = *"${FLEET_SA}"* ]]; then return; fi
+  if [[ "${PROJECT_POLICY_MEMBERS}" == *"${SA_NAME}"* ]]; then
+    return
+  fi
 
-  error "The Fleet service account for the Fleet hosted in ${FLEET_ID} needs permissions on ${PROJECT_ID}."
-  error "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
-  fatal "for information on how to grant permissions."
+
+  if [[ "${ENABLE_ALL}" -eq 1 || "${ENABLE_GCP_IAM_ROLES}" -eq 1 ]]; then
+    bind_user_to_iam_policy "${ROLE}" "${SA_NAME}"
+    true
+    return
+  fi
+  false
 }
+
