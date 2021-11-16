@@ -754,52 +754,80 @@ get_cr_yaml() {
   echo "${CR} ${REVISION}"
 }
 
-ensure_cross_project_fleet_sa() {
+ensure_cross_project_service_accounts() {
   local FLEET_ID; FLEET_ID="${1}"
   local PROJECT_ID; PROJECT_ID="${2}"
 
   if ! is_gcp; then return; fi
 
+  local FLEET_HOST_PROJECT_NUMBER
+  FLEET_HOST_PROJECT_NUMBER="$(gcloud projects describe "${FLEET_ID}" --format "value(projectNumber)")"
+
+  local FLEET_SA
+  local MESH_SA
+  FLEET_SA="serviceAccount:service-${FLEET_HOST_PROJECT_NUMBER}@gcp-sa-gkehub.iam.gserviceaccount.com"
+  MESH_SA="serviceAccount:service-${FLEET_HOST_PROJECT_NUMBER}@gcp-sa-servicemesh.iam.gserviceaccount.com"
+
+  if ! ensure_cross_project_sa "${FLEET_ID}" "${PROJECT_ID}" "${FLEET_SA}" "roles/gkehub.serviceAgent"; then
+    warn "The Fleet service account may not have been created for the Fleet hosted in ${FLEET_ID}."
+    warn "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
+    warn "for information on how to create the identity and grant permissions. You may also re-run this command"
+    warn "with either the --enable-all or --enable-gcp-iam-roles flag to automatically create the IAM bindings."
+  fi
+
+  if ! ensure_cross_project_sa "${FLEET_ID}" "${PROJECT_ID}" "${MESH_SA}" "roles/anthosservicemesh.serviceAgent"; then
+    warn "The Mesh service account may not have been created for the Fleet hosted in ${FLEET_ID}."
+    warn "Please add an IAM binding for service-${FLEET_HOST_PROJECT_NUMBER}@gcp-sa-servicemesh.iam.gserviceaccount.com"
+    warn "with a role binding for roles/anthosservicemesh.serviceAgent. You may also re-run this command"
+    warn "with either the --enable-all or --enable-gcp-iam-roles flag to automatically create the IAM bindings."
+  fi
+}
+
+ensure_cross_project_sa() {
+  local FLEET_ID; FLEET_ID="${1}"
+  local PROJECT_ID; PROJECT_ID="${2}"
+  local SA_NAME; SA_NAME="${3}"
+  local ROLE; ROLE="${4}"
+  local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
+  local ENABLE_GCP_IAM_ROLES; ENABLE_GCP_IAM_ROLES="$(context_get-option "ENABLE_GCP_IAM_ROLES")"
+
   local FLEET_POLICIES
   FLEET_POLICIES="$(gcloud projects get-iam-policy "${FLEET_ID}" --format=json)"
 
   if [[ -z "${FLEET_POLICIES}" ]]; then
-    warn "Unable to verify cross-project Fleet permissions. Installation will continue."
-    warn "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
-    warn "if cross-project traffic doesn't work."
+    false
     return
   fi
 
-  if ! echo "${FLEET_POLICIES}" | grep -q "gcp-sa-gkehub"; then
-    error "The Fleet service account has not been created for the Fleet hosted in ${FLEET_ID}."
-    error "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
-    fatal "for information on how to create the identity and grant permissions."
+  if ! echo "${FLEET_POLICIES}" | grep -q "${SA_NAME}"; then
+    false
+    return
   fi
-
-  local FLEET_HOST_PROJECT_NUMBER
-  local FLEET_SA
-  FLEET_HOST_PROJECT_NUMBER="$(gcloud projects describe "${FLEET_ID}" --format "value(projectNumber)")"
-  FLEET_SA="serviceAccount:service-${FLEET_HOST_PROJECT_NUMBER}@gcp-sa-gkehub.iam.gserviceaccount.com"
 
   local PROJECT_POLICY_MEMBERS
   PROJECT_POLICY_MEMBERS="$(gcloud projects get-iam-policy "${PROJECT_ID}" --format=json)"
 
   if [[ -z "${PROJECT_POLICY_MEMBERS}" ]]; then
-    warn "Unable to verify cross-project Fleet permissions. Installation will continue."
-    warn "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
-    warn "if cross-project traffic doesn't work."
+    false
     return
   fi
 
-  PROJECT_POLICY_MEMBERS="$(echo "${PROJECT_POLICY_MEMBERS}" | jq '.bindings[] | select(.role == "roles/gkehub.serviceAgent")')"
+  PROJECT_POLICY_MEMBERS="$(echo "${PROJECT_POLICY_MEMBERS}" | jq '.bindings[] | select(.role == "'"${ROLE}"'")')"
 
   if [[ -n "${PROJECT_POLICY_MEMBERS}" ]]; then
     PROJECT_POLICY_MEMBERS="$(echo "${PROJECT_POLICY_MEMBERS}" | jq '.members[]')"
   fi
 
-  if [[ "${PROJECT_POLICY_MEMBERS}" = *"${FLEET_SA}"* ]]; then return; fi
+  if [[ "${PROJECT_POLICY_MEMBERS}" == *"${SA_NAME}"* ]]; then
+    return
+  fi
 
-  error "The Fleet service account for the Fleet hosted in ${FLEET_ID} needs permissions on ${PROJECT_ID}."
-  error "Please refer to https://cloud.google.com/anthos/multicluster-management/connect/prerequisites#gke-cross-project"
-  fatal "for information on how to grant permissions."
+
+  if [[ "${ENABLE_ALL}" -eq 1 || "${ENABLE_GCP_IAM_ROLES}" -eq 1 ]]; then
+    bind_user_to_iam_policy "${ROLE}" "${SA_NAME}"
+    true
+    return
+  fi
+  false
 }
+
