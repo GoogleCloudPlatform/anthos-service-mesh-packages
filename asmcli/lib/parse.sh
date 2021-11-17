@@ -118,6 +118,10 @@ parse_args() {
         context_set-option "ENABLE_NAMESPACE_CREATION" 1
         shift 1
         ;;
+      --enable_meshconfig_init | --enable-meshconfig-init)
+        context_set-option "ENABLE_MESHCONFIG_INIT" 1
+        shift 1
+        ;;
       --managed)
         context_set-option "MANAGED" 1
         REVISION_LABEL="asm-managed"

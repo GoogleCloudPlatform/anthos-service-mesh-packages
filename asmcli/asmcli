@@ -1166,6 +1166,9 @@ FLAGS:
                                       IAM permissions
      --enable_gcp_components          Allow the script to enable required GCP
                                       managed services and components
+     --enable_meshconfig_init         Allow the script to initialize the meshconfig
+                                      endpoint on your behalf. Implied by
+                                      --enable_gcp_components and --managed.
      --enable_registration            Allow the script to register the cluster
                                       to a fleet
      --enable_namespace_creation      Allow the script to create the istio-system
@@ -1260,6 +1263,7 @@ FLAGS:
      --enable_gcp_apis
      --enable_gcp_iam_roles
      --enable_gcp_components
+     --enable_meshconfig_init
      --enable_registration
      --enable_namespace_creation
      --use_managed_cni
@@ -1903,7 +1907,7 @@ validate_in_cluster_control_plane() {
   if should_validate; then
     validate_environment
   fi
-  if can_modify_gcp_components; then
+  if can_init_meshconfig; then
     init_meshconfig
   elif should_validate && [[ "${FLEET_ID}" == "${PROJECT_ID}" ]]; then
     warn "There is no way to validate that the meshconfig API has been initialized."
@@ -1951,7 +1955,7 @@ validate_managed_control_plane() {
   if can_modify_gcp_iam_roles; then
     bind_user_to_iam_policy "roles/meshconfig.admin" "$(local_iam_user)"
   fi
-  if can_modify_at_all; then
+  if can_init_meshconfig; then
     if ! init_meshconfig_managed; then
       fatal "Couldn't initialize meshconfig, do you have the required permission resourcemanager.projects.setIamPolicy?"
     fi
@@ -2437,6 +2441,20 @@ can_modify_gcp_components() {
   fi
 }
 
+can_init_meshconfig() {
+  local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
+  local ENABLE_MESHCONFIG_INIT; ENABLE_MESHCONFIG_INIT="$(context_get-option "ENABLE_MESHCONFIG_INIT")"
+
+  if ! can_modify_at_all; then false; return; fi
+  if can_modify_gcp_components; then return; fi
+
+  if is_managed || [[ "${ENABLE_ALL}" -eq 1 || "${ENABLE_MESHCONFIG_INIT}" -eq 1 ]]; then
+    true
+  else
+    false
+  fi
+}
+
 can_register_cluster() {
   local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
   local USE_VM; USE_VM="$(context_get-option "USE_VM")"
@@ -2667,6 +2685,7 @@ context_init() {
     "ENABLE_GCP_COMPONENTS": ${ENABLE_GCP_COMPONENTS:-0},
     "ENABLE_REGISTRATION": ${ENABLE_REGISTRATION:-0},
     "ENABLE_NAMESPACE_CREATION": ${ENABLE_NAMESPACE_CREATION:-0},
+    "ENABLE_MESHCONFIG_INIT": ${ENABLE_MESHCONFIG_INIT:-0},
     "USE_MANAGED_CNI": ${USE_MANAGED_CNI:-0},
     "USE_VPCSC": ${USE_VPCSC:-0},
     "DISABLE_CANONICAL_SERVICE": ${DISABLE_CANONICAL_SERVICE:-0},
@@ -3277,6 +3296,10 @@ parse_args() {
         ;;
       --enable_namespace_creation | --enable-namespace-creation)
         context_set-option "ENABLE_NAMESPACE_CREATION" 1
+        shift 1
+        ;;
+      --enable_meshconfig_init | --enable-meshconfig-init)
+        context_set-option "ENABLE_MESHCONFIG_INIT" 1
         shift 1
         ;;
       --managed)
