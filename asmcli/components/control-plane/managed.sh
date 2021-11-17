@@ -1,4 +1,4 @@
-validate_managed_control_plane() {
+validate_managed_control_plane_legacy() {
   if can_modify_gcp_iam_roles; then
     bind_user_to_iam_policy "roles/meshconfig.admin" "$(local_iam_user)"
   fi
@@ -24,12 +24,31 @@ call_runIstiod() {
 }
 
 install_managed_control_plane() {
+  local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
+  local CA; CA="$(context_get-option "CA")"
+  if is_legacy; then
+    provision_mcp_legacy
+  else
+    wait_for_cpr_crd
+  fi
+
+  if [[ "${USE_MANAGED_CNI}" -eq 0 ]]; then
+    install_mananged_cni_static
+  fi
+
+  if [[ "${CA}" = "gcp_cas" ]]; then
+    install_managed_privateca
+  fi
+
+  install_managed_startup_config
+}
+
+provision_mcp_legacy() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
-  local CA; CA="$(context_get-option "CA")"
 
   local POST_DATA; POST_DATA="{}";
   if [[ -n "${_CI_CLOUDRUN_IMAGE_HUB}" ]]; then
@@ -65,14 +84,17 @@ install_managed_control_plane() {
 
   info "Configuring ASM managed control plane validating webhook config..."
   context_append "kubectlFiles" "${MANAGED_WEBHOOKS}"
+}
 
-  install_mananged_cni_static
-
-  if [[ "${CA}" = "gcp_cas" ]]; then
-    install_managed_privateca
-  fi
-
-  install_managed_startup_config
+wait_for_cpr_crd() {
+  # `kubectl wait` for non-existent resources will return error directly so we wait in loop
+  info "Waiting for the controlplanerevisions CRD to be installed by AFC. This could take a few minutes if cluster is newly registered."
+  for i in {1..10}; do
+    if kubectl wait --for condition=established --timeout=10s crd/controlplanerevisions.mesh.cloud.google.com 2>/dev/null; then
+      break
+    fi
+    sleep 10
+  done
 }
 
 install_managed_startup_config() {

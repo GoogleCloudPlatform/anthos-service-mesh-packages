@@ -125,8 +125,7 @@ EOF
     info "Installing ASM Control Plane Revision CR with ${REVISION} channel in istio-system namespace..."
     retry 3 kubectl apply -f "${CR}"
 
-    local EXPERIMENTAL; EXPERIMENTAL="$(context_get-option "EXPERIMENTAL")"
-    if [[ "${EXPERIMENTAL}" -eq 1 ]]; then
+    if ! is_legacy; then
       info "Waiting for deployment..."
       retry 3 kubectl wait --for=condition=ProvisioningFinished \
         controlplanerevision "${REVISION}" -n istio-system --timeout 600s

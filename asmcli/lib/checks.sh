@@ -26,6 +26,12 @@ is_managed() {
   if [[ "${MANAGED}" -ne 1 ]]; then false; fi
 }
 
+is_legacy() {
+  local LEGACY; LEGACY="$(context_get-option "LEGACY")"
+
+  if [[ "${LEGACY}" -ne 1 ]]; then false; fi
+}
+
 is_interactive() {
   local NON_INTERACTIVE; NON_INTERACTIVE="$(context_get-option "NON_INTERACTIVE")"
 
