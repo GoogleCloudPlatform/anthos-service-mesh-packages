@@ -349,7 +349,8 @@ init() {
   KPT_URL="${KPT_URL}.git/asm@${KPT_BRANCH}"; readonly KPT_URL;
   ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
   ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
-  BASE_REL_PATH="${ISTIO_FOLDER_NAME}/manifests/charts/base/files/gen-istio-cluster.yaml"; readonly BASE_REL_PATH;
+  BASE_REL_PATH="${_CI_BASE_REL_PATH:-${ISTIO_FOLDER_NAME}/manifests/charts/base/files/gen-istio-cluster.yaml}"
+  readonly BASE_REL_PATH
   PACKAGE_DIRECTORY="asm/istio"; readonly PACKAGE_DIRECTORY;
   VALIDATION_FIX_FILE_NAME="istiod-service.yaml"; readonly VALIDATION_FIX_FILE_NAME;
   VALIDATION_FIX_SERVICE="${PACKAGE_DIRECTORY}/${VALIDATION_FIX_FILE_NAME}"; readonly VALIDATION_FIX_SERVICE;
