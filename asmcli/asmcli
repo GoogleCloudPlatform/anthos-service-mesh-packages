@@ -1180,6 +1180,8 @@ FLAGS:
 
      --managed                        Provision a remote, managed control plane
                                       instead of installing one in-cluster.
+     --legacy                         Provision a remote, managed control plane with
+                                      the legacy asmcli installer that runs client-side.
 
      --print_config                   Instead of installing ASM, print all of
                                       the compiled YAML to stdout. All other
@@ -1270,6 +1272,7 @@ FLAGS:
      --use_managed_cni
 
      --managed
+     --legacy
 
      --print_config
      --disable_canonical_service
@@ -1462,8 +1465,7 @@ EOF
     info "Installing ASM Control Plane Revision CR with ${REVISION} channel in istio-system namespace..."
     retry 3 kubectl apply -f "${CR}"
 
-    local EXPERIMENTAL; EXPERIMENTAL="$(context_get-option "EXPERIMENTAL")"
-    if [[ "${EXPERIMENTAL}" -eq 1 ]]; then
+    if ! is_legacy; then
       info "Waiting for deployment..."
       retry 3 kubectl wait --for=condition=ProvisioningFinished \
         controlplanerevision "${REVISION}" -n istio-system --timeout 600s
@@ -1693,11 +1695,11 @@ validate_dependencies() {
 }
 
 validate_control_plane() {
-  if is_managed; then
-    # Managed must be able to set IAM permissions on a generated user, so the flow
+  if is_managed && is_legacy; then
+    # Managed legacy must be able to set IAM permissions on a generated user, so the flow
     # is a bit different
-    validate_managed_control_plane
-  else
+    validate_managed_control_plane_legacy
+  elif ! is_managed; then
     validate_in_cluster_control_plane
   fi
 }
@@ -1952,7 +1954,7 @@ init_meshconfig() {
     init_meshconfig_curl '' "${PROJECT_ID}"
   fi
 }
-validate_managed_control_plane() {
+validate_managed_control_plane_legacy() {
   if can_modify_gcp_iam_roles; then
     bind_user_to_iam_policy "roles/meshconfig.admin" "$(local_iam_user)"
   fi
@@ -1978,12 +1980,31 @@ call_runIstiod() {
 }
 
 install_managed_control_plane() {
+  local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
+  local CA; CA="$(context_get-option "CA")"
+  if is_legacy; then
+    provision_mcp_legacy
+  else
+    wait_for_cpr_crd
+  fi
+
+  if [[ "${USE_MANAGED_CNI}" -eq 0 ]]; then
+    install_mananged_cni_static
+  fi
+
+  if [[ "${CA}" = "gcp_cas" ]]; then
+    install_managed_privateca
+  fi
+
+  install_managed_startup_config
+}
+
+provision_mcp_legacy() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
-  local CA; CA="$(context_get-option "CA")"
 
   local POST_DATA; POST_DATA="{}";
   if [[ -n "${_CI_CLOUDRUN_IMAGE_HUB}" ]]; then
@@ -2019,14 +2040,17 @@ install_managed_control_plane() {
 
   info "Configuring ASM managed control plane validating webhook config..."
   context_append "kubectlFiles" "${MANAGED_WEBHOOKS}"
+}
 
-  install_mananged_cni_static
-
-  if [[ "${CA}" = "gcp_cas" ]]; then
-    install_managed_privateca
-  fi
-
-  install_managed_startup_config
+wait_for_cpr_crd() {
+  # `kubectl wait` for non-existent resources will return error directly so we wait in loop
+  info "Waiting for the controlplanerevisions CRD to be installed by AFC. This could take a few minutes if cluster is newly registered."
+  for i in {1..10}; do
+    if kubectl wait --for condition=established --timeout=10s crd/controlplanerevisions.mesh.cloud.google.com 2>/dev/null; then
+      break
+    fi
+    sleep 10
+  done
 }
 
 install_managed_startup_config() {
@@ -2141,6 +2165,12 @@ is_managed() {
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
 
   if [[ "${MANAGED}" -ne 1 ]]; then false; fi
+}
+
+is_legacy() {
+  local LEGACY; LEGACY="$(context_get-option "LEGACY")"
+
+  if [[ "${LEGACY}" -ne 1 ]]; then false; fi
 }
 
 is_interactive() {
@@ -2573,6 +2603,8 @@ configure_package() {
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
   local USE_VM; USE_VM="$(context_get-option "USE_VM")"
   local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
+  local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
+  local USE_VPCSC; USE_VPCSC="$(context_get-option "USE_VPCSC")"
 
   info "Configuring kpt package..."
 
@@ -2625,6 +2657,14 @@ configure_package() {
     kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod-${REVISION_LABEL}.istio-system.svc.cluster.local"
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${REVISION_LABEL}"
   fi
+  
+  if [[ "${USE_MANAGED_CNI}" -eq 1 ]]; then
+    kpt cfg set asm anthos.servicemesh.use-managed-cni "true"
+  fi
+  if [[ "${USE_VPCSC}" -eq 1 ]]; then
+    kpt cfg set asm anthos.servicemesh.managed-controlplane.vpcsc.enabled "true"
+  fi
+
   configure_ca
   configure_control_plane
 }
@@ -2707,6 +2747,7 @@ context_init() {
     "ONLY_ENABLE": ${ONLY_ENABLE:-0},
     "VERBOSE": ${VERBOSE:-0},
     "MANAGED": ${MANAGED:-0},
+    "LEGACY": ${LEGACY:-0},
     "MANAGED_SERVICE_ACCOUNT": "${MANAGED_SERVICE_ACCOUNT:-}",
     "PRINT_HELP": ${PRINT_HELP:-0},
     "PRINT_VERSION": ${PRINT_VERSION:-0},
@@ -3308,6 +3349,10 @@ parse_args() {
         REVISION_LABEL="asm-managed"
         shift 1
         ;;
+      --legacy)
+        context_set-option "LEGACY" 1
+        shift 1
+        ;;
       --disable_canonical_service | --disable-canonical-service)
         context_set-option "DISABLE_CANONICAL_SERVICE" 1
         shift 1
@@ -3467,6 +3512,10 @@ x_parse_install_args() {
         ;;
       --managed)
         context_set-option "MANAGED" 1
+        shift 1
+        ;;
+      --legacy)
+        context_set-option "LEGACY" 1
         shift 1
         ;;
       --use_vpcsc | --use-vpcsc)
@@ -4294,11 +4343,11 @@ get_cr_channels() {
 
 get_cr_yaml() {
   local CHANNEL; CHANNEL="${1}"
-  local EXPERIMENTAL; EXPERIMENTAL="$(context_get-option "EXPERIMENTAL")"
+  local LEGACY; LEGACY="$(context_get-option "LEGACY")"
   local CR REVISION
   case "${CHANNEL}" in
     regular)
-      if [[ "${EXPERIMENTAL}" -eq 1 ]]; then
+      if ! is_legacy; then
         CR="${CR_CONTROL_PLANE_REVISION_REGULAR}"
       else
         CR="${CR_CONTROL_PLANE_REVISION_REGULAR_RECONCILED}"
@@ -4306,7 +4355,7 @@ get_cr_yaml() {
       REVISION="${REVISION_LABEL_REGULAR}"
       ;;
     stable)
-      if [[ "${EXPERIMENTAL}" -eq 1 ]]; then
+      if ! is_legacy; then
         CR="${CR_CONTROL_PLANE_REVISION_STABLE}"
       else
         CR="${CR_CONTROL_PLANE_REVISION_STABLE_RECONCILED}"
@@ -4314,7 +4363,7 @@ get_cr_yaml() {
       REVISION="${REVISION_LABEL_STABLE}"
       ;;
     *)
-      if [[ "${EXPERIMENTAL}" -eq 1 ]]; then
+      if ! is_legacy; then
         CR="${CR_CONTROL_PLANE_REVISION_RAPID}"
       else
         CR="${CR_CONTROL_PLANE_REVISION_RAPID_RECONCILED}"
@@ -4921,6 +4970,7 @@ validate_args() {
   local ONLY_ENABLE; ONLY_ENABLE="$(context_get-option "ONLY_ENABLE")"
   local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
+  local LEGACY; LEGACY="$(context_get-option "LEGACY")"
   local MANAGED_SERVICE_ACCOUNT; MANAGED_SERVICE_ACCOUNT="$(context_get-option "MANAGED_SERVICE_ACCOUNT")"
   local PRINT_HELP; PRINT_HELP="$(context_get-option "PRINT_HELP")"
   local PRINT_VERSION; PRINT_VERSION="$(context_get-option "PRINT_VERSION")"
@@ -4933,6 +4983,10 @@ validate_args() {
   local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
   local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
+
+  if is_legacy && ! is_managed; then
+      fatal "The --legacy option is only supported with managed control plane."
+  fi
 
   if [[ -z "${CA}" ]]; then
     CA="mesh_ca"
@@ -5082,6 +5136,7 @@ ENABLE_GCP_IAM_ROLES
 ENABLE_GCP_COMPONENTS
 ENABLE_REGISTRATION
 MANAGED
+LEGACY
 DISABLE_CANONICAL_SERVICE
 ONLY_VALIDATE
 ONLY_ENABLE
@@ -5154,11 +5209,14 @@ arg_required() {
 }
 
 x_validate_install_args() {
+  fatal "\"x install\" is now included with the --managed flag in the install command."
+
   ### Option variables ###
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
+  local LEGACY; LEGACY="$(context_get-option "LEGACY")"
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local CA; CA="$(context_get-option "CA")"
   local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
@@ -5208,6 +5266,10 @@ EOF
 
   if [[ "${MANAGED}" -eq 0 ]]; then
     fatal "Currently only managed control plane installation is supported by experimental install."
+  fi
+
+  if [[ "${LEGACY}" -eq 1 ]]; then
+    fatal "The legacy install subcommand is not available in the experimental install command."
   fi
 
   if [[ -n "${CHANNEL}" ]]; then

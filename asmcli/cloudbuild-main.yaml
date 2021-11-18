@@ -169,14 +169,15 @@ steps:
       - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
     timeout: 900s
 
+
   - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
     dir: 'asmcli'
-    id: 'run-basic-suite-managed-experimental'
+    id: 'run-basic-suite-managed-legacy'
     entrypoint: '/bin/bash'
     args:
       - '-c'
       - >
-        ./tests/run_basic_suite_managed_experimental
+        ./tests/run_basic_suite_managed_legacy
         --PROJECT_ID "${PROJECT_ID}"
         --BUILD_ID "${BUILD_ID}"
     env:

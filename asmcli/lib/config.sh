@@ -9,6 +9,8 @@ configure_package() {
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
   local USE_VM; USE_VM="$(context_get-option "USE_VM")"
   local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
+  local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
+  local USE_VPCSC; USE_VPCSC="$(context_get-option "USE_VPCSC")"
 
   info "Configuring kpt package..."
 
@@ -61,6 +63,14 @@ configure_package() {
     kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod-${REVISION_LABEL}.istio-system.svc.cluster.local"
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${REVISION_LABEL}"
   fi
+  
+  if [[ "${USE_MANAGED_CNI}" -eq 1 ]]; then
+    kpt cfg set asm anthos.servicemesh.use-managed-cni "true"
+  fi
+  if [[ "${USE_VPCSC}" -eq 1 ]]; then
+    kpt cfg set asm anthos.servicemesh.managed-controlplane.vpcsc.enabled "true"
+  fi
+
   configure_ca
   configure_control_plane
 }

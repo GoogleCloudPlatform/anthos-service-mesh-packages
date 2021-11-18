@@ -724,11 +724,11 @@ get_cr_channels() {
 
 get_cr_yaml() {
   local CHANNEL; CHANNEL="${1}"
-  local EXPERIMENTAL; EXPERIMENTAL="$(context_get-option "EXPERIMENTAL")"
+  local LEGACY; LEGACY="$(context_get-option "LEGACY")"
   local CR REVISION
   case "${CHANNEL}" in
     regular)
-      if [[ "${EXPERIMENTAL}" -eq 1 ]]; then
+      if ! is_legacy; then
         CR="${CR_CONTROL_PLANE_REVISION_REGULAR}"
       else
         CR="${CR_CONTROL_PLANE_REVISION_REGULAR_RECONCILED}"
@@ -736,7 +736,7 @@ get_cr_yaml() {
       REVISION="${REVISION_LABEL_REGULAR}"
       ;;
     stable)
-      if [[ "${EXPERIMENTAL}" -eq 1 ]]; then
+      if ! is_legacy; then
         CR="${CR_CONTROL_PLANE_REVISION_STABLE}"
       else
         CR="${CR_CONTROL_PLANE_REVISION_STABLE_RECONCILED}"
@@ -744,7 +744,7 @@ get_cr_yaml() {
       REVISION="${REVISION_LABEL_STABLE}"
       ;;
     *)
-      if [[ "${EXPERIMENTAL}" -eq 1 ]]; then
+      if ! is_legacy; then
         CR="${CR_CONTROL_PLANE_REVISION_RAPID}"
       else
         CR="${CR_CONTROL_PLANE_REVISION_RAPID_RECONCILED}"

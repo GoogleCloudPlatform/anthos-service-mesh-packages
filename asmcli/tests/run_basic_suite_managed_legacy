@@ -15,7 +15,7 @@ main() {
   # CLI setup
   parse_args "$@"
 
-  run_basic_test "experimental install" "" "--managed"; RETVAL=$?;
+  run_basic_test "install" "" "--managed --legacy"; RETVAL=$?;
   cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"
 
   exit "${RETVAL}"
