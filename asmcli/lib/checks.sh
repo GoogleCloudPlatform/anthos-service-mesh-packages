@@ -325,6 +325,20 @@ can_modify_gcp_components() {
   fi
 }
 
+can_init_meshconfig() {
+  local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
+  local ENABLE_MESHCONFIG_INIT; ENABLE_MESHCONFIG_INIT="$(context_get-option "ENABLE_MESHCONFIG_INIT")"
+
+  if ! can_modify_at_all; then false; return; fi
+  if can_modify_gcp_components; then return; fi
+
+  if is_managed || [[ "${ENABLE_ALL}" -eq 1 || "${ENABLE_MESHCONFIG_INIT}" -eq 1 ]]; then
+    true
+  else
+    false
+  fi
+}
+
 can_register_cluster() {
   local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
   local USE_VM; USE_VM="$(context_get-option "USE_VM")"

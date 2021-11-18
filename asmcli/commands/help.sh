@@ -165,6 +165,9 @@ FLAGS:
                                       IAM permissions
      --enable_gcp_components          Allow the script to enable required GCP
                                       managed services and components
+     --enable_meshconfig_init         Allow the script to initialize the meshconfig
+                                      endpoint on your behalf. Implied by
+                                      --enable_gcp_components and --managed.
      --enable_registration            Allow the script to register the cluster
                                       to a fleet
      --enable_namespace_creation      Allow the script to create the istio-system
@@ -259,6 +262,7 @@ FLAGS:
      --enable_gcp_apis
      --enable_gcp_iam_roles
      --enable_gcp_components
+     --enable_meshconfig_init
      --enable_registration
      --enable_namespace_creation
      --use_managed_cni
