@@ -127,6 +127,10 @@ parse_args() {
         REVISION_LABEL="asm-managed"
         shift 1
         ;;
+      --legacy)
+        context_set-option "LEGACY" 1
+        shift 1
+        ;;
       --disable_canonical_service | --disable-canonical-service)
         context_set-option "DISABLE_CANONICAL_SERVICE" 1
         shift 1
@@ -286,6 +290,10 @@ x_parse_install_args() {
         ;;
       --managed)
         context_set-option "MANAGED" 1
+        shift 1
+        ;;
+      --legacy)
+        context_set-option "LEGACY" 1
         shift 1
         ;;
       --use_vpcsc | --use-vpcsc)

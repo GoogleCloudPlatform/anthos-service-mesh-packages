@@ -517,6 +517,7 @@ validate_args() {
   local ONLY_ENABLE; ONLY_ENABLE="$(context_get-option "ONLY_ENABLE")"
   local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
+  local LEGACY; LEGACY="$(context_get-option "LEGACY")"
   local MANAGED_SERVICE_ACCOUNT; MANAGED_SERVICE_ACCOUNT="$(context_get-option "MANAGED_SERVICE_ACCOUNT")"
   local PRINT_HELP; PRINT_HELP="$(context_get-option "PRINT_HELP")"
   local PRINT_VERSION; PRINT_VERSION="$(context_get-option "PRINT_VERSION")"
@@ -529,6 +530,10 @@ validate_args() {
   local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
   local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
+
+  if is_legacy && ! is_managed; then
+      fatal "The --legacy option is only supported with managed control plane."
+  fi
 
   if [[ -z "${CA}" ]]; then
     CA="mesh_ca"
@@ -678,6 +683,7 @@ ENABLE_GCP_IAM_ROLES
 ENABLE_GCP_COMPONENTS
 ENABLE_REGISTRATION
 MANAGED
+LEGACY
 DISABLE_CANONICAL_SERVICE
 ONLY_VALIDATE
 ONLY_ENABLE
@@ -750,11 +756,14 @@ arg_required() {
 }
 
 x_validate_install_args() {
+  fatal "\"x install\" is now included with the --managed flag in the install command."
+
   ### Option variables ###
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
+  local LEGACY; LEGACY="$(context_get-option "LEGACY")"
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local CA; CA="$(context_get-option "CA")"
   local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
@@ -804,6 +813,10 @@ EOF
 
   if [[ "${MANAGED}" -eq 0 ]]; then
     fatal "Currently only managed control plane installation is supported by experimental install."
+  fi
+
+  if [[ "${LEGACY}" -eq 1 ]]; then
+    fatal "The legacy install subcommand is not available in the experimental install command."
   fi
 
   if [[ -n "${CHANNEL}" ]]; then

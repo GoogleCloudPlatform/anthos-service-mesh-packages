@@ -178,6 +178,8 @@ FLAGS:
 
      --managed                        Provision a remote, managed control plane
                                       instead of installing one in-cluster.
+     --legacy                         Provision a remote, managed control plane with
+                                      the legacy asmcli installer that runs client-side.
 
      --print_config                   Instead of installing ASM, print all of
                                       the compiled YAML to stdout. All other
@@ -268,6 +270,7 @@ FLAGS:
      --use_managed_cni
 
      --managed
+     --legacy
 
      --print_config
      --disable_canonical_service
