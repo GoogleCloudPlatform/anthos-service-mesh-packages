@@ -647,7 +647,7 @@ backup_config() {
 
 asm_revision_label() {
   if should_use_mcp; then
-    echo "asm_managed"
+    echo "asm-managed"
   else
     echo "${REVISION_LABEL}"
   fi
