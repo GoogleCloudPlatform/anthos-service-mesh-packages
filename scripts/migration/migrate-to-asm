@@ -602,6 +602,11 @@ populate_cluster_values() {
 ${CLUSTER_DATA}
 EOF
 
+    GKE_CLUSTER_URI="${GKE_CLUSTER_URI#'https://'}"
+    GKE_CLUSTER_URI="${GKE_CLUSTER_URI/v1\//}"
+    GKE_CLUSTER_URI="${GKE_CLUSTER_URI/zones/locations}"
+    GKE_CLUSTER_URI="${GKE_CLUSTER_URI/regions/locations}"
+
     GCE_NETWORK_NAME="${PROJECT_ID}-${GCE_NETWORK_NAME}"
     readonly GKE_CLUSTER_URI; readonly GCE_NETWORK_NAME;
   fi
