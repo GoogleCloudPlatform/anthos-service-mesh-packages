@@ -320,6 +320,7 @@ register_cluster() {
   else
     CMD="${CMD} --kubeconfig=${KCF} --context=${KCC}"
   fi
+  CMD="${CMD} ${HUB_REGISTRATION_EXTRA_ARGS}"
   # shellcheck disable=SC2086
   retry 2 run_command ${CMD}
 }
