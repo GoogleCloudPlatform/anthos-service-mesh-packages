@@ -1288,7 +1288,7 @@ EOF
 create-mesh_usage() {
   cat << EOF
 ${SCRIPT_NAME} $(version_message)
-usage: ${SCRIPT_NAME} create-mesh FLEET_ID (PROJECT_ID/CLUSTER_LOCATION/CLUSTER_NAME | KUBECONFIG_PATH) ...
+usage: ${SCRIPT_NAME} create-mesh FLEET_ID (PROJECT_ID/CLUSTER_LOCATION/CLUSTER_NAME | KUBECONFIG_PATH) ... 
 
 Create a multi-cluster service mesh and allow cross-cluster service discovery. This is done by
 registering the clusters to the specified fleet and installing the necessary Kubernetes cluster
@@ -1456,7 +1456,7 @@ install_canonical_controller() {
 
 install_control_plane_revisions() {
   info "Configuring ASM managed control plane revision CR for channels..."
-
+  
   local CHANNEL CR REVISION
   while read -r CHANNEL; do
     read -r CR REVISION<<EOF
@@ -2657,7 +2657,7 @@ configure_package() {
     kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod-${REVISION_LABEL}.istio-system.svc.cluster.local"
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${REVISION_LABEL}"
   fi
-
+  
   if [[ "${USE_MANAGED_CNI}" -eq 1 ]]; then
     kpt cfg set asm anthos.servicemesh.use-managed-cni "true"
   fi
@@ -2873,9 +2873,21 @@ required_iam_roles() {
 required_apis() {
   local CA; CA="$(context_get-option "CA")"
     cat << EOF
-mesh.googleapis.com
+container.googleapis.com
+monitoring.googleapis.com
+logging.googleapis.com
+cloudtrace.googleapis.com
+meshconfig.googleapis.com
+iamcredentials.googleapis.com
+gkeconnect.googleapis.com
+gkehub.googleapis.com
+cloudresourcemanager.googleapis.com
+stackdriver.googleapis.com
 EOF
   case "${CA}" in
+   mesh_ca)
+     echo meshca.googleapis.com
+     ;;
    gcp_cas)
      echo privateca.googleapis.com
      ;;
@@ -2891,6 +2903,9 @@ EOF
 required_fleet_apis() {
   local CA; CA="$(context_get-option "CA")"
   case "${CA}" in
+   mesh_ca)
+     echo meshca.googleapis.com
+     ;;
    gcp_cas)
      echo privateca.googleapis.com
      ;;
