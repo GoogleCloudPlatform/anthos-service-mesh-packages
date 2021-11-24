@@ -321,6 +321,7 @@ register_cluster() {
     CMD="${CMD} --kubeconfig=${KCF} --context=${KCC}"
   fi
   CMD="${CMD} $(context_get-option "HUB_REGISTRATION_EXTRA_FLAGS")"
+
   # shellcheck disable=SC2086
   retry 2 run_command ${CMD}
 }
