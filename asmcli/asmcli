@@ -515,6 +515,7 @@ x_configure_package() {
   if [[ "${USE_VPCSC}" -eq 1 ]]; then
     kpt cfg set asm anthos.servicemesh.managed-controlplane.vpcsc.enabled "true"
   fi
+  kpt cfg set asm anthos.servicemesh.created-by "asmcli-$(version_message)"
 }
 x_mcp_migrate_check() {
   x_parse_mcp_migrate_args "${@}"
@@ -1038,7 +1039,7 @@ help_subcommand() {
 }
 
 version_message() {
-  local VER; VER="${MAJOR}.${MINOR}.${POINT}-asm.${REV}+config${CONFIG_VER}";
+  local VER; VER="${MAJOR}.${MINOR}.${POINT}-asm.${REV}.config${CONFIG_VER}";
   if [[ "${_CI_CRC_VERSION}" -eq 1 ]]; then
     VER="${VER}-$(crc32 "$0")"
   fi
@@ -2664,6 +2665,8 @@ configure_package() {
   if [[ "${USE_VPCSC}" -eq 1 ]]; then
     kpt cfg set asm anthos.servicemesh.managed-controlplane.vpcsc.enabled "true"
   fi
+
+  kpt cfg set asm anthos.servicemesh.created-by "asmcli-$(version_message)"
 
   configure_ca
   configure_control_plane

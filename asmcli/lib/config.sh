@@ -71,6 +71,8 @@ configure_package() {
     kpt cfg set asm anthos.servicemesh.managed-controlplane.vpcsc.enabled "true"
   fi
 
+  kpt cfg set asm anthos.servicemesh.created-by "asmcli-$(version_message)"
+
   configure_ca
   configure_control_plane
 }

@@ -53,4 +53,5 @@ x_configure_package() {
   if [[ "${USE_VPCSC}" -eq 1 ]]; then
     kpt cfg set asm anthos.servicemesh.managed-controlplane.vpcsc.enabled "true"
   fi
+  kpt cfg set asm anthos.servicemesh.created-by "asmcli-$(version_message)"
 }
