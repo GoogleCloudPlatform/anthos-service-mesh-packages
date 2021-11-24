@@ -1555,7 +1555,7 @@ install_control_plane() {
     install_control_plane_revisions
   fi
 
-  if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 && ! is_managed ]]; then
+  if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]] && ! is_managed; then
     install_canonical_controller
   fi
 }
