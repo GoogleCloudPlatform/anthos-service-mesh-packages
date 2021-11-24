@@ -2755,6 +2755,7 @@ context_init() {
     "USE_HUB_WIP": ${USE_HUB_WIP:-1},
     "USE_VM": ${USE_VM:-0},
     "HUB_MEMBERSHIP_ID": "${HUB_MEMBERSHIP_ID:-}",
+    "HUB_REGISTRATION_EXTRA_FLAGS": "${HUB_REGISTRATION_EXTRA_FLAGS:-}",
     "CUSTOM_REVISION": ${CUSTOM_REVISION:-0},
     "TRUST_DOMAIN_ALIASES": "${TRUST_DOMAIN_ALIASES:-}",
     "WI_ENABLED": ${WI_ENABLED:-0},
@@ -3146,7 +3147,7 @@ register_cluster() {
   else
     CMD="${CMD} --kubeconfig=${KCF} --context=${KCC}"
   fi
-  CMD="${CMD} ${HUB_REGISTRATION_EXTRA_ARGS}"
+  CMD="${CMD} $(context_get-option "HUB_REGISTRATION_EXTRA_FLAGS")"
 
   # shellcheck disable=SC2086
   retry 2 run_command ${CMD}
