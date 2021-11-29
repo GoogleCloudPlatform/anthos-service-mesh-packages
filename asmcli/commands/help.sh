@@ -36,7 +36,7 @@ help_subcommand() {
 }
 
 version_message() {
-  local VER; VER="${MAJOR}.${MINOR}.${POINT}-asm.${REV}.config${CONFIG_VER}";
+  local VER; VER="${MAJOR}.${MINOR}.${POINT}-asm.${REV}+config${CONFIG_VER}";
   if [[ "${_CI_CRC_VERSION}" -eq 1 ]]; then
     VER="${VER}-$(crc32 "$0")"
   fi
