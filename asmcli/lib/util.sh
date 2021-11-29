@@ -700,12 +700,10 @@ get_cr_channels() {
     echo "${CHANNEL}"
   elif ! is_gcp; then
     echo regular
-    echo rapid
   else
     local GKE_CHANNEL; GKE_CHANNEL="$(get_gke_release_channel)"
     case "${GKE_CHANNEL}" in
       regular)
-        echo rapid
         echo regular
         ;;
       rapid)
@@ -715,7 +713,6 @@ get_cr_channels() {
         echo stable
         ;;
       *)
-        echo rapid
         echo regular
         ;;
     esac
