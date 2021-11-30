@@ -125,14 +125,14 @@ OPTIONS:
                                       between Multicloud/GKE channel and the ASM Channel is
                                       as following:
                                       For Multicloud:
-                                        ASM provisions Regular, Rapid channels.
+                                        ASM provisions Regular channel.
                                       For GKE:
                                         GKE Channel  |  ASM Channel
                                         -------------|----------------
                                         Rapid        |  Rapid
-                                        Regular      |  Regular, Rapid
+                                        Regular      |  Regular
                                         Stable       |  Stable
-                                        Static       |  Regular, Rapid
+                                        Static       |  Regular
 
   The following four options must be passed together and are only necessary
   for using a custom certificate for Citadel. Users that aren't sure whether
