@@ -11,6 +11,7 @@ configure_package() {
   local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
   local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
   local USE_VPCSC; USE_VPCSC="$(context_get-option "USE_VPCSC")"
+  local ASMCLI_VERSION; ASMCLI_VERSION="$(version_message)"
 
   info "Configuring kpt package..."
 
@@ -70,6 +71,8 @@ configure_package() {
   if [[ "${USE_VPCSC}" -eq 1 ]]; then
     kpt cfg set asm anthos.servicemesh.managed-controlplane.vpcsc.enabled "true"
   fi
+
+  kpt cfg set asm anthos.servicemesh.created-by "asmcli-${ASMCLI_VERSION//+/.}"
 
   configure_ca
   configure_control_plane
