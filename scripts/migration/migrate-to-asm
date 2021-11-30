@@ -527,6 +527,10 @@ EOF
   unset TOKEN
 }
 
+kpt() {
+  "${AKPT}" "${@}"
+}
+
 needs_kpt() {
   if [[ -x "./kpt" ]]; then
     AKPT="./kpt"
