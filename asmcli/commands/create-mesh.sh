@@ -164,10 +164,17 @@ install_one_remote_secret() {
 
   context_set-option "KUBECONFIG" "${KCF1}"
   CTX1="$(kubectl config current-context)"
-  SECRET_NAME="${CTX1//_/-}"
-  SECRET_NAME="${SECRET_NAME//\./-}"
-  SECRET_NAME="${SECRET_NAME//@/-}"
+  if [[ "${SECRET_NAME}" =~ ^gke_[^_]+_[^_]+_.+ ]]; then
+    local CTX_PROJECT CTX_LOCATION CTX_CLUSTER
+    IFS="_" read -r _ CTX_PROJECT CTX_LOCATION CTX_CLUSTER <<<"$(context_get-option "CONTEXT")"
+    SECRET_NAME="cn-${CTX_PROJECT}-${CTX_LOCATION}-${CTX_CLUSTER}"
+  else
+    SECRET_NAME="${CTX1//_/-}"
+    SECRET_NAME="${SECRET_NAME//\./-}"
+    SECRET_NAME="${SECRET_NAME//@/-}"
+  fi
   SECRET_NAME="$(generate_secret_name "${SECRET_NAME}")"
+
   context_set-option "KUBECONFIG" "${KCF2}"
   local CTX2; CTX2="$(kubectl config current-context)"
 
