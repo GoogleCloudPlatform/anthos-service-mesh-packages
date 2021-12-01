@@ -131,6 +131,10 @@ parse_args() {
         context_set-option "LEGACY" 1
         shift 1
         ;;
+      --use_vpcsc | --use-vpcsc)
+        context_set-option "USE_VPCSC" 1
+        shift 1
+        ;;
       --disable_canonical_service | --disable-canonical-service)
         context_set-option "DISABLE_CANONICAL_SERVICE" 1
         shift 1
