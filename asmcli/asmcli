@@ -1195,6 +1195,9 @@ FLAGS:
      --use_vpcsc                      Provision a remote, managed control plane in
                                       VPCSC environment. Not supported for --legacy
                                       installation method.
+     --use_managed_cni                Provision a remote, managed control plane with
+                                      managed CNI. Not supported for --legacy installation
+                                      method.
 
      --print_config                   Instead of installing ASM, print all of
                                       the compiled YAML to stdout. All other
@@ -1287,6 +1290,7 @@ FLAGS:
      --managed
      --legacy
      --use_vpcsc
+     --use_managed_cni
 
      --print_config
      --disable_canonical_service
@@ -3375,6 +3379,10 @@ parse_args() {
         ;;
       --use_vpcsc | --use-vpcsc)
         context_set-option "USE_VPCSC" 1
+        shift 1
+        ;;
+      --use_managed_cni | --use-managed-cni)
+        context_set-option "USE_MANAGED_CNI" 1
         shift 1
         ;;
       --disable_canonical_service | --disable-canonical-service)
