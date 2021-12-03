@@ -117,7 +117,11 @@ EOF
   G_DATA="$(gcloud container hub memberships list --project "${FLEET_ID}" --format=json)"
   LIST="$(echo "${G_DATA}" | grep "${WANT}")"
 
-  if [[ "${IDENTITY_PROVIDER}" != "${FLEET_ID}" ]] || \
+  local FLEET_HOST_PROJECT_NUMBER
+  FLEET_HOST_PROJECT_NUMBER="$(gcloud projects describe "${FLEET_ID}" --format "value(projectNumber)")"
+
+  if [[ "${IDENTITY_PROVIDER}" != "${FLEET_ID}" ]] && \
+     [[ "${IDENTITY_PROVIDER}" != "${FLEET_HOST_PROJECT_NUMBER}" ]] || \
      [[ -z "${LIST}" ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Cluster is registered in the project ${IDENTITY_PROVIDER}, but the required Fleet project is ${FLEET_ID}.
