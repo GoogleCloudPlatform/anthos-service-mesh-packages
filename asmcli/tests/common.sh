@@ -1,5 +1,5 @@
-LT_CLUSTER_NAME="${_LT_CLUSTER_NAME:=long-term-test-cluster}"
-LT_ENVIRON_CLUSTER_NAME="long-term-test-cluster-environ"
+LT_CLUSTER_NAME="${_LT_CLUSTER_NAME:=new-long-term-test-cluster}"
+LT_ENVIRON_CLUSTER_NAME="new-long-term-test-cluster-environ"
 LT_CLUSTER_LOCATION="us-central1-c"
 LT_PROJECT_ID="asm-scriptaro-oss"
 LT_NAMESPACE=""
