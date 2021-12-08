@@ -26,6 +26,7 @@ trap 'gsutil retention "${HOLD_TYPE}" release gs://"${STABLE_VERSION_FILE_PATH}"
 prod_releases() {
   cat << EOF
 release 1.11
+release 1.12
 EOF
 }
 
