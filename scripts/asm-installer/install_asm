@@ -2439,7 +2439,7 @@ bind_user_to_cluster_admin(){
     clusterrolebinding "${PREFIX}-cluster-admin-binding" \
     --clusterrole=cluster-admin \
     --user="${GCLOUD_USER}" \
-    --dry-run -o yaml)"
+    --dry-run=client -o yaml)"
   retry 3 kubectl apply -f - <<EOF
 ${YAML}
 EOF
