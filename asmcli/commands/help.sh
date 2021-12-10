@@ -307,6 +307,14 @@ This command will fail if any of the specified clusters are registered to a flee
 specified by FLEET_ID.
 
 FLAGS:
+  All flags must come AFTER the FLEET_ID.
+  -D|--output_dir        <DIR PATH>   The directory where this script will place
+                                      downloaded ASM packages and configuration.
+                                      If not specified, a temporary directory
+                                      will be created. If specified and the
+                                      directory already contains the necessary
+                                      files, they will be used instead of
+                                      downloading them again.
   The following several flags are used to display help texts and the version message.
   -v|--verbose                        Print commands before and after execution.
   -h|--help                           Show this message and exit.
@@ -335,6 +343,7 @@ Create a multi-cluster service mesh and allow cross-cluster service discovery.
 Use -h|--help with -v|--verbose to show detailed descriptions.
 
 FLAGS:
+  -D|--output_dir <DIR PATH>
   -v|--verbose
   -h|--help
   --version
