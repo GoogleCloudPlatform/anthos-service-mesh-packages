@@ -155,12 +155,34 @@ create-mesh_parse_args() {
     exit 2
   fi
 
+  case "${1}" in
+    -v | --verbose)
+      case "${2}" in
+        -h | --help) create-mesh_usage; exit;;
+      esac
+      ;;
+    -h | --help)
+      case "${2}" in
+        -v | --verbose) create-mesh_usage; exit;;
+      esac
+      ;;
+  esac
+
   local FLEET_ID; FLEET_ID="${1}"
+  if [[ "${FLEET_ID}" = -* ]]; then
+    fatal "First argument must be the fleet ID."
+  fi
+
   context_set-option "FLEET_ID" "${FLEET_ID}"
   shift 1
 
   while [[ $# != 0 ]]; do
     case "${1}" in
+      -D | --output_dir | --output-dir)
+        arg_required "${@}"
+        context_set-option "OUTPUT_DIR" "${2}"
+        shift 2
+        ;;
       -v | --verbose)
         context_set-option "VERBOSE" 1
         shift 1
@@ -1319,6 +1341,14 @@ This command will fail if any of the specified clusters are registered to a flee
 specified by FLEET_ID.
 
 FLAGS:
+  All flags must come AFTER the FLEET_ID.
+  -D|--output_dir        <DIR PATH>   The directory where this script will place
+                                      downloaded ASM packages and configuration.
+                                      If not specified, a temporary directory
+                                      will be created. If specified and the
+                                      directory already contains the necessary
+                                      files, they will be used instead of
+                                      downloading them again.
   The following several flags are used to display help texts and the version message.
   -v|--verbose                        Print commands before and after execution.
   -h|--help                           Show this message and exit.
@@ -1347,6 +1377,7 @@ Create a multi-cluster service mesh and allow cross-cluster service discovery.
 Use -h|--help with -v|--verbose to show detailed descriptions.
 
 FLAGS:
+  -D|--output_dir <DIR PATH>
   -v|--verbose
   -h|--help
   --version

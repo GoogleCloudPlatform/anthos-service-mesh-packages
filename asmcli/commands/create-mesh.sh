@@ -20,12 +20,34 @@ create-mesh_parse_args() {
     exit 2
   fi
 
+  case "${1}" in
+    -v | --verbose)
+      case "${2}" in
+        -h | --help) create-mesh_usage; exit;;
+      esac
+      ;;
+    -h | --help)
+      case "${2}" in
+        -v | --verbose) create-mesh_usage; exit;;
+      esac
+      ;;
+  esac
+
   local FLEET_ID; FLEET_ID="${1}"
+  if [[ "${FLEET_ID}" = -* ]]; then
+    fatal "First argument must be the fleet ID."
+  fi
+
   context_set-option "FLEET_ID" "${FLEET_ID}"
   shift 1
 
   while [[ $# != 0 ]]; do
     case "${1}" in
+      -D | --output_dir | --output-dir)
+        arg_required "${@}"
+        context_set-option "OUTPUT_DIR" "${2}"
+        shift 2
+        ;;
       -v | --verbose)
         context_set-option "VERBOSE" 1
         shift 1
