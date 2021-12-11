@@ -20,12 +20,34 @@ create-mesh_parse_args() {
     exit 2
   fi
 
+  case "${1}" in
+    -v | --verbose)
+      case "${2}" in
+        -h | --help) create-mesh_usage; exit;;
+      esac
+      ;;
+    -h | --help)
+      case "${2}" in
+        -v | --verbose) create-mesh_usage; exit;;
+      esac
+      ;;
+  esac
+
   local FLEET_ID; FLEET_ID="${1}"
+  if [[ "${FLEET_ID}" = -* ]]; then
+    fatal "First argument must be the fleet ID."
+  fi
+
   context_set-option "FLEET_ID" "${FLEET_ID}"
   shift 1
 
   while [[ $# != 0 ]]; do
     case "${1}" in
+      -D | --output_dir | --output-dir)
+        arg_required "${@}"
+        context_set-option "OUTPUT_DIR" "${2}"
+        shift 2
+        ;;
       -v | --verbose)
         context_set-option "VERBOSE" 1
         shift 1
@@ -164,10 +186,17 @@ install_one_remote_secret() {
 
   context_set-option "KUBECONFIG" "${KCF1}"
   CTX1="$(kubectl config current-context)"
+
   SECRET_NAME="${CTX1//_/-}"
   SECRET_NAME="${SECRET_NAME//\./-}"
   SECRET_NAME="${SECRET_NAME//@/-}"
+  if [[ "${SECRET_NAME}" =~ ^gke_[^_]+_[^_]+_.+ ]]; then
+    local CTX_PROJECT CTX_LOCATION CTX_CLUSTER
+    IFS="_" read -r _ CTX_PROJECT CTX_LOCATION CTX_CLUSTER <<<"$(context_get-option "CONTEXT")"
+    SECRET_NAME="cn-${CTX_PROJECT}-${CTX_LOCATION}-${CTX_CLUSTER}"
+  fi
   SECRET_NAME="$(generate_secret_name "${SECRET_NAME}")"
+
   context_set-option "KUBECONFIG" "${KCF2}"
   local CTX2; CTX2="$(kubectl config current-context)"
 
