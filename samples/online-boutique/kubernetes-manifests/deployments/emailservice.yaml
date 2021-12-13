@@ -35,7 +35,7 @@ spec:
       serviceAccountName: email
       containers:
       - name: server
-        image: gcr.io/google-samples/microservices-demo/emailservice:v0.2.2
+        image: gcr.io/google-samples/microservices-demo/emailservice:v0.3.3
         ports:
         - containerPort: 8080
         env:
