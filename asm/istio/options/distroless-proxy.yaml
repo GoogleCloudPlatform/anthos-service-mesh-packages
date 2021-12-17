@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-# [START docs]
 ---
 apiVersion: install.istio.io/v1alpha1
 kind: IstioOperator
@@ -21,4 +19,3 @@ spec:
     defaultConfig:
       image:
         imageType: distroless
-# [END docs]
