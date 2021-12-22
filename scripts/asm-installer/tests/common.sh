@@ -222,7 +222,7 @@ EOF
 
 get_demo_yaml() {
  curl -L "https://raw.githubusercontent.com/GoogleCloudPlatform/\
-microservices-demo/v0.2.0/release/${1}-manifests.yaml"
+microservices-demo/v0.3.4/release/${1}-manifests.yaml"
 }
 
 verify_demo_app() {
