@@ -14,9 +14,34 @@ openAPI:
       x-k8s-cli:
         setter:
           name: gcloud.compute.network
-          value: "NETWORK_ID"
+          value: default
+    io.k8s.cli.setters.gcloud.compute.subnetwork:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: gcloud.compute.subnetwork
+          value: default
+    io.k8s.cli.setters.gcloud.container.cluster.clusterSecondaryRange:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: gcloud.container.cluster.clusterSecondaryRange
+          value: ""
+    io.k8s.cli.setters.gcloud.container.cluster.servicesSecondaryRange:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: gcloud.container.cluster.servicesSecondaryRange
+          value: ""
+    io.k8s.cli.setters.gcloud.container.cluster.releaseChannel:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: gcloud.container.cluster.releaseChannel
+          value: REGULAR
     io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases:
       items:
+        pattern: '[a-z0-9\-].(svc|hub).id.goog'
         type: string
       minItems: 1
       type: array
@@ -44,6 +69,11 @@ openAPI:
         setter:
           name: gcloud.container.cluster
           value: asm-cluster
+    io.k8s.cli.setters.gcloud.container.nodepool.max-nodes:
+      x-k8s-cli:
+        setter:
+          name: gcloud.container.nodepool.max-nodes
+          value: "4"
     io.k8s.cli.setters.gcloud.core.project:
       type: string
       x-k8s-cli:
@@ -62,6 +92,12 @@ openAPI:
         setter:
           name: gcloud.project.environProjectNumber
           value: PROJECT_NUMBER
+    io.k8s.cli.setters.gcloud.project.environProjectID:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: gcloud.project.environProjectID
+          value: ENVIRON_PROJECT_ID
     io.k8s.cli.setters.gcloud.compute.location:
       x-k8s-cli:
         setter:
@@ -77,23 +113,6 @@ openAPI:
         setter:
           name: anthos.servicemesh.tag
           value: 1.12.0-asm.4
-          isSet: true
-    io.k8s.cli.substitutions.gke-mcp-image:
-      x-k8s-cli:
-        substitution:
-          name: gke-mcp-image
-          pattern: "IMAGE_HUB/cloudrun:IMAGE_TAG"
-          values:
-          - marker: IMAGE_HUB
-            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub'
-          - marker: IMAGE_TAG
-            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag'
-    io.k8s.cli.setters.anthos.servicemesh.managed-controlplane.vpcsc.enabled:
-      type: string
-      x-k8s-cli:
-        setter:
-          name: anthos.servicemesh.managed-controlplane.vpcsc.enabled
-          value: "false"
           isSet: true
     io.k8s.cli.setters.anthos.servicemesh.rev:
       x-k8s-cli:
@@ -125,30 +144,12 @@ openAPI:
           name: anthos.servicemesh.canonicalServiceHub
           value: gcr.io/gke-release/asm/canonical-service-controller:1.7.3-asm.6
           isSet: true
-    io.k8s.cli.setters.anthos.servicemesh.idp-url:
+    io.k8s.cli.setters.anthos.servicemesh.hubMembershipID:
       type: string
       x-k8s-cli:
         setter:
-          name: anthos.servicemesh.idp-url
-          value: IDP_URL
-    io.k8s.cli.setters.anthos.servicemesh.trustDomain:
-      type: string
-      x-k8s-cli:
-        setter:
-          name: anthos.servicemesh.trustDomain
-          value: TRUST_DOMAIN
-    io.k8s.cli.setters.anthos.servicemesh.tokenAudiences:
-      type: string
-      x-k8s-cli:
-        setter:
-          name: anthos.servicemesh.tokenAudiences
-          value: TOKEN_AUDIENCES
-    io.k8s.cli.setters.anthos.servicemesh.spiffeBundleEndpoints:
-      type: string
-      x-k8s-cli:
-        setter:
-          name: anthos.servicemesh.spiffeBundleEndpoints
-          value: SPIFFE_BUNDLE_ENDPOINTS
+          name: anthos.servicemesh.hubMembershipID
+          value: MEMBERSHIP_ID
     io.k8s.cli.setters.anthos.servicemesh.controlplane.validation-url:
       type: string
       x-k8s-cli:
@@ -161,6 +162,15 @@ openAPI:
         setter:
           name: anthos.servicemesh.managed-controlplane.cloudrun-addr
           value: CLOUDRUN_ADDR
+    io.k8s.cli.substitutions.network:
+      type: string
+      x-k8s-cli:
+        substitution:
+          name: network
+          pattern: "NETWORK_ID"
+          values:
+          - marker: NETWORK_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.network'
     io.k8s.cli.substitutions.mesh-id:
       type: string
       x-k8s-cli:
@@ -170,6 +180,15 @@ openAPI:
           values:
           - marker: PROJECT_NUMBER
             ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectNumber'
+    io.k8s.cli.substitutions.network-id:
+      type: string
+      x-k8s-cli:
+        substitution:
+          name: network-id
+          pattern: "NETWORK_ID"
+          values:
+          - marker: NETWORK_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.network'
     io.k8s.cli.substitutions.gke-metadata:
       type: string
       x-k8s-cli:
@@ -185,28 +204,21 @@ openAPI:
             ref: '#/definitions/io.k8s.cli.setters.gcloud.container.cluster'
           - marker: us-central1-c
             ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.location'
-    io.k8s.cli.substitutions.gke-cni-image:
+    io.k8s.cli.substitutions.gke-hub-metadata:
       type: string
       x-k8s-cli:
         substitution:
-          name: gke-cni-image
-          pattern: "IMAGE_HUB/install-cni:IMAGE_TAG"
+          name: gke-hub-metadata
+          pattern: "PROJECT_ID|PROJECT_NUMBER|asm-cluster|us-central1-c"
           values:
-          - marker: IMAGE_HUB
-            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub'
-          - marker: IMAGE_TAG
-            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag'
-    io.k8s.cli.substitutions.gke-mdp-image:
-      type: string
-      x-k8s-cli:
-        substitution:
-          name: gke-mdp-image
-          pattern: "IMAGE_HUB/mdp:IMAGE_TAG"
-          values:
-          - marker: IMAGE_HUB
-            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub'
-          - marker: IMAGE_TAG
-            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag'
+          - marker: PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+          - marker: PROJECT_NUMBER
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectNumber'
+          - marker: asm-cluster
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.container.cluster'
+          - marker: us-central1-c
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.compute.location'
     io.k8s.cli.substitutions.trust-domain:
       type: string
       x-k8s-cli:
@@ -221,10 +233,19 @@ openAPI:
       x-k8s-cli:
         substitution:
           name: token-audiences
-          pattern: "TOKEN_AUDIENCES"
+          pattern: "istio-ca,PROJECT_ID.svc.id.goog"
           values:
-          - marker: TOKEN_AUDIENCES
-            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.tokenAudiences'
+          - marker: PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
+    io.k8s.cli.substitutions.token-audiences-hub:
+      type: string
+      x-k8s-cli:
+        substitution:
+          name: token-audiences-hub
+          pattern: "istio-ca,ENVIRON_PROJECT_ID.hub.id.goog"
+          values:
+          - marker: ENVIRON_PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectID'
     io.k8s.cli.substitutions.gke-cluster-url:
       type: string
       x-k8s-cli:
@@ -264,10 +285,10 @@ openAPI:
       x-k8s-cli:
         substitution:
           name: spiffe-bundle-endpoints
-          pattern: SPIFFE_BUNDLE_ENDPOINTS
+          pattern: PROJECT_ID.svc.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json
           values:
-          - marker: SPIFFE_BUNDLE_ENDPOINTS
-            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.spiffeBundleEndpoints'
+          - marker: PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.core.project'
     io.k8s.cli.substitutions.gkeio-cluster:
       x-k8s-cli:
         substitution:
@@ -286,6 +307,34 @@ openAPI:
         setter:
           name: anthos.servicemesh.controlplane.monitoring.enabled
           value: "true"
+    io.k8s.cli.substitutions.spiffe-bundle-endpoints-hub:
+      x-k8s-cli:
+        substitution:
+          name: spiffe-bundle-endpoints-hub
+          pattern: ENVIRON_PROJECT_ID.hub.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json
+          values:
+          - marker: ENVIRON_PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectID'
+    io.k8s.cli.substitutions.hub-idp-url:
+      type: string
+      x-k8s-cli:
+        substitution:
+          name: hub-idp-url
+          pattern: "https://gkehub.googleapis.com/projects/ENVIRON_PROJECT_ID/locations/global/memberships/MEMBERSHIP_ID"
+          values:
+          - marker: ENVIRON_PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectID'
+          - marker: MEMBERSHIP_ID
+            ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.hubMembershipID'
+    io.k8s.cli.substitutions.trust-domain-hub:
+      type: string
+      x-k8s-cli:
+        substitution:
+          name: trust-domain-hub
+          pattern: "ENVIRON_PROJECT_ID.hub.id.goog"
+          values:
+          - marker: ENVIRON_PROJECT_ID
+            ref: '#/definitions/io.k8s.cli.setters.gcloud.project.environProjectID'
     io.k8s.cli.setters.anthos.servicemesh.external_ca.ca_name:
       x-k8s-cli:
         setter:
@@ -324,15 +373,3 @@ openAPI:
             ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.rev'
           - marker: INGRESSGATEWAY_NAME
             ref: '#/definitions/io.k8s.cli.setters.anthos.servicemesh.custom-ingressgateway-name'
-    io.k8s.cli.setters.anthos.servicemesh.use-managed-cni:
-      type: string
-      x-k8s-cli:
-        setter:
-          name: anthos.servicemesh.use-managed-cni
-          value: "false"
-    io.k8s.cli.setters.anthos.servicemesh.created-by:
-      type: string
-      x-k8s-cli:
-        setter:
-          name: anthos.servicemesh.created-by
-          value: ""
