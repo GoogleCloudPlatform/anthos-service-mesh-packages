@@ -11,68 +11,100 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+#
+---
 apiVersion: install.istio.io/v1alpha1
 kind: IstioOperator
 spec:
-  profile: asm-gcp
+  profile: empty
   hub: gcr.io/gke-release/asm # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}
-  tag: 1.9.0-asm.3 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
-  components:
-    base:
-      enabled: true
-    egressGateways:
-    - enabled: false
-      name: istio-egressgateway
-      k8s:
-        hpaSpec:
-          maxReplicas: 5
-          minReplicas: 2
-    ingressGateways:
-    - enabled: true
-      name: istio-ingressgateway
-      k8s:
-        hpaSpec:
-          maxReplicas: 5
-          minReplicas: 2   
-    pilot:
-      k8s:
-        env:
-        - name: SPIFFE_BUNDLE_ENDPOINTS
-          value: "PROJECT_ID.svc.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json" # {"$ref":"#/definitions/io.k8s.cli.substitutions.spiffe-bundle-endpoints"}
-        - name: ENABLE_STACKDRIVER_MONITORING
-          value: "true" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.controlplane.monitoring.enabled"}
-        - name: TOKEN_AUDIENCES
-          value: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.token-audiences"}
-        - name: PILOT_ENABLE_WORKLOAD_ENTRY_AUTOREGISTRATION
-          value: "true"
-        - name: PILOT_ENABLE_CROSS_CLUSTER_WORKLOAD_ENTRY
-          value: "true"  
-        resources:
-          requests:
-            cpu: 50m
-            memory: 150Mi
+  tag: 1.12.0-asm.4 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
   meshConfig:
     trustDomainAliases: # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases"}
-      - PROJECT_ID.svc.id.goog # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
-    trustDomain: PROJECT_ID.svc.id.goog # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
+      - PROJECT_ID.svc.id.goog # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.trustDomain"}
+    trustDomain: PROJECT_ID.svc.id.goog # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.trustDomain"}
     defaultConfig:
       proxyMetadata:
-        GKE_CLUSTER_URL: "https://container.googleapis.com/v1/projects/PROJECT_ID/locations/us-central1-c/clusters/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-cluster-url"}
+        GKE_CLUSTER_URL: "" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.idp-url"}
         GCP_METADATA: "PROJECT_ID|PROJECT_NUMBER|asm-cluster|us-central1-c" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-metadata"}
         CA_PROVIDER: "GoogleCA"
         PLUGINS: "GoogleTokenExchange"
         USE_TOKEN_FOR_CSR: "true"
         GCE_METADATA_HOST: "metadata.google.internal"
-    # Protocol detection timeout is not supported
-    protocolDetectionTimeout: 0s
     # Locality load balancing is not supported
     localityLbSetting:
       enabled: false
+  components:
+    base:
+      enabled: true
+    egressGateways:
+      - enabled: false
+        name: istio-egressgateway
+        k8s:
+          hpaSpec:
+            maxReplicas: 5
+            minReplicas: 2
+    ingressGateways:
+      - enabled: true
+        name: istio-ingressgateway
+        k8s:
+          hpaSpec:
+            maxReplicas: 5
+            minReplicas: 2
+    # The default profile is tuned to fit on smaller clusters.
+    # Increase cpu req to ensure we can handle larger scale clusters.
+    pilot:
+      enabled: true
+      k8s:
+        resources:
+          requests:
+            cpu: 50m
+        env:
+          - name: GKE_CLUSTER_URL
+            value: "" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.idp-url"}
+          - name: GCP_METADATA
+            value: "PROJECT_ID|PROJECT_NUMBER|asm-cluster|us-central1-c" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-metadata"}
+          - name: SPIFFE_BUNDLE_ENDPOINTS
+            value: "" # {"$ref":"#/definitions/io.k8s.cli.substitutions.spiffe-bundle-endpoints"}
+          - name: ENABLE_STACKDRIVER_MONITORING
+            value: "true" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.controlplane.monitoring.enabled"}
+          - name: TOKEN_AUDIENCES
+            value: "TOKEN_AUDIENCES" # {"$ref":"#/definitions/io.k8s.cli.substitutions.token-audiences"}
+          - name: PILOT_ENABLE_CROSS_CLUSTER_WORKLOAD_ENTRY
+            value: "true"
   values:
+    # Enable telemetry v2 backend by Stackdriver.
+    # Prometheus is also supported with --set values.telemetry.v2.prometheus.enabled=true --set prometheus.enabled=true
+    telemetry:
+      enabled: true
+      v2:
+        enabled: true
+        prometheus:
+          enabled: false
+        stackdriver:
+          enabled: true
+          inboundAccessLogging: "FULL"
+          outboundAccessLogging: "ERRORS_ONLY"
+          topology: true
+    sidecarInjectorWebhook:
+      rewriteAppHTTPProbe: true
     global:
-      trustDomain: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
-      # Enable SDS
+      caAddress: "meshca.googleapis.com:443"
+      pilotCertProvider: kubernetes
+      sts:
+        servicePort: 15463
       sds:
         token:
-          aud: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.substitutions.trust-domain"}
+          aud: "PROJECT_ID.svc.id.goog" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.trustDomain"}
+      multiCluster:
+        # Provided to ensure a human readable name rather than a UUID.
+        clusterName: "cn-PROJECTID-us-central1-c-asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.cluster-name"}
+      meshID: "proj-PROJECT_NUMBER" # {"$ref":"#/definitions/io.k8s.cli.substitutions.mesh-id"}
+      network: "NETWORK_ID" # {"$ref":"#/definitions/io.k8s.cli.setters.gcloud.compute.network"}
+    gateways:
+      istio-ingressgateway:
+        # Enable gateway injection
+        injectionTemplate: gateway
+      istio-egressgateway:
+        # Enable gateway injection
+        injectionTemplate: gateway
