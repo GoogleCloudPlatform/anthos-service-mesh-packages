@@ -242,7 +242,7 @@ is_service_mesh_feature_enabled() {
   local RESPONSE
   RESPONSE="$(run_command gcloud beta container hub mesh describe --project="${FLEET_ID}")"
 
-  if [[ "$(echo "${RESPONSE}" | jq -r '.featureState.lifecycleState')" != "ENABLED" ]]; then
+  if [[ "$(echo "${RESPONSE}" | jq -r '.featureState.lifecycleState' 2>/dev/null)" != "ENABLED" ]]; then
     false
   fi
 }
