@@ -5,7 +5,7 @@ metadata:
   name: asm-managed-rapid
   namespace: istio-system
   labels:
-    mesh.cloud.google.com/managed-cni-enabled: "false" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.use-managed-cni"}
+    mesh.cloud.google.com/managed-cni-enabled: "" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.use-managed-cni"}
     app.kubernetes.io/created-by: "" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.created-by"}
   annotations:
     mesh.cloud.google.com/image: "" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-mcp-image"}
