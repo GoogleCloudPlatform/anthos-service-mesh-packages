@@ -1105,11 +1105,12 @@ validate_istio_version() {
   fi
   local FOUND_INVALID_VERSION; FOUND_INVALID_VERSION=0
   for version in $(echo "${VERSION_OUTPUT}" | jq -r '.meshVersion[].Info.version' -r); do
-    if [[ "$version" =~ ^1.7 || "$version" =~ ^1.8 || "$version" =~ ^1.9 || "$version" =~ ^1.10 ]]; then
-      info "  $version"
-    else
+    if [[ "$version" =~ ^1.6 || "$version" =~ ^1.5 || "$version" =~ ^1.4 || "$version" =~ ^1.3 || \
+      "$version" =~ ^1.2 ]]; then
       info "  $version (not supported)"
       FOUND_INVALID_VERSION=1
+    else
+      info "  $version"
     fi
   done
   if [[ "$FOUND_INVALID_VERSION" -eq 1 ]]; then
