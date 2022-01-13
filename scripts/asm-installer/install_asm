@@ -324,16 +324,14 @@ init() {
   if [[ "${POINT}" == "alpha" ]]; then
     RELEASE="${MAJOR}.${MINOR}-alpha.${REV}"
     REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}"
-    KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=master}"
   elif [[ "$(version_message)" =~ ^[0-9]+\.[0-9]+\.[0-9]+-asm\.[0-9]+\+config[0-9]+$ ]]; then
     RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
     REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}-${REV}"
-    KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=$(version_message)}"
   else
     RELEASE="${MAJOR}.${MINOR}.${POINT}-asm.${REV}"
     REVISION_LABEL="${_CI_REVISION_PREFIX}asm-${MAJOR}${MINOR}${POINT}-${REV}"
-    KPT_BRANCH="${_CI_ASM_KPT_BRANCH:=release-${MAJOR}.${MINOR}-asm}"
   fi
+  KPT_BRANCH="legacy-staging-1.11"
   RELEASE_LINE="${MAJOR}.${MINOR}."
   PREVIOUS_RELEASE_LINE="${MAJOR}.$(( MINOR - 1 ))."
   readonly RELEASE; readonly RELEASE_LINE; readonly PREVIOUS_RELEASE_LINE; readonly KPT_BRANCH;
@@ -2549,6 +2547,7 @@ configure_package() {
   kpt cfg set asm gcloud.compute.network "${GCE_NETWORK_NAME}"
   kpt cfg set asm anthos.servicemesh.rev "${REVISION_LABEL}"
   kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
+  kpt cfg set asm anthos.servicemesh.trustDomain "${PROJECT_ID}.svc.id.goog"
   if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then
     kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
   fi
@@ -2559,12 +2558,12 @@ configure_package() {
   if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
     # VM installation uses the latest Hub WIP format
     if [[ "${USE_VM}" -eq 1 ]]; then
-      kpt cfg set asm anthos.servicemesh.hubTrustDomain "${ENVIRON_PROJECT_ID}.svc.id.goog"
-      kpt cfg set asm anthos.servicemesh.hub-idp-url "${HUB_IDP_URL}"
+      kpt cfg set asm anthos.servicemesh.trustDomain "${ENVIRON_PROJECT_ID}.svc.id.goog"
+      kpt cfg set asm anthos.servicemesh.idp-url "${HUB_IDP_URL}"
     # GKE-on-GCP installation uses legacy Hub WIP format to be consistent with GCP Hub public preview feature
     else
-      kpt cfg set asm anthos.servicemesh.hubTrustDomain "${ENVIRON_PROJECT_ID}.hub.id.goog"
-      kpt cfg set asm anthos.servicemesh.hub-idp-url "https://gkehub.googleapis.com/projects/${ENVIRON_PROJECT_ID}/locations/global/memberships/${HUB_MEMBERSHIP_ID}"
+      kpt cfg set asm anthos.servicemesh.trustDomain "${ENVIRON_PROJECT_ID}.hub.id.goog"
+      kpt cfg set asm anthos.servicemesh.idp-url "https://gkehub.googleapis.com/projects/${ENVIRON_PROJECT_ID}/locations/global/memberships/${HUB_MEMBERSHIP_ID}"
     fi
   fi
   if [[ -n "${CA_NAME}" && "${CA}" = "gcp_cas" ]]; then
