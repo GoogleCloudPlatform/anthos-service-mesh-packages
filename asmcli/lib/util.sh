@@ -252,6 +252,10 @@ download_kpt_package() {
   retry 3 kpt pkg get --auto-set=false "${KPT_URL}" asm
   retry 3 kpt pkg get --auto-set=false "${SAMPLES_URL}" samples
 
+  touch "${ASM_SETTINGS_FILE}"
+}
+
+set_kpt_configured() {
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
   local CA; CA="$(context_get-option "CA")"
 
@@ -260,6 +264,12 @@ download_kpt_package() {
 
 should_download_kpt_package() {
   if [[ ! -f "${ASM_SETTINGS_FILE}" ]]; then return; fi
+  if [[ ! -s "${ASM_SETTINGS_FILE}" ]]; then
+    # Empty ASM settings file means kpt packages already exist but haven't been configured yet.
+    # No need to re-download in this case
+    false
+    return
+  fi
 
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
   local CA; CA="$(context_get-option "CA")"
@@ -302,12 +312,23 @@ prepare_environment() {
     fi
   fi
 
-  if needs_asm && needs_kpt; then
-    download_kpt
-  fi
-  readonly AKPT
-
   if needs_asm; then
+    # Offline mode should not trigger any download
+    if is_offline; then
+      if needs_kpt || ! necessary_files_exist || should_download_kpt_package; then
+        { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Critical components not found in the offline mode. Note that if the installation configuration has changed,
+kpt packages would have to be re-downloaded. Please run "asmcli build-offline-package"
+and pass the directory containing the required files to install ASM successfully offline.
+EOF
+      fi
+    fi
+
+    if needs_kpt; then
+      download_kpt
+    fi
+    readonly AKPT
+
     if ! necessary_files_exist; then
       download_asm
     fi
@@ -524,6 +545,9 @@ set_up_local_workspace() {
   else
     OUTPUT_DIR="$(apath -f "${OUTPUT_DIR}")"
     if [[ ! -a "${OUTPUT_DIR}" ]]; then
+      if is_offline; then
+        fatal "${OUTPUT_DIR} must exist for offline installation."
+      fi
       if ! mkdir -p "${OUTPUT_DIR}"; then
         fatal "Failed to create directory ${OUTPUT_DIR}"
       fi

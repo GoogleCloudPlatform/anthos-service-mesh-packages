@@ -216,6 +216,10 @@ parse_args() {
         context_set-option "CHANNEL" "${2}"
         shift 2
         ;;
+      --offline)
+        context_set-option "OFFLINE" 1
+        shift 1
+        ;;
       -v | --verbose)
         context_set-option "VERBOSE" 1
         shift 1
