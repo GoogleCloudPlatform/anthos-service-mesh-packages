@@ -89,6 +89,7 @@ KPT_BRANCH=""
 RAW_YAML=""
 EXPANDED_YAML=""
 NAMESPACE_EXISTS=0
+IS_AUTOPILOT=0
 
 main() {
   if [[ "${*}" = '' ]]; then
@@ -2641,6 +2642,19 @@ istio_namespace_exists() {
     NAMESPACE_EXISTS=1; readonly NAMESPACE_EXISTS
   fi
 }
+
+is_autopilot() {
+  # TODO: wait till https://pkg.go.dev/google.golang.org/genproto/googleapis/container/v1#Cluster  
+  # publish the `Autopilot` field
+  # This is a temporary workaround to check if a cluster is Autopilot or GKE
+  # This CRD will be installed only if the cluster is Autopilot
+  if [[ "${IS_AUTOPILOT}" -eq 1 ]]; then return; fi
+  if ! retry 2 kubectl get crd allowlistedworkloads.auto.gke.io 1>/dev/null 2>/dev/null; then
+    false
+  else
+    IS_AUTOPILOT=1; readonly IS_AUTOPILOT
+  fi
+}
 configure_package() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
@@ -4674,6 +4688,30 @@ machine type is at least ${MACHINE_CPU_REQ} vCPUs.
 ${CLUSTER_LOCATION}/${CLUSTER_NAME} does not meet this requirement. ASM
 may not function as expected.
 
+EOF
+  fi
+}
+
+validate_node_pool_workload_identity(){
+  # Autopilot clusters do not allow accessing/mutating the node pools
+  # so we skip in such cases.
+  if is_autopilot; then
+    return
+  fi
+  local METADATA_CONFIG_MODE MACHINE_CPU_REQ
+  # No CPU requirement for Managed ASM
+  MACHINE_CPU_REQ=0
+  METADATA_CONFIG_MODE="$(list_valid_pools "${MACHINE_CPU_REQ}" | \
+      jq -r '.[] |
+        .config.workloadMetadataConfig.mode
+      ' 2>/dev/null)" || true
+  if [[ "${METADATA_CONFIG_MODE}" != "GKE_METADATA" ]]; then
+    { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
+Node pool Workload Identity is not enabled which is a pre-requisite for Managed ASM.
+Please follow:
+  https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity#migrate_applications_to 
+to migrate or update to a Workload Identity Enabled Node pool. 
+If installation continues, Managed ASM components such as CNI will not work properly.
 EOF
   fi
 }
