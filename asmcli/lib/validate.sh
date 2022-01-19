@@ -165,6 +165,11 @@ EOF
 }
 
 validate_node_pool_workload_identity(){
+  # Autopilot clusters do not allow accessing/mutating the node pools
+  # so we skip in such cases.
+  if is_autopilot; then
+    return
+  fi
   local METADATA_CONFIG_MODE MACHINE_CPU_REQ
   # No CPU requirement for Managed ASM
   MACHINE_CPU_REQ=0
