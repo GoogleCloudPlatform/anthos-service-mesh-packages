@@ -553,6 +553,7 @@ validate_args() {
   local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
   local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
+  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
 
   if is_legacy && ! is_managed; then
       fatal "The --legacy option is only supported with managed control plane."
@@ -685,6 +686,11 @@ EOF
     validate_private_ca
   elif [[ "${CUSTOM_CA}" -eq 1 ]]; then
     validate_custom_ca
+  fi
+
+  if is_offline && [[ -z "${OUTPUT_DIR}" ]]; then
+      MISSING_ARGS=1
+      warn "Output directory must be specified in offline mode."
   fi
 
   if [[ "${MISSING_ARGS}" -ne 0 ]]; then

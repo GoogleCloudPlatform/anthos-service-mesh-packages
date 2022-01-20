@@ -47,6 +47,12 @@ is_gcp() {
   fi
 }
 
+is_offline() {
+  local OFFLINE; OFFLINE="$(context_get-option "OFFLINE")"
+
+  if [[ "${OFFLINE}" -ne 1 ]]; then false; fi
+}
+
 using_connect_gateway() {
   local KVC; KVC="$(context_get-option "KC_VIA_CONNECT")"
   if [[ "${KVC}" -eq 1 ]]; then
