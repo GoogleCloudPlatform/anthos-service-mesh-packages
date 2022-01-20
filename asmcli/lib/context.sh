@@ -61,6 +61,7 @@ context_init() {
     "INSTALL_IDENTITY_PROVIDER": ${INSTALL_IDENTITY_PROVIDER:-0},
     "EXPERIMENTAL": ${EXPERIMENTAL:-0},
     "KC_VIA_CONNECT": ${KC_VIA_CONNECT:-0},
+    "OFFLINE": "${OFFLINE:-0}",
     "CHANNEL": "${CHANNEL:-}"
   },
   "istioctlFiles": [],

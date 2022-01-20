@@ -125,6 +125,10 @@ main() {
       shift 1
       experimental_subcommand "${@}"
       ;;
+    build-offline-package)
+      shift 1
+      build-offline-package_subcommand "${@}"
+      ;;
     *)
       help_subcommand "${@}"
       ;;

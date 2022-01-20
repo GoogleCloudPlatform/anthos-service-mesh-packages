@@ -129,10 +129,100 @@ main() {
       shift 1
       experimental_subcommand "${@}"
       ;;
+    build-offline-package)
+      shift 1
+      build-offline-package_subcommand "${@}"
+      ;;
     *)
       help_subcommand "${@}"
       ;;
   esac
+}
+build-offline-package_subcommand() {
+  build-offline-package_parse_args "$@"
+  build-offline-package
+}
+
+build-offline-package() {
+  set_up_local_workspace
+
+  if needs_kpt; then
+    download_kpt
+  fi
+  readonly AKPT
+
+  if ! necessary_files_exist; then
+    download_asm
+  fi
+
+  # kpt package initial downloads should be the same accross configuration
+  # so no need to call should_download_kpt_package
+  download_kpt_package
+
+  build-offline-package_outro
+}
+
+build-offline-package_parse_args() {
+  while [[ $# != 0 ]]; do
+    case "${1}" in
+      -D | --output_dir | --output-dir)
+        arg_required "${@}"
+        context_set-option "OUTPUT_DIR" "${2}"
+        shift 2
+        ;;
+      -v | --verbose)
+        context_set-option "VERBOSE" 1
+        shift 1
+        ;;
+      -h | --help)
+        context_set-option "PRINT_HELP" 1
+        shift 1
+        ;;
+      --version)
+        context_set-option "PRINT_VERSION" 1
+        shift 1
+        ;;
+    esac
+  done
+
+  local PRINT_HELP; PRINT_HELP="$(context_get-option "PRINT_HELP")"
+  local PRINT_VERSION; PRINT_VERSION="$(context_get-option "PRINT_VERSION")"
+  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
+  if [[ "${PRINT_HELP}" -eq 1 || "${PRINT_VERSION}" -eq 1 ]]; then
+    if [[ "${PRINT_VERSION}" -eq 1 ]]; then
+      version_message
+    elif [[ "${VERBOSE}" -eq 1 ]]; then
+      usage
+    else
+      usage_short
+    fi
+    exit
+  fi
+}
+
+build-offline-package_outro() {
+  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+
+  info ""
+  info "$(starline)"
+  istioctl version
+  info "$(starline)"
+  info "The offline package download is now complete."
+
+  info "The ASM package used for installation can be found at:"
+  info "${OUTPUT_DIR}/asm"
+  info "The version of istioctl that matches the installation can be found at:"
+  info "${OUTPUT_DIR}/${ISTIOCTL_REL_PATH}"
+  info "A symlink to the istioctl binary can be found at:"
+  info "${OUTPUT_DIR}/istioctl"
+  if ! is_managed; then
+    info "The combined configuration generated for installation can be found at:"
+    info "${OUTPUT_DIR}/${RAW_YAML}"
+    info "The full, expanded set of kubernetes resources can be found at:"
+    info "${OUTPUT_DIR}/${EXPANDED_YAML}"
+  fi
+
+  info "$(starline)"
 }
 create-mesh_subcommand() {
   ### Preparation ###
@@ -1093,6 +1183,7 @@ SUBCOMMANDS:
   validate                            Validate will attempt a new ASM validation
   print-config                        Print Config will attempt to print the configurations used
   create-mesh                         Add multiple clusters to the mesh
+  build-offline-package               Download required packages for offline installation
 
 OPTIONS:
   -l|--cluster_location  <LOCATION>   The GCP location of the target cluster.
@@ -1218,6 +1309,10 @@ FLAGS:
      --use_vpcsc                      Provision a remote, managed control plane in
                                       VPCSC environment. Not supported for --legacy
                                       installation method.
+     --offline                        Perform an offline installation using the pre-downloaded
+                                      package in the output directory. If the directory is not
+                                      specified or does not contain the required files, the 
+                                      script will exit with error.
 
      --print_config                   Instead of installing ASM, print all of
                                       the compiled YAML to stdout. All other
@@ -1269,6 +1364,7 @@ SUBCOMMANDS:
   validate
   print-config
   create-mesh
+  build-offline-package
 
 OPTIONS:
   -l|--cluster_location  <LOCATION>
@@ -1310,6 +1406,8 @@ FLAGS:
      --managed
      --legacy
      --use_vpcsc
+
+     --offline
 
      --print_config
      --disable_canonical_service
@@ -1376,6 +1474,44 @@ usage: ${SCRIPT_NAME} create-mesh FLEET_ID (PROJECT_ID/CLUSTER_LOCATION/CLUSTER_
 
 Create a multi-cluster service mesh and allow cross-cluster service discovery.
 Use -h|--help with -v|--verbose to show detailed descriptions.
+
+FLAGS:
+  -D|--output_dir <DIR PATH>
+  -v|--verbose
+  -h|--help
+  --version
+EOF
+}
+
+
+build-offline-package_usage(){
+  cat << EOF
+${SCRIPT_NAME} $(version_message)
+usage: ${SCRIPT_NAME} build-offline-package [FLAGS]...
+
+Download ASM and KPT packages to the specified output directory or a temporary directory.
+
+FLAGS:
+  -D|--output_dir        <DIR PATH>   The directory where this script will place
+                                      downloaded ASM packages and configuration.
+                                      If not specified, a temporary directory
+                                      will be created. If specified and the
+                                      directory already contains the necessary
+                                      files, they will be used instead of
+                                      downloading them again.
+  The following several flags are used to display help texts and the version message.
+  -v|--verbose                        Print commands before and after execution.
+  -h|--help                           Show this message and exit.
+  --version                           Print the version of this tool and exit.
+EOF
+}
+
+build-offline-package_usage_short(){
+  cat << EOF
+${SCRIPT_NAME} $(version_message)
+usage: ${SCRIPT_NAME} build-offline-package [FLAGS]...
+
+Download ASM and KPT packages to the specified output directory or a temporary directory.
 
 FLAGS:
   -D|--output_dir <DIR PATH>
@@ -2238,6 +2374,12 @@ is_gcp() {
   fi
 }
 
+is_offline() {
+  local OFFLINE; OFFLINE="$(context_get-option "OFFLINE")"
+
+  if [[ "${OFFLINE}" -ne 1 ]]; then false; fi
+}
+
 using_connect_gateway() {
   local KVC; KVC="$(context_get-option "KC_VIA_CONNECT")"
   if [[ "${KVC}" -eq 1 ]]; then
@@ -2675,6 +2817,7 @@ configure_package() {
   local ASMCLI_VERSION; ASMCLI_VERSION="$(version_message)"
 
   info "Configuring kpt package..."
+  set_kpt_configured
 
   populate_cluster_values
   local NETWORK_ID; NETWORK_ID="$(context_get-option "NETWORK_ID")"
@@ -2834,6 +2977,7 @@ context_init() {
     "INSTALL_IDENTITY_PROVIDER": ${INSTALL_IDENTITY_PROVIDER:-0},
     "EXPERIMENTAL": ${EXPERIMENTAL:-0},
     "KC_VIA_CONNECT": ${KC_VIA_CONNECT:-0},
+    "OFFLINE": "${OFFLINE:-0}",
     "CHANNEL": "${CHANNEL:-}"
   },
   "istioctlFiles": [],
@@ -3512,6 +3656,10 @@ parse_args() {
         context_set-option "CHANNEL" "${2}"
         shift 2
         ;;
+      --offline)
+        context_set-option "OFFLINE" 1
+        shift 1
+        ;;
       -v | --verbose)
         context_set-option "VERBOSE" 1
         shift 1
@@ -3953,6 +4101,10 @@ download_kpt_package() {
   retry 3 kpt pkg get --auto-set=false "${KPT_URL}" asm
   retry 3 kpt pkg get --auto-set=false "${SAMPLES_URL}" samples
 
+  touch "${ASM_SETTINGS_FILE}"
+}
+
+set_kpt_configured() {
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
   local CA; CA="$(context_get-option "CA")"
 
@@ -3961,6 +4113,12 @@ download_kpt_package() {
 
 should_download_kpt_package() {
   if [[ ! -f "${ASM_SETTINGS_FILE}" ]]; then return; fi
+  if [[ ! -s "${ASM_SETTINGS_FILE}" ]]; then
+    # Empty ASM settings file means kpt packages already exist but haven't been configured yet.
+    # No need to re-download in this case
+    false
+    return
+  fi
 
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
   local CA; CA="$(context_get-option "CA")"
@@ -4003,12 +4161,23 @@ prepare_environment() {
     fi
   fi
 
-  if needs_asm && needs_kpt; then
-    download_kpt
-  fi
-  readonly AKPT
-
   if needs_asm; then
+    # Offline mode should not trigger any download
+    if is_offline; then
+      if needs_kpt || ! necessary_files_exist || should_download_kpt_package; then
+        { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Critical components not found in the offline mode. Note that if the installation configuration has changed,
+kpt packages would have to be re-downloaded. Please run "asmcli build-offline-package"
+and pass the directory containing the required files to install ASM successfully offline.
+EOF
+      fi
+    fi
+
+    if needs_kpt; then
+      download_kpt
+    fi
+    readonly AKPT
+
     if ! necessary_files_exist; then
       download_asm
     fi
@@ -4225,6 +4394,9 @@ set_up_local_workspace() {
   else
     OUTPUT_DIR="$(apath -f "${OUTPUT_DIR}")"
     if [[ ! -a "${OUTPUT_DIR}" ]]; then
+      if is_offline; then
+        fatal "${OUTPUT_DIR} must exist for offline installation."
+      fi
       if ! mkdir -p "${OUTPUT_DIR}"; then
         fatal "Failed to create directory ${OUTPUT_DIR}"
       fi
@@ -5085,6 +5257,7 @@ validate_args() {
   local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
   local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
+  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
 
   if is_legacy && ! is_managed; then
       fatal "The --legacy option is only supported with managed control plane."
@@ -5217,6 +5390,11 @@ EOF
     validate_private_ca
   elif [[ "${CUSTOM_CA}" -eq 1 ]]; then
     validate_custom_ca
+  fi
+
+  if is_offline && [[ -z "${OUTPUT_DIR}" ]]; then
+      MISSING_ARGS=1
+      warn "Output directory must be specified in offline mode."
   fi
 
   if [[ "${MISSING_ARGS}" -ne 0 ]]; then
