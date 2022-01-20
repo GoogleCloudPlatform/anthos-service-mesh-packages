@@ -205,7 +205,7 @@ build-offline-package_outro() {
 
   info ""
   info "$(starline)"
-  istioctl version
+  istioctl version --remote=false
   info "$(starline)"
   info "The offline package download is now complete."
 
