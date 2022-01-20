@@ -530,6 +530,13 @@ validate_args() {
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
   local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
 
+  if is_autopilot; then
+    if ! is_managed; then
+      fatal "Autopilot clusters are only supported with managed control plane."
+    fi
+    context_set-option "USE_MANAGED_CNI" 1
+  fi
+
   if [[ -z "${CA}" ]]; then
     CA="mesh_ca"
     context_set-option "CA" "${CA}"
