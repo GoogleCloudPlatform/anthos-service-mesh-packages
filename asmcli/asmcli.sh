@@ -30,8 +30,8 @@ _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"; readonly _CI_I_AM_A_TEST_RO
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=12}"; readonly MINOR;
-POINT="${POINT:=0}"; readonly POINT;
-REV="${REV:=4}"; readonly REV;
+POINT="${POINT:=2}"; readonly POINT;
+REV="${REV:=0}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
@@ -85,6 +85,7 @@ KPT_BRANCH=""
 RAW_YAML=""
 EXPANDED_YAML=""
 NAMESPACE_EXISTS=0
+IS_AUTOPILOT=0
 
 main() {
   if [[ "${*}" = '' ]]; then
@@ -123,6 +124,10 @@ main() {
     experimental | x)
       shift 1
       experimental_subcommand "${@}"
+      ;;
+    build-offline-package)
+      shift 1
+      build-offline-package_subcommand "${@}"
       ;;
     *)
       help_subcommand "${@}"

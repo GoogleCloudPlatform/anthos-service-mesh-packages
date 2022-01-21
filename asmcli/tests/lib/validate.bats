@@ -39,3 +39,17 @@ setup() {
   run context_get-option "CLUSTER_LOCATION"
   assert_output "${GKE_CLUSTER_LOCATION}"
 }
+
+@test "VALIDATE: validate_node_pool_workload_identity should skip autopilot cluster" {
+  is_autopilot() {
+    true
+  }
+  run validate_node_pool_workload_identity
+  assert_success
+
+  is_autopilot() {
+    false
+  }
+  run validate_node_pool_workload_identity
+  assert_failure
+}

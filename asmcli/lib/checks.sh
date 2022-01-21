@@ -47,6 +47,12 @@ is_gcp() {
   fi
 }
 
+is_offline() {
+  local OFFLINE; OFFLINE="$(context_get-option "OFFLINE")"
+
+  if [[ "${OFFLINE}" -ne 1 ]]; then false; fi
+}
+
 using_connect_gateway() {
   local KVC; KVC="$(context_get-option "KC_VIA_CONNECT")"
   if [[ "${KVC}" -eq 1 ]]; then
@@ -453,5 +459,18 @@ istio_namespace_exists() {
     false
   else
     NAMESPACE_EXISTS=1; readonly NAMESPACE_EXISTS
+  fi
+}
+
+is_autopilot() {
+  # TODO: wait till https://pkg.go.dev/google.golang.org/genproto/googleapis/container/v1#Cluster  
+  # publish the `Autopilot` field
+  # This is a temporary workaround to check if a cluster is Autopilot or GKE
+  # This CRD will be installed only if the cluster is Autopilot
+  if [[ "${IS_AUTOPILOT}" -eq 1 ]]; then return; fi
+  if ! retry 2 kubectl get crd allowlistedworkloads.auto.gke.io 1>/dev/null 2>/dev/null; then
+    false
+  else
+    IS_AUTOPILOT=1; readonly IS_AUTOPILOT
   fi
 }

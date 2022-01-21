@@ -14,6 +14,7 @@ configure_package() {
   local ASMCLI_VERSION; ASMCLI_VERSION="$(version_message)"
 
   info "Configuring kpt package..."
+  set_kpt_configured
 
   populate_cluster_values
   local NETWORK_ID; NETWORK_ID="$(context_get-option "NETWORK_ID")"
