@@ -550,7 +550,12 @@ download_kpt() {
 
   case "$(uname)" in
     Linux ) OS="linux_amd64";;
-    Darwin) OS="darwin_arm64";;
+    Darwin)
+      case "$(uname -m)" in
+        x86_64 ) OS="darwin_amd64";;
+        * ) OS="darwin_arm64";;
+      esac
+      ;;
     *     ) fatal "$(uname) is not a supported OS.";;
   esac
 
