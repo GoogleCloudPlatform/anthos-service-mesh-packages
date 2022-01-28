@@ -211,6 +211,7 @@ write_and_upload() {
 
   if [[ "${BRANCH_NAME}" == "${CURRENT_RELEASE}" ]]; then
     upload "${SCRIPT_NAME}" "${FILE_NAME}" "${BUCKET_PATH}/${SCRIPT_NAME}" "${BUCKET_URL}/${BUCKET_PATH}/${SCRIPT_NAME}"
+    append_version "${VERSION}" "${SCRIPT_NAME}"
   fi
 
   if [[ "${BRANCH_NAME}" =~ "release" ]] || is_proper_tag "${VERSION}"; then
