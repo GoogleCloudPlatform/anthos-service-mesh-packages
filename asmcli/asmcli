@@ -14,6 +14,12 @@ else
   set -u
 fi
 
+### Workaround for RHEL/centOS redefining which for whatever reason?
+
+if [[ -f /etc/profile.d/which2.sh ]]; then
+  unset -f which
+fi
+
 ### These are hooks for Cloud Build to be able to use debug/staging images
 ### when necessary. Don't set these environment variables unless you're testing
 ### in CI/CD.
