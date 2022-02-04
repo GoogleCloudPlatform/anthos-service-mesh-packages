@@ -14,6 +14,12 @@ else
   set -u
 fi
 
+### Workaround for RHEL/centOS redefining which for whatever reason?
+
+if [[ -f /etc/profile.d/which2.sh ]]; then
+  unset -f which
+fi
+
 ### These are hooks for Cloud Build to be able to use debug/staging images
 ### when necessary. Don't set these environment variables unless you're testing
 ### in CI/CD.
@@ -2267,6 +2273,8 @@ install_mananged_cni_static() {
 
   if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=on"* ]]; then
     context_append "mcpOptions" "CNI=on"
+  else
+    context_append "mcpOptions" "${ASM_OPTS}"
   fi
   context_append "kubectlFiles" "${MANAGED_CNI}"
 }
@@ -5257,6 +5265,13 @@ validate_args() {
 
   if is_legacy && ! is_managed; then
       fatal "The --legacy option is only supported with managed control plane."
+  fi
+
+  if is_autopilot; then
+    if ! is_managed; then
+      fatal "Autopilot clusters are only supported with managed control plane."
+    fi
+    context_set-option "USE_MANAGED_CNI" 1
   fi
 
   if [[ -z "${CA}" ]]; then
