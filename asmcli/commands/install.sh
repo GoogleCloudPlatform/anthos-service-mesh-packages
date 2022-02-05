@@ -69,11 +69,12 @@ install_private_ca() {
   # If modify_gcp_component permissions are not granted, it is assumed that the
   # user has taken care of this, else Istio setup will fail
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
+  local CA_POOL_URL; CA_POOL_URL=$(echo "${CA_NAME}" | cut -f1 -d:)
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${FLEET_ID}.svc.id.goog:/allAuthenticatedUsers/"
-  local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
-  local CA_POOL; CA_POOL=$(echo "${CA_NAME}" | cut -f6 -d/)
-  local PROJECT; PROJECT=$(echo "${CA_NAME}" | cut -f2 -d/)
+  local CA_LOCATION; CA_LOCATION=$(echo "${CA_POOL_URL}" | cut -f4 -d/)
+  local CA_POOL; CA_POOL=$(echo "${CA_POOL_URL}" | cut -f6 -d/)
+  local PROJECT; PROJECT=$(echo "${CA_POOL_URL}" | cut -f2 -d/)
 
   # TODO : reduce retry and remove logging
   retry 10 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
@@ -92,6 +93,15 @@ install_private_ca() {
     --role "roles/privateca.auditor" \
     --log-http \
     --verbosity debug
+
+  if [[ 1 == $(grep -o ":" <<< "${CA_NAME}" | wc -l) ]]; then
+    local CERT_TEMPLATE; CERT_TEMPLATE=$(echo "${CA_NAME}" | cut -f2 -d:)
+    retry 3 gcloud privateca templates add-iam-policy-binding "${CERT_TEMPLATE}" \
+      --member "group:${WORKLOAD_IDENTITY}" \
+      --role "roles/privateca.templateUser" \
+      --log-http \
+      --verbose
+  fi
 }
 
 does_istiod_exist(){

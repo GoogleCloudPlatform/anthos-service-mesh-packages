@@ -1241,7 +1241,11 @@ OPTIONS:
                                       Name of the ca pool in the GCP CAS service used to
                                       sign certificates in the format
                                       'projects/project_name/locations/ \
-                                      ca_region/caPools/ca_pool'.
+                                      ca_region/caPools/ca_pool'. If certificate template
+                                      needs to be specified, the format is 'projects/ \
+                                      project_name/locations/ca_region/caPools/ \
+                                      ca_pool:projects/project_name/locations/ca_region/ \
+                                      certificateTemplates/cert_template'.
   -r|--revision_name <REVISION NAME>  Custom revision label. Label needs to follow DNS
                                       label formats (re: RFC 1123). Not supported if
                                       control plane is managed. Prefixing the revision
@@ -1597,11 +1601,12 @@ install_private_ca() {
   # If modify_gcp_component permissions are not granted, it is assumed that the
   # user has taken care of this, else Istio setup will fail
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
+  local CA_POOL_URL; CA_POOL_URL=$(echo "${CA_NAME}" | cut -f1 -d:)
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${FLEET_ID}.svc.id.goog:/allAuthenticatedUsers/"
-  local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
-  local CA_POOL; CA_POOL=$(echo "${CA_NAME}" | cut -f6 -d/)
-  local PROJECT; PROJECT=$(echo "${CA_NAME}" | cut -f2 -d/)
+  local CA_LOCATION; CA_LOCATION=$(echo "${CA_POOL_URL}" | cut -f4 -d/)
+  local CA_POOL; CA_POOL=$(echo "${CA_POOL_URL}" | cut -f6 -d/)
+  local PROJECT; PROJECT=$(echo "${CA_POOL_URL}" | cut -f2 -d/)
 
   # TODO : reduce retry and remove logging
   retry 10 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
@@ -1620,6 +1625,15 @@ install_private_ca() {
     --role "roles/privateca.auditor" \
     --log-http \
     --verbosity debug
+
+  if [[ 1 == $(grep -o ":" <<< "${CA_NAME}" | wc -l) ]]; then
+    local CERT_TEMPLATE; CERT_TEMPLATE=$(echo "${CA_NAME}" | cut -f2 -d:)
+    retry 3 gcloud privateca templates add-iam-policy-binding "${CERT_TEMPLATE}" \
+      --member "group:${WORKLOAD_IDENTITY}" \
+      --role "roles/privateca.templateUser" \
+      --log-http \
+      --verbose
+  fi
 }
 
 does_istiod_exist(){
@@ -2083,14 +2097,28 @@ EOF
 }
 validate_private_ca() {
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
-  local CA_NAME_TEMPLATE; CA_NAME_TEMPLATE="projects/project_name/locations/ca_region/caPools/ca_pool"
+  local CA_POOL_TEMPLATE; CA_POOL_TEMPLATE="projects/project_name/locations/ca_region/caPools/ca_pool"
+  local CT_TEMPLATE; CT_TEMPLATE="projects/project_name/locations/ca_region/certificateTemplates/cert_template"
+  local CA_NAME_TEMPLATE; CA_NAME_TEMPLATE="${CA_POOL_TEMPLATE}:${CT_TEMPLATE}"
 
   if [[ -z ${CA_NAME} ]]; then
     fatal "A ca-name must be provided for integration with Google Certificate Authority Service."
-  elif [[ $(grep -o "/" <<< "${CA_NAME}" | wc -l) != $(grep -o "/" <<< "${CA_NAME_TEMPLATE}" | wc -l) ]]; then
-    fatal "Malformed ca-name. ca-name must be of the form ${CA_NAME_TEMPLATE}."
-  elif [[ "$(echo "${CA_NAME}" | cut -f1 -d/)" != "$(echo "${CA_NAME_TEMPLATE}" | cut -f1 -d/)" ]]; then
-    fatal "Malformed ca-name. ca-name must be of the form ${CA_NAME_TEMPLATE}."
+  # check if CA_NAME is ca_pool:cert_template format
+  elif [[ 0 < $(grep -o ":" <<< "${CA_NAME}" | wc -l) ]]; then
+    if [[ $(grep -o ":" <<< "${CA_NAME}" | wc -l) != $(grep -o ":" <<< "${CA_NAME_TEMPLATE}" | wc -l) ]]; then
+      fatal "Malformed ca-name with certificate template. ca-name must be of the form ${CA_NAME_TEMPLATE}."
+    elif [[ $(grep -o "/" <<< "${CA_NAME}" | wc -l) != $(grep -o "/" <<< "${CA_NAME_TEMPLATE}" | wc -l) ]]; then
+      fatal "Malformed ca-name with certificate template. ca-name must be of the form ${CA_NAME_TEMPLATE}."
+    elif [[ "$(echo "${CA_NAME}" | cut -f1 -d/)" != "$(echo "${CA_NAME_TEMPLATE}" | cut -f1 -d/)" ]]; then
+      fatal "Malformed ca-name with certificate template. ca-name must be of the form ${CA_NAME_TEMPLATE}."
+    fi
+  # when CA_NAME is ca_pool format
+  else
+    if [[ $(grep -o "/" <<< "${CA_NAME}" | wc -l) != $(grep -o "/" <<< "${CA_POOL_TEMPLATE}" | wc -l) ]]; then
+      fatal "Malformed ca-name. ca-name must be of the form ${CA_POOL_TEMPLATE}."
+    elif [[ "$(echo "${CA_NAME}" | cut -f1 -d/)" != "$(echo "${CA_POOL_TEMPLATE}" | cut -f1 -d/)" ]]; then
+      fatal "Malformed ca-name. ca-name must be of the form ${CA_POOL_TEMPLATE}."
+    fi
   fi
 }
 
