@@ -507,7 +507,7 @@ x_install() {
   local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
 
   if [[ "${USE_MANAGED_CNI}" -eq 0 ]]; then
-    install_mananged_cni_static
+    install_managed_cni_static
   fi
   apply_kube_yamls
 
@@ -2053,7 +2053,9 @@ install_managed_control_plane() {
   info "Configuring ASM managed control plane validating webhook config..."
   context_append "kubectlFiles" "${MANAGED_WEBHOOKS}"
 
-  install_mananged_cni_static
+  if [[ "${USE_MANAGED_CNI}" -eq 0 ]]; then
+    install_managed_cni_static
+  fi
 
   if [[ "${CA}" = "gcp_cas" ]]; then
     install_managed_privateca
@@ -2085,7 +2087,7 @@ EOF
 
 }
 
-install_mananged_cni_static() {
+install_managed_cni_static() {
   info "Configuring CNI..."
   local ASM_OPTS
   ASM_OPTS="$(kubectl -n istio-system \
