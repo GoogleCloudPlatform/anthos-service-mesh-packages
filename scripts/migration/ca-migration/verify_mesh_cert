@@ -1,0 +1,150 @@
+#!/bin/bash
+#set -x
+CACERT=""
+
+check_dependencies() {
+
+  if ! awk --help &> /dev/null; then
+    echo "awk could not be found, please make sure it is installed."
+    exit 1
+  fi
+
+  if ! grep --help &> /dev/null; then
+    echo "grep could not be found, please make sure it is installed."
+    exit 1
+  fi
+
+  if ! istioctl &> /dev/null; then
+    echo "istioctl could not be found, please add istioctl into your PATH."
+    exit 1
+  fi
+
+  if ! jq --version &> /dev/null; then
+    echo "jq could not be found, please make sure it is installed."
+    exit 1
+  fi
+
+  if ! kubectl version &> /dev/null; then
+    echo "kubectl could not be found, please make sure it is installed."
+    exit 1
+  fi
+
+  if ! openssl version &> /dev/null; then
+    echo "openssl could not be found, please make sure it is installed."
+    exit 1
+  fi
+}
+declare -A rootmap
+
+add_to_rootmap() {
+  local output
+  local roots
+
+  output=$(istioctl pc secret "$1" -n "$2" -o json)
+
+  if [ "$(echo "${output}" | jq '.dynamicActiveSecrets[0].name')" = "\"ROOTCA\"" ]; then
+    roots=$(echo "${output}" | jq '.dynamicActiveSecrets[0].secret.validationContext.trustedCa.inlineBytes')
+  else
+    roots=$(echo "${output}" | jq '.dynamicActiveSecrets[1].secret.validationContext.trustedCa.inlineBytes')
+  fi
+  if [ -z "${roots}" ]; then
+    echo "Cannot find roots for $1.$2"
+    exit 1
+  fi
+  echo "${roots}" | sed 's/\"//g' | base64 -d > /tmp/"$3".pem
+  # Search for trustAnchor in workload trustBundle
+  if [[ "$CACERT" = "$(grep -f /tmp/"$3".pem <(echo "$CACERT"))" ]]; then
+    rootmap[$3]=true
+  else
+    rootmap[$3]=false
+  fi
+}
+
+# $1: pod
+# $2: namespace
+# $3: ROOTCA/default
+# $4: caCert file
+check_cert_in_pod() {
+  local sn
+
+  # Example format:
+  # RESOURCE NAME   TYPE   STATUS   VALID CERT  SERIAL NUMBER        NOT AFTER            NOT BEFORE
+  # ROOTCA          CA     ACTIVE   true        16289816804573236346 2117-12-31T19:15:51Z 2018-01-24T19:15:51Z
+  # We use the serial number for the comparison.
+  if [ "$3" = "ROOTCA" ]; then
+    sn=$(istioctl pc secret "$1" -n "$2" | grep "ROOTCA" | awk '{print $5}')
+    if [[ -z ${sn} ]]; then
+      echo " - [WARNING] $1.$2 cannot find certificate information"
+      return
+    fi
+    if [[ -z ${rootmap[${sn}]} ]]; then
+      add_to_rootmap "$1" "$2" "${sn}" "$4"
+    fi
+    if ! ${rootmap[${sn}]}; then
+      echo "$1.$2 does not trust $4"
+    else
+      echo "$1.$2 trusts $4"
+    fi
+  fi
+}
+
+# $1: namespace
+# $2: cert/other subcommand
+# $3: roots/certs
+# $4: caCert filename
+check_in_namespace() {
+  local pods
+  local containers
+
+  pods=$(kubectl get pod -o jsonpath={.items..metadata.name} -n "$1")
+	for pod in ${pods}
+	do
+    containers=$(kubectl get pod "${pod}" -n "$1" -o jsonpath=={.spec.containers.*.name})
+    if [[ "${containers}" == *"istio-proxy"* ]]; then
+      if [[ "$2" = "cert" ]]; then
+        check_cert_in_pod "${pod}" "$1" "$3" "$4"
+      fi
+    fi
+	done
+}
+
+# $1: cert/other subcommand
+# $2: roots/certs
+# $3: caCert filename
+check() {
+  local ns
+
+  ns=$(kubectl get ns -o jsonpath={.items..metadata.name})
+  for n in ${ns}
+  do
+    if [ "$n" != "kube-system" ] && [ "$n" != "kube-public" ] && [ "$n" != "kube-node-lease" ]; then
+      echo
+      echo "Namespace: $n"
+      check_in_namespace "$n" "$1" "$2" "$3"
+    fi
+  done
+}
+
+print_help_info() {
+  echo
+  echo "Usage: check-proxy-trustbundle
+
+check-proxy-trustbundle
+  Check trustbundle for each ASM workload proxy includes the provided caCert.
+
+"
+}
+
+check_dependencies
+
+case $1 in
+  check-proxy-trustbundle)
+    echo
+    echo "Checking the root certificates loaded on each pod..."
+    CACERT=$(cat "$2" | grep -v -E 'BEGIN CERTIFICATE|END CERTIFICATE'); readonly CACERT
+    check "cert" "ROOTCA" "$2"
+    ;;
+  *)
+  print_help_info
+
+esac
