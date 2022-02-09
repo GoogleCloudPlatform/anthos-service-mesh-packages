@@ -94,7 +94,7 @@ install_private_ca() {
     --log-http \
     --verbosity debug
 
-  if [[ 1 == $(grep -o ":" <<< "${CA_NAME}" | wc -l) ]]; then
+  if [[ $(grep -o ":" <<< "${CA_NAME}" | wc -l) -eq 1 ]]; then
     local CERT_TEMPLATE; CERT_TEMPLATE=$(echo "${CA_NAME}" | cut -f2 -d:)
     retry 3 gcloud privateca templates add-iam-policy-binding "${CERT_TEMPLATE}" \
       --member "group:${WORKLOAD_IDENTITY}" \

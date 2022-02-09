@@ -7,7 +7,7 @@ validate_private_ca() {
   if [[ -z ${CA_NAME} ]]; then
     fatal "A ca-name must be provided for integration with Google Certificate Authority Service."
   # check if CA_NAME is ca_pool:cert_template format
-  elif [[ 0 < $(grep -o ":" <<< "${CA_NAME}" | wc -l) ]]; then
+  elif [[ "${CA_NAME}" == *":"* ]]; then
     if [[ $(grep -o ":" <<< "${CA_NAME}" | wc -l) != $(grep -o ":" <<< "${CA_NAME_TEMPLATE}" | wc -l) ]]; then
       fatal "Malformed ca-name with certificate template. ca-name must be of the form ${CA_NAME_TEMPLATE}."
     elif [[ $(grep -o "/" <<< "${CA_NAME}" | wc -l) != $(grep -o "/" <<< "${CA_NAME_TEMPLATE}" | wc -l) ]]; then
