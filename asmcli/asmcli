@@ -1603,17 +1603,23 @@ install_private_ca() {
   local CA_POOL; CA_POOL=$(echo "${CA_NAME}" | cut -f6 -d/)
   local PROJECT; PROJECT=$(echo "${CA_NAME}" | cut -f2 -d/)
 
-  retry 3 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
+  # TODO : reduce retry and remove logging
+  retry 10 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
     --project "${PROJECT}" \
     --location "${CA_LOCATION}" \
     --member "group:${WORKLOAD_IDENTITY}" \
-    --role "roles/privateca.workloadCertificateRequester"
+    --role "roles/privateca.workloadCertificateRequester" \
+    --log-http \
+    --verbose
 
-  retry 3 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
+  # TODO : reduce retry and remove logging
+  retry 10 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
     --project "${PROJECT}" \
     --location "${CA_LOCATION}" \
     --member "group:${WORKLOAD_IDENTITY}" \
-    --role "roles/privateca.auditor"
+    --role "roles/privateca.auditor" \
+    --log-http \
+    --verbose
 }
 
 does_istiod_exist(){
