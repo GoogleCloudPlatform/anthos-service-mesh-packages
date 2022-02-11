@@ -1672,16 +1672,31 @@ expose_istiod() {
 
 outro() {
   local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
-  
+  local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
+  local MANAGED_REVISION_LABEL; MANAGED_REVISION_LABEL="${REVISION_LABEL}"
+  if is_managed; then
+    case "${CHANNEL}" in
+    regular)
+      MANAGED_REVISION_LABEL="${REVISION_LABEL_REGULAR}"
+      ;;
+    stable)
+      MANAGED_REVISION_LABEL="${REVISION_LABEL_STABLE}"
+      ;;
+    rapid)
+      MANAGED_REVISION_LABEL="${REVISION_LABEL_RAPID}"
+      ;;
+    esac
+  fi
+
   info ""
   info "$(starline)"
   istioctl version
   info "$(starline)"
   info "The ASM control plane installation is now complete."
   info "To enable automatic sidecar injection on a namespace, you can use the following command:"
-  info "kubectl label namespace <NAMESPACE> istio-injection- istio.io/rev=${REVISION_LABEL} --overwrite"
+  info "kubectl label namespace <NAMESPACE> istio-injection- istio.io/rev=${MANAGED_REVISION_LABEL} --overwrite"
   info "If you use 'istioctl install' afterwards to modify this installation, you will need"
-  info "to specify the option '--set revision=${REVISION_LABEL}' to target this control plane"
+  info "to specify the option '--set revision=${MANAGED_REVISION_LABEL}' to target this control plane"
   info "instead of installing a new one."
 
   info "To finish the installation, enable Istio sidecar injection and restart your workloads."
