@@ -70,6 +70,15 @@ parse_args() {
           info "Fleet workload identity pool is used as default for Mesh CA. No need to specify hub-meshca option."
           shift 2
           continue
+        elif [[ "${2}" == "prometheus" ]]; then
+          context_set-option "INCLUDES_PROMETHEUS" 1
+          context_set-option "INCLUDES_STACKDRIVER" 0
+        elif [[ "${2}" == "stackdriver" ]]; then
+          context_set-option "INCLUDES_PROMETHEUS" 0
+          context_set-option "INCLUDES_STACKDRIVER" 1
+        elif [[ "${2}" == "prometheus-and-stackdriver" ]]; then
+          context_set-option "INCLUDES_PROMETHEUS" 1
+          context_set-option "INCLUDES_STACKDRIVER" 1
         fi
 
         OPTIONAL_OVERLAY="${2},${OPTIONAL_OVERLAY}"
