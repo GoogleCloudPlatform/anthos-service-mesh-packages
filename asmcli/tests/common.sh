@@ -280,7 +280,6 @@ create_working_cluster() {
     --no-enable-basic-auth \
     --release-channel "regular" \
     --machine-type "e2-standard-4" \
-    --image-type "COS" \
     --disk-type "pd-standard" \
     --disk-size "100" \
     --num-nodes "4" \
