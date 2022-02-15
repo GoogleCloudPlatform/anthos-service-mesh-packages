@@ -2102,9 +2102,9 @@ validate_private_ca() {
   local CT_TEMPLATE; CT_TEMPLATE="projects/project_name/locations/ca_region/certificateTemplates/cert_template"
   local CA_NAME_TEMPLATE; CA_NAME_TEMPLATE="${CA_POOL_TEMPLATE}:${CT_TEMPLATE}"
 
-  local CA_POOL_REGEX; CA_POOL_REGEX="projects\/[a-zA-Z0-9_-]+\/locations\/[a-zA-Z0-9_-]+\/caPools\/[a-zA-Z0-9_-]+"
-  local CT_REGEX; CT_REGEX="projects\/[a-zA-Z0-9_-]+\/locations\/[a-zA-Z0-9_-]+\/certificateTemplates\/[a-zA-Z0-9_-]+"
-  local CA_NAME_REGEX; CA_NAME_REGEX="${CA_POOL_REGEX}\:${CT_REGEX}"
+  local CA_POOL_REGEX; CA_POOL_REGEX="projects/[a-zA-Z0-9_-]+/locations/[a-zA-Z0-9_-]+/caPools/[a-zA-Z0-9_-]+"
+  local CT_REGEX; CT_REGEX="projects/[a-zA-Z0-9_-]+/locations/[a-zA-Z0-9_-]+/certificateTemplates/[a-zA-Z0-9_-]+"
+  local CA_NAME_REGEX; CA_NAME_REGEX="${CA_POOL_REGEX}:${CT_REGEX}"
 
   if [[ -z ${CA_NAME} ]]; then
     fatal "A ca-name must be provided for integration with Google Certificate Authority Service."
