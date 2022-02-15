@@ -62,6 +62,8 @@ context_init() {
     "EXPERIMENTAL": ${EXPERIMENTAL:-0},
     "KC_VIA_CONNECT": ${KC_VIA_CONNECT:-0},
     "OFFLINE": "${OFFLINE:-0}",
+    "INCLUDES_PROMETHEUS": "${INCLUDES_PROMETHEUS:-0}",
+    "INCLUDES_STACKDRIVER": "${INCLUDES_STACKDRIVER:-1}",
     "CHANNEL": "${CHANNEL:-}"
   },
   "istioctlFiles": [],
