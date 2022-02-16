@@ -69,23 +69,41 @@ install_private_ca() {
   # If modify_gcp_component permissions are not granted, it is assumed that the
   # user has taken care of this, else Istio setup will fail
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
+  local CA_POOL_URI; CA_POOL_URI=$(echo "${CA_NAME}" | cut -f1 -d:)
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${FLEET_ID}.svc.id.goog:/allAuthenticatedUsers/"
-  local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
-  local CA_POOL; CA_POOL=$(echo "${CA_NAME}" | cut -f6 -d/)
-  local PROJECT; PROJECT=$(echo "${CA_NAME}" | cut -f2 -d/)
+  local CA_LOCATION; CA_LOCATION=$(echo "${CA_POOL_URI}" | cut -f4 -d/)
+  local CA_POOL; CA_POOL=$(echo "${CA_POOL_URI}" | cut -f6 -d/)
+  local PROJECT; PROJECT=$(echo "${CA_POOL_URI}" | cut -f2 -d/)
 
-  retry 3 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
-    --project "${PROJECT}" \
-    --location "${CA_LOCATION}" \
-    --member "group:${WORKLOAD_IDENTITY}" \
-    --role "roles/privateca.workloadCertificateRequester"
+  if can_modify_gcp_iam_roles; then
+    # TODO : reduce retry and remove logging
+    retry 10 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
+      --project "${PROJECT}" \
+      --location "${CA_LOCATION}" \
+      --member "group:${WORKLOAD_IDENTITY}" \
+      --role "roles/privateca.workloadCertificateRequester" \
+      --log-http \
+      --verbosity debug
 
-  retry 3 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
-    --project "${PROJECT}" \
-    --location "${CA_LOCATION}" \
-    --member "group:${WORKLOAD_IDENTITY}" \
-    --role "roles/privateca.auditor"
+    # TODO : reduce retry and remove logging
+    retry 10 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
+      --project "${PROJECT}" \
+      --location "${CA_LOCATION}" \
+      --member "group:${WORKLOAD_IDENTITY}" \
+      --role "roles/privateca.auditor" \
+      --log-http \
+      --verbosity debug
+
+    if [[ "${CA_NAME}" == *":"* ]]; then
+      local CERT_TEMPLATE; CERT_TEMPLATE=$(echo "${CA_NAME}" | cut -f2 -d:)
+      retry 3 gcloud privateca templates add-iam-policy-binding "${CERT_TEMPLATE}" \
+        --member "group:${WORKLOAD_IDENTITY}" \
+        --role "roles/privateca.templateUser" \
+        --log-http \
+        --verbosity debug
+    fi
+  fi
 }
 
 does_istiod_exist(){

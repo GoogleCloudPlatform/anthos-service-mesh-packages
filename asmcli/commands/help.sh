@@ -110,7 +110,11 @@ OPTIONS:
                                       Name of the ca pool in the GCP CAS service used to
                                       sign certificates in the format
                                       'projects/project_name/locations/ \
-                                      ca_region/caPools/ca_pool'.
+                                      ca_region/caPools/ca_pool'. If certificate template
+                                      needs to be specified, the format is 'projects/ \
+                                      project_name/locations/ca_region/caPools/ \
+                                      ca_pool:projects/project_name/locations/ca_region/ \
+                                      certificateTemplates/cert_template'.
   -r|--revision_name <REVISION NAME>  Custom revision label. Label needs to follow DNS
                                       label formats (re: RFC 1123). Not supported if
                                       control plane is managed. Prefixing the revision
