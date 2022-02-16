@@ -1,13 +1,24 @@
 validate_private_ca() {
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
-  local CA_NAME_TEMPLATE; CA_NAME_TEMPLATE="projects/project_name/locations/ca_region/caPools/ca_pool"
+  
+  local CA_POOL_TEMPLATE; CA_POOL_TEMPLATE="projects/project_name/locations/ca_region/caPools/ca_pool"
+  local CT_TEMPLATE; CT_TEMPLATE="projects/project_name/locations/ca_region/certificateTemplates/cert_template"
+  local CA_NAME_TEMPLATE; CA_NAME_TEMPLATE="${CA_POOL_TEMPLATE}:${CT_TEMPLATE}"
+
+  local CA_POOL_REGEX; CA_POOL_REGEX="projects/[a-zA-Z0-9_-]+/locations/[a-zA-Z0-9_-]+/caPools/[a-zA-Z0-9_-]+"
+  local CT_REGEX; CT_REGEX="projects/[a-zA-Z0-9_-]+/locations/[a-zA-Z0-9_-]+/certificateTemplates/[a-zA-Z0-9_-]+"
+  local CA_NAME_REGEX; CA_NAME_REGEX="${CA_POOL_REGEX}:${CT_REGEX}"
 
   if [[ -z ${CA_NAME} ]]; then
     fatal "A ca-name must be provided for integration with Google Certificate Authority Service."
-  elif [[ $(grep -o "/" <<< "${CA_NAME}" | wc -l) != $(grep -o "/" <<< "${CA_NAME_TEMPLATE}" | wc -l) ]]; then
-    fatal "Malformed ca-name. ca-name must be of the form ${CA_NAME_TEMPLATE}."
-  elif [[ "$(echo "${CA_NAME}" | cut -f1 -d/)" != "$(echo "${CA_NAME_TEMPLATE}" | cut -f1 -d/)" ]]; then
-    fatal "Malformed ca-name. ca-name must be of the form ${CA_NAME_TEMPLATE}."
+  # check if CA_NAME is ca_pool:cert_template format
+  elif [[ "${CA_NAME}" == *":"* ]]; then
+    if ! [[ "${CA_NAME}" =~ ^${CA_NAME_REGEX}$ ]]; then
+      fatal "Malformed ca-name with certificate template. ca-name must be of the form ${CA_NAME_TEMPLATE}."
+    fi
+  # when CA_NAME is ca_pool format
+  elif ! [[ "${CA_NAME}" =~ ^${CA_POOL_REGEX}$ ]]; then
+    fatal "Malformed ca-name. ca-name must be of the form ${CA_POOL_TEMPLATE}."
   fi
 }
 
