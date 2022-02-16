@@ -12,6 +12,7 @@ configure_package() {
   local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
   local USE_VPCSC; USE_VPCSC="$(context_get-option "USE_VPCSC")"
   local ASMCLI_VERSION; ASMCLI_VERSION="$(version_message)"
+  local INCLUDES_STACKDRIVER; INCLUDES_STACKDRIVER="$(context_get-option "INCLUDES_STACKDRIVER")"
 
   info "Configuring kpt package..."
   set_kpt_configured
@@ -34,7 +35,7 @@ configure_package() {
     fi
     # "global" is the current default value for off-GCP
     kpt cfg set asm gcloud.compute.location "global"
-    if [[ "${CA}" == "citadel" ]]; then
+    if [[ "${CA}" == "citadel" && "${INCLUDES_STACKDRIVER}" -eq 0 ]]; then
       kpt cfg set asm anthos.servicemesh.controlplane.monitoring.enabled "false"
     fi
   fi
@@ -65,7 +66,7 @@ configure_package() {
     kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod-${REVISION_LABEL}.istio-system.svc.cluster.local"
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${REVISION_LABEL}"
   fi
-  
+
   if [[ "${USE_MANAGED_CNI}" -eq 1 ]]; then
     kpt cfg set asm anthos.servicemesh.use-managed-cni "true"
   fi

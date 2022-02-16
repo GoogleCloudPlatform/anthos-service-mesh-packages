@@ -1672,6 +1672,21 @@ expose_istiod() {
 
 outro() {
   local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+  local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
+  local MANAGED_REVISION_LABEL; MANAGED_REVISION_LABEL="${REVISION_LABEL}"
+  if is_managed; then
+    case "${CHANNEL}" in
+    regular)
+      MANAGED_REVISION_LABEL="${REVISION_LABEL_REGULAR}"
+      ;;
+    stable)
+      MANAGED_REVISION_LABEL="${REVISION_LABEL_STABLE}"
+      ;;
+    rapid)
+      MANAGED_REVISION_LABEL="${REVISION_LABEL_RAPID}"
+      ;;
+    esac
+  fi
 
   info ""
   info "$(starline)"
@@ -1679,9 +1694,9 @@ outro() {
   info "$(starline)"
   info "The ASM control plane installation is now complete."
   info "To enable automatic sidecar injection on a namespace, you can use the following command:"
-  info "kubectl label namespace <NAMESPACE> istio-injection- istio.io/rev=${REVISION_LABEL} --overwrite"
+  info "kubectl label namespace <NAMESPACE> istio-injection- istio.io/rev=${MANAGED_REVISION_LABEL} --overwrite"
   info "If you use 'istioctl install' afterwards to modify this installation, you will need"
-  info "to specify the option '--set revision=${REVISION_LABEL}' to target this control plane"
+  info "to specify the option '--set revision=${MANAGED_REVISION_LABEL}' to target this control plane"
   info "instead of installing a new one."
 
   info "To finish the installation, enable Istio sidecar injection and restart your workloads."
@@ -2819,6 +2834,7 @@ configure_package() {
   local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
   local USE_VPCSC; USE_VPCSC="$(context_get-option "USE_VPCSC")"
   local ASMCLI_VERSION; ASMCLI_VERSION="$(version_message)"
+  local INCLUDES_STACKDRIVER; INCLUDES_STACKDRIVER="$(context_get-option "INCLUDES_STACKDRIVER")"
 
   info "Configuring kpt package..."
   set_kpt_configured
@@ -2841,7 +2857,7 @@ configure_package() {
     fi
     # "global" is the current default value for off-GCP
     kpt cfg set asm gcloud.compute.location "global"
-    if [[ "${CA}" == "citadel" ]]; then
+    if [[ "${CA}" == "citadel" && "${INCLUDES_STACKDRIVER}" -eq 0 ]]; then
       kpt cfg set asm anthos.servicemesh.controlplane.monitoring.enabled "false"
     fi
   fi
@@ -2872,7 +2888,7 @@ configure_package() {
     kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod-${REVISION_LABEL}.istio-system.svc.cluster.local"
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${REVISION_LABEL}"
   fi
-  
+
   if [[ "${USE_MANAGED_CNI}" -eq 1 ]]; then
     kpt cfg set asm anthos.servicemesh.use-managed-cni "true"
   fi
@@ -2982,6 +2998,8 @@ context_init() {
     "EXPERIMENTAL": ${EXPERIMENTAL:-0},
     "KC_VIA_CONNECT": ${KC_VIA_CONNECT:-0},
     "OFFLINE": "${OFFLINE:-0}",
+    "INCLUDES_PROMETHEUS": "${INCLUDES_PROMETHEUS:-0}",
+    "INCLUDES_STACKDRIVER": "${INCLUDES_STACKDRIVER:-1}",
     "CHANNEL": "${CHANNEL:-}"
   },
   "istioctlFiles": [],
@@ -3514,6 +3532,15 @@ parse_args() {
           info "Fleet workload identity pool is used as default for Mesh CA. No need to specify hub-meshca option."
           shift 2
           continue
+        elif [[ "${2}" == "prometheus" ]]; then
+          context_set-option "INCLUDES_PROMETHEUS" 1
+          context_set-option "INCLUDES_STACKDRIVER" 0
+        elif [[ "${2}" == "stackdriver" ]]; then
+          context_set-option "INCLUDES_PROMETHEUS" 0
+          context_set-option "INCLUDES_STACKDRIVER" 1
+        elif [[ "${2}" == "prometheus-and-stackdriver" ]]; then
+          context_set-option "INCLUDES_PROMETHEUS" 1
+          context_set-option "INCLUDES_STACKDRIVER" 1
         fi
 
         OPTIONAL_OVERLAY="${2},${OPTIONAL_OVERLAY}"
