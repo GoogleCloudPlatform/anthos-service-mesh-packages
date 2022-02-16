@@ -82,7 +82,7 @@ install_private_ca() {
     --member "group:${WORKLOAD_IDENTITY}" \
     --role "roles/privateca.workloadCertificateRequester" \
     --log-http \
-    --verbose
+    --verbosity debug
 
   # TODO : reduce retry and remove logging
   retry 10 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
@@ -91,7 +91,7 @@ install_private_ca() {
     --member "group:${WORKLOAD_IDENTITY}" \
     --role "roles/privateca.auditor" \
     --log-http \
-    --verbose
+    --verbosity debug
 }
 
 does_istiod_exist(){
