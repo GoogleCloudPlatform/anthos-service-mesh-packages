@@ -28,10 +28,6 @@ spec:
       cniConfDir: /etc/cni/multus/net.d
       chained: false
       cniConfFileName: "istio-cni.conf"
-      excludeNamespaces:
-      - istio-system
-      - kube-system
-      logLevel: info
       privileged: true
     sidecarInjectorWebhook:
       injectedAnnotations:
