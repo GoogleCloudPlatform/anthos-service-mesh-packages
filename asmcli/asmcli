@@ -33,8 +33,8 @@ _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"; readonly _CI_I_AM_A_TEST_RO
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=11}"; readonly MINOR;
-POINT="${POINT:=5}"; readonly POINT;
-REV="${REV:=3}"; readonly REV;
+POINT="${POINT:=7}"; readonly POINT;
+REV="${REV:=1}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
@@ -2094,6 +2094,8 @@ install_mananged_cni_static() {
 
   if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=on"* ]]; then
     context_append "mcpOptions" "CNI=on"
+  else
+    context_append "mcpOptions" "${ASM_OPTS}"
   fi
   context_append "kubectlFiles" "${MANAGED_CNI}"
 }
@@ -4946,6 +4948,13 @@ validate_args() {
   local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
   local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
+
+  if is_autopilot; then
+    if ! is_managed; then
+      fatal "Autopilot clusters are only supported with managed control plane."
+    fi
+    context_set-option "USE_MANAGED_CNI" 1
+  fi
 
   if [[ -z "${CA}" ]]; then
     CA="mesh_ca"

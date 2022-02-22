@@ -85,6 +85,10 @@ _intercept_setup() {
         fi
         return 0
     }
+
+    is_autopilot() {
+      false
+    }
 }
 
 gcloud_intercept() {
