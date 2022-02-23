@@ -527,6 +527,10 @@ EOF
   unset TOKEN
 }
 
+kpt() {
+  "${AKPT}" "${@}"
+}
+
 needs_kpt() {
   if [[ -x "./kpt" ]]; then
     AKPT="./kpt"
@@ -546,7 +550,12 @@ download_kpt() {
 
   case "$(uname)" in
     Linux ) OS="linux_amd64";;
-    Darwin) OS="darwin_arm64";;
+    Darwin)
+      case "$(uname -m)" in
+        x86_64 ) OS="darwin_amd64";;
+        * ) OS="darwin_arm64";;
+      esac
+      ;;
     *     ) fatal "$(uname) is not a supported OS.";;
   esac
 
@@ -602,6 +611,11 @@ populate_cluster_values() {
 ${CLUSTER_DATA}
 EOF
 
+    GKE_CLUSTER_URI="${GKE_CLUSTER_URI#'https://'}"
+    GKE_CLUSTER_URI="${GKE_CLUSTER_URI/v1\//}"
+    GKE_CLUSTER_URI="${GKE_CLUSTER_URI/zones/locations}"
+    GKE_CLUSTER_URI="${GKE_CLUSTER_URI/regions/locations}"
+
     GCE_NETWORK_NAME="${PROJECT_ID}-${GCE_NETWORK_NAME}"
     readonly GKE_CLUSTER_URI; readonly GCE_NETWORK_NAME;
   fi
@@ -642,7 +656,7 @@ backup_config() {
 
 asm_revision_label() {
   if should_use_mcp; then
-    echo "asm_managed"
+    echo "asm-managed"
   else
     echo "${REVISION_LABEL}"
   fi

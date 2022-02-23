@@ -16,7 +16,7 @@ fi
 BUCKET_URL="https://storage.googleapis.com"
 BUCKET_PATH="csm-artifacts/asm"; readonly BUCKET_PATH
 
-CURRENT_RELEASE="release-1.10-asmcli"; readonly CURRENT_RELEASE
+CURRENT_RELEASE="release-1.12"; readonly CURRENT_RELEASE
 
 STABLE_VERSION_FILE="ASMCLI_VERSIONS"; readonly STABLE_VERSION_FILE
 STABLE_VERSION_FILE_PATH="${BUCKET_PATH}/${STABLE_VERSION_FILE}"; readonly STABLE_VERSION_FILE_PATH
@@ -26,6 +26,7 @@ trap 'gsutil retention "${HOLD_TYPE}" release gs://"${STABLE_VERSION_FILE_PATH}"
 prod_releases() {
   cat << EOF
 release 1.11
+release 1.12
 EOF
 }
 
@@ -210,6 +211,7 @@ write_and_upload() {
 
   if [[ "${BRANCH_NAME}" == "${CURRENT_RELEASE}" ]]; then
     upload "${SCRIPT_NAME}" "${FILE_NAME}" "${BUCKET_PATH}/${SCRIPT_NAME}" "${BUCKET_URL}/${BUCKET_PATH}/${SCRIPT_NAME}"
+    append_version "${VERSION}" "${SCRIPT_NAME}"
   fi
 
   if [[ "${BRANCH_NAME}" =~ "release" ]] || is_proper_tag "${VERSION}"; then

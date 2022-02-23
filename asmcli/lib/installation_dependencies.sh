@@ -64,6 +64,7 @@ EOF
 
 required_fleet_apis() {
   local CA; CA="$(context_get-option "CA")"
+  echo meshconfig.googleapis.com
   case "${CA}" in
    mesh_ca)
      echo meshca.googleapis.com
@@ -84,7 +85,7 @@ bind_user_to_cluster_admin(){
     clusterrolebinding "${PREFIX}-cluster-admin-binding" \
     --clusterrole=cluster-admin \
     --user="${GCLOUD_USER}" \
-    --dry-run -o yaml)"
+    --dry-run=client -o yaml)"
   retry 3 kubectl apply -f - <<EOF
 ${YAML}
 EOF
@@ -308,6 +309,8 @@ register_cluster() {
   else
     CMD="${CMD} --kubeconfig=${KCF} --context=${KCC}"
   fi
+  CMD="${CMD} $(context_get-option "HUB_REGISTRATION_EXTRA_FLAGS")"
+
   # shellcheck disable=SC2086
   retry 2 run_command ${CMD}
 }

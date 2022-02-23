@@ -91,11 +91,15 @@ validate_dependencies() {
 }
 
 validate_control_plane() {
-  if is_managed && is_legacy; then
-    # Managed legacy must be able to set IAM permissions on a generated user, so the flow
-    # is a bit different
-    validate_managed_control_plane_legacy
-  elif ! is_managed; then
+  if is_managed; then
+    if is_legacy; then
+      # Managed legacy must be able to set IAM permissions on a generated user, so the flow
+      # is a bit different
+      validate_managed_control_plane_legacy
+    fi
+    # Node-level Workload Identity is required for managed CNI
+    validate_node_pool_workload_identity
+  else
     validate_in_cluster_control_plane
   fi
 }

@@ -58,6 +58,7 @@ SUBCOMMANDS:
   validate                            Validate will attempt a new ASM validation
   print-config                        Print Config will attempt to print the configurations used
   create-mesh                         Add multiple clusters to the mesh
+  build-offline-package               Download required packages for offline installation
 
 OPTIONS:
   -l|--cluster_location  <LOCATION>   The GCP location of the target cluster.
@@ -109,7 +110,11 @@ OPTIONS:
                                       Name of the ca pool in the GCP CAS service used to
                                       sign certificates in the format
                                       'projects/project_name/locations/ \
-                                      ca_region/caPools/ca_pool'.
+                                      ca_region/caPools/ca_pool'. If certificate template
+                                      needs to be specified, the format is 'projects/ \
+                                      project_name/locations/ca_region/caPools/ \
+                                      ca_pool:projects/project_name/locations/ca_region/ \
+                                      certificateTemplates/cert_template'.
   -r|--revision_name <REVISION NAME>  Custom revision label. Label needs to follow DNS
                                       label formats (re: RFC 1123). Not supported if
                                       control plane is managed. Prefixing the revision
@@ -125,14 +130,14 @@ OPTIONS:
                                       between Multicloud/GKE channel and the ASM Channel is
                                       as following:
                                       For Multicloud:
-                                        ASM provisions Regular, Rapid channels.
+                                        ASM provisions Regular channel.
                                       For GKE:
                                         GKE Channel  |  ASM Channel
                                         -------------|----------------
                                         Rapid        |  Rapid
-                                        Regular      |  Regular, Rapid
+                                        Regular      |  Regular
                                         Stable       |  Stable
-                                        Static       |  Regular, Rapid
+                                        Static       |  Regular
 
   The following four options must be passed together and are only necessary
   for using a custom certificate for Citadel. Users that aren't sure whether
@@ -180,6 +185,13 @@ FLAGS:
                                       instead of installing one in-cluster.
      --legacy                         Provision a remote, managed control plane with
                                       the legacy asmcli installer that runs client-side.
+     --use_vpcsc                      Provision a remote, managed control plane in
+                                      VPCSC environment. Not supported for --legacy
+                                      installation method.
+     --offline                        Perform an offline installation using the pre-downloaded
+                                      package in the output directory. If the directory is not
+                                      specified or does not contain the required files, the 
+                                      script will exit with error.
 
      --print_config                   Instead of installing ASM, print all of
                                       the compiled YAML to stdout. All other
@@ -231,6 +243,7 @@ SUBCOMMANDS:
   validate
   print-config
   create-mesh
+  build-offline-package
 
 OPTIONS:
   -l|--cluster_location  <LOCATION>
@@ -271,6 +284,9 @@ FLAGS:
 
      --managed
      --legacy
+     --use_vpcsc
+
+     --offline
 
      --print_config
      --disable_canonical_service
@@ -303,6 +319,14 @@ This command will fail if any of the specified clusters are registered to a flee
 specified by FLEET_ID.
 
 FLAGS:
+  All flags must come AFTER the FLEET_ID.
+  -D|--output_dir        <DIR PATH>   The directory where this script will place
+                                      downloaded ASM packages and configuration.
+                                      If not specified, a temporary directory
+                                      will be created. If specified and the
+                                      directory already contains the necessary
+                                      files, they will be used instead of
+                                      downloading them again.
   The following several flags are used to display help texts and the version message.
   -v|--verbose                        Print commands before and after execution.
   -h|--help                           Show this message and exit.
@@ -331,6 +355,45 @@ Create a multi-cluster service mesh and allow cross-cluster service discovery.
 Use -h|--help with -v|--verbose to show detailed descriptions.
 
 FLAGS:
+  -D|--output_dir <DIR PATH>
+  -v|--verbose
+  -h|--help
+  --version
+EOF
+}
+
+
+build-offline-package_usage(){
+  cat << EOF
+${SCRIPT_NAME} $(version_message)
+usage: ${SCRIPT_NAME} build-offline-package [FLAGS]...
+
+Download ASM and KPT packages to the specified output directory or a temporary directory.
+
+FLAGS:
+  -D|--output_dir        <DIR PATH>   The directory where this script will place
+                                      downloaded ASM packages and configuration.
+                                      If not specified, a temporary directory
+                                      will be created. If specified and the
+                                      directory already contains the necessary
+                                      files, they will be used instead of
+                                      downloading them again.
+  The following several flags are used to display help texts and the version message.
+  -v|--verbose                        Print commands before and after execution.
+  -h|--help                           Show this message and exit.
+  --version                           Print the version of this tool and exit.
+EOF
+}
+
+build-offline-package_usage_short(){
+  cat << EOF
+${SCRIPT_NAME} $(version_message)
+usage: ${SCRIPT_NAME} build-offline-package [FLAGS]...
+
+Download ASM and KPT packages to the specified output directory or a temporary directory.
+
+FLAGS:
+  -D|--output_dir <DIR PATH>
   -v|--verbose
   -h|--help
   --version

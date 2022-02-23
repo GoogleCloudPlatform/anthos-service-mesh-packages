@@ -10,6 +10,12 @@ else
   set -u
 fi
 
+### Workaround for RHEL/centOS redefining which for whatever reason?
+
+if [[ -f /etc/profile.d/which2.sh ]]; then
+  unset -f which
+fi
+
 ### These are hooks for Cloud Build to be able to use debug/staging images
 ### when necessary. Don't set these environment variables unless you're testing
 ### in CI/CD.
@@ -29,9 +35,9 @@ _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"; readonly _CI_I_AM_A_TEST_RO
 
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
-MINOR="${MINOR:=11}"; readonly MINOR;
-POINT="${POINT:=2}"; readonly POINT;
-REV="${REV:=17}"; readonly REV;
+MINOR="${MINOR:=12}"; readonly MINOR;
+POINT="${POINT:=4}"; readonly POINT;
+REV="${REV:=1}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1-unstable"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
@@ -85,6 +91,7 @@ KPT_BRANCH=""
 RAW_YAML=""
 EXPANDED_YAML=""
 NAMESPACE_EXISTS=0
+IS_AUTOPILOT=0
 
 main() {
   if [[ "${*}" = '' ]]; then
@@ -123,6 +130,10 @@ main() {
     experimental | x)
       shift 1
       experimental_subcommand "${@}"
+      ;;
+    build-offline-package)
+      shift 1
+      build-offline-package_subcommand "${@}"
       ;;
     *)
       help_subcommand "${@}"

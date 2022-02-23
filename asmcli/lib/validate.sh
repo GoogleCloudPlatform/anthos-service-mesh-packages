@@ -164,6 +164,30 @@ EOF
   fi
 }
 
+validate_node_pool_workload_identity(){
+  # Autopilot clusters do not allow accessing/mutating the node pools
+  # so we skip in such cases.
+  if is_autopilot; then
+    return
+  fi
+  local METADATA_CONFIG_MODE MACHINE_CPU_REQ
+  # No CPU requirement for Managed ASM
+  MACHINE_CPU_REQ=0
+  METADATA_CONFIG_MODE="$(list_valid_pools "${MACHINE_CPU_REQ}" | \
+      jq -r '.[] |
+        .config.workloadMetadataConfig.mode
+      ' 2>/dev/null)" || true
+  if [[ "${METADATA_CONFIG_MODE}" != "GKE_METADATA" ]]; then
+    { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
+Node pool Workload Identity is not enabled which is a pre-requisite for Managed ASM.
+Please follow:
+  https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity#migrate_applications_to 
+to migrate or update to a Workload Identity Enabled Node pool. 
+If installation continues, Managed ASM components such as CNI will not work properly.
+EOF
+  fi
+}
+
 validate_expected_control_plane(){
   info "Checking Istio installations..."
   check_no_istiod_outside_of_istio_system_namespace
@@ -253,7 +277,8 @@ validate_ca_consistency() {
 
 validate_no_ingress_gateway() {
   local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
-  if [[ "${CUSTOM_OVERLAY}" =~ "legacy-default-ingressgateway" ]]; then
+  if [[ "${CUSTOM_OVERLAY}" =~ "legacy-default-ingressgateway" || \
+        "${CUSTOM_OVERLAY}" =~ "iap-operator" ]]; then
     return
   fi
 
@@ -264,10 +289,8 @@ validate_no_ingress_gateway() {
     return
   fi
 
-  warn "Defaults have changed between previous installation methods and this tool."
   warn "We detected an ASM ingress gateway currently running in the cluster that"
-  warn "would be disabled if continuing with default configuration."
-  warn "If this is intended, please enter Y. If this is not intended, please enter"
+  warn "will be disabled if installation continues. If this is not intended, please enter"
   warn "N and re-run the tool with the '--option legacy-default-ingressgateway'."
   if ! prompt_default_no "Continue?"; then fatal "Stopping installation at user request."; fi
 }
@@ -530,9 +553,17 @@ validate_args() {
   local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
   local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
+  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
 
   if is_legacy && ! is_managed; then
       fatal "The --legacy option is only supported with managed control plane."
+  fi
+
+  if is_autopilot; then
+    if ! is_managed; then
+      fatal "Autopilot clusters are only supported with managed control plane."
+    fi
+    context_set-option "USE_MANAGED_CNI" 1
   fi
 
   if [[ -z "${CA}" ]]; then
@@ -662,6 +693,11 @@ EOF
     validate_private_ca
   elif [[ "${CUSTOM_CA}" -eq 1 ]]; then
     validate_custom_ca
+  fi
+
+  if is_offline && [[ -z "${OUTPUT_DIR}" ]]; then
+      MISSING_ARGS=1
+      warn "Output directory must be specified in offline mode."
   fi
 
   if [[ "${MISSING_ARGS}" -ne 0 ]]; then

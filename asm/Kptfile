@@ -76,7 +76,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.tag
-          value: 1.11.2-asm.17
+          value: 1.12.4-asm.1
           isSet: true
     io.k8s.cli.substitutions.gke-mcp-image:
       x-k8s-cli:
@@ -330,3 +330,9 @@ openAPI:
         setter:
           name: anthos.servicemesh.use-managed-cni
           value: "false"
+    io.k8s.cli.setters.anthos.servicemesh.created-by:
+      type: string
+      x-k8s-cli:
+        setter:
+          name: anthos.servicemesh.created-by
+          value: ""

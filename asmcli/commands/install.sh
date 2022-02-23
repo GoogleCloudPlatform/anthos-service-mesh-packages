@@ -69,23 +69,41 @@ install_private_ca() {
   # If modify_gcp_component permissions are not granted, it is assumed that the
   # user has taken care of this, else Istio setup will fail
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
+  local CA_POOL_URI; CA_POOL_URI=$(echo "${CA_NAME}" | cut -f1 -d:)
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${FLEET_ID}.svc.id.goog:/allAuthenticatedUsers/"
-  local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
-  local CA_POOL; CA_POOL=$(echo "${CA_NAME}" | cut -f6 -d/)
-  local PROJECT; PROJECT=$(echo "${CA_NAME}" | cut -f2 -d/)
+  local CA_LOCATION; CA_LOCATION=$(echo "${CA_POOL_URI}" | cut -f4 -d/)
+  local CA_POOL; CA_POOL=$(echo "${CA_POOL_URI}" | cut -f6 -d/)
+  local PROJECT; PROJECT=$(echo "${CA_POOL_URI}" | cut -f2 -d/)
 
-  retry 3 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
-    --project "${PROJECT}" \
-    --location "${CA_LOCATION}" \
-    --member "group:${WORKLOAD_IDENTITY}" \
-    --role "roles/privateca.workloadCertificateRequester"
+  if can_modify_gcp_iam_roles; then
+    # TODO : reduce retry and remove logging
+    retry 10 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
+      --project "${PROJECT}" \
+      --location "${CA_LOCATION}" \
+      --member "group:${WORKLOAD_IDENTITY}" \
+      --role "roles/privateca.workloadCertificateRequester" \
+      --log-http \
+      --verbosity debug
 
-  retry 3 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
-    --project "${PROJECT}" \
-    --location "${CA_LOCATION}" \
-    --member "group:${WORKLOAD_IDENTITY}" \
-    --role "roles/privateca.auditor"
+    # TODO : reduce retry and remove logging
+    retry 10 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
+      --project "${PROJECT}" \
+      --location "${CA_LOCATION}" \
+      --member "group:${WORKLOAD_IDENTITY}" \
+      --role "roles/privateca.auditor" \
+      --log-http \
+      --verbosity debug
+
+    if [[ "${CA_NAME}" == *":"* ]]; then
+      local CERT_TEMPLATE; CERT_TEMPLATE=$(echo "${CA_NAME}" | cut -f2 -d:)
+      retry 3 gcloud privateca templates add-iam-policy-binding "${CERT_TEMPLATE}" \
+        --member "group:${WORKLOAD_IDENTITY}" \
+        --role "roles/privateca.templateUser" \
+        --log-http \
+        --verbosity debug
+    fi
+  fi
 }
 
 does_istiod_exist(){
@@ -144,6 +162,21 @@ expose_istiod() {
 
 outro() {
   local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+  local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
+  local MANAGED_REVISION_LABEL; MANAGED_REVISION_LABEL="${REVISION_LABEL}"
+  if is_managed; then
+    case "${CHANNEL}" in
+    regular)
+      MANAGED_REVISION_LABEL="${REVISION_LABEL_REGULAR}"
+      ;;
+    stable)
+      MANAGED_REVISION_LABEL="${REVISION_LABEL_STABLE}"
+      ;;
+    rapid)
+      MANAGED_REVISION_LABEL="${REVISION_LABEL_RAPID}"
+      ;;
+    esac
+  fi
 
   info ""
   info "$(starline)"
@@ -151,9 +184,9 @@ outro() {
   info "$(starline)"
   info "The ASM control plane installation is now complete."
   info "To enable automatic sidecar injection on a namespace, you can use the following command:"
-  info "kubectl label namespace <NAMESPACE> istio-injection- istio.io/rev=${REVISION_LABEL} --overwrite"
+  info "kubectl label namespace <NAMESPACE> istio-injection- istio.io/rev=${MANAGED_REVISION_LABEL} --overwrite"
   info "If you use 'istioctl install' afterwards to modify this installation, you will need"
-  info "to specify the option '--set revision=${REVISION_LABEL}' to target this control plane"
+  info "to specify the option '--set revision=${MANAGED_REVISION_LABEL}' to target this control plane"
   info "instead of installing a new one."
 
   info "To finish the installation, enable Istio sidecar injection and restart your workloads."
@@ -215,7 +248,7 @@ install_control_plane() {
     install_control_plane_revisions
   fi
 
-  if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
+  if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]] && ! is_managed; then
     install_canonical_controller
   fi
 }

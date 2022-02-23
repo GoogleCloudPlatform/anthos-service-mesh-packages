@@ -234,7 +234,7 @@ EOF
 
 get_demo_yaml() {
  curl -L "https://raw.githubusercontent.com/GoogleCloudPlatform/\
-microservices-demo/v0.2.0/release/${1}-manifests.yaml"
+microservices-demo/v0.3.3/release/${1}-manifests.yaml"
 }
 
 verify_demo_app() {
@@ -280,7 +280,6 @@ create_working_cluster() {
     --no-enable-basic-auth \
     --release-channel "regular" \
     --machine-type "e2-standard-4" \
-    --image-type "COS" \
     --disk-type "pd-standard" \
     --disk-size "100" \
     --num-nodes "4" \
@@ -699,7 +698,7 @@ run_basic_test() {
   fi
 
   LT_NAMESPACE="$(uniq_name "${SCRIPT_NAME}" "${BUILD_ID}")"
-  OUTPUT_DIR="$(mktemp -d)"
+  OUTPUT_DIR="${OUTPUT_DIR:=$(mktemp -d)}"
 
   configure_kubectl "${LT_CLUSTER_NAME}" "${PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
 
@@ -813,6 +812,22 @@ run_basic_test() {
   date +"%T"
 
   return "$SUCCESS"
+}
+
+run_build_offline_package() {
+  local OUTPUT_DIR; OUTPUT_DIR="${1}"
+  echo "Build offline package..."
+  echo "../asmcli build-offline-package -v \
+    --output-dir ${OUTPUT_DIR}"
+  # shellcheck disable=SC2086
+    ../asmcli build-offline-package -v \
+    --output-dir "${OUTPUT_DIR}" 2>&1
+
+  # Check downloaded packages
+  [ -s "${OUTPUT_DIR}" ]
+  ls "${OUTPUT_DIR}/asm" 1>/dev/null
+  ls "${OUTPUT_DIR}/istioctl" 1>/dev/null
+  ls "${OUTPUT_DIR}/istio-"* 1>/dev/null
 }
 
 delete_service_mesh_feature() {

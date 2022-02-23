@@ -14,6 +14,12 @@ else
   set -u
 fi
 
+### Workaround for RHEL/centOS redefining which for whatever reason?
+
+if [[ -f /etc/profile.d/which2.sh ]]; then
+  unset -f which
+fi
+
 ### These are hooks for Cloud Build to be able to use debug/staging images
 ### when necessary. Don't set these environment variables unless you're testing
 ### in CI/CD.
@@ -33,9 +39,9 @@ _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"; readonly _CI_I_AM_A_TEST_RO
 
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
-MINOR="${MINOR:=11}"; readonly MINOR;
-POINT="${POINT:=2}"; readonly POINT;
-REV="${REV:=17}"; readonly REV;
+MINOR="${MINOR:=12}"; readonly MINOR;
+POINT="${POINT:=4}"; readonly POINT;
+REV="${REV:=1}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1-unstable"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
@@ -89,6 +95,7 @@ KPT_BRANCH=""
 RAW_YAML=""
 EXPANDED_YAML=""
 NAMESPACE_EXISTS=0
+IS_AUTOPILOT=0
 
 main() {
   if [[ "${*}" = '' ]]; then
@@ -128,10 +135,100 @@ main() {
       shift 1
       experimental_subcommand "${@}"
       ;;
+    build-offline-package)
+      shift 1
+      build-offline-package_subcommand "${@}"
+      ;;
     *)
       help_subcommand "${@}"
       ;;
   esac
+}
+build-offline-package_subcommand() {
+  build-offline-package_parse_args "$@"
+  build-offline-package
+}
+
+build-offline-package() {
+  set_up_local_workspace
+
+  if needs_kpt; then
+    download_kpt
+  fi
+  readonly AKPT
+
+  if ! necessary_files_exist; then
+    download_asm
+  fi
+
+  # kpt package initial downloads should be the same accross configuration
+  # so no need to call should_download_kpt_package
+  download_kpt_package
+
+  build-offline-package_outro
+}
+
+build-offline-package_parse_args() {
+  while [[ $# != 0 ]]; do
+    case "${1}" in
+      -D | --output_dir | --output-dir)
+        arg_required "${@}"
+        context_set-option "OUTPUT_DIR" "${2}"
+        shift 2
+        ;;
+      -v | --verbose)
+        context_set-option "VERBOSE" 1
+        shift 1
+        ;;
+      -h | --help)
+        context_set-option "PRINT_HELP" 1
+        shift 1
+        ;;
+      --version)
+        context_set-option "PRINT_VERSION" 1
+        shift 1
+        ;;
+    esac
+  done
+
+  local PRINT_HELP; PRINT_HELP="$(context_get-option "PRINT_HELP")"
+  local PRINT_VERSION; PRINT_VERSION="$(context_get-option "PRINT_VERSION")"
+  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
+  if [[ "${PRINT_HELP}" -eq 1 || "${PRINT_VERSION}" -eq 1 ]]; then
+    if [[ "${PRINT_VERSION}" -eq 1 ]]; then
+      version_message
+    elif [[ "${VERBOSE}" -eq 1 ]]; then
+      usage
+    else
+      usage_short
+    fi
+    exit
+  fi
+}
+
+build-offline-package_outro() {
+  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+
+  info ""
+  info "$(starline)"
+  istioctl version --remote=false
+  info "$(starline)"
+  info "The offline package download is now complete."
+
+  info "The ASM package used for installation can be found at:"
+  info "${OUTPUT_DIR}/asm"
+  info "The version of istioctl that matches the installation can be found at:"
+  info "${OUTPUT_DIR}/${ISTIOCTL_REL_PATH}"
+  info "A symlink to the istioctl binary can be found at:"
+  info "${OUTPUT_DIR}/istioctl"
+  if ! is_managed; then
+    info "The combined configuration generated for installation can be found at:"
+    info "${OUTPUT_DIR}/${RAW_YAML}"
+    info "The full, expanded set of kubernetes resources can be found at:"
+    info "${OUTPUT_DIR}/${EXPANDED_YAML}"
+  fi
+
+  info "$(starline)"
 }
 create-mesh_subcommand() {
   ### Preparation ###
@@ -155,12 +252,34 @@ create-mesh_parse_args() {
     exit 2
   fi
 
+  case "${1}" in
+    -v | --verbose)
+      case "${2}" in
+        -h | --help) create-mesh_usage; exit;;
+      esac
+      ;;
+    -h | --help)
+      case "${2}" in
+        -v | --verbose) create-mesh_usage; exit;;
+      esac
+      ;;
+  esac
+
   local FLEET_ID; FLEET_ID="${1}"
+  if [[ "${FLEET_ID}" = -* ]]; then
+    fatal "First argument must be the fleet ID."
+  fi
+
   context_set-option "FLEET_ID" "${FLEET_ID}"
   shift 1
 
   while [[ $# != 0 ]]; do
     case "${1}" in
+      -D | --output_dir | --output-dir)
+        arg_required "${@}"
+        context_set-option "OUTPUT_DIR" "${2}"
+        shift 2
+        ;;
       -v | --verbose)
         context_set-option "VERBOSE" 1
         shift 1
@@ -299,10 +418,17 @@ install_one_remote_secret() {
 
   context_set-option "KUBECONFIG" "${KCF1}"
   CTX1="$(kubectl config current-context)"
+
   SECRET_NAME="${CTX1//_/-}"
   SECRET_NAME="${SECRET_NAME//\./-}"
   SECRET_NAME="${SECRET_NAME//@/-}"
+  if [[ "${SECRET_NAME}" =~ ^gke_[^_]+_[^_]+_.+ ]]; then
+    local CTX_PROJECT CTX_LOCATION CTX_CLUSTER
+    IFS="_" read -r _ CTX_PROJECT CTX_LOCATION CTX_CLUSTER <<<"$(context_get-option "CONTEXT")"
+    SECRET_NAME="cn-${CTX_PROJECT}-${CTX_LOCATION}-${CTX_CLUSTER}"
+  fi
   SECRET_NAME="$(generate_secret_name "${SECRET_NAME}")"
+
   context_set-option "KUBECONFIG" "${KCF2}"
   local CTX2; CTX2="$(kubectl config current-context)"
 
@@ -502,6 +628,7 @@ x_install() {
 x_configure_package() {
   local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
   local USE_VPCSC; USE_VPCSC="$(context_get-option "USE_VPCSC")"
+  local ASMCLI_VERSION; ASMCLI_VERSION="$(version_message)"
   kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
   if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then
     kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
@@ -515,6 +642,8 @@ x_configure_package() {
   if [[ "${USE_VPCSC}" -eq 1 ]]; then
     kpt cfg set asm anthos.servicemesh.managed-controlplane.vpcsc.enabled "true"
   fi
+
+  kpt cfg set asm anthos.servicemesh.created-by "asmcli-${ASMCLI_VERSION//+/.}"
 }
 x_mcp_migrate_check() {
   x_parse_mcp_migrate_args "${@}"
@@ -1060,6 +1189,7 @@ SUBCOMMANDS:
   validate                            Validate will attempt a new ASM validation
   print-config                        Print Config will attempt to print the configurations used
   create-mesh                         Add multiple clusters to the mesh
+  build-offline-package               Download required packages for offline installation
 
 OPTIONS:
   -l|--cluster_location  <LOCATION>   The GCP location of the target cluster.
@@ -1111,7 +1241,11 @@ OPTIONS:
                                       Name of the ca pool in the GCP CAS service used to
                                       sign certificates in the format
                                       'projects/project_name/locations/ \
-                                      ca_region/caPools/ca_pool'.
+                                      ca_region/caPools/ca_pool'. If certificate template
+                                      needs to be specified, the format is 'projects/ \
+                                      project_name/locations/ca_region/caPools/ \
+                                      ca_pool:projects/project_name/locations/ca_region/ \
+                                      certificateTemplates/cert_template'.
   -r|--revision_name <REVISION NAME>  Custom revision label. Label needs to follow DNS
                                       label formats (re: RFC 1123). Not supported if
                                       control plane is managed. Prefixing the revision
@@ -1127,14 +1261,14 @@ OPTIONS:
                                       between Multicloud/GKE channel and the ASM Channel is
                                       as following:
                                       For Multicloud:
-                                        ASM provisions Regular, Rapid channels.
+                                        ASM provisions Regular channel.
                                       For GKE:
                                         GKE Channel  |  ASM Channel
                                         -------------|----------------
                                         Rapid        |  Rapid
-                                        Regular      |  Regular, Rapid
+                                        Regular      |  Regular
                                         Stable       |  Stable
-                                        Static       |  Regular, Rapid
+                                        Static       |  Regular
 
   The following four options must be passed together and are only necessary
   for using a custom certificate for Citadel. Users that aren't sure whether
@@ -1182,6 +1316,13 @@ FLAGS:
                                       instead of installing one in-cluster.
      --legacy                         Provision a remote, managed control plane with
                                       the legacy asmcli installer that runs client-side.
+     --use_vpcsc                      Provision a remote, managed control plane in
+                                      VPCSC environment. Not supported for --legacy
+                                      installation method.
+     --offline                        Perform an offline installation using the pre-downloaded
+                                      package in the output directory. If the directory is not
+                                      specified or does not contain the required files, the 
+                                      script will exit with error.
 
      --print_config                   Instead of installing ASM, print all of
                                       the compiled YAML to stdout. All other
@@ -1233,6 +1374,7 @@ SUBCOMMANDS:
   validate
   print-config
   create-mesh
+  build-offline-package
 
 OPTIONS:
   -l|--cluster_location  <LOCATION>
@@ -1273,6 +1415,9 @@ FLAGS:
 
      --managed
      --legacy
+     --use_vpcsc
+
+     --offline
 
      --print_config
      --disable_canonical_service
@@ -1305,6 +1450,14 @@ This command will fail if any of the specified clusters are registered to a flee
 specified by FLEET_ID.
 
 FLAGS:
+  All flags must come AFTER the FLEET_ID.
+  -D|--output_dir        <DIR PATH>   The directory where this script will place
+                                      downloaded ASM packages and configuration.
+                                      If not specified, a temporary directory
+                                      will be created. If specified and the
+                                      directory already contains the necessary
+                                      files, they will be used instead of
+                                      downloading them again.
   The following several flags are used to display help texts and the version message.
   -v|--verbose                        Print commands before and after execution.
   -h|--help                           Show this message and exit.
@@ -1333,6 +1486,45 @@ Create a multi-cluster service mesh and allow cross-cluster service discovery.
 Use -h|--help with -v|--verbose to show detailed descriptions.
 
 FLAGS:
+  -D|--output_dir <DIR PATH>
+  -v|--verbose
+  -h|--help
+  --version
+EOF
+}
+
+
+build-offline-package_usage(){
+  cat << EOF
+${SCRIPT_NAME} $(version_message)
+usage: ${SCRIPT_NAME} build-offline-package [FLAGS]...
+
+Download ASM and KPT packages to the specified output directory or a temporary directory.
+
+FLAGS:
+  -D|--output_dir        <DIR PATH>   The directory where this script will place
+                                      downloaded ASM packages and configuration.
+                                      If not specified, a temporary directory
+                                      will be created. If specified and the
+                                      directory already contains the necessary
+                                      files, they will be used instead of
+                                      downloading them again.
+  The following several flags are used to display help texts and the version message.
+  -v|--verbose                        Print commands before and after execution.
+  -h|--help                           Show this message and exit.
+  --version                           Print the version of this tool and exit.
+EOF
+}
+
+build-offline-package_usage_short(){
+  cat << EOF
+${SCRIPT_NAME} $(version_message)
+usage: ${SCRIPT_NAME} build-offline-package [FLAGS]...
+
+Download ASM and KPT packages to the specified output directory or a temporary directory.
+
+FLAGS:
+  -D|--output_dir <DIR PATH>
   -v|--verbose
   -h|--help
   --version
@@ -1409,23 +1601,41 @@ install_private_ca() {
   # If modify_gcp_component permissions are not granted, it is assumed that the
   # user has taken care of this, else Istio setup will fail
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
+  local CA_POOL_URI; CA_POOL_URI=$(echo "${CA_NAME}" | cut -f1 -d:)
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${FLEET_ID}.svc.id.goog:/allAuthenticatedUsers/"
-  local CA_LOCATION; CA_LOCATION=$(echo "${CA_NAME}" | cut -f4 -d/)
-  local CA_POOL; CA_POOL=$(echo "${CA_NAME}" | cut -f6 -d/)
-  local PROJECT; PROJECT=$(echo "${CA_NAME}" | cut -f2 -d/)
+  local CA_LOCATION; CA_LOCATION=$(echo "${CA_POOL_URI}" | cut -f4 -d/)
+  local CA_POOL; CA_POOL=$(echo "${CA_POOL_URI}" | cut -f6 -d/)
+  local PROJECT; PROJECT=$(echo "${CA_POOL_URI}" | cut -f2 -d/)
 
-  retry 3 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
-    --project "${PROJECT}" \
-    --location "${CA_LOCATION}" \
-    --member "group:${WORKLOAD_IDENTITY}" \
-    --role "roles/privateca.workloadCertificateRequester"
+  if can_modify_gcp_iam_roles; then
+    # TODO : reduce retry and remove logging
+    retry 10 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
+      --project "${PROJECT}" \
+      --location "${CA_LOCATION}" \
+      --member "group:${WORKLOAD_IDENTITY}" \
+      --role "roles/privateca.workloadCertificateRequester" \
+      --log-http \
+      --verbosity debug
 
-  retry 3 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
-    --project "${PROJECT}" \
-    --location "${CA_LOCATION}" \
-    --member "group:${WORKLOAD_IDENTITY}" \
-    --role "roles/privateca.auditor"
+    # TODO : reduce retry and remove logging
+    retry 10 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
+      --project "${PROJECT}" \
+      --location "${CA_LOCATION}" \
+      --member "group:${WORKLOAD_IDENTITY}" \
+      --role "roles/privateca.auditor" \
+      --log-http \
+      --verbosity debug
+
+    if [[ "${CA_NAME}" == *":"* ]]; then
+      local CERT_TEMPLATE; CERT_TEMPLATE=$(echo "${CA_NAME}" | cut -f2 -d:)
+      retry 3 gcloud privateca templates add-iam-policy-binding "${CERT_TEMPLATE}" \
+        --member "group:${WORKLOAD_IDENTITY}" \
+        --role "roles/privateca.templateUser" \
+        --log-http \
+        --verbosity debug
+    fi
+  fi
 }
 
 does_istiod_exist(){
@@ -1484,6 +1694,21 @@ expose_istiod() {
 
 outro() {
   local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+  local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
+  local MANAGED_REVISION_LABEL; MANAGED_REVISION_LABEL="${REVISION_LABEL}"
+  if is_managed; then
+    case "${CHANNEL}" in
+    regular)
+      MANAGED_REVISION_LABEL="${REVISION_LABEL_REGULAR}"
+      ;;
+    stable)
+      MANAGED_REVISION_LABEL="${REVISION_LABEL_STABLE}"
+      ;;
+    rapid)
+      MANAGED_REVISION_LABEL="${REVISION_LABEL_RAPID}"
+      ;;
+    esac
+  fi
 
   info ""
   info "$(starline)"
@@ -1491,9 +1716,9 @@ outro() {
   info "$(starline)"
   info "The ASM control plane installation is now complete."
   info "To enable automatic sidecar injection on a namespace, you can use the following command:"
-  info "kubectl label namespace <NAMESPACE> istio-injection- istio.io/rev=${REVISION_LABEL} --overwrite"
+  info "kubectl label namespace <NAMESPACE> istio-injection- istio.io/rev=${MANAGED_REVISION_LABEL} --overwrite"
   info "If you use 'istioctl install' afterwards to modify this installation, you will need"
-  info "to specify the option '--set revision=${REVISION_LABEL}' to target this control plane"
+  info "to specify the option '--set revision=${MANAGED_REVISION_LABEL}' to target this control plane"
   info "instead of installing a new one."
 
   info "To finish the installation, enable Istio sidecar injection and restart your workloads."
@@ -1555,7 +1780,7 @@ install_control_plane() {
     install_control_plane_revisions
   fi
 
-  if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]]; then
+  if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]] && ! is_managed; then
     install_canonical_controller
   fi
 }
@@ -1695,11 +1920,15 @@ validate_dependencies() {
 }
 
 validate_control_plane() {
-  if is_managed && is_legacy; then
-    # Managed legacy must be able to set IAM permissions on a generated user, so the flow
-    # is a bit different
-    validate_managed_control_plane_legacy
-  elif ! is_managed; then
+  if is_managed; then
+    if is_legacy; then
+      # Managed legacy must be able to set IAM permissions on a generated user, so the flow
+      # is a bit different
+      validate_managed_control_plane_legacy
+    fi
+    # Node-level Workload Identity is required for managed CNI
+    validate_node_pool_workload_identity
+  else
     validate_in_cluster_control_plane
   fi
 }
@@ -1870,14 +2099,25 @@ EOF
 }
 validate_private_ca() {
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
-  local CA_NAME_TEMPLATE; CA_NAME_TEMPLATE="projects/project_name/locations/ca_region/caPools/ca_pool"
+  
+  local CA_POOL_TEMPLATE; CA_POOL_TEMPLATE="projects/project_name/locations/ca_region/caPools/ca_pool"
+  local CT_TEMPLATE; CT_TEMPLATE="projects/project_name/locations/ca_region/certificateTemplates/cert_template"
+  local CA_NAME_TEMPLATE; CA_NAME_TEMPLATE="${CA_POOL_TEMPLATE}:${CT_TEMPLATE}"
+
+  local CA_POOL_REGEX; CA_POOL_REGEX="projects/[a-zA-Z0-9_-]+/locations/[a-zA-Z0-9_-]+/caPools/[a-zA-Z0-9_-]+"
+  local CT_REGEX; CT_REGEX="projects/[a-zA-Z0-9_-]+/locations/[a-zA-Z0-9_-]+/certificateTemplates/[a-zA-Z0-9_-]+"
+  local CA_NAME_REGEX; CA_NAME_REGEX="${CA_POOL_REGEX}:${CT_REGEX}"
 
   if [[ -z ${CA_NAME} ]]; then
     fatal "A ca-name must be provided for integration with Google Certificate Authority Service."
-  elif [[ $(grep -o "/" <<< "${CA_NAME}" | wc -l) != $(grep -o "/" <<< "${CA_NAME_TEMPLATE}" | wc -l) ]]; then
-    fatal "Malformed ca-name. ca-name must be of the form ${CA_NAME_TEMPLATE}."
-  elif [[ "$(echo "${CA_NAME}" | cut -f1 -d/)" != "$(echo "${CA_NAME_TEMPLATE}" | cut -f1 -d/)" ]]; then
-    fatal "Malformed ca-name. ca-name must be of the form ${CA_NAME_TEMPLATE}."
+  # check if CA_NAME is ca_pool:cert_template format
+  elif [[ "${CA_NAME}" == *":"* ]]; then
+    if ! [[ "${CA_NAME}" =~ ^${CA_NAME_REGEX}$ ]]; then
+      fatal "Malformed ca-name with certificate template. ca-name must be of the form ${CA_NAME_TEMPLATE}."
+    fi
+  # when CA_NAME is ca_pool format
+  elif ! [[ "${CA_NAME}" =~ ^${CA_POOL_REGEX}$ ]]; then
+    fatal "Malformed ca-name. ca-name must be of the form ${CA_POOL_TEMPLATE}."
   fi
 }
 
@@ -2085,6 +2325,8 @@ install_mananged_cni_static() {
 
   if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=on"* ]]; then
     context_append "mcpOptions" "CNI=on"
+  else
+    context_append "mcpOptions" "${ASM_OPTS}"
   fi
   context_append "kubectlFiles" "${MANAGED_CNI}"
 }
@@ -2188,6 +2430,12 @@ is_gcp() {
   fi
 }
 
+is_offline() {
+  local OFFLINE; OFFLINE="$(context_get-option "OFFLINE")"
+
+  if [[ "${OFFLINE}" -ne 1 ]]; then false; fi
+}
+
 using_connect_gateway() {
   local KVC; KVC="$(context_get-option "KC_VIA_CONNECT")"
   if [[ "${KVC}" -eq 1 ]]; then
@@ -2258,7 +2506,11 @@ EOF
   G_DATA="$(gcloud container hub memberships list --project "${FLEET_ID}" --format=json)"
   LIST="$(echo "${G_DATA}" | grep "${WANT}")"
 
-  if [[ "${IDENTITY_PROVIDER}" != "${FLEET_ID}" ]] || \
+  local FLEET_HOST_PROJECT_NUMBER
+  FLEET_HOST_PROJECT_NUMBER="$(gcloud projects describe "${FLEET_ID}" --format "value(projectNumber)")"
+
+  if [[ "${IDENTITY_PROVIDER}" != "${FLEET_ID}" ]] && \
+     [[ "${IDENTITY_PROVIDER}" != "${FLEET_HOST_PROJECT_NUMBER}" ]] || \
      [[ -z "${LIST}" ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Cluster is registered in the project ${IDENTITY_PROVIDER}, but the required Fleet project is ${FLEET_ID}.
@@ -2379,7 +2631,7 @@ is_service_mesh_feature_enabled() {
   local RESPONSE
   RESPONSE="$(run_command gcloud beta container hub mesh describe --project="${FLEET_ID}")"
 
-  if [[ "$(echo "${RESPONSE}" | jq -r '.featureState.lifecycleState')" != "ENABLED" ]]; then
+  if [[ "$(echo "${RESPONSE}" | jq -r '.featureState.lifecycleState' 2>/dev/null)" != "ENABLED" ]]; then
     false
   fi
 }
@@ -2592,6 +2844,19 @@ istio_namespace_exists() {
     NAMESPACE_EXISTS=1; readonly NAMESPACE_EXISTS
   fi
 }
+
+is_autopilot() {
+  # TODO: wait till https://pkg.go.dev/google.golang.org/genproto/googleapis/container/v1#Cluster  
+  # publish the `Autopilot` field
+  # This is a temporary workaround to check if a cluster is Autopilot or GKE
+  # This CRD will be installed only if the cluster is Autopilot
+  if [[ "${IS_AUTOPILOT}" -eq 1 ]]; then return; fi
+  if ! retry 2 kubectl get crd allowlistedworkloads.auto.gke.io 1>/dev/null 2>/dev/null; then
+    false
+  else
+    IS_AUTOPILOT=1; readonly IS_AUTOPILOT
+  fi
+}
 configure_package() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
@@ -2605,8 +2870,11 @@ configure_package() {
   local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
   local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
   local USE_VPCSC; USE_VPCSC="$(context_get-option "USE_VPCSC")"
+  local ASMCLI_VERSION; ASMCLI_VERSION="$(version_message)"
+  local INCLUDES_STACKDRIVER; INCLUDES_STACKDRIVER="$(context_get-option "INCLUDES_STACKDRIVER")"
 
   info "Configuring kpt package..."
+  set_kpt_configured
 
   populate_cluster_values
   local NETWORK_ID; NETWORK_ID="$(context_get-option "NETWORK_ID")"
@@ -2626,7 +2894,7 @@ configure_package() {
     fi
     # "global" is the current default value for off-GCP
     kpt cfg set asm gcloud.compute.location "global"
-    if [[ "${CA}" == "citadel" ]]; then
+    if [[ "${CA}" == "citadel" && "${INCLUDES_STACKDRIVER}" -eq 0 ]]; then
       kpt cfg set asm anthos.servicemesh.controlplane.monitoring.enabled "false"
     fi
   fi
@@ -2657,13 +2925,15 @@ configure_package() {
     kpt cfg set asm anthos.servicemesh.istiodHostFQDN "istiod-${REVISION_LABEL}.istio-system.svc.cluster.local"
     kpt cfg set asm anthos.servicemesh.istiod-vs-name "istiod-vs-${REVISION_LABEL}"
   fi
-  
+
   if [[ "${USE_MANAGED_CNI}" -eq 1 ]]; then
     kpt cfg set asm anthos.servicemesh.use-managed-cni "true"
   fi
   if [[ "${USE_VPCSC}" -eq 1 ]]; then
     kpt cfg set asm anthos.servicemesh.managed-controlplane.vpcsc.enabled "true"
   fi
+
+  kpt cfg set asm anthos.servicemesh.created-by "asmcli-${ASMCLI_VERSION//+/.}"
 
   configure_ca
   configure_control_plane
@@ -2755,6 +3025,7 @@ context_init() {
     "USE_HUB_WIP": ${USE_HUB_WIP:-1},
     "USE_VM": ${USE_VM:-0},
     "HUB_MEMBERSHIP_ID": "${HUB_MEMBERSHIP_ID:-}",
+    "HUB_REGISTRATION_EXTRA_FLAGS": "${HUB_REGISTRATION_EXTRA_FLAGS:-}",
     "CUSTOM_REVISION": ${CUSTOM_REVISION:-0},
     "TRUST_DOMAIN_ALIASES": "${TRUST_DOMAIN_ALIASES:-}",
     "WI_ENABLED": ${WI_ENABLED:-0},
@@ -2763,6 +3034,9 @@ context_init() {
     "INSTALL_IDENTITY_PROVIDER": ${INSTALL_IDENTITY_PROVIDER:-0},
     "EXPERIMENTAL": ${EXPERIMENTAL:-0},
     "KC_VIA_CONNECT": ${KC_VIA_CONNECT:-0},
+    "OFFLINE": "${OFFLINE:-0}",
+    "INCLUDES_PROMETHEUS": "${INCLUDES_PROMETHEUS:-0}",
+    "INCLUDES_STACKDRIVER": "${INCLUDES_STACKDRIVER:-1}",
     "CHANNEL": "${CHANNEL:-}"
   },
   "istioctlFiles": [],
@@ -2890,6 +3164,7 @@ EOF
 
 required_fleet_apis() {
   local CA; CA="$(context_get-option "CA")"
+  echo meshconfig.googleapis.com
   case "${CA}" in
    mesh_ca)
      echo meshca.googleapis.com
@@ -2910,7 +3185,7 @@ bind_user_to_cluster_admin(){
     clusterrolebinding "${PREFIX}-cluster-admin-binding" \
     --clusterrole=cluster-admin \
     --user="${GCLOUD_USER}" \
-    --dry-run -o yaml)"
+    --dry-run=client -o yaml)"
   retry 3 kubectl apply -f - <<EOF
 ${YAML}
 EOF
@@ -3134,6 +3409,8 @@ register_cluster() {
   else
     CMD="${CMD} --kubeconfig=${KCF} --context=${KCC}"
   fi
+  CMD="${CMD} $(context_get-option "HUB_REGISTRATION_EXTRA_FLAGS")"
+
   # shellcheck disable=SC2086
   retry 2 run_command ${CMD}
 }
@@ -3280,6 +3557,15 @@ parse_args() {
           info "Fleet workload identity pool is used as default for Mesh CA. No need to specify hub-meshca option."
           shift 2
           continue
+        elif [[ "${2}" == "prometheus" ]]; then
+          context_set-option "INCLUDES_PROMETHEUS" 1
+          context_set-option "INCLUDES_STACKDRIVER" 0
+        elif [[ "${2}" == "stackdriver" ]]; then
+          context_set-option "INCLUDES_PROMETHEUS" 0
+          context_set-option "INCLUDES_STACKDRIVER" 1
+        elif [[ "${2}" == "prometheus-and-stackdriver" ]]; then
+          context_set-option "INCLUDES_PROMETHEUS" 1
+          context_set-option "INCLUDES_STACKDRIVER" 1
         fi
 
         OPTIONAL_OVERLAY="${2},${OPTIONAL_OVERLAY}"
@@ -3339,6 +3625,14 @@ parse_args() {
         ;;
       --legacy)
         context_set-option "LEGACY" 1
+        shift 1
+        ;;
+      --use_vpcsc | --use-vpcsc)
+        context_set-option "USE_VPCSC" 1
+        shift 1
+        ;;
+      --use_managed_cni | --use-managed-cni)
+        context_set-option "USE_MANAGED_CNI" 1
         shift 1
         ;;
       --disable_canonical_service | --disable-canonical-service)
@@ -3417,6 +3711,10 @@ parse_args() {
         arg_required "${@}"
         context_set-option "CHANNEL" "${2}"
         shift 2
+        ;;
+      --offline)
+        context_set-option "OFFLINE" 1
+        shift 1
         ;;
       -v | --verbose)
         context_set-option "VERBOSE" 1
@@ -3859,6 +4157,10 @@ download_kpt_package() {
   retry 3 kpt pkg get --auto-set=false "${KPT_URL}" asm
   retry 3 kpt pkg get --auto-set=false "${SAMPLES_URL}" samples
 
+  touch "${ASM_SETTINGS_FILE}"
+}
+
+set_kpt_configured() {
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
   local CA; CA="$(context_get-option "CA")"
 
@@ -3867,6 +4169,12 @@ download_kpt_package() {
 
 should_download_kpt_package() {
   if [[ ! -f "${ASM_SETTINGS_FILE}" ]]; then return; fi
+  if [[ ! -s "${ASM_SETTINGS_FILE}" ]]; then
+    # Empty ASM settings file means kpt packages already exist but haven't been configured yet.
+    # No need to re-download in this case
+    false
+    return
+  fi
 
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
   local CA; CA="$(context_get-option "CA")"
@@ -3909,12 +4217,23 @@ prepare_environment() {
     fi
   fi
 
-  if needs_asm && needs_kpt; then
-    download_kpt
-  fi
-  readonly AKPT
-
   if needs_asm; then
+    # Offline mode should not trigger any download
+    if is_offline; then
+      if needs_kpt || ! necessary_files_exist || should_download_kpt_package; then
+        { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+Critical components not found in the offline mode. Note that if the installation configuration has changed,
+kpt packages would have to be re-downloaded. Please run "asmcli build-offline-package"
+and pass the directory containing the required files to install ASM successfully offline.
+EOF
+      fi
+    fi
+
+    if needs_kpt; then
+      download_kpt
+    fi
+    readonly AKPT
+
     if ! necessary_files_exist; then
       download_asm
     fi
@@ -4131,6 +4450,9 @@ set_up_local_workspace() {
   else
     OUTPUT_DIR="$(apath -f "${OUTPUT_DIR}")"
     if [[ ! -a "${OUTPUT_DIR}" ]]; then
+      if is_offline; then
+        fatal "${OUTPUT_DIR} must exist for offline installation."
+      fi
       if ! mkdir -p "${OUTPUT_DIR}"; then
         fatal "Failed to create directory ${OUTPUT_DIR}"
       fi
@@ -4307,12 +4629,10 @@ get_cr_channels() {
     echo "${CHANNEL}"
   elif ! is_gcp; then
     echo regular
-    echo rapid
   else
     local GKE_CHANNEL; GKE_CHANNEL="$(get_gke_release_channel)"
     case "${GKE_CHANNEL}" in
       regular)
-        echo rapid
         echo regular
         ;;
       rapid)
@@ -4322,7 +4642,6 @@ get_cr_channels() {
         echo stable
         ;;
       *)
-        echo rapid
         echo regular
         ;;
     esac
@@ -4605,6 +4924,30 @@ EOF
   fi
 }
 
+validate_node_pool_workload_identity(){
+  # Autopilot clusters do not allow accessing/mutating the node pools
+  # so we skip in such cases.
+  if is_autopilot; then
+    return
+  fi
+  local METADATA_CONFIG_MODE MACHINE_CPU_REQ
+  # No CPU requirement for Managed ASM
+  MACHINE_CPU_REQ=0
+  METADATA_CONFIG_MODE="$(list_valid_pools "${MACHINE_CPU_REQ}" | \
+      jq -r '.[] |
+        .config.workloadMetadataConfig.mode
+      ' 2>/dev/null)" || true
+  if [[ "${METADATA_CONFIG_MODE}" != "GKE_METADATA" ]]; then
+    { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
+Node pool Workload Identity is not enabled which is a pre-requisite for Managed ASM.
+Please follow:
+  https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity#migrate_applications_to 
+to migrate or update to a Workload Identity Enabled Node pool. 
+If installation continues, Managed ASM components such as CNI will not work properly.
+EOF
+  fi
+}
+
 validate_expected_control_plane(){
   info "Checking Istio installations..."
   check_no_istiod_outside_of_istio_system_namespace
@@ -4694,7 +5037,8 @@ validate_ca_consistency() {
 
 validate_no_ingress_gateway() {
   local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
-  if [[ "${CUSTOM_OVERLAY}" =~ "legacy-default-ingressgateway" ]]; then
+  if [[ "${CUSTOM_OVERLAY}" =~ "legacy-default-ingressgateway" || \
+        "${CUSTOM_OVERLAY}" =~ "iap-operator" ]]; then
     return
   fi
 
@@ -4705,10 +5049,8 @@ validate_no_ingress_gateway() {
     return
   fi
 
-  warn "Defaults have changed between previous installation methods and this tool."
   warn "We detected an ASM ingress gateway currently running in the cluster that"
-  warn "would be disabled if continuing with default configuration."
-  warn "If this is intended, please enter Y. If this is not intended, please enter"
+  warn "will be disabled if installation continues. If this is not intended, please enter"
   warn "N and re-run the tool with the '--option legacy-default-ingressgateway'."
   if ! prompt_default_no "Continue?"; then fatal "Stopping installation at user request."; fi
 }
@@ -4971,9 +5313,17 @@ validate_args() {
   local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
   local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
+  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
 
   if is_legacy && ! is_managed; then
       fatal "The --legacy option is only supported with managed control plane."
+  fi
+
+  if is_autopilot; then
+    if ! is_managed; then
+      fatal "Autopilot clusters are only supported with managed control plane."
+    fi
+    context_set-option "USE_MANAGED_CNI" 1
   fi
 
   if [[ -z "${CA}" ]]; then
@@ -5103,6 +5453,11 @@ EOF
     validate_private_ca
   elif [[ "${CUSTOM_CA}" -eq 1 ]]; then
     validate_custom_ca
+  fi
+
+  if is_offline && [[ -z "${OUTPUT_DIR}" ]]; then
+      MISSING_ARGS=1
+      warn "Output directory must be specified in offline mode."
   fi
 
   if [[ "${MISSING_ARGS}" -ne 0 ]]; then
