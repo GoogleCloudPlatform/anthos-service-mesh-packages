@@ -77,31 +77,23 @@ install_private_ca() {
   local PROJECT; PROJECT=$(echo "${CA_POOL_URI}" | cut -f2 -d/)
 
   if can_modify_gcp_iam_roles; then
-    # TODO : reduce retry and remove logging
-    retry 10 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
+    retry 3 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
       --project "${PROJECT}" \
       --location "${CA_LOCATION}" \
       --member "group:${WORKLOAD_IDENTITY}" \
-      --role "roles/privateca.workloadCertificateRequester" \
-      --log-http \
-      --verbosity debug
+      --role "roles/privateca.workloadCertificateRequester"
 
-    # TODO : reduce retry and remove logging
-    retry 10 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
+    retry 3 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
       --project "${PROJECT}" \
       --location "${CA_LOCATION}" \
       --member "group:${WORKLOAD_IDENTITY}" \
-      --role "roles/privateca.auditor" \
-      --log-http \
-      --verbosity debug
+      --role "roles/privateca.auditor"
 
     if [[ "${CA_NAME}" == *":"* ]]; then
       local CERT_TEMPLATE; CERT_TEMPLATE=$(echo "${CA_NAME}" | cut -f2 -d:)
       retry 3 gcloud privateca templates add-iam-policy-binding "${CERT_TEMPLATE}" \
         --member "group:${WORKLOAD_IDENTITY}" \
-        --role "roles/privateca.templateUser" \
-        --log-http \
-        --verbosity debug
+        --role "roles/privateca.templateUser"
     fi
   fi
 }
