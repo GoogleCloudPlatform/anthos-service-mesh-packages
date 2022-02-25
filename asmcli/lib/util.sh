@@ -184,8 +184,10 @@ enable_common_message() {
 }
 
 download_kpt() {
-  local PLATFORM
+  local PLATFORM HTTPS_PROXY
   PLATFORM="$(get_platform "$(uname)" "$(uname -m)")"
+  HTTPS_PROXY="$(context_get-option "HTTPS_PROXY")"
+
   if [[ -z "${PLATFORM}" ]]; then
     fatal "$(uname) $(uname -m) is not a supported platform to perform installation from."
   fi
@@ -194,7 +196,11 @@ download_kpt() {
   KPT_TGZ="https://github.com/GoogleContainerTools/kpt/releases/download/v0.39.3/kpt_${PLATFORM}-0.39.3.tar.gz"
 
   info "Downloading kpt.."
-  curl -L "${KPT_TGZ}" | tar xz
+  if [[ -n "${HTTPS_PROXY}" ]]; then
+    HTTPS_PROXY="${HTTPS_PROXY}" curl -L "${KPT_TGZ}" | tar xz
+  else
+    curl -L "${KPT_TGZ}" | tar xz
+  fi
   AKPT="$(apath -f kpt)"
 }
 
@@ -218,8 +224,9 @@ get_platform() {
 }
 
 download_asm() {
-  local OS
+  local OS HTTPS_PROXY
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  HTTPS_PROXY="$(context_get-option "HTTPS_PROXY")"
 
   case "$(uname)" in
     Linux ) OS="linux-amd64";;
@@ -230,8 +237,13 @@ download_asm() {
   info "Downloading ASM.."
   local TARBALL; TARBALL="istio-${RELEASE}-${OS}.tar.gz"
   if [[ -z "${_CI_ASM_PKG_LOCATION}" ]]; then
-    curl -L "https://storage.googleapis.com/gke-release/asm/${TARBALL}" \
-      | tar xz
+    if [[ -n "${HTTPS_PROXY}" ]]; then
+      HTTPS_PROXY="${HTTPS_PROXY}" curl -L "https://storage.googleapis.com/gke-release/asm/${TARBALL}" \
+        | tar xz
+    else
+      curl -L "https://storage.googleapis.com/gke-release/asm/${TARBALL}" \
+        | tar xz
+    fi
   else
     local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
     run_command curl -L "https://storage.googleapis.com/${_CI_ASM_PKG_LOCATION}/asm/${TARBALL}" \
