@@ -17,6 +17,7 @@ metadata:
   name: istio-ingressgateway
   annotations:
     networking.gke.io/load-balancer-type: "Internal"
+    beta.cloud.google.com/backend-config: '{"default": "config-default"}'
   labels:
     app: istio-ingressgateway
     istio: ingressgateway
