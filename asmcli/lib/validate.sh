@@ -484,7 +484,7 @@ enable_service_mesh_feature() {
 
   info "Enabling the service mesh feature..."
 
-  retry 2 run_command gcloud beta container hub mesh enable --project="${FLEET_ID}"
+  retry 2 run_command gcloud container fleet mesh enable --project="${FLEET_ID}"
 }
 
 check_istio_deployed(){
