@@ -40,8 +40,8 @@ _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"; readonly _CI_I_AM_A_TEST_RO
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=12}"; readonly MINOR;
-POINT="${POINT:=4}"; readonly POINT;
-REV="${REV:=2}"; readonly REV;
+POINT="${POINT:=5}"; readonly POINT;
+REV="${REV:=0}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
@@ -2311,7 +2311,7 @@ install_mananged_cni_static() {
     get --ignore-not-found cm asm-options \
     -o jsonpath='{.data.ASM_OPTS}' || true)"
 
-  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=on"* ]]; then
+  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=on"* && "${ASM_OPTS}" != *"CNI=off"* ]]; then
     context_append "mcpOptions" "CNI=on"
   else
     context_append "mcpOptions" "${ASM_OPTS}"
@@ -2617,7 +2617,7 @@ is_service_mesh_feature_enabled() {
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   local RESPONSE
-  RESPONSE="$(run_command gcloud beta container hub mesh describe --project="${FLEET_ID}")"
+  RESPONSE="$(run_command gcloud container fleet mesh describe --project="${FLEET_ID}")"
 
   if [[ "$(echo "${RESPONSE}" | jq -r '.featureState.lifecycleState')" != "ENABLED" ]]; then
     false
@@ -5244,7 +5244,7 @@ enable_service_mesh_feature() {
 
   info "Enabling the service mesh feature..."
 
-  retry 2 run_command gcloud beta container hub mesh enable --project="${FLEET_ID}"
+  retry 2 run_command gcloud container fleet mesh enable --project="${FLEET_ID}"
 }
 
 check_istio_deployed(){
