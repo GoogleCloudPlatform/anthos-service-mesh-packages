@@ -1806,6 +1806,13 @@ configure_citadel() {
 
 install_citadel() {
   local CUSTOM_CA; CUSTOM_CA="$(context_get-option "CUSTOM_CA")"
+  local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
+  local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
+  local INCLUDES_STACKDRIVER; INCLUDES_STACKDRIVER="$(context_get-option "INCLUDES_STACKDRIVER")"
+
+  if [[ "${USE_HUB_WIP}" -eq 1 && "${INCLUDES_STACKDRIVER}" -eq 1 ]]; then
+    kpt cfg set asm anthos.servicemesh.idp-url "${HUB_IDP_URL}"
+  fi
 
   if [[ "${CUSTOM_CA}" -eq 1 ]]; then
     install_custom_certificates
