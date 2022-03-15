@@ -33,6 +33,8 @@ EOF
 staging_releases() {
   cat << EOF
 staging 1.11
+staging 1.12
+staging 1.13
 EOF
 }
 
