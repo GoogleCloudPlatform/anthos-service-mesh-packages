@@ -172,13 +172,18 @@ EOF
 
   if [[ "${*}" == *"services list --enabled"*"this_should_pass" ]]; then
     cat <<EOF
-mesh.googleapis.com
+container.googleapis.com
+monitoring.googleapis.com
+logging.googleapis.com
+cloudtrace.googleapis.com
+meshconfig.googleapis.com
+iamcredentials.googleapis.com
+gkeconnect.googleapis.com
+gkehub.googleapis.com
+cloudresourcemanager.googleapis.com
+stackdriver.googleapis.com
 meshconfig.googleapis.com
 meshca.googleapis.com
-container.googleapis.com
-gkehub.googleapis.com
-monitoring.googleapis.com
-stackdriver.googleapis.com
 opsconfigmonitoring.googleapis.com
 privateca.googleapis.com
 EOF
