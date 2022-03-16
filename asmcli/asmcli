@@ -2092,7 +2092,7 @@ install_mananged_cni_static() {
     get --ignore-not-found cm asm-options \
     -o jsonpath='{.data.ASM_OPTS}' || true)"
 
-  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=on"* ]]; then
+  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=on"* && "${ASM_OPTS}" != *"CNI=off"* ]]; then
     context_append "mcpOptions" "CNI=on"
   else
     context_append "mcpOptions" "${ASM_OPTS}"
