@@ -43,6 +43,31 @@ required_iam_roles() {
 }
 # [END required_iam_roles]
 
+old_required_apis() {
+  local CA; CA="$(context_get-option "CA")"
+    cat << EOF
+container.googleapis.com
+monitoring.googleapis.com
+logging.googleapis.com
+cloudtrace.googleapis.com
+meshconfig.googleapis.com
+iamcredentials.googleapis.com
+gkeconnect.googleapis.com
+gkehub.googleapis.com
+cloudresourcemanager.googleapis.com
+stackdriver.googleapis.com
+EOF
+   case "${CA}" in
+   mesh_ca)
+     echo meshca.googleapis.com
+     ;;
+   gcp_cas)
+     echo privateca.googleapis.com
+     ;;
+    *);;
+  esac
+}
+
 # [START required_apis]
 required_apis() {
   local CA; CA="$(context_get-option "CA")"

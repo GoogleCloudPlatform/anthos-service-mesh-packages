@@ -329,10 +329,20 @@ EOF
 exit_if_apis_not_enabled() {
   local ENABLED; ENABLED="$(get_enabled_apis)";
   local REQUIRED; REQUIRED="$(required_apis)";
+  local OLD_REQUIRED; OLD_REQUIRED="$(old_required_apis)";
   local NOTFOUND; NOTFOUND="";
+  local OLD_NOTFOUND; OLD_NOTFOUND="";
 
   info "Checking required APIs..."
   NOTFOUND="$(find_missing_strings "${REQUIRED}" "${ENABLED}")"
+  OLD_NOTFOUND="$(find_missing_strings "${OLD_REQUIRED}" "${ENABLED}")"
+
+  if [[ -z "${OLD_NOTFOUND}" ]]; then
+    if [[ -n "${NOTFOUND}" ]]; then
+      warn "mesh.googleapis.com will be required in future versions of ASM."
+    fi
+    return;
+  fi
 
   if [[ -n "${NOTFOUND}" ]]; then
     for api in $(echo "${NOTFOUND}" | tr ' ' '\n'); do
