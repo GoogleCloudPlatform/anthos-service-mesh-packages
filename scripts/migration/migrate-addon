@@ -235,8 +235,13 @@ xjb8UkCmyjU=
 "
 
 configure_mesh_ca_16() {
-  # TODO: skip when there is no 1.6 usage at all
   prompt "Configuring Istio Addon 1.6 to trust Anthos Service Mesh..."
+  #
+  ISTIOD_16_REPLICA="$(kubectl get deployment/istiod-istio-1611 -n istio-system -ojsonpath='{.status.availableReplicas}' --ignore-not-found)"
+  if [[ -z "${ISTIOD_16_REPLICA}" || "${ISTIOD_16_REPLICA}" == "0" ]];then
+    echo "Skip because Istio Addon 1.6 control plane does not exists"
+    return
+  fi
   HUB_WIP="$(kube get cm -n istio-system env-${REVISION} -ojsonpath='{.data.TRUST_DOMAIN}' --ignore-not-found)"
   if [[ -z ${HUB_WIP} ]]; then
     HUB_WIP="$(kube get cm -n istio-system istio-${REVISION} -oyaml | grep 'trustDomain: .*' | cut -d':' -f2 | xargs)"
@@ -323,6 +328,12 @@ EOF
 
 configure_mesh_ca_14() {
   prompt "Configuring Istio Addon 1.4 to trust Anthos Service Mesh..."
+  PILOT_EXISTS="$(kube get pods -listio=pilot -n istio-system --ignore-not-found)"
+  CITADEL_EXISTS="$(kube get pods -listio=citadel -n istio-system --ignore-not-found)"
+  if [[ -z "${PILOT_EXISTS}" || -z "${CITADEL_EXISTS}" ]];then
+    echo "Skip because Istio Addon 1.4 control plane does not exists"
+    return
+  fi
   pushd "${TMP_DIR}" > /dev/null
   kube -n istio-system apply -f - << EOF
 apiVersion: v1
