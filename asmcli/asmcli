@@ -3435,7 +3435,7 @@ register_cluster() {
   else
     CMD="${CMD} --kubeconfig=${KCF} --context=${KCC}"
   fi
-  if OPENSHIFT_CLUSTER; then
+  if ${OPENSHIFT_CLUSTER}; then
    CMD="${CMD} --has-private-issuer"
   fi
   CMD="${CMD} $(context_get-option "HUB_REGISTRATION_EXTRA_FLAGS")"
