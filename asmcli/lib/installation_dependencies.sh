@@ -320,7 +320,7 @@ register_cluster() {
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local KCF; KCF="$(context_get-option "KUBECONFIG")"
   local KCC; KCC="$(context_get-option "CONTEXT")"
-  local OPENSHIFT_CLUSTER; OPENSHIFT_CLUSTER="$(context_get-option "OPENSHIFT_CLUSTER_SETUP")"
+  local PRIVATE_ISSUER; PRIVATE_ISSUER="$(context_get-option "PRIVATE_ISSUER")"
 
   if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
     ensure_cross_project_service_accounts "${FLEET_ID}" "${PROJECT_ID}"
@@ -335,7 +335,7 @@ register_cluster() {
   else
     CMD="${CMD} --kubeconfig=${KCF} --context=${KCC}"
   fi
-  if ${OPENSHIFT_CLUSTER}; then
+  if ${PRIVATE_ISSUER}; then
    CMD="${CMD} --has-private-issuer"
   fi
   CMD="${CMD} $(context_get-option "HUB_REGISTRATION_EXTRA_FLAGS")"

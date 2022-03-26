@@ -65,7 +65,7 @@ context_init() {
     "INCLUDES_PROMETHEUS": "${INCLUDES_PROMETHEUS:-0}",
     "INCLUDES_STACKDRIVER": "${INCLUDES_STACKDRIVER:-1}",
     "CHANNEL": "${CHANNEL:-}",
-    "OPENSHIFT_CLUSTER_SETUP": "${OPENSHIFT_CLUSTER_SETUP:-}"
+    "PRIVATE_ISSUER": "${PRIVATE_ISSUER:-}"
   },
   "istioctlFiles": [],
   "kubectlFiles": [],
