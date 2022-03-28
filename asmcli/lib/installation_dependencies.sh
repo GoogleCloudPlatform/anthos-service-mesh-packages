@@ -320,6 +320,7 @@ register_cluster() {
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local KCF; KCF="$(context_get-option "KUBECONFIG")"
   local KCC; KCC="$(context_get-option "CONTEXT")"
+  local PRIVATE_ISSUER; PRIVATE_ISSUER="$(context_get-option "PRIVATE_ISSUER")"
 
   if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
     ensure_cross_project_service_accounts "${FLEET_ID}" "${PROJECT_ID}"
@@ -333,6 +334,9 @@ register_cluster() {
     CMD="${CMD} --gke-uri=${GKE_CLUSTER_URI}"
   else
     CMD="${CMD} --kubeconfig=${KCF} --context=${KCC}"
+  fi
+  if ${PRIVATE_ISSUER}; then
+   CMD="${CMD} --has-private-issuer"
   fi
   CMD="${CMD} $(context_get-option "HUB_REGISTRATION_EXTRA_FLAGS")"
 
