@@ -64,7 +64,8 @@ context_init() {
     "OFFLINE": "${OFFLINE:-0}",
     "INCLUDES_PROMETHEUS": "${INCLUDES_PROMETHEUS:-0}",
     "INCLUDES_STACKDRIVER": "${INCLUDES_STACKDRIVER:-1}",
-    "CHANNEL": "${CHANNEL:-}"
+    "CHANNEL": "${CHANNEL:-}",
+    "PRIVATE_ISSUER": "${PRIVATE_ISSUER:-}"
   },
   "istioctlFiles": [],
   "kubectlFiles": [],
