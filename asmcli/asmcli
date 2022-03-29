@@ -3435,8 +3435,8 @@ register_cluster() {
   else
     CMD="${CMD} --kubeconfig=${KCF} --context=${KCC}"
   fi
-  if ${PRIVATE_ISSUER}; then
-   CMD="${CMD} --has-private-issuer"
+  if [[ "${PRIVATE_ISSUER}" -eq 1 ]]; then
+    CMD="${CMD} --has-private-issuer"
   fi
   CMD="${CMD} $(context_get-option "HUB_REGISTRATION_EXTRA_FLAGS")"
 
