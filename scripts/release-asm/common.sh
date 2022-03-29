@@ -27,6 +27,7 @@ prod_releases() {
   cat << EOF
 release 1.11
 release 1.12
+release 1.13
 EOF
 }
 
