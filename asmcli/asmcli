@@ -4191,12 +4191,18 @@ EOF
 }
 
 download_kpt_package() {
-  local SAMPLES_URL
+  local SAMPLES_URL HTTPS_PROXY
   SAMPLES_URL="${KPT_URL/asm@/samples@}"
+  HTTPS_PROXY="$(context_get-option "HTTPS_PROXY")"
 
   info "Downloading ASM kpt package..."
-  retry 3 kpt pkg get --auto-set=false "${KPT_URL}" asm
-  retry 3 kpt pkg get --auto-set=false "${SAMPLES_URL}" samples
+  if [[ -n "${HTTPS_PROXY}" ]]; then
+    HTTPS_PROXY="${HTTPS_PROXY}" retry 3 kpt pkg get --auto-set=false "${KPT_URL}" asm
+    HTTPS_PROXY="${HTTPS_PROXY}" retry 3 kpt pkg get --auto-set=false "${SAMPLES_URL}" samples
+  else
+    retry 3 kpt pkg get --auto-set=false "${KPT_URL}" asm
+    retry 3 kpt pkg get --auto-set=false "${SAMPLES_URL}" samples
+  fi
 
   touch "${ASM_SETTINGS_FILE}"
 }
