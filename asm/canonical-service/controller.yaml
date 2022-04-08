@@ -120,41 +120,7 @@ status:
     plural: ""
   conditions: []
   storedVersions: []
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: canonical-service-leader-election-role
-  namespace: asm-system
-  annotations:
-    gke.io/cluster: "gke://PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - ""
-  resources:
-  - configmaps/status
-  verbs:
-  - get
-  - update
-  - patch
-- apiGroups:
-  - ""
-  resources:
-  - events
-  verbs:
-  - create
+
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -220,22 +186,6 @@ metadata:
   namespace: asm-system
   annotations:
     gke.io/cluster: "gke://PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: canonical-service-leader-election-rolebinding
-  namespace: asm-system
-  annotations:
-    gke.io/cluster: "gke://PROJECT_ID/us-central1-c/asm-cluster" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gkeio-cluster"}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: canonical-service-leader-election-role
-subjects:
-- kind: ServiceAccount
-  name: canonical-service-account
-  namespace: asm-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
