@@ -95,6 +95,109 @@ context_post-init() {
   # a proxy. If this proxy is exported, the gcloud will
   # break.
   unset HTTPS_PROXY
+
+  local VALUE
+  # When we pull values from environment variables, we
+  # should print them to make it obvious.
+  for opt in $(default_empty_opts); do
+    VALUE="$(context_get-option "${opt}")"
+    if [[ -n "${VALUE}" ]]; then
+      info "Using ${opt} = ${VALUE} from environment."
+    fi
+  done
+
+  for opt in $(default_zero_opts); do
+    VALUE="$(context_get-option "${opt}")"
+    if [[ "${VALUE}" -ne 0 ]]; then
+      info "Using ${opt} = ${VALUE} from environment."
+    fi
+  done
+
+  for opt in $(default_one_opts); do
+    VALUE="$(context_get-option "${opt}")"
+    if [[ "${VALUE}" -ne 1 ]]; then
+      info "Using ${opt} = ${VALUE} from environment."
+    fi
+  done
+}
+
+default_empty_opts() {
+  cat <<EOF
+KUBECONFIG
+PROJECT_ID
+CLUSTER_NAME
+CLUSTER_LOCATION
+GKE_CLUSTER_URI
+FLEET_ID
+CA
+PLATFORM
+CONTEXT
+CUSTOM_OVERLAY
+OPTIONAL_OVERLAY
+NETWORK_ID
+SERVICE_ACCOUNT
+KEY_FILE
+OUTPUT_DIR
+CA_CERT
+CA_KEY
+CA_ROOT
+CA_CHAIN
+CA_NAME
+MANAGED_SERVICE_ACCOUNT
+HUB_MEMBERSHIP_ID
+HUB_REGISTRATION_EXTRA_FLAGS
+CHANNEL
+PRIVATE_ISSUER
+EOF
+}
+
+default_zero_opts() {
+  cat <<EOF
+KUBECONFIG_SUPPLIED
+ENABLE_ALL
+ENABLE_CLUSTER_ROLES
+ENABLE_CLUSTER_LABELS
+ENABLE_GCP_APIS
+ENABLE_GCP_IAM_ROLES
+ENABLE_GCP_COMPONENTS
+ENABLE_REGISTRATION
+ENABLE_NAMESPACE_CREATION
+ENABLE_MESHCONFIG_INIT
+USE_MANAGED_CNI
+USE_VPCSC
+DISABLE_CANONICAL_SERVICE
+PRINT_CONFIG
+NON_INTERACTIVE
+DRY_RUN
+ONLY_VALIDATE
+VALIDATION_ERROR
+ONLY_ENABLE
+VERBOSE
+MANAGED
+LEGACY
+PRINT_HELP
+PRINT_VERSION
+CUSTOM_CA
+USE_VM
+CUSTOM_REVISION
+TRUST_DOMAIN_ALIASES
+WI_ENABLED
+HTTPS_PROXY
+INSTALL_EXPANSION_GATEWAY
+INSTALL_IDENTITY_PROVIDER
+EXPERIMENTAL
+KC_VIA_CONNECT
+OFFLINE
+INCLUDES_PROMETHEUS
+EOF
+}
+
+default_one_opts() {
+  cat <<EOF
+TRUST_FLEET_IDENTITY
+USE_HUB_WIP
+INCLUDES_STACKDRIVER
+EOF
 }
 
 context_get-option() {
