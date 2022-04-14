@@ -164,30 +164,6 @@ EOF
   fi
 }
 
-validate_node_pool_workload_identity(){
-  # Autopilot clusters do not allow accessing/mutating the node pools
-  # so we skip in such cases.
-  if is_autopilot; then
-    return
-  fi
-  local METADATA_CONFIG_MODE MACHINE_CPU_REQ
-  # No CPU requirement for Managed ASM
-  MACHINE_CPU_REQ=0
-  METADATA_CONFIG_MODE="$(list_valid_pools "${MACHINE_CPU_REQ}" | \
-      jq -r '.[] |
-        .config.workloadMetadataConfig.mode
-      ' 2>/dev/null)" || true
-  if [[ "${METADATA_CONFIG_MODE}" != "GKE_METADATA" ]]; then
-    { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
-Node pool Workload Identity is not enabled which is a pre-requisite for Managed ASM.
-Please follow:
-  https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity#migrate_applications_to 
-to migrate or update to a Workload Identity Enabled Node pool. 
-If installation continues, Managed ASM components such as CNI will not work properly.
-EOF
-  fi
-}
-
 validate_expected_control_plane(){
   info "Checking Istio installations..."
   check_no_istiod_outside_of_istio_system_namespace
@@ -567,13 +543,6 @@ validate_args() {
 
   if is_legacy && ! is_managed; then
       fatal "The --legacy option is only supported with managed control plane."
-  fi
-
-  if is_autopilot; then
-    if ! is_managed; then
-      fatal "Autopilot clusters are only supported with managed control plane."
-    fi
-    context_set-option "USE_MANAGED_CNI" 1
   fi
 
   if [[ -z "${CA}" ]]; then
