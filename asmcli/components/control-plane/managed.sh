@@ -33,7 +33,7 @@ install_managed_control_plane() {
   fi
 
   if [[ "${USE_MANAGED_CNI}" -eq 0 ]]; then
-    install_mananged_cni_static
+    install_managed_cni_static
   fi
 
   if [[ "${CA}" = "gcp_cas" ]]; then
@@ -120,8 +120,18 @@ EOF
 
 }
 
-install_mananged_cni_static() {
+install_managed_cni_static() {
   info "Configuring CNI..."
+  if ! node_pool_wi_enabled; then
+  { read -r -d '' MSG; warn_pause "${MSG}"; } <<EOF || true
+
+Nodepool Workload identity is not enabled or only partially enabled. CNI components will be installed but won't be used.
+To use CNI, please follow:
+  https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity#migrate_applications_to 
+to migrate or update to a Workload Identity Enabled Node pool.
+
+EOF
+  fi
   local ASM_OPTS
   ASM_OPTS="$(kubectl -n istio-system \
     get --ignore-not-found cm asm-options \
