@@ -92,6 +92,7 @@ RAW_YAML=""
 EXPANDED_YAML=""
 NAMESPACE_EXISTS=0
 IS_AUTOPILOT=0
+NODE_POOL_WI_ENABLED=0
 
 main() {
   if [[ "${*}" = '' ]]; then
