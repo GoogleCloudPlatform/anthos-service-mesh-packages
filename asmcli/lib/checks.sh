@@ -474,3 +474,31 @@ is_autopilot() {
     IS_AUTOPILOT=1; readonly IS_AUTOPILOT
   fi
 }
+
+node_pool_wi_enabled(){
+  # Autopilot clusters do not allow accessing/mutating the node pools
+  # so we skip in such cases.
+  if is_autopilot || [[ "${NODE_POOL_WI_ENABLED}" -eq 1 ]]; then 
+    return
+  fi
+  local METADATA_CONFIG_MODE MACHINE_CPU_REQ
+  # No CPU requirement for Managed ASM
+  MACHINE_CPU_REQ=0
+  METADATA_CONFIG_MODE="$(list_valid_pools "${MACHINE_CPU_REQ}" | \
+      jq -r '.[] |
+        .config.workloadMetadataConfig.mode
+      ' 2>/dev/null)" || true
+  if [[ -z "${METADATA_CONFIG_MODE}" ]]; then
+    NODE_POOL_WI_ENABLED=0
+    false
+    return
+  fi
+  for metadata in ${METADATA_CONFIG_MODE}; do
+    if [[ "${metadata}" != "GKE_METADATA" ]]; then
+      NODE_POOL_WI_ENABLED=0
+      false
+      return
+    fi
+  done
+  NODE_POOL_WI_ENABLED=1; readonly NODE_POOL_WI_ENABLED
+}

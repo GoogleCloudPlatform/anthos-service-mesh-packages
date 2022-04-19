@@ -91,11 +91,32 @@ validate_dependencies() {
 }
 
 validate_control_plane() {
-  if is_managed && is_legacy; then
-    # Managed legacy must be able to set IAM permissions on a generated user, so the flow
-    # is a bit different
-    validate_managed_control_plane_legacy
-  elif ! is_managed; then
+  if is_autopilot; then
+    validate_autopilot
+  elif is_managed; then
+    if is_legacy; then
+      # Managed legacy must be able to set IAM permissions on a generated user, so the flow
+      # is a bit different
+      validate_managed_control_plane_legacy
+    fi
+  else
     validate_in_cluster_control_plane
   fi
+}
+
+validate_autopilot() {
+  if ! is_managed; then
+    fatal "Autopilot clusters are only supported with managed control plane."
+  fi
+  if is_legacy; then
+    fatal "Autopilot clusters are not supported with legacy managed control plane."
+  fi
+  # Autopilot requires managed CNI
+  local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
+  if [[ "${USE_MANAGED_CNI}" -eq 0 ]]; then
+    warn "Managed CNI is required to continue installing managed ASM on GKE Autopilot."
+    warn "Confirm or pass --use-managed-cni flag to asmcli."
+    if ! prompt_default_no "Continue?"; then fatal "Stopping installation at user request."; fi
+  fi
+  context_set-option "USE_MANAGED_CNI" 1
 }
