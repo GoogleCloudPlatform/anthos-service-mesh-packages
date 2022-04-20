@@ -48,6 +48,7 @@ validate_cli_dependencies() {
   done <<EOF
 awk
 $AGCLOUD
+git
 grep
 jq
 $AKUBECTL
