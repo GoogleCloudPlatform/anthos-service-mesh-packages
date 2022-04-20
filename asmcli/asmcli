@@ -96,6 +96,7 @@ RAW_YAML=""
 EXPANDED_YAML=""
 NAMESPACE_EXISTS=0
 IS_AUTOPILOT=0
+NODE_POOL_WI_ENABLED=0
 
 main() {
   if [[ "${*}" = '' ]]; then
@@ -1912,17 +1913,34 @@ validate_dependencies() {
 }
 
 validate_control_plane() {
-  if is_managed; then
+  if is_autopilot; then
+    validate_autopilot
+  elif is_managed; then
     if is_legacy; then
       # Managed legacy must be able to set IAM permissions on a generated user, so the flow
       # is a bit different
       validate_managed_control_plane_legacy
     fi
-    # Node-level Workload Identity is required for managed CNI
-    validate_node_pool_workload_identity
   else
     validate_in_cluster_control_plane
   fi
+}
+
+validate_autopilot() {
+  if ! is_managed; then
+    fatal "Autopilot clusters are only supported with managed control plane."
+  fi
+  if is_legacy; then
+    fatal "Autopilot clusters are not supported with legacy managed control plane."
+  fi
+  # Autopilot requires managed CNI
+  local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
+  if [[ "${USE_MANAGED_CNI}" -eq 0 ]]; then
+    warn "Managed CNI is required to continue installing managed ASM on GKE Autopilot."
+    warn "Confirm or pass --use-managed-cni flag to asmcli."
+    if ! prompt_default_no "Continue?"; then fatal "Stopping installation at user request."; fi
+  fi
+  context_set-option "USE_MANAGED_CNI" 1
 }
 validate_custom_ca() {
   local CA_ROOT; CA_ROOT="$(context_get-option "CA_ROOT")"
@@ -2228,7 +2246,7 @@ install_managed_control_plane() {
   fi
 
   if [[ "${USE_MANAGED_CNI}" -eq 0 ]]; then
-    install_mananged_cni_static
+    install_managed_cni_static
   fi
 
   if [[ "${CA}" = "gcp_cas" ]]; then
@@ -2315,8 +2333,18 @@ EOF
 
 }
 
-install_mananged_cni_static() {
+install_managed_cni_static() {
   info "Configuring CNI..."
+  if ! node_pool_wi_enabled; then
+  { read -r -d '' MSG; warn_pause "${MSG}"; } <<EOF || true
+
+Nodepool Workload identity is not enabled or only partially enabled. CNI components will be installed but won't be used.
+To use CNI, please follow:
+  https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity#migrate_applications_to 
+to migrate or update to a Workload Identity Enabled Node pool.
+
+EOF
+  fi
   local ASM_OPTS
   ASM_OPTS="$(kubectl -n istio-system \
     get --ignore-not-found cm asm-options \
@@ -2856,6 +2884,34 @@ is_autopilot() {
     IS_AUTOPILOT=1; readonly IS_AUTOPILOT
   fi
 }
+
+node_pool_wi_enabled(){
+  # Autopilot clusters do not allow accessing/mutating the node pools
+  # so we skip in such cases.
+  if is_autopilot || [[ "${NODE_POOL_WI_ENABLED}" -eq 1 ]]; then 
+    return
+  fi
+  local METADATA_CONFIG_MODE MACHINE_CPU_REQ
+  # No CPU requirement for Managed ASM
+  MACHINE_CPU_REQ=0
+  METADATA_CONFIG_MODE="$(list_valid_pools "${MACHINE_CPU_REQ}" | \
+      jq -r '.[] |
+        .config.workloadMetadataConfig.mode
+      ' 2>/dev/null)" || true
+  if [[ -z "${METADATA_CONFIG_MODE}" ]]; then
+    NODE_POOL_WI_ENABLED=0
+    false
+    return
+  fi
+  for metadata in ${METADATA_CONFIG_MODE}; do
+    if [[ "${metadata}" != "GKE_METADATA" ]]; then
+      NODE_POOL_WI_ENABLED=0
+      false
+      return
+    fi
+  done
+  NODE_POOL_WI_ENABLED=1; readonly NODE_POOL_WI_ENABLED
+}
 configure_package() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
@@ -2927,6 +2983,9 @@ configure_package() {
 
   if [[ "${USE_MANAGED_CNI}" -eq 1 ]]; then
     kpt cfg set asm anthos.servicemesh.use-managed-cni "true"
+  fi
+  if ! node_pool_wi_enabled; then
+    kpt cfg set asm anthos.servicemesh.managed-cni.cni-enable-install "false"
   fi
   if [[ "${USE_VPCSC}" -eq 1 ]]; then
     kpt cfg set asm anthos.servicemesh.managed-controlplane.vpcsc.enabled "true"
@@ -5075,30 +5134,6 @@ EOF
   fi
 }
 
-validate_node_pool_workload_identity(){
-  # Autopilot clusters do not allow accessing/mutating the node pools
-  # so we skip in such cases.
-  if is_autopilot; then
-    return
-  fi
-  local METADATA_CONFIG_MODE MACHINE_CPU_REQ
-  # No CPU requirement for Managed ASM
-  MACHINE_CPU_REQ=0
-  METADATA_CONFIG_MODE="$(list_valid_pools "${MACHINE_CPU_REQ}" | \
-      jq -r '.[] |
-        .config.workloadMetadataConfig.mode
-      ' 2>/dev/null)" || true
-  if [[ "${METADATA_CONFIG_MODE}" != "GKE_METADATA" ]]; then
-    { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
-Node pool Workload Identity is not enabled which is a pre-requisite for Managed ASM.
-Please follow:
-  https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity#migrate_applications_to 
-to migrate or update to a Workload Identity Enabled Node pool. 
-If installation continues, Managed ASM components such as CNI will not work properly.
-EOF
-  fi
-}
-
 validate_expected_control_plane(){
   info "Checking Istio installations..."
   check_no_istiod_outside_of_istio_system_namespace
@@ -5478,13 +5513,6 @@ validate_args() {
 
   if is_legacy && ! is_managed; then
       fatal "The --legacy option is only supported with managed control plane."
-  fi
-
-  if is_autopilot; then
-    if ! is_managed; then
-      fatal "Autopilot clusters are only supported with managed control plane."
-    fi
-    context_set-option "USE_MANAGED_CNI" 1
   fi
 
   if [[ -z "${CA}" ]]; then

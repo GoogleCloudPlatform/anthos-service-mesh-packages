@@ -70,6 +70,9 @@ configure_package() {
   if [[ "${USE_MANAGED_CNI}" -eq 1 ]]; then
     kpt cfg set asm anthos.servicemesh.use-managed-cni "true"
   fi
+  if ! node_pool_wi_enabled; then
+    kpt cfg set asm anthos.servicemesh.managed-cni.cni-enable-install "false"
+  fi
   if [[ "${USE_VPCSC}" -eq 1 ]]; then
     kpt cfg set asm anthos.servicemesh.managed-controlplane.vpcsc.enabled "true"
   fi

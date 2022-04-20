@@ -362,6 +362,8 @@ spec:
             port: 8000
         command: ["install-cni"]
         env:
+        - name: CNI_ENABLE_INSTALL
+          value: "true"  # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.managed-cni.cni-enable-install"}
         # The CNI network config to install on each node.
         - name: CNI_NETWORK_CONFIG
           valueFrom:

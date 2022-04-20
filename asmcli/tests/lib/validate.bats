@@ -40,16 +40,19 @@ setup() {
   assert_output "${GKE_CLUSTER_LOCATION}"
 }
 
-@test "VALIDATE: validate_node_pool_workload_identity should skip autopilot cluster" {
+@test "VALIDATE: node_pool_wi_enabled should skip autopilot cluster" {
   is_autopilot() {
     true
   }
-  run validate_node_pool_workload_identity
-  assert_success
+
+  local RETVAL=0
+  _="$(node_pool_wi_enabled)" || RETVAL="${?}"
+  [ "${RETVAL}" -eq 0 ]
 
   is_autopilot() {
     false
   }
-  run validate_node_pool_workload_identity
-  assert_failure
+
+  _="$(node_pool_wi_enabled)" || RETVAL="${?}"
+  [ "${RETVAL}" -eq 1 ]
 }
