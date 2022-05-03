@@ -802,6 +802,7 @@ prepare_cluster_subcommand() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local CA; CA="$(context_get-option "CA")"
   if [[ "${INSTALL_EXPANSION_GATEWAY}" -eq 1 ]] || [[ "${INSTALL_IDENTITY_PROVIDER}" -eq 1 ]]; then
     set_up_local_workspace
     configure_kubectl "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
@@ -1208,7 +1209,7 @@ OPTIONS:
                                       environments, "default" will be used.
   -c|--ca                <CA>         The type of certificate authority to be
                                       used. Defaults to "mesh_ca" for install.
-                                      Allowed values for <CA> are {citadel|mesh_ca|gcp_cas}.
+                                      Allowed values for <CA> are {citadel|mesh_ca|gcp_cas|managed_cas}.
   -o|--option            <FILE NAME>  The name of a YAML file in the kpt pkg to
                                       apply. For options, see the
                                       anthos-service-mesh-package GitHub
@@ -1737,6 +1738,7 @@ configure_ca() {
   case "${CA}" in
     mesh_ca) configure_meshca;;
     gcp_cas) configure_private_ca;;
+    managed_cas) configure_managed_cas;;
     citadel) configure_citadel;;
   esac
 }
@@ -1857,6 +1859,7 @@ validate_dependencies() {
   local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
   local USE_VM; USE_VM="$(context_get-option "USE_VM")"
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  local CA; CA="$(context_get-option "CA")"
 
   if can_modify_gcp_apis; then
     enable_gcloud_apis
@@ -1873,6 +1876,9 @@ validate_dependencies() {
       if needs_service_mesh_feature; then
         enable_service_mesh_feature
       fi
+      if [[ "${CA}" = "managed_cas" ]]; then
+        enable_workload_certificate_on_fleet "autopush-gkehub.sandbox.googleapis.com"
+      fi
     else
       exit_if_no_workload_identity
       exit_if_stackdriver_not_enabled
@@ -1884,6 +1890,12 @@ validate_dependencies() {
 
   if can_register_cluster; then
     register_cluster
+    exit_if_cluster_unregistered
+    exit_if_hub_membership_is_empty
+    local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
+    if [[ "${CA}" = "managed_cas" ]]; then
+      enable_workload_certificate_on_membership "autopush-gkehub.sandbox.googleapis.com" "${FLEET_ID}" "${HUB_MEMBERSHIP_ID}"
+    fi
   elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 || "${USE_VM}" -eq 1 ]]; then
     exit_if_cluster_unregistered
   fi
@@ -2158,6 +2170,28 @@ configure_private_ca() {
 
   configure_trust_domain_aliases
 }
+
+configure_managed_cas() {
+  local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
+
+  CUSTOM_OVERLAY="${OPTIONS_DIRECTORY}/managed_cas.yaml,${CUSTOM_OVERLAY}"
+  context_set-option "CUSTOM_OVERLAY" "${CUSTOM_OVERLAY}"
+
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
+  local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
+  local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
+
+  if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
+    kpt cfg set asm anthos.servicemesh.idp-url "${HUB_IDP_URL}"
+  else
+    kpt cfg set asm anthos.servicemesh.idp-url "https://container.googleapis.com/v1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}"
+  fi
+
+  configure_trust_domain_aliases
+}
+
 validate_in_cluster_control_plane() {
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
@@ -2492,6 +2526,13 @@ is_gcp_cas_installed() {
   INSTALLED_CA_PROVIDER="$(kubectl -n istio-system get pod -l istio=ingressgateway \
     -o jsonpath='{.items[].spec.containers[].env[?(@.name=="CA_PROVIDER")].value}')"
   [[ "${INSTALLED_CA_PROVIDER}" = "GoogleCAS" ]] && return 0
+}
+
+is_managed_cas_installed() {
+  local INSTALLED_CA_PROVIDER
+  INSTALLED_CA_PROVIDER="$(kubectl -n istio-system get pod -l istio=ingressgateway \
+    -o jsonpath='{.items[].spec.containers[].env[?(@.name=="CA_PROVIDER")].value}')"
+  [[ "${INSTALLED_CA_PROVIDER}" = "managed_cas" ]] && return 0
 }
 
 is_cluster_registered() {
@@ -3338,6 +3379,9 @@ EOF
    gcp_cas)
      echo privateca.googleapis.com
      ;;
+   managed_cas)
+     echo staging-workloadcertificate.sandbox.googleapis.com
+     ;;
     *);;
   esac
 
@@ -3356,6 +3400,9 @@ required_fleet_apis() {
      ;;
    gcp_cas)
      echo privateca.googleapis.com
+     ;;
+   managed_cas)
+     echo staging-workloadcertificate.sandbox.googleapis.com
      ;;
     *);;
   esac
@@ -3581,6 +3628,7 @@ register_cluster() {
   local KCF; KCF="$(context_get-option "KUBECONFIG")"
   local KCC; KCC="$(context_get-option "CONTEXT")"
   local PRIVATE_ISSUER; PRIVATE_ISSUER="$(context_get-option "PRIVATE_ISSUER")"
+  local CA; CA="$(context_get-option "CA")"
 
   if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
     ensure_cross_project_service_accounts "${FLEET_ID}" "${PROJECT_ID}"
@@ -5072,7 +5120,6 @@ validate_cluster() {
   local CLUSTER_NAME; CLUSTER_NAME="${3}"
 
   local RESULT; RESULT=""
-
   RESULT="$(gcloud container clusters list \
     --project="${PROJECT_ID}" \
     --filter="name = ${CLUSTER_NAME} AND location = ${CLUSTER_LOCATION}" \
@@ -5205,6 +5252,8 @@ validate_ca_consistency() {
     CURRENT_CA="mesh_ca"
   elif is_gcp_cas_installed; then
     CURRENT_CA="gcp_cas"
+  elif is_managed_cas_installed; then
+    CURRENT_CA="managed_cas"
   fi
 
   info "CA already in use: ${CURRENT_CA}"
@@ -5329,6 +5378,16 @@ EOF
   fi
 }
 
+exit_if_hub_membership_is_empty() {
+  local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
+  if [[ -z "${HUB_MEMBERSHIP_ID}" ]]; then
+    { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
+The hub membership id for the cluster is empty: either the cluster is not regisered to the fleet
+or the hub membership id is not retrieved successfully.
+EOF
+  fi
+}
+
 exit_if_no_workload_identity() {
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   if ! is_workload_identity_enabled; then
@@ -5337,6 +5396,16 @@ Workload identity is not enabled on ${CLUSTER_NAME}. Please enable it and
 retry, or run the script with the '--enable_gcp_components' flag to allow
 the script to enable it on your behalf.
 $(enable_common_message)
+EOF
+  fi
+}
+
+exit_if_no_auth_token() {
+  local AUTHTOKEN; AUTHTOKEN="$(get_auth_token)"
+  if [[ -z "${AUTHTOKEN}" ]]; then
+    { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
+Auth token is not obtained successfully. Please login and
+retry, e.g., run 'gcloud auth application-default login` to login.
 EOF
   fi
 }
@@ -5439,6 +5508,57 @@ enable_service_mesh_feature() {
   info "Enabling the service mesh feature..."
 
   retry 2 run_command gcloud container fleet mesh enable --project="${FLEET_ID}"
+}
+
+enable_workload_certificate_on_fleet() {
+  local GKEHUB_API; GKEHUB_API="$1"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+
+  info "Enabling the workload identity platform on ${FLEET_ID} ..."
+  exit_if_no_auth_token
+  local AUTHTOKEN; AUTHTOKEN="$(get_auth_token)"
+
+  # gcloud command is not ready yet, use curl command instead.
+  # retry 2 run_command gcloud alpha container fleet workload-certificate enable --provision-google-ca --project="${FLEET_ID}"
+  local BODY; BODY="{
+    'spec': {
+      'workloadcertificate': {
+        'provision_google_ca': 'ENABLED'
+      }
+    }
+  }"
+
+  curl -H "Authorization: Bearer ${AUTHTOKEN}" \
+      -X POST -H "Content-Type: application/json" -H "Accept: application/json" \
+      -d "${BODY}" \
+      "https://${GKEHUB_API}/v1alpha/projects/${FLEET_ID}/locations/global/features?feature_id=workloadcertificate"
+}
+
+enable_workload_certificate_on_membership() {
+  local GKEHUB_API; GKEHUB_API="${1}"
+  local FLEET_ID; FLEET_ID="${2}"
+  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="${3}"
+
+  info "Enabling the workload identity platform certificate for the membership ${MEMBERSHIP_NAME}  ..."
+  exit_if_no_auth_token
+  local AUTHTOKEN; AUTHTOKEN="$(get_auth_token)"
+
+
+  # gcloud command is not ready yet, use curl command instead
+  # retry 2 run_command gcloud alpha container fleet workload-certificate update --memberships="${MEMBERSHIP_NAME}" --enable --project="${FLEET_ID}"
+  ENABLEFEATURE="{
+    'membership_specs': {
+      'projects/${FLEET_ID}/locations/global/memberships/${MEMBERSHIP_NAME}': {
+        'workloadcertificate': {
+          'certificate_management': 'ENABLED'
+        }
+      }
+    }
+  }"
+
+  curl -H "Authorization: Bearer ${AUTHTOKEN}" \
+     -X PATCH -H "Content-Type: application/json" -H "Accept: application/json" \
+     -d "${ENABLEFEATURE}" "https://${GKEHUB_API}/v1alpha/projects/${FLEET_ID}/locations/global/features/workloadcertificate?update_mask=membership_specs"
 }
 
 check_istio_deployed(){
@@ -5628,12 +5748,12 @@ EOF
   fi
 
   case "${CA}" in
-    citadel | mesh_ca | gcp_cas);;
+    citadel | mesh_ca | gcp_cas | managed_cas);;
     "")
       MISSING_ARGS=1
       warn "Missing value for CA"
       ;;
-    *) fatal "CA must be one of 'citadel', 'mesh_ca', 'gcp_cas'";;
+    *) fatal "CA must be one of 'citadel', 'mesh_ca', 'gcp_cas', 'managed_cas'";;
   esac
 
   if [[ "${CA}" = "gcp_cas" ]]; then
