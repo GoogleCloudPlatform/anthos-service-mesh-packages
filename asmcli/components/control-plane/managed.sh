@@ -137,7 +137,7 @@ EOF
     get --ignore-not-found cm asm-options \
     -o jsonpath='{.data.ASM_OPTS}' || true)"
 
-  if [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=on"* && "${ASM_OPTS}" != *"CNI=off"* ]]; then
+if node_pool_wi_enabled && [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=on"* && "${ASM_OPTS}" != *"CNI=off"* ]]; then
     context_append "mcpOptions" "CNI=on"
   else
     context_append "mcpOptions" "${ASM_OPTS}"
