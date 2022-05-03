@@ -201,6 +201,11 @@ enable_gcloud_apis(){
   # shellcheck disable=SC2046
   retry 3 gcloud services enable --project="${PROJECT_ID}" $(required_apis | tr '\n' ' ')
 
+  local CA; CA="$(context_get-option "CA")"
+  if [[ "${CA}" = "managed_cas" ]]; then
+    enable_workload_certificate_api "gkehub.googleapis.com" "workloadcertificate.googleapis.com"
+  fi
+
   if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
     local REQUIRED_FLEET_APIS; REQUIRED_FLEET_APIS="$(required_fleet_apis | tr '\n' ' ')"
     if [[ -n "${REQUIRED_FLEET_APIS// }" ]]; then
@@ -358,6 +363,7 @@ register_cluster() {
   local KCF; KCF="$(context_get-option "KUBECONFIG")"
   local KCC; KCC="$(context_get-option "CONTEXT")"
   local PRIVATE_ISSUER; PRIVATE_ISSUER="$(context_get-option "PRIVATE_ISSUER")"
+  local CA; CA="$(context_get-option "CA")"
 
   if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
     ensure_cross_project_service_accounts "${FLEET_ID}" "${PROJECT_ID}"
