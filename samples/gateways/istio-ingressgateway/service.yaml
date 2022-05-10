@@ -18,6 +18,8 @@ metadata:
   annotations:
     networking.gke.io/load-balancer-type: "Internal"
     beta.cloud.google.com/backend-config: '{"default": "config-default"}'
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/app-protocols: '{"https":"HTTP2"}' # HTTP/2 with TLS encryption
   labels:
     app: istio-ingressgateway
     istio: ingressgateway
