@@ -3303,6 +3303,19 @@ required_iam_roles() {
 }
 # [END required_iam_roles]
 
+# Required IAM roles for GKE Hub registratinon are
+# defined in https://cloud.google.com/anthos/fleet-management/docs/before-you-begin#grant_iam_roles
+required_iam_roles_registration() {
+  if is_gcp; then
+    echo roles/container.admin
+  else
+    echo roles/iam.serviceAccountAdmin
+    echo roles/iam.serviceAccountKeyAdmin
+    echo roles/resourcemanager.projectIamAdmin
+  fi
+  echo roles/gkehub.admin
+}
+
 old_required_apis() {
   local CA; CA="$(context_get-option "CA")"
     cat << EOF
@@ -3568,6 +3581,12 @@ register_cluster() {
     else
       exit_if_no_workload_identity
     fi
+  fi
+
+  if can_modify_gcp_iam_roles; then
+    bind_user_to_iam_policy "$(required_iam_roles_registration)" "$(local_iam_user)"
+  else
+    exit_if_out_of_iam_policy
   fi
   populate_cluster_values
 
