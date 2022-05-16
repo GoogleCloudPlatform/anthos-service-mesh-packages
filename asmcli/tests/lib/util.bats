@@ -109,3 +109,27 @@ EOF
   assert_output "stable"
   ### [END] channel should be stable for stable GKE channel ###
 }
+
+@test "UTIL: KPT_BRANCH is set correctly for release versions" {
+  local TEST_VER; TEST_VER="1.1.1-asm.1+config1"
+  version_message() {
+    echo  "${TEST_VER}"
+  }
+  init
+
+  if [[ "${TEST_VER}" != "$KPT_BRANCH" ]]; then
+    exit 1
+  fi
+}
+
+@test "UTIL: KPT_BRANCH is set correctly for nonrelease versions" {
+  version_message() {
+    echo "1.1.1-asm.1+config1+unstable"
+  }
+
+  init
+
+  if [[ "main" != "$KPT_BRANCH" ]]; then
+    exit 1
+  fi
+}
