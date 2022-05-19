@@ -2285,6 +2285,10 @@ install_managed_control_plane() {
     install_managed_privateca
   fi
 
+  if [[ "${CA}" = "managed_cas" ]]; then
+    install_managed_cas_for_mcp
+  fi
+
   install_managed_startup_config
 }
 
@@ -2396,6 +2400,12 @@ install_managed_privateca() {
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
   context_append "mcpOptions" "CA=PRIVATECA"
   context_append "mcpOptions" "CAAddr=${CA_NAME}"
+}
+
+install_managed_cas_for_mcp() {
+  info "Configuring managed CAS for managed control plane..."
+
+  context_append "mcpOptions" "CA=MANAGEDCAS"
 }
 
 configure_managed_control_plane() {
