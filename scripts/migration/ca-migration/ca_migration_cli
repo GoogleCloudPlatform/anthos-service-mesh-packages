@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+set -CeE
+set -o pipefail
+
+warn() {
+  info "[WARNING]: ${1}" >&2
+}
+
+error() {
+  info "[ERROR]: ${1}" >&2
+}
+
+info() {
+  echo "ca_migration_cli: ${1}" >&2
+}
+
+#TODO: Add script usage introduction
+usage() {
+  cat << EOF
+Introduction-TBD
+EOF
+}
+
+#TODO: Initialize
+# 1. Initialize CA per different CA types if needed
+# 2. Grant IAM permissions if needed
+# 3. Fetch CA trust anchors
+initialize_subcommand() {
+  warn "initialize-to-be-implemented"
+}
+
+#TODO: Add new CA trust anchor as mesh trustAnchors in all clusters of the same mesh
+add-trust-anchor_subcommand() {
+  warn "add-trust-anchor-to-be-implemented"
+}
+
+#TODO: Check if new CA trust anchor has reached all workloads in all clusters of the same mesh
+check-trust-anchor_subcommand() {
+  warn "check-trust-anchor-to-be-implemented"
+}
+
+#TODO: Change CA configuration
+change-ca_subcommand() {
+  warn "change-ca-to-be-implemented"
+}
+
+#TODO: Verify new CA configuration has reached all workloads
+verify-ca_subcommand() {
+  warn "verify-ca-to-be-implemented"
+}
+
+#TODO: Remove old CA trust anchor from mesh trustAnchors
+remove-trust-anchor_subcommand() {
+  warn "remove-trust-anchor-to-be-implemented"
+}
+
+#TODO: Restore old CA configuration and remove new CA trust anchors
+rollback_subcommand() {
+  warn "rollback-to-be-implemented"
+}
+
+helper_subcommand() {
+  warn "${1} is not a supported subcommand"
+  usage
+}
+
+main() {
+  if [[ "${*}" = '' ]]; then
+    usage >&2
+    exit 2
+  fi
+
+  case "${1}" in
+    initialize)
+      shift 1
+      initialize_subcommand "${@}"
+      ;;
+    add-trust-anchor)
+      shift 1
+      add-trust-anchor_subcommand "${@}"
+      ;;
+    check-trust-anchor)
+      shift 1
+      check-trust-anchor_subcommand "${@}"
+      ;;
+    change-ca)
+      shift 1
+      change-ca_subcommand "${@}"
+      ;;
+    verify-ca)
+      shift 1
+      verify-ca_subcommand "${@}"
+      ;;
+    remove-trust-anchor)
+      shift 1
+      remove-trust-anchor_subcommand "${@}"
+      ;;
+    rollback)
+      shift 1
+      rollback_subcommand "${@}"
+      ;;
+    *)
+    helper_subcommand "${@}"
+  esac
+}
+
+main "${@}"
