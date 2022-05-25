@@ -2,6 +2,10 @@
 set -CeE
 set -o pipefail
 
+info() {
+  echo "ca_migration_cli: ${1}" >&2
+}
+
 warn() {
   info "[WARNING]: ${1}" >&2
 }
@@ -10,8 +14,105 @@ error() {
   info "[ERROR]: ${1}" >&2
 }
 
-info() {
-  echo "ca_migration_cli: ${1}" >&2
+fatal_with_usage() {
+  error "${1}"
+  usage >&2
+  exit 2
+}
+
+arg_required() {
+  if [[ ! "$2" || "${2:0:1}" = '-' ]]; then
+    fatal "ERROR: Option $1 requires an argument."
+  fi
+}
+
+context_init() {
+  local CONTEXT_JSON; CONTEXT_JSON=$(cat <<EOF
+{
+  "flags": {
+    "KUBECONFIG": "${KUBECONFIG:-}",
+    "KUBECONTEXT": "${KUBECONTEXT:-}",
+    "CA": "${CA:-}",
+    "CA_POOL_NAME": "${CA_POOL_NAME:-}",
+    "MEMBERSHIP_NAME": "${MEMBERSHIP_NAME:-}",
+    "REVISION": "${REVISION:-}",
+    "NAMESPACES": "${NAMESPACES:-}",
+    "CA_CERT": "${CA_CERT:-}"
+  }
+}
+EOF
+)
+
+  context_FILE_LOCATION="$(mktemp)"; readonly context_FILE_LOCATION
+  export context_FILE_LOCATION
+
+  echo "${CONTEXT_JSON}" | jq -S '.' >| "${context_FILE_LOCATION}"
+}
+
+context_set-option() {
+  local OPTION; OPTION="${1}"
+  local VALUE; VALUE="${2}"
+  local TEMP_FILE; TEMP_FILE="$(mktemp)"
+
+  jq -S --arg OPTION "${OPTION}" --arg VALUE "${VALUE}" \
+  '.flags[$OPTION]=($VALUE | try tonumber catch $VALUE)' "${context_FILE_LOCATION}" >| "${TEMP_FILE}" \
+  && mv "${TEMP_FILE}" "${context_FILE_LOCATION}"
+}
+
+context_get-option() {
+  local OPTION; OPTION="${1}"
+
+  jq -r --arg OPTION "${OPTION}" '.flags[$OPTION]' "${context_FILE_LOCATION}"
+}
+
+parse_args() {
+  while [[ $# != 0 ]]; do
+    case "${1}" in
+      --kubeconfig)
+        arg_required "${@}"
+        context_set-option "KUBECONFIG" "${2}"
+        shift 2
+        ;;
+      --kubecontext)
+        arg_required "${@}"
+        context_set-option "KUBECONTEXT" "${2}"
+        shift 2
+        ;;
+      --ca)
+        arg_required "${@}"
+        context_set-option "CA" "$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+        shift 2
+        ;;
+      --ca_pool | --ca-pool)
+        arg_required "${@}"
+        context_set-option "CA_POOL_NAME" "${2}"
+        shift 2
+        ;;
+      --membership)
+        arg_required "${@}"
+        context_set-option "MEMBERSHIP_NAME" "${2}"
+        shift 2
+        ;;
+      --revision)
+        arg_required "${@}"
+        context_set-option "REVISION" "${2}"
+        shift 2
+        ;;
+      --namespaces)
+        arg_required "${@}"
+        context_set-option "NAMESPACES" "${2}"
+        shift 2
+        ;;
+      --ca_cert | --ca-cert)
+        arg_required "${@}"
+        context_set-option "CA_CERT" "${2}"
+        shift 2
+        ;;
+      *)
+        fatal_with_usage "Unknown option ${1}"
+        ;;
+    esac
+  done
 }
 
 #TODO: Add script usage introduction
@@ -26,36 +127,44 @@ EOF
 # 2. Grant IAM permissions if needed
 # 3. Fetch CA trust anchors
 initialize_subcommand() {
-  warn "initialize-to-be-implemented"
+  parse_args "${@}"
+  KUBECONFIG="$(context_get-option "KUBECONFIG")"
+  warn "initialize-to-be-implemented: ${KUBECONFIG}"
 }
 
 #TODO: Add new CA trust anchor as mesh trustAnchors in all clusters of the same mesh
 add-trust-anchor_subcommand() {
+  parse_args "${@}"
   warn "add-trust-anchor-to-be-implemented"
 }
 
 #TODO: Check if new CA trust anchor has reached all workloads in all clusters of the same mesh
 check-trust-anchor_subcommand() {
+  parse_args "${@}"
   warn "check-trust-anchor-to-be-implemented"
 }
 
 #TODO: Change CA configuration
 change-ca_subcommand() {
+  parse_args "${@}"
   warn "change-ca-to-be-implemented"
 }
 
 #TODO: Verify new CA configuration has reached all workloads
 verify-ca_subcommand() {
+  parse_args "${@}"
   warn "verify-ca-to-be-implemented"
 }
 
 #TODO: Remove old CA trust anchor from mesh trustAnchors
 remove-trust-anchor_subcommand() {
+  parse_args "${@}"
   warn "remove-trust-anchor-to-be-implemented"
 }
 
 #TODO: Restore old CA configuration and remove new CA trust anchors
 rollback_subcommand() {
+  parse_args "${@}"
   warn "rollback-to-be-implemented"
 }
 
@@ -69,6 +178,8 @@ main() {
     usage >&2
     exit 2
   fi
+
+  context_init
 
   case "${1}" in
     initialize)
