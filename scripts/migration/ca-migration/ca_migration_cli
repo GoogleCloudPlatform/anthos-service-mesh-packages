@@ -122,6 +122,12 @@ Introduction-TBD
 EOF
 }
 
+#TODO: Check prerequisite
+check-prerequisite_subcommand() {
+  parse_args "${@}"
+  warn "check-prerequisite-to-be-implemented"
+}
+
 #TODO: Initialize
 # 1. Initialize CA per different CA types if needed
 # 2. Grant IAM permissions if needed
@@ -182,6 +188,10 @@ main() {
   context_init
 
   case "${1}" in
+    check-prerequisite)
+      shift 1
+      check-prerequisite_subcommand "${@}"
+      ;;
     initialize)
       shift 1
       initialize_subcommand "${@}"
