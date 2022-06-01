@@ -2,6 +2,117 @@
 set -CeE
 set -o pipefail
 
+starline() {
+  echo "*****************************"
+}
+
+_CI_ASM_PKG_LOCATION="${_CI_ASM_PKG_LOCATION:=}"; readonly _CI_ASM_PKG_LOCATION;
+_CI_ISTIOCTL_REL_PATH="${_CI_ISTIOCTL_REL_PATH:=}"; readonly _CI_ISTIOCTL_REL_PATH;
+AKUBECTL="$(which kubectl || true)"; readonly AKUBECTL;
+AGCLOUD="$(which gcloud || true)"; readonly AGCLOUD;
+
+ISTIOCTL_REL_PATH=""
+
+kube() {
+  local KUBECTL_CONTEXT; KUBECTL_CONTEXT="$(context_get-option "CONTEXT")"
+  local KUBECONFIG; KUBECONFIG="$(context_get-option "KUBECONFIG")"
+  kubectl --kubeconfig=${KUBECONFIG} --context=${KUBECTL_CONTEXT} ${@}
+}
+
+download_istioctl_tarball() {
+  local OS
+  local RELEASE; RELEASE="$(context_get-option "RELEASE")"
+  case "$(uname)" in
+    Linux ) OS="linux-amd64";;
+    Darwin) OS="osx";;
+    *     ) fatal "$(uname) is not a supported OS.";;
+  esac
+
+  info "Downloading istioctl tool.."
+  local TARBALL; TARBALL="istio-${RELEASE}-${OS}.tar.gz"
+  if [[ -z "${_CI_ASM_PKG_LOCATION}" ]]; then
+    curl -L "https://storage.googleapis.com/gke-release/asm/${TARBALL}" \
+      | tar xz
+  else
+    local TOKEN; TOKEN="$(retry 2 gcloud auth print-access-token)"
+    curl -L "https://storage.googleapis.com/${_CI_ASM_PKG_LOCATION}/asm/${TARBALL}" \
+      --header @- <<EOF | tar xz
+Authorization: Bearer ${TOKEN}
+EOF
+  fi
+  ## TODO : Fix this path
+  ISTIOCTL_REL_PATH="$(pwd)/istio-${RELEASE}-${OS}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
+}
+
+## $1: ca-migration-state
+## $2: log/state  
+update_migration_cr() {
+  local CURRENT_TIME; CURRENT_TIME="$(date +%s)"
+  local REVISION; REVISION="$(context_get-option "REVISION")"
+  local NAME; NAME="ca-migration-${REVISION}"
+  local CA; CA="$(context_get-option "CA")"
+  local CA_POOL; CA_POOL="$(context_get-option "CA_NAME")"
+  local CA_OLD; CA_OLD="$(context_get-option "CA_OLD")"
+  local START_TIME;
+
+  if  [[ "${1}" = "INITIALIZE" ]]; then
+    START_TIME="${CURRENT_TIME}"
+  else
+    START_TIME="$(kube get cm/${NAME} -n istio-system -ojsonpath={.data.start_time})"
+    CA_OLD="$(kube get cm/${NAME} -n istio-system -ojsonpath={.data.old_ca})"
+  fi
+
+    cat <<EOF | kube apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: asm-ca-migration-${REVISION}
+  namespace: istio-system
+data:
+  start_time: ${START_TIME}
+  revision: ${REVISION}
+  state_update_time:${CURRENT_TIME} 
+  state: ${1}
+  target_ca: ${CA}:${CA_POOL}
+  old_ca: ${CA_OLD}
+EOF
+
+}
+
+update_proxyConfig_cr() {
+  local REVISION; REVISION="$(context_get-option "REVISION")"
+
+  cat <<EOF | kube apply -f -
+apiVersion: networking.istio.io/v1beta1
+kind: ProxyConfig
+metadata:
+  name: ca-migration-${REVISION}
+  namespace: istio-system
+  labels:
+    istio.io/rev: ${REVISION}
+spec:
+  environmentVariables:
+    CA_ADDR: "$1"
+    CA_PROVIDER: "$2"
+EOF
+}
+
+retry() {
+  local MAX_TRIES; MAX_TRIES="${1}";
+  shift 1
+  for i in $(seq 0 "${MAX_TRIES}"); do
+    if [[ "${i}" -eq "${MAX_TRIES}" ]]; then
+      break
+    fi
+    { "${@}" && return 0; } || true
+    warn "Failed, retrying...($((i+1)) of ${MAX_TRIES})"
+    sleep 2
+  done
+  local CMD="'$*'"
+  warn "Command $CMD failed."
+  false
+}
+
 info() {
   echo "ca_migration_cli: ${1}" >&2
 }
@@ -31,13 +142,17 @@ context_init() {
 {
   "flags": {
     "KUBECONFIG": "${KUBECONFIG:-}",
-    "KUBECONTEXT": "${KUBECONTEXT:-}",
+    "CONTEXT": "${CONTEXT:-}",
+    "PROJECT": "${PROJECT:-}",
     "CA": "${CA:-}",
-    "CA_POOL_NAME": "${CA_POOL_NAME:-}",
-    "MEMBERSHIP_NAME": "${MEMBERSHIP_NAME:-}",
+    "CA_OLD": "${CA_OLD:-}",
+    "CA_NAME": "${CA_NAME:-}",
+    "FLEET_ID": "${FLEET_ID:-}",
     "REVISION": "${REVISION:-}",
     "NAMESPACES": "${NAMESPACES:-}",
-    "CA_CERT": "${CA_CERT:-}"
+    "CA_CERT": "${CA_CERT:-}",
+    "FORCE": "${FORCE:-}",
+    "RELEASE": "${RELEASE:-}",
   }
 }
 EOF
@@ -75,9 +190,14 @@ parse_args() {
         ;;
       --kubecontext)
         arg_required "${@}"
-        context_set-option "KUBECONTEXT" "${2}"
+        context_set-option "CONTEXT" "${2}"
         shift 2
         ;;
+      --project)
+        arg_required "${@}"
+        context_set-option "PROJECT" "${2}"
+        shift 2
+        ;;        
       --ca)
         arg_required "${@}"
         context_set-option "CA" "$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
@@ -85,12 +205,12 @@ parse_args() {
         ;;
       --ca_pool | --ca-pool)
         arg_required "${@}"
-        context_set-option "CA_POOL_NAME" "${2}"
+        context_set-option "CA_NAME" "${2}"
         shift 2
         ;;
-      --membership)
+      --fleet_id | --fleet-id)
         arg_required "${@}"
-        context_set-option "MEMBERSHIP_NAME" "${2}"
+        context_set-option "FLEET_ID" "${2}"
         shift 2
         ;;
       --revision)
@@ -108,6 +228,25 @@ parse_args() {
         context_set-option "CA_CERT" "${2}"
         shift 2
         ;;
+      --ca_old)
+        arg_required "${@}"
+        context_set-option "CA_OLD" "$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+        shift 2
+        ;; 
+      --force | -f)
+        context_set-option "FORCE" "true"
+        shift 1
+        ;;
+      --output_dir | --output-dir)
+        arg_required "${@}"
+        context_set-option "OUTPUT_DIR" "${2}"
+        shift 2
+        ;;
+      --release)
+        arg_required "${@}"
+        context_set-option "RELEASE" "${2}"
+        shift 2
+        ;;        
       *)
         fatal_with_usage "Unknown option ${1}"
         ;;
@@ -122,10 +261,157 @@ Introduction-TBD
 EOF
 }
 
-#TODO: Check prerequisite
 check-prerequisite_subcommand() {
-  parse_args "${@}"
-  warn "check-prerequisite-to-be-implemented"
+  local NOTFOUND; NOTFOUND="";
+  local EXITCODE; EXITCODE=0;
+
+  # TODO: need to add/remove some tools
+  info "Checking installation tool dependencies..."
+
+  while read -r dependency; do
+    EXITCODE=0
+    hash "${dependency}" 2>/dev/null || EXITCODE=$?
+    if [[ "${EXITCODE}" -ne 0 ]]; then
+      NOTFOUND="${dependency},${NOTFOUND}"
+    fi
+  done <<EOF
+awk
+$AGCLOUD
+git
+grep
+jq
+$AKUBECTL
+sed
+tr
+head
+csplit
+EOF
+
+  while read -r FLAG; do
+    if [[ -z "${!FLAG}" ]]; then
+      NOTFOUND="${FLAG},${NOTFOUND}"
+    fi
+  done <<EOF
+AKUBECTL
+AGCLOUD
+EOF
+
+  if [[ "${#NOTFOUND}" -gt 1 ]]; then
+    NOTFOUND="$(strip_trailing_commas "${NOTFOUND}")"
+    for dep in $(echo "${NOTFOUND}" | tr ' ' '\n'); do
+      warn "Dependency not found: ${dep}"
+    done
+    fatal "One or more dependencies were not found. Please install them and retry."
+  fi
+
+  local OS
+  # shellcheck disable=SC2064
+  trap "$(shopt -p nocasematch)" RETURN
+  shopt -s nocasematch
+  if [[ "$(uname -m)" != "x86_64" ]]; then
+    fatal "Installation is only supported on x86_64."
+  fi  
+   
+}
+
+initialize_istiod_ca() {
+  fatal "Not implemented yet"
+}
+
+initialize_mesh_ca() {
+  ## TODO : handle case where tool doesn't have permission to enable api's
+  local PROJECT; PROJECT="$(context_get-option "FLEET_ID")"
+  retry 3 gcloud services enable --project=meshca.googleapis.com --project=${PROJECT}
+}
+
+validate_private_ca() {
+  
+  local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
+  
+  local CA_POOL_TEMPLATE; CA_POOL_TEMPLATE="projects/project_name/locations/ca_region/caPools/ca_pool"
+  local CT_TEMPLATE; CT_TEMPLATE="projects/project_name/locations/ca_region/certificateTemplates/cert_template"
+  local CA_NAME_TEMPLATE; CA_NAME_TEMPLATE="${CA_POOL_TEMPLATE}:${CT_TEMPLATE}"
+
+  local CA_POOL_REGEX; CA_POOL_REGEX="projects/[a-zA-Z0-9_-]+/locations/[a-zA-Z0-9_-]+/caPools/[a-zA-Z0-9_-]+"
+  local CT_REGEX; CT_REGEX="projects/[a-zA-Z0-9_-]+/locations/[a-zA-Z0-9_-]+/certificateTemplates/[a-zA-Z0-9_-]+"
+  local CA_NAME_REGEX; CA_NAME_REGEX="${CA_POOL_REGEX}:${CT_REGEX}"
+
+  if [[ -z ${CA_NAME} ]]; then
+    fatal "A ca-name must be provided for integration with Google Certificate Authority Service."
+  # check if CA_NAME is ca_pool:cert_template format
+  elif [[ "${CA_NAME}" == *":"* ]]; then
+    if ! [[ "${CA_NAME}" =~ ^${CA_NAME_REGEX}$ ]]; then
+      fatal "Malformed ca-name with certificate template. ca-name must be of the form ${CA_NAME_TEMPLATE}."
+    fi
+  # when CA_NAME is ca_pool format
+  elif ! [[ "${CA_NAME}" =~ ^${CA_POOL_REGEX}$ ]]; then
+    fatal "Malformed ca-name. ca-name must be of the form ${CA_POOL_TEMPLATE}."
+  fi
+}
+
+initialize_google_cas() {
+
+  # TODO : initialize privateca api on the project
+  validate_private_ca
+
+  local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
+  local CA_POOL_URI; CA_POOL_URI=$(echo "${CA_NAME}" | cut -f1 -d:)
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  local WORKLOAD_IDENTITY; WORKLOAD_IDENTITY="${FLEET_ID}.svc.id.goog:/allAuthenticatedUsers/"
+  local CA_LOCATION; CA_LOCATION=$(echo "${CA_POOL_URI}" | cut -f4 -d/)
+  local CA_POOL; CA_POOL=$(echo "${CA_POOL_URI}" | cut -f6 -d/)
+  local PROJECT; PROJECT=$(echo "${CA_POOL_URI}" | cut -f2 -d/)
+
+  retry 3 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
+    --project "${PROJECT}" \
+    --location "${CA_LOCATION}" \
+    --member "group:${WORKLOAD_IDENTITY}" \
+    --role "roles/privateca.workloadCertificateRequester"
+
+  retry 3 gcloud privateca pools add-iam-policy-binding "${CA_POOL}" \
+    --project "${PROJECT}" \
+    --location "${CA_LOCATION}" \
+    --member "group:${WORKLOAD_IDENTITY}" \
+    --role "roles/privateca.auditor"
+
+  if [[ "${CA_NAME}" == *":"* ]]; then
+    local CERT_TEMPLATE; CERT_TEMPLATE=$(echo "${CA_NAME}" | cut -f2 -d:)
+    retry 3 gcloud privateca templates add-iam-policy-binding "${CERT_TEMPLATE}" \
+      --member "group:${WORKLOAD_IDENTITY}" \
+      --role "roles/privateca.templateUser"
+  fi
+}
+
+set_up_local_workspace() {
+  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+
+  info "Setting up necessary working directory ......"
+  if [[ -z "${OUTPUT_DIR}" ]]; then
+    info "Creating temp directory..."
+    OUTPUT_DIR="$(mktemp -d)"
+    if [[ -z "${OUTPUT_DIR}" ]]; then
+      fatal "Encountered error when running mktemp -d!"
+    fi
+    info ""
+    info "$(starline)"
+    info "No output folder was specified with --output_dir|-D, so configuration and"
+    info "binaries will be stored in the following directory."
+    info "${OUTPUT_DIR}"
+    info "$(starline)"
+    info ""
+    sleep 2
+  else
+    OUTPUT_DIR="$(apath -f "${OUTPUT_DIR}")"
+    if [[ ! -a "${OUTPUT_DIR}" ]]; then
+        fatal "directory ${OUTPUT_DIR} does not exist"
+    elif [[ ! -d "${OUTPUT_DIR}" ]]; then
+      fatal "${OUTPUT_DIR} exists and is not a directory, please specify another directory."
+    fi
+  fi
+
+  context_set-option "OUTPUT_DIR" "${OUTPUT_DIR}"
+  pushd "$OUTPUT_DIR" > /dev/null
+
 }
 
 #TODO: Initialize
@@ -134,8 +420,18 @@ check-prerequisite_subcommand() {
 # 3. Fetch CA trust anchors
 initialize_subcommand() {
   parse_args "${@}"
-  KUBECONFIG="$(context_get-option "KUBECONFIG")"
-  warn "initialize-to-be-implemented: ${KUBECONFIG}"
+  local CA; CA="$(context_get-option "CA")"
+
+  case "${CA}" in
+    mesh_ca) initialize_mesh_ca;;
+    gcp_cas) initialize_gcp_cas;;
+    citadel) initialize_istiod_ca;;
+  esac
+
+   set_up_local_workspace
+   download_istioctl_tarball
+   # working directory should be OUTPUT_DIR before this command
+   update_migration_cr "INITIALIZE"
 }
 
 #TODO: Add new CA trust anchor as mesh trustAnchors in all clusters of the same mesh
@@ -151,9 +447,22 @@ check-trust-anchor_subcommand() {
 }
 
 #TODO: Change CA configuration
-change-ca_subcommand() {
+migrate-ca_subcommand() {
   parse_args "${@}"
-  warn "change-ca-to-be-implemented"
+
+  local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
+  local CA; CA="$(context_get-option "CA_NAME")"
+  local CA_PROVIDER;
+  local CA_ADDR;
+
+  case "${CA}" in
+    mesh_ca) CA_PROVIDER="mesh_ca", CA_ADDR="";;
+    gcp_cas) CA_PROVIDER="gcp_cas"; CA_ADDR="$(CA_NAME)";;
+    citadel) fatal "Not implemented";;
+  esac
+
+  update_proxyConfig_cr "$(CA_PROVIDER)" "$(CA_ADDR)"
+  update_migration_cr "CA_MIGRATE"
 }
 
 #TODO: Verify new CA configuration has reached all workloads
@@ -162,10 +471,10 @@ verify-ca_subcommand() {
   warn "verify-ca-to-be-implemented"
 }
 
-#TODO: Remove old CA trust anchor from mesh trustAnchors
-remove-trust-anchor_subcommand() {
+complete_subcommand() {
+  #TODO: Remove old CA trust anchor from mesh trustAnchors
   parse_args "${@}"
-  warn "remove-trust-anchor-to-be-implemented"
+  update_migration_cr "COMPLETE"
 }
 
 #TODO: Restore old CA configuration and remove new CA trust anchors
@@ -188,7 +497,7 @@ main() {
   context_init
 
   case "${1}" in
-    check-prerequisite)
+    check-prerequisites)
       shift 1
       check-prerequisite_subcommand "${@}"
       ;;
@@ -204,17 +513,17 @@ main() {
       shift 1
       check-trust-anchor_subcommand "${@}"
       ;;
-    change-ca)
+    migrate-ca)
       shift 1
-      change-ca_subcommand "${@}"
+      migrate-ca_subcommand "${@}"
       ;;
     verify-ca)
       shift 1
       verify-ca_subcommand "${@}"
       ;;
-    remove-trust-anchor)
+    complete)
       shift 1
-      remove-trust-anchor_subcommand "${@}"
+      complete_subcommand "${@}"
       ;;
     rollback)
       shift 1
