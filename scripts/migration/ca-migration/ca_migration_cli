@@ -2,10 +2,6 @@
 set -CeE
 set -o pipefail
 
-starline() {
-  echo "*****************************"
-}
-
 _CI_ASM_PKG_LOCATION="${_CI_ASM_PKG_LOCATION:=}"; readonly _CI_ASM_PKG_LOCATION;
 _CI_ISTIOCTL_REL_PATH="${_CI_ISTIOCTL_REL_PATH:=}"; readonly _CI_ISTIOCTL_REL_PATH;
 AKUBECTL="$(which kubectl || true)"; readonly AKUBECTL;
@@ -13,10 +9,67 @@ AGCLOUD="$(which gcloud || true)"; readonly AGCLOUD;
 
 ISTIOCTL_REL_PATH=""
 
+
+starline() {
+  echo "*****************************"
+}
+
+info() {
+  echo "ca_migration_cli: ${1}" >&2
+}
+
+warn() {
+  info "[WARNING]: ${1}" >&2
+}
+
+error() {
+  info "[ERROR]: ${1}" >&2
+}
+
+fatal_with_usage() {
+  error "${1}"
+  usage >&2
+  exit 2
+}
+
+arg_required() {
+  if [[ ! "$2" || "${2:0:1}" = '-' ]]; then
+    fatal "ERROR: Option $1 requires an argument."
+  fi
+}
+
 kube() {
   local KUBECTL_CONTEXT; KUBECTL_CONTEXT="$(context_get-option "CONTEXT")"
   local KUBECONFIG; KUBECONFIG="$(context_get-option "KUBECONFIG")"
-  kubectl --kubeconfig=${KUBECONFIG} --context=${KUBECTL_CONTEXT} ${@}
+  if [[ -z "${KUBECONFIG}" ]]; do
+    kubectl ${@}
+  else
+    kubectl --kubeconfig=${KUBECONFIG} --context=${KUBECTL_CONTEXT} ${@}
+  fi
+}
+
+check_empty_args() {
+  for arg in "$@"; do
+    arg_val="$(context_get-option "${arg}")" 
+    if [[ -z "${arg_val}" ]]; then
+      error "arg ${arg} missing"
+  done
+}
+
+retry() {
+  local MAX_TRIES; MAX_TRIES="${1}";
+  shift 1
+  for i in $(seq 0 "${MAX_TRIES}"); do
+    if [[ "${i}" -eq "${MAX_TRIES}" ]]; then
+      break
+    fi
+    { "${@}" && return 0; } || true
+    warn "Failed, retrying...($((i+1)) of ${MAX_TRIES})"
+    sleep 2
+  done
+  local CMD="'$*'"
+  warn "Command $CMD failed."
+  false
 }
 
 download_istioctl_tarball() {
@@ -44,98 +97,37 @@ EOF
   ISTIOCTL_REL_PATH="$(pwd)/istio-${RELEASE}-${OS}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
 }
 
-## $1: ca-migration-state
-## $2: log/state  
-update_migration_cr() {
-  local CURRENT_TIME; CURRENT_TIME="$(date +%s)"
-  local REVISION; REVISION="$(context_get-option "REVISION")"
-  local NAME; NAME="ca-migration-${REVISION}"
-  local CA; CA="$(context_get-option "CA")"
-  local CA_POOL; CA_POOL="$(context_get-option "CA_NAME")"
-  local CA_OLD; CA_OLD="$(context_get-option "CA_OLD")"
-  local START_TIME;
+set_up_local_workspace() {
+  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
 
-  if  [[ "${1}" = "INITIALIZE" ]]; then
-    START_TIME="${CURRENT_TIME}"
-  else
-    START_TIME="$(kube get cm/${NAME} -n istio-system -ojsonpath={.data.start_time})"
-    CA_OLD="$(kube get cm/${NAME} -n istio-system -ojsonpath={.data.old_ca})"
-  fi
-
-    cat <<EOF | kube apply -f -
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: asm-ca-migration-${REVISION}
-  namespace: istio-system
-data:
-  start_time: ${START_TIME}
-  revision: ${REVISION}
-  state_update_time:${CURRENT_TIME} 
-  state: ${1}
-  target_ca: ${CA}:${CA_POOL}
-  old_ca: ${CA_OLD}
-EOF
-
-}
-
-update_proxyConfig_cr() {
-  local REVISION; REVISION="$(context_get-option "REVISION")"
-
-  cat <<EOF | kube apply -f -
-apiVersion: networking.istio.io/v1beta1
-kind: ProxyConfig
-metadata:
-  name: ca-migration-${REVISION}
-  namespace: istio-system
-  labels:
-    istio.io/rev: ${REVISION}
-spec:
-  environmentVariables:
-    CA_ADDR: "$1"
-    CA_PROVIDER: "$2"
-EOF
-}
-
-retry() {
-  local MAX_TRIES; MAX_TRIES="${1}";
-  shift 1
-  for i in $(seq 0 "${MAX_TRIES}"); do
-    if [[ "${i}" -eq "${MAX_TRIES}" ]]; then
-      break
+  info "Setting up necessary working directory ......"
+  if [[ -z "${OUTPUT_DIR}" ]]; then
+    info "Creating temp directory..."
+    OUTPUT_DIR="$(mktemp -d)"
+    if [[ -z "${OUTPUT_DIR}" ]]; then
+      fatal "Encountered error when running mktemp -d!"
     fi
-    { "${@}" && return 0; } || true
-    warn "Failed, retrying...($((i+1)) of ${MAX_TRIES})"
+    info ""
+    info "$(starline)"
+    info "No output folder was specified with --output_dir|-D, so configuration and"
+    info "binaries will be stored in the following directory."
+    info "${OUTPUT_DIR}"
+    info "$(starline)"
+    info ""
     sleep 2
-  done
-  local CMD="'$*'"
-  warn "Command $CMD failed."
-  false
-}
-
-info() {
-  echo "ca_migration_cli: ${1}" >&2
-}
-
-warn() {
-  info "[WARNING]: ${1}" >&2
-}
-
-error() {
-  info "[ERROR]: ${1}" >&2
-}
-
-fatal_with_usage() {
-  error "${1}"
-  usage >&2
-  exit 2
-}
-
-arg_required() {
-  if [[ ! "$2" || "${2:0:1}" = '-' ]]; then
-    fatal "ERROR: Option $1 requires an argument."
+  else
+    OUTPUT_DIR="$(apath -f "${OUTPUT_DIR}")"
+    if [[ ! -a "${OUTPUT_DIR}" ]]; then
+        fatal "directory ${OUTPUT_DIR} does not exist"
+    elif [[ ! -d "${OUTPUT_DIR}" ]]; then
+      fatal "${OUTPUT_DIR} exists and is not a directory, please specify another directory."
+    fi
   fi
+
+  context_set-option "OUTPUT_DIR" "${OUTPUT_DIR}"
+  pushd "$OUTPUT_DIR" > /dev/null
 }
+
 
 context_init() {
   local CONTEXT_JSON; CONTEXT_JSON=$(cat <<EOF
@@ -180,6 +172,63 @@ context_get-option() {
   jq -r --arg OPTION "${OPTION}" '.flags[$OPTION]' "${context_FILE_LOCATION}"
 }
 
+## $1: ca-migration-state
+## $2: log/state  
+update_migration_cr() {
+  local CURRENT_TIME; CURRENT_TIME="$(date +%s)"
+  local REVISION; REVISION="$(context_get-option "REVISION")"
+  local NAME; NAME="ca-migration-v1alpha1-${REVISION}"
+  local CA; CA="$(context_get-option "CA")"
+  local CA_POOL; CA_POOL="$(context_get-option "CA_NAME")"
+  local CA_OLD; CA_OLD="$(context_get-option "CA_OLD")"
+  local CA_POOL_OLD; CA_POOL_OLD="$(context_get-option "CA_NAME_OLD")"
+  local START_TIME;
+
+  if  [[ "${1}" = "INITIALIZE" ]]; then
+    START_TIME="${CURRENT_TIME}"
+  else
+    START_TIME="$(kube get cm/${NAME} -n istio-system -ojsonpath={.data.start_time})"
+    CA_OLD="$(kube get cm/${NAME} -n istio-system -ojsonpath={.data.old_ca} | cut -d":" -f 1)"
+    CA_POOL_OLD="$(kube get cm/${NAME} -n istio-system -ojsonpath={.data.old_ca} | cut -d":" -f 2-)"
+    CA="$(kube get cm/${NAME} -n istio-system -ojsonpath={.data.target_ca} | cut -d":" -f 1)"
+    CA_POOL="$(kube get cm/${NAME} -n istio-system -ojsonpath={.data.target_ca} | cut -d":" -f 2-)"        
+  fi
+
+    cat <<EOF | kube apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: asm-ca-migration-v1alpha1-${REVISION}
+  namespace: istio-system
+data:
+  start_time: ${START_TIME}
+  revision: ${REVISION}
+  state_update_time:${CURRENT_TIME} 
+  state: ${1}
+  target_ca: ${CA}:${CA_POOL}
+  old_ca: ${CA_OLD}
+EOF
+
+}
+
+update_proxyConfig_cr() {
+  local REVISION; REVISION="$(context_get-option "REVISION")"
+
+  cat <<EOF | kube apply -f -
+apiVersion: networking.istio.io/v1beta1
+kind: ProxyConfig
+metadata:
+  name: ca-migration-${REVISION}
+  namespace: istio-system
+  labels:
+    istio.io/rev: ${REVISION}
+spec:
+  environmentVariables:
+    CA_ADDR: "$1"
+    CA_PROVIDER: "$2"
+EOF
+}
+
 parse_args() {
   while [[ $# != 0 ]]; do
     case "${1}" in
@@ -192,12 +241,7 @@ parse_args() {
         arg_required "${@}"
         context_set-option "CONTEXT" "${2}"
         shift 2
-        ;;
-      --project)
-        arg_required "${@}"
-        context_set-option "PROJECT" "${2}"
-        shift 2
-        ;;        
+        ;;  
       --ca)
         arg_required "${@}"
         context_set-option "CA" "$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
@@ -228,11 +272,16 @@ parse_args() {
         context_set-option "CA_CERT" "${2}"
         shift 2
         ;;
-      --ca_old)
+      --ca_old | --ca-old)
         arg_required "${@}"
         context_set-option "CA_OLD" "$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
         shift 2
-        ;; 
+        ;;
+      --ca_pool_old | --ca-pool-old )
+        arg_required "${@}"
+        context_set-option "CA_NAME_OLD" "${2}"
+        shift 2
+        ;;         
       --force | -f)
         context_set-option "FORCE" "true"
         shift 1
@@ -382,44 +431,13 @@ initialize_google_cas() {
   fi
 }
 
-set_up_local_workspace() {
-  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
-
-  info "Setting up necessary working directory ......"
-  if [[ -z "${OUTPUT_DIR}" ]]; then
-    info "Creating temp directory..."
-    OUTPUT_DIR="$(mktemp -d)"
-    if [[ -z "${OUTPUT_DIR}" ]]; then
-      fatal "Encountered error when running mktemp -d!"
-    fi
-    info ""
-    info "$(starline)"
-    info "No output folder was specified with --output_dir|-D, so configuration and"
-    info "binaries will be stored in the following directory."
-    info "${OUTPUT_DIR}"
-    info "$(starline)"
-    info ""
-    sleep 2
-  else
-    OUTPUT_DIR="$(apath -f "${OUTPUT_DIR}")"
-    if [[ ! -a "${OUTPUT_DIR}" ]]; then
-        fatal "directory ${OUTPUT_DIR} does not exist"
-    elif [[ ! -d "${OUTPUT_DIR}" ]]; then
-      fatal "${OUTPUT_DIR} exists and is not a directory, please specify another directory."
-    fi
-  fi
-
-  context_set-option "OUTPUT_DIR" "${OUTPUT_DIR}"
-  pushd "$OUTPUT_DIR" > /dev/null
-
-}
-
 #TODO: Initialize
 # 1. Initialize CA per different CA types if needed
 # 2. Grant IAM permissions if needed
 # 3. Fetch CA trust anchors
 initialize_subcommand() {
   parse_args "${@}"
+  check_empty_args "CA" "FLEET_ID" "REVISION"
   local CA; CA="$(context_get-option "CA")"
 
   case "${CA}" in
@@ -430,6 +448,7 @@ initialize_subcommand() {
 
    set_up_local_workspace
    download_istioctl_tarball
+   # infer_older_ca_proxyconfig
    # working directory should be OUTPUT_DIR before this command
    update_migration_cr "INITIALIZE"
 }
@@ -437,18 +456,21 @@ initialize_subcommand() {
 #TODO: Add new CA trust anchor as mesh trustAnchors in all clusters of the same mesh
 add-trust-anchor_subcommand() {
   parse_args "${@}"
+  check_empty_args "CA_CERT" "FLEET_ID" "REVISION"
   warn "add-trust-anchor-to-be-implemented"
 }
 
 #TODO: Check if new CA trust anchor has reached all workloads in all clusters of the same mesh
 check-trust-anchor_subcommand() {
   parse_args "${@}"
+  check_empty_args "CA_CERT" "FLEET_ID" "REVISION" "NAMESPACES"
   warn "check-trust-anchor-to-be-implemented"
 }
 
 #TODO: Change CA configuration
 migrate-ca_subcommand() {
   parse_args "${@}"
+  check_empty_args "CA" "FLEET_ID" "REVISION"
 
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
   local CA; CA="$(context_get-option "CA_NAME")"
@@ -468,19 +490,25 @@ migrate-ca_subcommand() {
 #TODO: Verify new CA configuration has reached all workloads
 verify-ca_subcommand() {
   parse_args "${@}"
+  check_empty_args "CA_CERT" "FLEET_ID" "REVISION" "NAMESPACES"
   warn "verify-ca-to-be-implemented"
 }
 
 complete_subcommand() {
   #TODO: Remove old CA trust anchor from mesh trustAnchors
   parse_args "${@}"
+  check_empty_args "REVISION"
   update_migration_cr "COMPLETE"
 }
 
 #TODO: Restore old CA configuration and remove new CA trust anchors
 rollback_subcommand() {
   parse_args "${@}"
-  warn "rollback-to-be-implemented"
+
+  # Remove CA config
+  kube delete ProxyConfig/ca-migration-${REVISION} -n istio-system
+
+  # TODO Remove trustAnchor
 }
 
 helper_subcommand() {
