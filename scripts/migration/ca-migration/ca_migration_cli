@@ -2,10 +2,12 @@
 set -CeE
 set -o pipefail
 
+SCRIPT_NAME="${0##*/}"; readonly SCRIPT_NAME
 _CI_ASM_PKG_LOCATION="${_CI_ASM_PKG_LOCATION:=}"; readonly _CI_ASM_PKG_LOCATION;
 _CI_ISTIOCTL_REL_PATH="${_CI_ISTIOCTL_REL_PATH:=}"; readonly _CI_ISTIOCTL_REL_PATH;
 AKUBECTL="$(which kubectl || true)"; readonly AKUBECTL;
 AGCLOUD="$(which gcloud || true)"; readonly AGCLOUD;
+AOPENSSL="$(which openssl || true)"; readonly AOPENSSL;
 
 ISTIOCTL_REL_PATH=""
 
@@ -26,6 +28,11 @@ error() {
   info "[ERROR]: ${1}" >&2
 }
 
+fatal() {
+  error "${1}"
+  exit 2
+}
+
 fatal_with_usage() {
   error "${1}"
   usage >&2
@@ -38,13 +45,18 @@ arg_required() {
   fi
 }
 
+strip_trailing_commas() {
+  # shellcheck disable=SC2001
+  echo "${1}" | sed 's/,*$//g'
+}
+
 kube() {
   local KUBECTL_CONTEXT; KUBECTL_CONTEXT="$(context_get-option "CONTEXT")"
   local KUBECONFIG; KUBECONFIG="$(context_get-option "KUBECONFIG")"
   if [[ -z "${KUBECONFIG}" ]]; then
     kubectl "${@}"
   else
-    kubectl --kubeconfig=${KUBECONFIG} --context=${KUBECTL_CONTEXT} "${@}"
+    kubectl --kubeconfig="${KUBECONFIG}" --context="${KUBECTL_CONTEXT}" "${@}"
   fi
 }
 
@@ -187,11 +199,11 @@ update_migration_cr() {
   if  [[ "${1}" = "INITIALIZE" ]]; then
     START_TIME="${CURRENT_TIME}"
   else
-    START_TIME="$(kube get cm/${NAME} -n istio-system -ojsonpath={.data.start_time})"
-    CA_OLD="$(kube get cm/${NAME} -n istio-system -ojsonpath={.data.old_ca} | cut -d":" -f 1)"
-    CA_POOL_OLD="$(kube get cm/${NAME} -n istio-system -ojsonpath={.data.old_ca} | cut -d":" -f 2-)"
-    CA="$(kube get cm/${NAME} -n istio-system -ojsonpath={.data.target_ca} | cut -d":" -f 1)"
-    CA_POOL="$(kube get cm/${NAME} -n istio-system -ojsonpath={.data.target_ca} | cut -d":" -f 2-)"        
+    START_TIME="$(kube get cm/"${NAME}" -n istio-system -ojsonpath={.data.start_time})"
+    CA_OLD="$(kube get cm/"${NAME}" -n istio-system -ojsonpath={.data.old_ca} | cut -d":" -f 1)"
+    CA_POOL_OLD="$(kube get cm/"${NAME}" -n istio-system -ojsonpath={.data.old_ca} | cut -d":" -f 2-)"
+    CA="$(kube get cm/"${NAME}" -n istio-system -ojsonpath={.data.target_ca} | cut -d":" -f 1)"
+    CA_POOL="$(kube get cm/"${NAME}" -n istio-system -ojsonpath={.data.target_ca} | cut -d":" -f 2-)" 
   fi
 
     cat <<EOF | kube apply -f -
@@ -232,12 +244,12 @@ EOF
 parse_args() {
   while [[ $# != 0 ]]; do
     case "${1}" in
-      --kubeconfig)
+      --kubeconfig | --kc)
         arg_required "${@}"
         context_set-option "KUBECONFIG" "${2}"
         shift 2
         ;;
-      --kubecontext)
+      --context | --ctx)
         arg_required "${@}"
         context_set-option "CONTEXT" "${2}"
         shift 2
@@ -286,7 +298,7 @@ parse_args() {
         context_set-option "FORCE" "true"
         shift 1
         ;;
-      --output_dir | --output-dir)
+      -D | --output_dir | --output-dir)
         arg_required "${@}"
         context_set-option "OUTPUT_DIR" "${2}"
         shift 2
@@ -303,12 +315,7 @@ parse_args() {
   done
 }
 
-#TODO: Add script usage introduction
-usage() {
-  cat << EOF
-Introduction-TBD
-EOF
-}
+
 
 check-prerequisite_subcommand() {
   local NOTFOUND; NOTFOUND="";
@@ -335,6 +342,7 @@ sed
 tr
 head
 csplit
+$AOPENSSL
 EOF
 
   while read -r FLAG; do
@@ -344,6 +352,7 @@ EOF
   done <<EOF
 AKUBECTL
 AGCLOUD
+AOPENSSL
 EOF
 
   if [[ "${#NOTFOUND}" -gt 1 ]]; then
@@ -360,8 +369,8 @@ EOF
   shopt -s nocasematch
   if [[ "$(uname -m)" != "x86_64" ]]; then
     fatal "Installation is only supported on x86_64."
-  fi  
-   
+  fi 
+  info "All Dependencies satisfied!..."
 }
 
 initialize_istiod_ca() {
@@ -371,7 +380,7 @@ initialize_istiod_ca() {
 initialize_mesh_ca() {
   ## TODO : handle case where tool doesn't have permission to enable api's
   local PROJECT; PROJECT="$(context_get-option "FLEET_ID")"
-  retry 3 gcloud services enable --project=meshca.googleapis.com --project=${PROJECT}
+  retry 3 gcloud services enable --project=meshca.googleapis.com --project="${PROJECT}"
 }
 
 validate_private_ca() {
@@ -658,6 +667,46 @@ main() {
     *)
     helper_subcommand "${@}"
   esac
+}
+
+#TODO: Add script usage introduction
+usage() {
+  cat << EOF
+usage: ${SCRIPT_NAME} [SUBCOMMAND] [OPTION]...
+Migrate ASM CA with minimial mesh downtime
+SUBCOMMANDS:
+  check-prerequisites                           Check prerequisites before using tool
+  initialize                                    Initialize newer CA and migration state in cluster
+  add-trust-anchor                              Add newer CA's trustAnchors to all mesh workloads in cluster
+  check-trust-anchor                            Check all cluster workloads have newer CA's trustAnchor in trustbundle
+  migrate-ca                                    Migrate ASM CA to newer CA
+  verify-ca                                     Check all cluster workloads have certificates signed by newer CA
+  complete                                      Complete CA migration
+  rollback                                      Rollback CA migration to older CA
+OPTIONS:
+  --kubeconfig           <KUBECONFIG_FILE>      (Optional) Path to the kubeconfig file to use for CLI requests.
+  --ctx|--context        <CONTEXT>              (Optional) The name of the kubeconfig context to use.
+  --fleet_id             <FLEET ID>             The Fleet host project ID. All clusters need to be registered to a fleet.
+  --ca                   <CA>                   Newer ASM CA type. Allowed values for are {citadel|mesh_ca|gcp_cas}.
+  --ca_old|--ca-old      <CA_OLD>               Older ASM CA type. Allowed values for are {citadel|mesh_ca|gcp_cas}.              
+  --ca_name|--ca-name    <CA POOL>              Required only if --ca option is gcp_cas.
+                                                Name of the newer ca pool in the GCP CAS service used to
+                                                sign certificates in the format
+                                                'projects/project_name/locations/ \
+                                                ca_region/caPools/ca_pool'. If certificate template
+                                                needs to be specified, the format is 'projects/ \
+                                                project_name/locations/ca_region/caPools/ \
+                                                ca_pool:projects/project_name/locations/ca_region/ \
+                                                certificateTemplates/cert_template'.
+  --ca_old_name|--ca-old-name <CA_OLD_NAME>     Required only if --ca_old option is gcp_cas.
+                                                Similar to --ca_name
+  --ca_cert              <CA CERT FILE>         Absolute to CA cert file of newer CA
+  -D|--output_dir        <DIR PATH>             The directory where script will
+                                                download and backup all migration artifacts
+  --revision             <FILE NAME>            ASM revision/channel where CA migration is being performed
+  --namespaces           <Namespaces>           Comma seperated list of namespaces where ASM workloads are deployed
+FLAGS:
+EOF
 }
 
 main "${@}"
