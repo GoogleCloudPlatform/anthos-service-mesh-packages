@@ -4427,6 +4427,9 @@ download_kpt_package() {
     retry 3 kpt pkg get --auto-set=false "${SAMPLES_URL}" samples
   fi
 
+  # leitang@: a temporary walkaround before the managed_cas was merged into the code repo.
+  cp ../asm/istio/options/managed_cas.yaml ./asm/istio/options
+
   touch "${ASM_SETTINGS_FILE}"
 }
 
