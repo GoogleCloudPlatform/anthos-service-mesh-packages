@@ -2065,7 +2065,8 @@ configure_managed_cas() {
   fi
 
   configure_trust_domain_aliases
-}validate_meshca() {
+}
+validate_meshca() {
   return
 }
 
