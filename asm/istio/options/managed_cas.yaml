@@ -23,4 +23,3 @@ spec:
   values:
     global:
       caName: "GkeWorkloadCertificate"
-
