@@ -77,6 +77,9 @@ EOF
    gcp_cas)
      echo privateca.googleapis.com
      ;;
+   managed_cas)
+     echo workloadcertificate.googleapis.com
+     ;;
     *);;
   esac
 }
@@ -90,6 +93,9 @@ EOF
   case "${CA}" in
    gcp_cas)
      echo privateca.googleapis.com
+     ;;
+   managed_cas)
+     echo workloadcertificate.googleapis.com
      ;;
     *);;
   esac
@@ -109,6 +115,9 @@ required_fleet_apis() {
      ;;
    gcp_cas)
      echo privateca.googleapis.com
+     ;;
+   managed_cas)
+     echo workloadcertificate.googleapis.com
      ;;
     *);;
   esac

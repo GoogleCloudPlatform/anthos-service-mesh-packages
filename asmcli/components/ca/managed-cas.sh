@@ -19,14 +19,6 @@ x_configure_managed_cas() {
   configure_trust_domain_aliases
 }
 
-x_enable_workload_certificate_api() {
-  local WORKLOAD_CERT_API; WORKLOAD_CERT_API="$1"
-  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
-
-  info "Enabling the workload certificate API for ${FLEET_ID} ..."
-  retry 2 run_command gcloud services enable --project="${FLEET_ID}" "${WORKLOAD_CERT_API}"
-}
-
 x_exit_if_no_auth_token() {
   local AUTHTOKEN; AUTHTOKEN="$(get_auth_token)"
   if [[ -z "${AUTHTOKEN}" ]]; then
