@@ -1877,7 +1877,7 @@ validate_dependencies() {
         enable_service_mesh_feature
       fi
       if [[ "${CA}" = "managed_cas" ]]; then
-        enable_workload_certificate_on_fleet "autopush-gkehub.sandbox.googleapis.com"
+        enable_workload_certificate_on_fleet "gkehub.googleapis.com"
       fi
     else
       exit_if_no_workload_identity
@@ -1894,7 +1894,7 @@ validate_dependencies() {
     exit_if_hub_membership_is_empty
     local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
     if [[ "${CA}" = "managed_cas" ]]; then
-      enable_workload_certificate_on_membership "autopush-gkehub.sandbox.googleapis.com" "${FLEET_ID}" "${HUB_MEMBERSHIP_ID}"
+      enable_workload_certificate_on_membership "gkehub.googleapis.com" "${FLEET_ID}" "${HUB_MEMBERSHIP_ID}"
     fi
   elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 || "${USE_VM}" -eq 1 ]]; then
     exit_if_cluster_unregistered
@@ -3486,13 +3486,7 @@ enable_gcloud_apis(){
 
   local CA; CA="$(context_get-option "CA")"
   if [[ "${CA}" = "managed_cas" ]]; then
-    enable_workload_certificate_api "autopush-gkehub.sandbox.googleapis.com" "staging-workloadcertificate.sandbox.googleapis.com"
-    # As autopush is used, also enable autopush of meshconfig.
-    # When production version is used, these code can be removed.
-    # https://g3doc.corp.google.com/cloud/csm/config/g3doc/projects/controller/user_guide.md?cl=head
-    # Enable the API. Staging meshconfig is required since MCP Provisioning uses it.
-    retry 2 gcloud services enable --project=${FLEET_ID} autopush-meshconfig.sandbox.googleapis.com staging-meshconfig.sandbox.googleapis.com
-    retry 2 gcloud config set api_endpoint_overrides/gkehub "https://autopush-gkehub.sandbox.googleapis.com/"
+    enable_workload_certificate_api "gkehub.googleapis.com" "workloadcertificate.googleapis.com"
   fi
 
   if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
@@ -5542,8 +5536,6 @@ enable_workload_certificate_on_fleet() {
   exit_if_no_auth_token
   local AUTHTOKEN; AUTHTOKEN="$(get_auth_token)"
 
-  # gcloud command is not ready yet, use curl command instead.
-  # retry 2 run_command gcloud alpha container fleet workload-certificate enable --provision-google-ca --project="${FLEET_ID}"
   local BODY; BODY="{
     'spec': {
       'workloadcertificate': {
@@ -5567,9 +5559,6 @@ enable_workload_certificate_on_membership() {
   exit_if_no_auth_token
   local AUTHTOKEN; AUTHTOKEN="$(get_auth_token)"
 
-
-  # gcloud command is not ready yet, use curl command instead
-  # retry 2 run_command gcloud alpha container fleet workload-certificate update --memberships="${MEMBERSHIP_NAME}" --enable --project="${FLEET_ID}"
   ENABLEFEATURE="{
     'membership_specs': {
       'projects/${FLEET_ID}/locations/global/memberships/${MEMBERSHIP_NAME}': {
