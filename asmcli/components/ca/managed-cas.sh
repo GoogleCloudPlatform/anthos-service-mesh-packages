@@ -26,3 +26,35 @@ x_enable_workload_certificate_api() {
   info "Enabling the workload certificate API for ${FLEET_ID} ..."
   retry 2 run_command gcloud services enable --project="${FLEET_ID}" "${WORKLOAD_CERT_API}"
 }
+
+x_exit_if_no_auth_token() {
+  local AUTHTOKEN; AUTHTOKEN="$(get_auth_token)"
+  if [[ -z "${AUTHTOKEN}" ]]; then
+    { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
+Auth token is not obtained successfully. Please login and
+retry, e.g., run 'gcloud auth application-default login' to login.
+EOF
+  fi
+}
+
+x_enable_workload_certificate_on_fleet() {
+  local GKEHUB_API; GKEHUB_API="$1"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+
+  info "Enabling the workload identity feature on ${FLEET_ID} ..."
+  x_exit_if_no_auth_token
+  local AUTHTOKEN; AUTHTOKEN="$(get_auth_token)"
+
+  local BODY; BODY="{
+    'spec': {
+      'workloadcertificate': {
+        'provision_google_ca': 'ENABLED'
+      }
+    }
+  }"
+
+  curl -H "Authorization: Bearer ${AUTHTOKEN}" \
+      -X POST -H "Content-Type: application/json" -H "Accept: application/json" \
+      -d "${BODY}" \
+      "https://${GKEHUB_API}/v1alpha/projects/${FLEET_ID}/locations/global/features?feature_id=workloadcertificate"
+}
