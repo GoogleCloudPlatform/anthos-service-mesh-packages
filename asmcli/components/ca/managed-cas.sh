@@ -68,7 +68,7 @@ x_enable_workload_certificate_on_membership() {
   x_exit_if_no_auth_token
   local AUTHTOKEN; AUTHTOKEN="$(get_auth_token)"
 
-  ENABLEFEATURE="{
+  local ENABLEFEATURE; ENABLEFEATURE="{
     'membership_specs': {
       'projects/${FLEET_ID}/locations/global/memberships/${MEMBERSHIP_NAME}': {
         'workloadcertificate': {
