@@ -82,3 +82,9 @@ x_enable_workload_certificate_on_membership() {
      -X PATCH -H "Content-Type: application/json" -H "Accept: application/json" \
      -d "${ENABLEFEATURE}" "https://${GKEHUB_API}/v1alpha/projects/${FLEET_ID}/locations/global/features/workloadcertificate?update_mask=membership_specs"
 }
+
+x_install_managed_cas_for_mcp() {
+  info "Configuring managed CAS for managed control plane..."
+
+  context_append "mcpOptions" "CA=MANAGEDCAS"
+}
