@@ -58,3 +58,27 @@ x_enable_workload_certificate_on_fleet() {
       -d "${BODY}" \
       "https://${GKEHUB_API}/v1alpha/projects/${FLEET_ID}/locations/global/features?feature_id=workloadcertificate"
 }
+
+x_enable_workload_certificate_on_membership() {
+  local GKEHUB_API; GKEHUB_API="${1}"
+  local FLEET_ID; FLEET_ID="${2}"
+  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="${3}"
+
+  info "Enabling the workload certificate for the membership ${MEMBERSHIP_NAME}  ..."
+  x_exit_if_no_auth_token
+  local AUTHTOKEN; AUTHTOKEN="$(get_auth_token)"
+
+  local ENABLEFEATURE; ENABLEFEATURE="{
+    'membership_specs': {
+      'projects/${FLEET_ID}/locations/global/memberships/${MEMBERSHIP_NAME}': {
+        'workloadcertificate': {
+          'certificate_management': 'ENABLED'
+        }
+      }
+    }
+  }"
+
+  curl -H "Authorization: Bearer ${AUTHTOKEN}" \
+     -X PATCH -H "Content-Type: application/json" -H "Accept: application/json" \
+     -d "${ENABLEFEATURE}" "https://${GKEHUB_API}/v1alpha/projects/${FLEET_ID}/locations/global/features/workloadcertificate?update_mask=membership_specs"
+}
