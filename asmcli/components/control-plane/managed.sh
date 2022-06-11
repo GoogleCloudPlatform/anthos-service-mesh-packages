@@ -40,6 +40,10 @@ install_managed_control_plane() {
     install_managed_privateca
   fi
 
+  if [[ "${CA}" == "managed_cas" ]]; then
+    x_install_managed_cas_for_mcp
+  fi
+
   install_managed_startup_config
 }
 
