@@ -362,6 +362,16 @@ EOF
   fi
 }
 
+exit_if_hub_membership_is_empty() {
+  local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
+  if [[ -z "${HUB_MEMBERSHIP_ID}" ]]; then
+    { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
+The hub membership id for the cluster is empty: either the cluster is not regisered to the fleet
+or the hub membership id is not retrieved successfully.
+EOF
+  fi
+}
+
 exit_if_no_workload_identity() {
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   if ! is_workload_identity_enabled; then

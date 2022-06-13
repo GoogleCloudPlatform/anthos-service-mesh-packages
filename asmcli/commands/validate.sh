@@ -37,6 +37,7 @@ validate_dependencies() {
   local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
   local USE_VM; USE_VM="$(context_get-option "USE_VM")"
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  local CA; CA="$(context_get-option "CA")"
 
   if can_modify_gcp_apis; then
     enable_gcloud_apis
@@ -53,6 +54,9 @@ validate_dependencies() {
       if needs_service_mesh_feature; then
         enable_service_mesh_feature
       fi
+      if [[ "${CA}" == "managed_cas" ]]; then
+        x_enable_workload_certificate_on_fleet "gkehub.googleapis.com"
+      fi
     else
       exit_if_no_workload_identity
       exit_if_stackdriver_not_enabled
@@ -64,6 +68,12 @@ validate_dependencies() {
 
   if can_register_cluster; then
     register_cluster
+    exit_if_cluster_unregistered
+    exit_if_hub_membership_is_empty
+    local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
+    if [[ "${CA}" == "managed_cas" ]]; then
+      x_enable_workload_certificate_on_membership "gkehub.googleapis.com" "${FLEET_ID}" "${HUB_MEMBERSHIP_ID}"
+    fi
   elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 || "${USE_VM}" -eq 1 ]]; then
     exit_if_cluster_unregistered
   fi

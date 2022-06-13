@@ -206,6 +206,7 @@ configure_ca() {
   case "${CA}" in
     mesh_ca) configure_meshca;;
     gcp_cas) configure_private_ca;;
+    managed_cas) x_configure_managed_cas;;
     citadel) configure_citadel;;
   esac
 }
