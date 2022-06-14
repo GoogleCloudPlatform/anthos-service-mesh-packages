@@ -12,6 +12,7 @@ AOPENSSL="$(which openssl || true)"; readonly AOPENSSL;
 RELEASE="1.13.1-asm.1"; readonly RELEASE;
 CA_MIGRATION_CM_PREFIX="ca-migration-v1alpha1"
 CA_MIGRATION_CR_PREFIX="ca-migration"
+context_FILE_LOCATION="context_file";
 
 APATH=""
 
@@ -168,10 +169,9 @@ EOF
 }
 
 istioctl() {
-  local KCF KCC HTTPS_PROXY
+  local KCF KCC
   KCF="$(context_get-option "KUBECONFIG")"
   KCC="$(context_get-option "CONTEXT")"
-  HTTPS_PROXY="$(context_get-option "HTTPS_PROXY")"
 
   if [[ -n "${KCF}" ]]; then
     "$(istioctl_path)" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
@@ -218,6 +218,10 @@ set_up_local_workspace() {
   fi
 
   context_set-option "OUTPUT_DIR" "${OUTPUT_DIR}"
+  if [[ ! -f "${OUTPUT_DIR}/${context_FILE_LOCATION}" ]]; then
+    mv ${context_FILE_LOCATION} ${OUTPUT_DIR}
+  fi
+  context_FILE_LOCATION="${OUTPUT_DIR}/${context_FILE_LOCATION}"; readonly context_FILE_LOCATION
   pushd "$OUTPUT_DIR" > /dev/null
 }
 
@@ -228,7 +232,7 @@ context_init() {
   "flags": {
     "KUBECONFIG": "${KUBECONFIG:-}",
     "CONTEXT": "${CONTEXT:-}",
-    "PROJECT": "${PROJECT:-}",
+    "OUTPUT_DIR": "${OUTPUT_DIR:-}",
     "CA": "${CA:-}",
     "CA_OLD": "${CA_OLD:-}",
     "CA_NAME": "${CA_NAME:-}",
@@ -244,8 +248,6 @@ context_init() {
 EOF
 )
 
-  context_FILE_LOCATION="$(mktemp)"; readonly context_FILE_LOCATION
-  export context_FILE_LOCATION
   echo "${CONTEXT_JSON}" | jq -S '.' >| "${context_FILE_LOCATION}"
 
   # BSD-style readlink apparently doesn't have the same -f toggle on readlink
@@ -526,13 +528,22 @@ initialize_gcp_cas() {
   fi
 }
 
-#TODO: Initialize
+setup_subcommand() {
+
+  context_init
+
+  parse_args "${@}"
+
+  set_up_local_workspace
+
+  download_istioctl_tarball
+}
+
 # 1. Initialize CA per different CA types if needed
 # 2. Grant IAM permissions if needed
 # 3. Fetch CA trust anchors
 initialize_subcommand() {
-  context_init
-
+  
   parse_args "${@}"
 
   check_empty_args "CA" "FLEET_ID" "REVISION"
@@ -544,10 +555,6 @@ initialize_subcommand() {
     gcp_cas) initialize_gcp_cas;;
     citadel) initialize_istiod_ca;;
   esac
-
-   set_up_local_workspace
-   download_istioctl_tarball
-
    # infer_older_ca_proxyconfig
    # working directory should be OUTPUT_DIR before this command
    update_migration_cm "INITIALIZE"
@@ -740,6 +747,10 @@ main() {
       shift 1
       check-prerequisite_subcommand "${@}"
       ;;
+    setup)
+      shift 1
+      setup_subcommand "${@}"
+      ;;
     initialize)
       shift 1
       initialize_subcommand "${@}"
@@ -784,6 +795,7 @@ usage: ${SCRIPT_NAME} [SUBCOMMAND] [OPTION]...
 Migrate ASM CA with minimial mesh downtime
 SUBCOMMANDS:
   check-prerequisites                           Check prerequisites before using tool
+  setup                                         Sets up the working directory and downloads necessary pre-requisites
   initialize                                    Initialize newer CA and migration state in cluster
   download-trust-anchor                         Download trustAnchor into a file. Only intended for CA=mesh_ca
   add-trust-anchor                              Add newer CA's trustAnchors to all mesh workloads in cluster
