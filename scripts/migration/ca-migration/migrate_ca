@@ -621,7 +621,7 @@ check_in_namespace() {
   pods=$(kube get pod -o jsonpath={.items..metadata.name} -n "$1")
 	for pod in ${pods}
 	do
-    containers=$(kube get pod "${pod}" -n "$1" -o jsonpath=={.spec.containers.*.name})
+    containers="$(kube get pod "${pod}" -n "$1" -o jsonpath=={.spec.containers.*.name})"
     if [[ "${containers}" == *"istio-proxy"* ]]; then
       if [[ "$2" = "cert" ]]; then
         check_cert_in_pod "${pod}" "$1" "$3" "$4"
@@ -661,26 +661,47 @@ add_to_rootmap() {
 # $3: ROOTCA/default
 # $4: caCert file
 check_cert_in_pod() {
-  local sn
-
-  # Example format:
-  # RESOURCE NAME   TYPE   STATUS   VALID CERT  SERIAL NUMBER        NOT AFTER            NOT BEFORE
-  # ROOTCA          CA     ACTIVE   true        16289816804573236346 2117-12-31T19:15:51Z 2018-01-24T19:15:51Z
-  # We use the serial number for the comparison.
-  if [ "$3" = "ROOTCA" ]; then
-    sn=$(istioctl pc secret "$1" -n "$2" | grep "ROOTCA" | awk '{print $5}')
-    if [[ -z ${sn} ]]; then
-      echo " - [WARNING] $1.$2 cannot find certificate information"
+  local POD; POD="$1"
+  local NS; NS="$2"
+  local TARGET; TARGET="$3"
+  local CA_CERT; CA_CERT="$4"
+  if [ "$TARGET" = "ROOTCA" ]; then
+    # Example format:
+    # RESOURCE NAME   TYPE   STATUS   VALID CERT  SERIAL NUMBER        NOT AFTER            NOT BEFORE
+    # ROOTCA          CA     ACTIVE   true        16289816804573236346 2117-12-31T19:15:51Z 2018-01-24T19:15:51Z
+    # We use the serial number for the comparison.
+    local SN
+    SN=$(istioctl pc secret "${POD}" -n "${NS}" | grep "ROOTCA" | awk '{print $5}')
+    if [[ -z ${SN} ]]; then
+      echo " - [WARNING] ${POD}.${NS} cannot find certificate information"
       return
     fi
-    if [[ -z ${rootmap[${sn}]} ]]; then
-      add_to_rootmap "$1" "$2" "${sn}" "$4"
+    if [[ -z ${rootmap[${SN}]} ]]; then
+      add_to_rootmap "${POD}" "${NS}" "${SN}" "${CA_CERT}"
     fi
-    if ! ${rootmap[${sn}]}; then
-      echo "$1.$2 does not trust $4"
+    if ! ${rootmap[${SN}]}; then
+      echo "${POD}.${NS} does not trust ${CA_CERT}"
     else
-      echo "$1.$2 trusts $4"
+      echo "${POD}.${NS} trusts ${CA_CERT}"
     fi
+  elif [ "$TARGET" = "default" ]; then
+    local OUTPUT
+    local CERT_CHAIN
+    OUTPUT=$(istioctl pc secret "${POD}" -n "${NS}" -o json)
+    if [ "$(echo "${OUTPUT}" | jq '.dynamicActiveSecrets[0].name')" = "\"default\"" ]; then
+      CERT_CHAIN=$(echo "${OUTPUT}" | jq '.dynamicActiveSecrets[0].secret.tlsCertificate.certificateChain.inlineBytes')
+    else
+      CERT_CHAIN=$(echo "${OUTPUT}" | jq '.dynamicActiveSecrets[1].secret.tlsCertificate.certificateChain.inlineBytes')
+    fi
+    if [ -z "${CERT_CHAIN}" ]; then
+      echo "Cannot find certificate chain for ${POD}.${NS}"
+      exit 1
+    fi
+    if [ -f "${POD}-${NS}-${TARGET}".pem ]; then
+       rm "${POD}-${NS}-${TARGET}".pem
+    fi
+    echo "${CERT_CHAIN}" | sed 's/\"//g' | base64 -d > "${POD}-${NS}-${TARGET}".pem
+    openssl verify -CAfile "${POD}-${NS}-${TARGET}".pem "${CA_CERT}"
   fi
 }
 
@@ -706,9 +727,17 @@ migrate-ca_subcommand() {
 
 #TODO: Verify new CA configuration has reached all workloads
 verify-ca_subcommand() {
-  parse_args "${@}"
-  check_empty_args "CA_CERT" "FLEET_ID" "REVISION" "NAMESPACES"
-  warn "verify-ca-to-be-implemented"
+    parse_args "${@}"
+    check_empty_args "CA_CERT" "FLEET_ID" "REVISION" "NAMESPACES"
+    local CA_CERT; CA_CERT="$(context_get-option "CA_CERT")"
+    local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+    local REVISION; REVISION="$(context_get-option "REVISION")"
+    local NAMESPACES; NAMESPACES="$(context_get-option "NAMESPACES")"
+    IFS=',' read -ra NAMESPACE_LIST <<< "$NAMESPACES"
+    for ns in "${NAMESPACE_LIST[@]}"; do
+      echo "Check the CA configuration in namespace ${ns}"
+      check_in_namespace "${ns}" "cert" "default" "${CA_CERT}"
+    done
 }
 
 complete_subcommand() {
