@@ -86,6 +86,13 @@ is_gcp_cas_installed() {
   [[ "${INSTALLED_CA_PROVIDER}" = "GoogleCAS" ]] && return 0
 }
 
+is_managed_cas_installed() {
+  local INSTALLED_CA_PROVIDER
+  INSTALLED_CA_PROVIDER="$(kubectl -n istio-system get pod -l istio=ingressgateway \
+    -o jsonpath='{.items[].spec.containers[].env[?(@.name=="CA_PROVIDER")].value}')"
+  [[ "${INSTALLED_CA_PROVIDER}" == "GkeWorkloadCertificate" ]] && return 0
+}
+
 is_cluster_registered() {
   info "Verifying cluster registration."
 

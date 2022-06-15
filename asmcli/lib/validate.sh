@@ -238,6 +238,8 @@ validate_ca_consistency() {
     CURRENT_CA="mesh_ca"
   elif is_gcp_cas_installed; then
     CURRENT_CA="gcp_cas"
+  elif is_managed_cas_installed; then
+    CURRENT_CA="managed_cas"
   fi
 
   info "CA already in use: ${CURRENT_CA}"
