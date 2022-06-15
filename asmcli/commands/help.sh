@@ -78,7 +78,7 @@ OPTIONS:
                                       environments, "default" will be used.
   -c|--ca                <CA>         The type of certificate authority to be
                                       used. Defaults to "mesh_ca" for install.
-                                      Allowed values for <CA> are {citadel|mesh_ca|gcp_cas}.
+                                      Allowed values for <CA> are {citadel|mesh_ca|gcp_cas|managed_cas}.
   -o|--option            <FILE NAME>  The name of a YAML file in the kpt pkg to
                                       apply. For options, see the
                                       anthos-service-mesh-package GitHub
