@@ -647,9 +647,10 @@ add_to_rootmap() {
     echo "Cannot find roots for $1.$2"
     exit 1
   fi
-  echo "${roots}" | sed 's/\"//g' | base64 -d > /tmp/"$3".pem
+  local tmp_file; tmp_file="$(mktemp).pem"
+  echo "${roots}" | sed 's/\"//g' | base64 -d > ${tmp_file}
   # Search for trustAnchor in workload trustBundle
-  if [[ "$CACERT" = "$(grep -f /tmp/"$3".pem <(echo "$CACERT"))" ]]; then
+  if [[ "$CACERT" = "$(grep -f ${tmp_file} <(echo "$CACERT"))" ]]; then
     rootmap[$3]=true
   else
     rootmap[$3]=false
@@ -701,7 +702,12 @@ check_cert_in_pod() {
        rm "${POD}-${NS}-${TARGET}".pem
     fi
     echo "${CERT_CHAIN}" | sed 's/\"//g' | base64 -d > "${POD}-${NS}-${TARGET}".pem
-    openssl verify -CAfile "${POD}-${NS}-${TARGET}".pem "${CA_CERT}"
+    openssl verify -CAfile "${POD}-${NS}-${TARGET}".pem "${CA_CERT}" &> /dev/null
+    if [[ "$?" != "0" ]]; then
+      echo "${POD}.${NS} is not signed by ${CA_CERT}"
+    else
+      echo "${POD}.${NS} is signed by ${CA_CERT}"
+    fi
   fi
 }
 
