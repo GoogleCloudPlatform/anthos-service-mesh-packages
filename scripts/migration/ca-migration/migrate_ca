@@ -164,7 +164,7 @@ Authorization: Bearer ${TOKEN}
 EOF
   fi
   ## TODO : Fix this path
-  local ISTIOCTL_REL_PATH; ISTIOCTL_REL_PATH="$(pwd)/istio-${RELEASE}-${OS}/bin/istioctl";
+  local ISTIOCTL_REL_PATH; ISTIOCTL_REL_PATH="$(pwd)/istio-${RELEASE}/bin/istioctl";
   context_set-option "ISTIOCTL_REL_PATH" "${ISTIOCTL_REL_PATH}"
 }
 
@@ -185,7 +185,7 @@ istioctl_path() {
   if [[ -n "${_CI_ISTIOCTL_REL_PATH}" && -f "${_CI_ISTIOCTL_REL_PATH}" ]]; then
     echo "${_CI_ISTIOCTL_REL_PATH}"
   else
-    echo "./${ISTIOCTL_REL_PATH}"
+    echo "${ISTIOCTL_REL_PATH}"
   fi
 }
 
@@ -579,7 +579,7 @@ add-trust-anchor_subcommand() {
   parse_args "${@}"
   check_empty_args "CA_CERT" "FLEET_ID" "REVISION"
   add_trust_anchor
-  update_migration_cr "TRUSTANCHOR_INJECTED"
+  update_migration_cm "TRUSTANCHOR_INJECTED"
 }
 
 add_trust_anchor() {
