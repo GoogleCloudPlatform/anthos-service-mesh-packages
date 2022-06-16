@@ -309,6 +309,9 @@ exit_if_apis_not_enabled() {
   local ENABLED; ENABLED="$(get_enabled_apis)";
   local REQUIRED; REQUIRED="$(required_apis)";
   local OLD_REQUIRED; OLD_REQUIRED="$(old_required_apis)";
+  if is_managed; then
+    OLD_REQUIRED="${OLD_REQUIRED} $(old_managed_required_apis)"
+  fi
   local NOTFOUND; NOTFOUND="";
   local OLD_NOTFOUND; OLD_NOTFOUND="";
 
