@@ -81,12 +81,6 @@ EOF
   esac
 }
 
-old_managed_required_apis() {
-    cat << EOF
-connectgateway.googleapis.com
-EOF
-}
-
 # [START required_apis]
 required_apis() {
   local CA; CA="$(context_get-option "CA")"
