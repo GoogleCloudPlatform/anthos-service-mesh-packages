@@ -32,8 +32,20 @@ spec:
         app: istio-ingressgateway
         istio: ingressgateway
     spec:
+      securityContext:
+        fsGroup: 1337
+        runAsGroup: 1337
+        runAsNonRoot: true
+        runAsUser: 1337
       containers:
       - name: istio-proxy
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - all
+          privileged: false
+          readOnlyRootFilesystem: true
         image: auto # The image will automatically update each time the pod starts.
         resources:
           limits:
