@@ -8,7 +8,6 @@ _CI_ISTIOCTL_REL_PATH="${_CI_ISTIOCTL_REL_PATH:=}"; readonly _CI_ISTIOCTL_REL_PA
 AKUBECTL="$(which kubectl || true)"; readonly AKUBECTL;
 AGCLOUD="$(which gcloud || true)"; readonly AGCLOUD;
 AOPENSSL="$(which openssl || true)"; readonly AOPENSSL;
-# TODO: Need better logic to determine istioctl RELEASE
 RELEASE="1.13.1-asm.1"; readonly RELEASE;
 CA_MIGRATION_CM_PREFIX="ca-migration-v1alpha1"
 CA_MIGRATION_CR_PREFIX="ca-migration"
@@ -163,7 +162,6 @@ download_istioctl_tarball() {
 Authorization: Bearer ${TOKEN}
 EOF
   fi
-  ## TODO : Fix this path
   local ISTIOCTL_REL_PATH; ISTIOCTL_REL_PATH="$(pwd)/istio-${RELEASE}/bin/istioctl";
   context_set-option "ISTIOCTL_REL_PATH" "${ISTIOCTL_REL_PATH}"
 }
@@ -410,7 +408,6 @@ check-prerequisite_subcommand() {
   local NOTFOUND; NOTFOUND="";
   local EXITCODE; EXITCODE=0;
 
-  # TODO: need to add/remove some tools
   info "Checking installation tool dependencies..."
 
   while read -r dependency; do
@@ -422,7 +419,6 @@ check-prerequisite_subcommand() {
   done <<EOF
 awk
 $AGCLOUD
-git
 grep
 jq
 yq
@@ -430,7 +426,6 @@ $AKUBECTL
 sed
 tr
 head
-csplit
 $AOPENSSL
 EOF
 
@@ -497,7 +492,6 @@ validate_private_ca() {
 
 initialize_gcp_cas() {
 
-  # TODO : initialize privateca api on the project
   validate_private_ca
 
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
@@ -546,7 +540,7 @@ initialize_subcommand() {
   
   parse_args "${@}"
 
-  check_empty_args "CA" "FLEET_ID" "REVISION"
+  check_empty_args "CA" "CA_OLD" "FLEET_ID" "REVISION"
 
   local CA; CA="$(context_get-option "CA")"
 
@@ -561,7 +555,6 @@ initialize_subcommand() {
 }
 
 download-trust-anchor_subcommand() {
-  #TODO: Remove old CA trust anchor from mesh trustAnchors
   parse_args "${@}"
   check_empty_args "CA" "CA_CERT"
   local CA; CA="$(context_get-option "CA")"
@@ -574,12 +567,21 @@ download-trust-anchor_subcommand() {
   esac
 }
 
-#TODO: Add new CA trust anchor as mesh trustAnchors in all clusters of the same mesh
 add-trust-anchor_subcommand() {
   parse_args "${@}"
   check_empty_args "CA_CERT" "FLEET_ID" "REVISION"
+  backup_resources
   add_trust_anchor
   update_migration_cm "TRUSTANCHOR_INJECTED"
+}
+
+backup_resources() {
+  local REVISION; REVISION="$(context_get-option "REVISION")"
+  local REV_NAME; REV_NAME="istio-${REVISION}"
+  if [[ "${REVISION}" = default ]]; then
+    REV_NAME="istio"
+  fi
+  kube get cm/${REV_NAME} -n istio-system -oyaml > "backup-${REV_NAME}"
 }
 
 add_trust_anchor() {
@@ -595,7 +597,6 @@ add_trust_anchor() {
   kube -n istio-system get configmaps ${REV_NAME} -o json | jq --arg NEW_MESH_CONFIG "$NEW_MESH_CONFIG" '.data.mesh = $NEW_MESH_CONFIG' | yq eval -P | kube apply -f - || warn "failed to patch the configmap ${REV_NAME}"
 }
 
-#TODO: Check if new CA trust anchor has reached all workloads in all clusters of the same mesh
 check-trust-anchor_subcommand() {
   parse_args "${@}"
   check_empty_args "CA_CERT" "FLEET_ID" "REVISION" "NAMESPACES"
@@ -711,7 +712,6 @@ check_cert_in_pod() {
   fi
 }
 
-#TODO: Change CA configuration
 migrate-ca_subcommand() {
   parse_args "${@}"
   check_empty_args "CA" "FLEET_ID" "REVISION"
@@ -731,7 +731,6 @@ migrate-ca_subcommand() {
   update_migration_cm "CA_MIGRATE"
 }
 
-#TODO: Verify new CA configuration has reached all workloads
 verify-ca_subcommand() {
     parse_args "${@}"
     check_empty_args "CA_CERT" "FLEET_ID" "REVISION" "NAMESPACES"
@@ -747,20 +746,16 @@ verify-ca_subcommand() {
 }
 
 complete_subcommand() {
-  #TODO: Remove old CA trust anchor from mesh trustAnchors
   parse_args "${@}"
   check_empty_args "REVISION"
   update_migration_cm "COMPLETE"
 }
 
-#TODO: Restore old CA configuration and remove new CA trust anchors
 rollback_subcommand() {
   parse_args "${@}"
-
+  local REVISION; REVISION="$(context_get-option "REVISION")"
   # Remove CA config
   kube delete ProxyConfig/${CA_MIGRATION_CR_PREFIX}-${REVISION} -n istio-system
-
-  # TODO Remove trustAnchor
 
   # update the final state
   update_migration_cm "ROLLBACK"
@@ -810,10 +805,6 @@ main() {
       shift 1
       verify-ca_subcommand "${@}"
       ;;
-    complete)
-      shift 1
-      complete_subcommand "${@}"
-      ;;
     rollback)
       shift 1
       rollback_subcommand "${@}"
@@ -823,7 +814,6 @@ main() {
   esac
 }
 
-#TODO: Add script usage introduction
 usage() {
   cat << EOF
 usage: ${SCRIPT_NAME} [SUBCOMMAND] [OPTION]...
@@ -837,7 +827,6 @@ SUBCOMMANDS:
   check-trust-anchor                            Check all cluster workloads have newer CA's trustAnchor in trustbundle
   migrate-ca                                    Migrate ASM CA to newer CA
   verify-ca                                     Check all cluster workloads have certificates signed by newer CA
-  complete                                      Complete CA migration
   rollback                                      Rollback CA migration to older CA
 OPTIONS:
   --kubeconfig           <KUBECONFIG_FILE>      (Optional) Path to the kubeconfig file to use for CLI requests.
