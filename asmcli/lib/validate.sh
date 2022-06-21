@@ -676,7 +676,7 @@ EOF
   fi
 
   case "${CA}" in
-    citadel | mesh_ca | gcp_cas);;
+    citadel | mesh_ca | gcp_cas | managed_cas);;
     "")
       MISSING_ARGS=1
       warn "Missing value for CA"
