@@ -1,13 +1,8 @@
 x_install_subcommand() {
-  x_parse_install_args "${@}"
   context_set-option "PLATFORM" "gcp"
   context_set-option "EXPERIMENTAL" 1
-  x_validate_install_args
-  prepare_environment
 
-  x_validate_dependencies
-  x_configure_package
-  x_install
+  install_subcommand "$@"
 }
 
 x_install() {
