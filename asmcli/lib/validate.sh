@@ -681,7 +681,7 @@ EOF
       MISSING_ARGS=1
       warn "Missing value for CA"
       ;;
-    *) fatal "CA must be one of 'citadel', 'mesh_ca', 'gcp_cas'";;
+    *) fatal "CA must be one of 'citadel', 'mesh_ca', 'gcp_cas', 'managed_cas'";;
   esac
 
   if [[ "${CA}" = "gcp_cas" ]]; then
