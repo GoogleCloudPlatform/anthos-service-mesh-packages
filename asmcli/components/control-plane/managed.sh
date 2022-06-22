@@ -26,6 +26,11 @@ call_runIstiod() {
 install_managed_control_plane() {
   local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
   local CA; CA="$(context_get-option "CA")"
+  if is_legacy; then
+    provision_mcp_legacy
+  else
+    wait_for_cpr_crd
+  fi
 
   if [[ "${USE_MANAGED_CNI}" -eq 0 ]]; then
     install_managed_cni_static
@@ -40,13 +45,6 @@ install_managed_control_plane() {
   fi
 
   install_managed_startup_config
-
-  if is_legacy; then
-    provision_mcp_legacy
-  else
-    wait_for_cpr_crd
-  fi
-
 }
 
 provision_mcp_legacy() {
