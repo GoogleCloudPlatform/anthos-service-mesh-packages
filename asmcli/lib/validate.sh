@@ -526,6 +526,7 @@ validate_args() {
   local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
   local ONLY_ENABLE; ONLY_ENABLE="$(context_get-option "ONLY_ENABLE")"
   local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
+  local MANAGED_CERTIFICATES; MANAGED_CERTIFICATES="$(context_get-option "MANAGED_CERTIFICATES")"
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
   local LEGACY; LEGACY="$(context_get-option "LEGACY")"
   local MANAGED_SERVICE_ACCOUNT; MANAGED_SERVICE_ACCOUNT="$(context_get-option "MANAGED_SERVICE_ACCOUNT")"
@@ -547,8 +548,14 @@ validate_args() {
   fi
 
   if [[ -z "${CA}" ]]; then
-    CA="mesh_ca"
+    if [[ "${MANAGED_CERTIFICATES}" -eq 1 ]]; then
+      CA="managed_cas"
+    else
+      CA="mesh_ca"
+    fi
     context_set-option "CA" "${CA}"
+  elif [[ "${MANAGED_CERTIFICATES}" -eq 1 ]]; then
+    fatal "When --managed_certificates is enabled, the --ca option should not be specified."
   fi
 
   if [[ "${CUSTOM_REVISION}" -eq 1 ]]; then
