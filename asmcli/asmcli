@@ -1331,6 +1331,9 @@ FLAGS:
      --disable_canonical_service      Do not install the CanonicalService
                                       controller. This is required for ASM UI to
                                       support various features.
+  --managed_certificates              Enable the managed certificates, which automatically manages
+                                      the workload certificates. When this flag is enabled,
+                                      you should not specify the --ca option.
   -v|--verbose                        Print commands before and after execution.
      --dry_run                        Print commands, but don't execute them.
      --only_validate                  Run validation, but don't install.
@@ -1420,6 +1423,7 @@ FLAGS:
 
      --print_config
      --disable_canonical_service
+  --managed_certificates
   -v|--verbose
      --dry_run
      --only_validate
@@ -3177,6 +3181,7 @@ context_init() {
     "ONLY_VALIDATE": ${ONLY_VALIDATE:-0},
     "VALIDATION_ERROR": ${VALIDATION_ERROR:-0},
     "ONLY_ENABLE": ${ONLY_ENABLE:-0},
+    "MANAGED_CERTIFICATES": ${MANAGED_CERTIFICATES:-0},
     "VERBOSE": ${VERBOSE:-0},
     "MANAGED": ${MANAGED:-0},
     "LEGACY": ${LEGACY:-0},
@@ -3308,6 +3313,7 @@ DRY_RUN
 ONLY_VALIDATE
 VALIDATION_ERROR
 ONLY_ENABLE
+MANAGED_CERTIFICATES
 VERBOSE
 MANAGED
 LEGACY
@@ -4043,6 +4049,10 @@ parse_args() {
         ;;
       --offline)
         context_set-option "OFFLINE" 1
+        shift 1
+        ;;
+      --managed_certificates)
+        context_set-option "MANAGED_CERTIFICATES" 1
         shift 1
         ;;
       -v | --verbose)
@@ -5648,6 +5658,7 @@ validate_args() {
   local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
   local ONLY_ENABLE; ONLY_ENABLE="$(context_get-option "ONLY_ENABLE")"
   local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
+  local MANAGED_CERTIFICATES; MANAGED_CERTIFICATES="$(context_get-option "MANAGED_CERTIFICATES")"
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
   local LEGACY; LEGACY="$(context_get-option "LEGACY")"
   local MANAGED_SERVICE_ACCOUNT; MANAGED_SERVICE_ACCOUNT="$(context_get-option "MANAGED_SERVICE_ACCOUNT")"
@@ -5669,8 +5680,14 @@ validate_args() {
   fi
 
   if [[ -z "${CA}" ]]; then
-    CA="mesh_ca"
+    if [[ "${MANAGED_CERTIFICATES}" -eq 1 ]]; then
+      CA="managed_cas"
+    else
+      CA="mesh_ca"
+    fi
     context_set-option "CA" "${CA}"
+  elif [[ "${MANAGED_CERTIFICATES}" -eq 1 ]]; then
+    fatal "When --managed_certificates is enabled, the --ca option should not be specified."
   fi
 
   if [[ "${CUSTOM_REVISION}" -eq 1 ]]; then
