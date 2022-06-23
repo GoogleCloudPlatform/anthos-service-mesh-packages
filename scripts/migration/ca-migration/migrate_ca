@@ -478,15 +478,15 @@ validate_private_ca() {
   local CA_NAME_REGEX; CA_NAME_REGEX="${CA_POOL_REGEX}:${CT_REGEX}"
 
   if [[ -z ${CA_NAME} ]]; then
-    fatal "A ca-name must be provided for integration with Google Certificate Authority Service."
+    fatal "A ca-pool must be provided for integration with Google Certificate Authority Service."
   # check if CA_NAME is ca_pool:cert_template format
   elif [[ "${CA_NAME}" == *":"* ]]; then
     if ! [[ "${CA_NAME}" =~ ^${CA_NAME_REGEX}$ ]]; then
-      fatal "Malformed ca-name with certificate template. ca-name must be of the form ${CA_NAME_TEMPLATE}."
+      fatal "Malformed ca with certificate template. ca-pool must be of the form ${CA_NAME_TEMPLATE}."
     fi
   # when CA_NAME is ca_pool format
   elif ! [[ "${CA_NAME}" =~ ^${CA_POOL_REGEX}$ ]]; then
-    fatal "Malformed ca-name. ca-name must be of the form ${CA_POOL_TEMPLATE}."
+    fatal "Malformed ca-pool. ca-pool must be of the form ${CA_POOL_TEMPLATE}."
   fi
 }
 
@@ -581,6 +581,7 @@ backup_resources() {
   if [[ "${REVISION}" = default ]]; then
     REV_NAME="istio"
   fi
+  rm "backup-${REV_NAME}" &> /dev/null
   kube get cm/${REV_NAME} -n istio-system -oyaml > "backup-${REV_NAME}"
 }
 
@@ -604,6 +605,10 @@ check-trust-anchor_subcommand() {
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local REVISION; REVISION="$(context_get-option "REVISION")"
   local NAMESPACES; NAMESPACES="$(context_get-option "NAMESPACES")"
+  if [[ -z "${NAMESPACES}" ]]; then
+    ns="$(kube get ns -ojsonpath={.items[*].metadata.name} | sed "s/ /\n/g" | grep -Ev "istio-system|kube-system" )"
+    NAMESPACES="$(echo $ns | sed "s/ /,/g" )"
+  fi
   IFS=',' read -ra NAMESPACE_LIST <<< "$NAMESPACES"
   for ns in "${NAMESPACE_LIST[@]}"; do
     echo "Check the CA cert in namespace ${ns}"
@@ -703,7 +708,7 @@ check_cert_in_pod() {
        rm "${POD}-${NS}-${TARGET}".pem
     fi
     echo "${CERT_CHAIN}" | sed 's/\"//g' | base64 -d > "${POD}-${NS}-${TARGET}".pem
-    openssl verify -CAfile "${POD}-${NS}-${TARGET}".pem "${CA_CERT}" &> /dev/null
+    openssl verify -CAfile "${CA_CERT}" "${POD}-${NS}-${TARGET}".pem &> /dev/null
     if [[ "$?" != "0" ]]; then
       echo "${POD}.${NS} is not signed by ${CA_CERT}"
     else
@@ -738,6 +743,10 @@ verify-ca_subcommand() {
     local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
     local REVISION; REVISION="$(context_get-option "REVISION")"
     local NAMESPACES; NAMESPACES="$(context_get-option "NAMESPACES")"
+    if [[ -z "${NAMESPACES}" ]]; then
+      ns="$(kube get ns -ojsonpath={.items[*].metadata.name} | sed "s/ /\n/g" | grep -Ev "istio-system|kube-system" )"
+      NAMESPACES="$(echo $ns | sed "s/ /,/g" )"
+    fi
     IFS=',' read -ra NAMESPACE_LIST <<< "$NAMESPACES"
     for ns in "${NAMESPACE_LIST[@]}"; do
       echo "Check the CA configuration in namespace ${ns}"
