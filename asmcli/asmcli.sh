@@ -36,8 +36,8 @@ _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"; readonly _CI_I_AM_A_TEST_RO
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=14}"; readonly MINOR;
-POINT="${POINT:=0}"; readonly POINT;
-REV="${REV:=1}"; readonly REV;
+POINT="${POINT:=1}"; readonly POINT;
+REV="${REV:=2}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1-staging"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 

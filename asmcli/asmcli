@@ -40,8 +40,8 @@ _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"; readonly _CI_I_AM_A_TEST_RO
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=14}"; readonly MINOR;
-POINT="${POINT:=0}"; readonly POINT;
-REV="${REV:=1}"; readonly REV;
+POINT="${POINT:=1}"; readonly POINT;
+REV="${REV:=2}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1-staging"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
@@ -1208,7 +1208,7 @@ OPTIONS:
                                       environments, "default" will be used.
   -c|--ca                <CA>         The type of certificate authority to be
                                       used. Defaults to "mesh_ca" for install.
-                                      Allowed values for <CA> are {citadel|mesh_ca|gcp_cas}.
+                                      Allowed values for <CA> are {citadel|mesh_ca|gcp_cas|managed_cas}.
   -o|--option            <FILE NAME>  The name of a YAML file in the kpt pkg to
                                       apply. For options, see the
                                       anthos-service-mesh-package GitHub
@@ -3448,6 +3448,12 @@ EOF
   esac
 }
 
+old_managed_required_apis() {
+    cat << EOF
+connectgateway.googleapis.com
+EOF
+}
+
 # [START required_apis]
 required_apis() {
   local CA; CA="$(context_get-option "CA")"
@@ -5408,6 +5414,9 @@ exit_if_apis_not_enabled() {
   local ENABLED; ENABLED="$(get_enabled_apis)";
   local REQUIRED; REQUIRED="$(required_apis)";
   local OLD_REQUIRED; OLD_REQUIRED="$(old_required_apis)";
+  if is_managed; then
+    OLD_REQUIRED="${OLD_REQUIRED} $(old_managed_required_apis)"
+  fi
   local NOTFOUND; NOTFOUND="";
   local OLD_NOTFOUND; OLD_NOTFOUND="";
 
@@ -5772,12 +5781,12 @@ EOF
   fi
 
   case "${CA}" in
-    citadel | mesh_ca | gcp_cas);;
+    citadel | mesh_ca | gcp_cas | managed_cas);;
     "")
       MISSING_ARGS=1
       warn "Missing value for CA"
       ;;
-    *) fatal "CA must be one of 'citadel', 'mesh_ca', 'gcp_cas'";;
+    *) fatal "CA must be one of 'citadel', 'mesh_ca', 'gcp_cas', 'managed_cas'";;
   esac
 
   if [[ "${CA}" = "gcp_cas" ]]; then

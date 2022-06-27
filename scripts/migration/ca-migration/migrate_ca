@@ -8,7 +8,6 @@ _CI_ISTIOCTL_REL_PATH="${_CI_ISTIOCTL_REL_PATH:=}"; readonly _CI_ISTIOCTL_REL_PA
 AKUBECTL="$(which kubectl || true)"; readonly AKUBECTL;
 AGCLOUD="$(which gcloud || true)"; readonly AGCLOUD;
 AOPENSSL="$(which openssl || true)"; readonly AOPENSSL;
-# TODO: Need better logic to determine istioctl RELEASE
 RELEASE="1.13.1-asm.1"; readonly RELEASE;
 CA_MIGRATION_CM_PREFIX="ca-migration-v1alpha1"
 CA_MIGRATION_CR_PREFIX="ca-migration"
@@ -163,7 +162,6 @@ download_istioctl_tarball() {
 Authorization: Bearer ${TOKEN}
 EOF
   fi
-  ## TODO : Fix this path
   local ISTIOCTL_REL_PATH; ISTIOCTL_REL_PATH="$(pwd)/istio-${RELEASE}/bin/istioctl";
   context_set-option "ISTIOCTL_REL_PATH" "${ISTIOCTL_REL_PATH}"
 }
@@ -410,7 +408,6 @@ check-prerequisite_subcommand() {
   local NOTFOUND; NOTFOUND="";
   local EXITCODE; EXITCODE=0;
 
-  # TODO: need to add/remove some tools
   info "Checking installation tool dependencies..."
 
   while read -r dependency; do
@@ -422,7 +419,6 @@ check-prerequisite_subcommand() {
   done <<EOF
 awk
 $AGCLOUD
-git
 grep
 jq
 yq
@@ -430,7 +426,6 @@ $AKUBECTL
 sed
 tr
 head
-csplit
 $AOPENSSL
 EOF
 
@@ -483,21 +478,20 @@ validate_private_ca() {
   local CA_NAME_REGEX; CA_NAME_REGEX="${CA_POOL_REGEX}:${CT_REGEX}"
 
   if [[ -z ${CA_NAME} ]]; then
-    fatal "A ca-name must be provided for integration with Google Certificate Authority Service."
+    fatal "A ca-pool must be provided for integration with Google Certificate Authority Service."
   # check if CA_NAME is ca_pool:cert_template format
   elif [[ "${CA_NAME}" == *":"* ]]; then
     if ! [[ "${CA_NAME}" =~ ^${CA_NAME_REGEX}$ ]]; then
-      fatal "Malformed ca-name with certificate template. ca-name must be of the form ${CA_NAME_TEMPLATE}."
+      fatal "Malformed ca with certificate template. ca-pool must be of the form ${CA_NAME_TEMPLATE}."
     fi
   # when CA_NAME is ca_pool format
   elif ! [[ "${CA_NAME}" =~ ^${CA_POOL_REGEX}$ ]]; then
-    fatal "Malformed ca-name. ca-name must be of the form ${CA_POOL_TEMPLATE}."
+    fatal "Malformed ca-pool. ca-pool must be of the form ${CA_POOL_TEMPLATE}."
   fi
 }
 
 initialize_gcp_cas() {
 
-  # TODO : initialize privateca api on the project
   validate_private_ca
 
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
@@ -546,7 +540,7 @@ initialize_subcommand() {
   
   parse_args "${@}"
 
-  check_empty_args "CA" "FLEET_ID" "REVISION"
+  check_empty_args "CA" "CA_OLD" "FLEET_ID" "REVISION"
 
   local CA; CA="$(context_get-option "CA")"
 
@@ -561,7 +555,6 @@ initialize_subcommand() {
 }
 
 download-trust-anchor_subcommand() {
-  #TODO: Remove old CA trust anchor from mesh trustAnchors
   parse_args "${@}"
   check_empty_args "CA" "CA_CERT"
   local CA; CA="$(context_get-option "CA")"
@@ -574,12 +567,22 @@ download-trust-anchor_subcommand() {
   esac
 }
 
-#TODO: Add new CA trust anchor as mesh trustAnchors in all clusters of the same mesh
 add-trust-anchor_subcommand() {
   parse_args "${@}"
   check_empty_args "CA_CERT" "FLEET_ID" "REVISION"
+  backup_resources
   add_trust_anchor
   update_migration_cm "TRUSTANCHOR_INJECTED"
+}
+
+backup_resources() {
+  local REVISION; REVISION="$(context_get-option "REVISION")"
+  local REV_NAME; REV_NAME="istio-${REVISION}"
+  if [[ "${REVISION}" = default ]]; then
+    REV_NAME="istio"
+  fi
+  rm "backup-${REV_NAME}" &> /dev/null
+  kube get cm/${REV_NAME} -n istio-system -oyaml > "backup-${REV_NAME}"
 }
 
 add_trust_anchor() {
@@ -595,7 +598,6 @@ add_trust_anchor() {
   kube -n istio-system get configmaps ${REV_NAME} -o json | jq --arg NEW_MESH_CONFIG "$NEW_MESH_CONFIG" '.data.mesh = $NEW_MESH_CONFIG' | yq eval -P | kube apply -f - || warn "failed to patch the configmap ${REV_NAME}"
 }
 
-#TODO: Check if new CA trust anchor has reached all workloads in all clusters of the same mesh
 check-trust-anchor_subcommand() {
   parse_args "${@}"
   check_empty_args "CA_CERT" "FLEET_ID" "REVISION" "NAMESPACES"
@@ -603,6 +605,10 @@ check-trust-anchor_subcommand() {
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local REVISION; REVISION="$(context_get-option "REVISION")"
   local NAMESPACES; NAMESPACES="$(context_get-option "NAMESPACES")"
+  if [[ -z "${NAMESPACES}" ]]; then
+    ns="$(kube get ns -ojsonpath={.items[*].metadata.name} | sed "s/ /\n/g" | grep -Ev "istio-system|kube-system" )"
+    NAMESPACES="$(echo $ns | sed "s/ /,/g" )"
+  fi
   IFS=',' read -ra NAMESPACE_LIST <<< "$NAMESPACES"
   for ns in "${NAMESPACE_LIST[@]}"; do
     echo "Check the CA cert in namespace ${ns}"
@@ -621,7 +627,7 @@ check_in_namespace() {
   pods=$(kube get pod -o jsonpath={.items..metadata.name} -n "$1")
 	for pod in ${pods}
 	do
-    containers=$(kube get pod "${pod}" -n "$1" -o jsonpath=={.spec.containers.*.name})
+    containers="$(kube get pod "${pod}" -n "$1" -o jsonpath=={.spec.containers.*.name})"
     if [[ "${containers}" == *"istio-proxy"* ]]; then
       if [[ "$2" = "cert" ]]; then
         check_cert_in_pod "${pod}" "$1" "$3" "$4"
@@ -647,9 +653,10 @@ add_to_rootmap() {
     echo "Cannot find roots for $1.$2"
     exit 1
   fi
-  echo "${roots}" | sed 's/\"//g' | base64 -d > /tmp/"$3".pem
+  local tmp_file; tmp_file="$(mktemp).pem"
+  echo "${roots}" | sed 's/\"//g' | base64 -d > ${tmp_file}
   # Search for trustAnchor in workload trustBundle
-  if [[ "$CACERT" = "$(grep -f /tmp/"$3".pem <(echo "$CACERT"))" ]]; then
+  if [[ "$CACERT" = "$(grep -f ${tmp_file} <(echo "$CACERT"))" ]]; then
     rootmap[$3]=true
   else
     rootmap[$3]=false
@@ -661,30 +668,55 @@ add_to_rootmap() {
 # $3: ROOTCA/default
 # $4: caCert file
 check_cert_in_pod() {
-  local sn
-
-  # Example format:
-  # RESOURCE NAME   TYPE   STATUS   VALID CERT  SERIAL NUMBER        NOT AFTER            NOT BEFORE
-  # ROOTCA          CA     ACTIVE   true        16289816804573236346 2117-12-31T19:15:51Z 2018-01-24T19:15:51Z
-  # We use the serial number for the comparison.
-  if [ "$3" = "ROOTCA" ]; then
-    sn=$(istioctl pc secret "$1" -n "$2" | grep "ROOTCA" | awk '{print $5}')
-    if [[ -z ${sn} ]]; then
-      echo " - [WARNING] $1.$2 cannot find certificate information"
+  local POD; POD="$1"
+  local NS; NS="$2"
+  local TARGET; TARGET="$3"
+  local CA_CERT; CA_CERT="$4"
+  if [ "$TARGET" = "ROOTCA" ]; then
+    # Example format:
+    # RESOURCE NAME   TYPE   STATUS   VALID CERT  SERIAL NUMBER        NOT AFTER            NOT BEFORE
+    # ROOTCA          CA     ACTIVE   true        16289816804573236346 2117-12-31T19:15:51Z 2018-01-24T19:15:51Z
+    # We use the serial number for the comparison.
+    local SN
+    SN=$(istioctl pc secret "${POD}" -n "${NS}" | grep "ROOTCA" | awk '{print $5}')
+    if [[ -z ${SN} ]]; then
+      echo " - [WARNING] ${POD}.${NS} cannot find certificate information"
       return
     fi
-    if [[ -z ${rootmap[${sn}]} ]]; then
-      add_to_rootmap "$1" "$2" "${sn}" "$4"
+    if [[ -z ${rootmap[${SN}]} ]]; then
+      add_to_rootmap "${POD}" "${NS}" "${SN}" "${CA_CERT}"
     fi
-    if ! ${rootmap[${sn}]}; then
-      echo "$1.$2 does not trust $4"
+    if ! ${rootmap[${SN}]}; then
+      echo "${POD}.${NS} does not trust ${CA_CERT}"
     else
-      echo "$1.$2 trusts $4"
+      echo "${POD}.${NS} trusts ${CA_CERT}"
+    fi
+  elif [ "$TARGET" = "default" ]; then
+    local OUTPUT
+    local CERT_CHAIN
+    OUTPUT=$(istioctl pc secret "${POD}" -n "${NS}" -o json)
+    if [ "$(echo "${OUTPUT}" | jq '.dynamicActiveSecrets[0].name')" = "\"default\"" ]; then
+      CERT_CHAIN=$(echo "${OUTPUT}" | jq '.dynamicActiveSecrets[0].secret.tlsCertificate.certificateChain.inlineBytes')
+    else
+      CERT_CHAIN=$(echo "${OUTPUT}" | jq '.dynamicActiveSecrets[1].secret.tlsCertificate.certificateChain.inlineBytes')
+    fi
+    if [ -z "${CERT_CHAIN}" ]; then
+      echo "Cannot find certificate chain for ${POD}.${NS}"
+      exit 1
+    fi
+    if [ -f "${POD}-${NS}-${TARGET}".pem ]; then
+       rm "${POD}-${NS}-${TARGET}".pem
+    fi
+    echo "${CERT_CHAIN}" | sed 's/\"//g' | base64 -d > "${POD}-${NS}-${TARGET}".pem
+    openssl verify -CAfile "${CA_CERT}" "${POD}-${NS}-${TARGET}".pem &> /dev/null
+    if [[ "$?" != "0" ]]; then
+      echo "${POD}.${NS} is not signed by ${CA_CERT}"
+    else
+      echo "${POD}.${NS} is signed by ${CA_CERT}"
     fi
   fi
 }
 
-#TODO: Change CA configuration
 migrate-ca_subcommand() {
   parse_args "${@}"
   check_empty_args "CA" "FLEET_ID" "REVISION"
@@ -704,28 +736,35 @@ migrate-ca_subcommand() {
   update_migration_cm "CA_MIGRATE"
 }
 
-#TODO: Verify new CA configuration has reached all workloads
 verify-ca_subcommand() {
-  parse_args "${@}"
-  check_empty_args "CA_CERT" "FLEET_ID" "REVISION" "NAMESPACES"
-  warn "verify-ca-to-be-implemented"
+    parse_args "${@}"
+    check_empty_args "CA_CERT" "FLEET_ID" "REVISION" "NAMESPACES"
+    local CA_CERT; CA_CERT="$(context_get-option "CA_CERT")"
+    local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+    local REVISION; REVISION="$(context_get-option "REVISION")"
+    local NAMESPACES; NAMESPACES="$(context_get-option "NAMESPACES")"
+    if [[ -z "${NAMESPACES}" ]]; then
+      ns="$(kube get ns -ojsonpath={.items[*].metadata.name} | sed "s/ /\n/g" | grep -Ev "istio-system|kube-system" )"
+      NAMESPACES="$(echo $ns | sed "s/ /,/g" )"
+    fi
+    IFS=',' read -ra NAMESPACE_LIST <<< "$NAMESPACES"
+    for ns in "${NAMESPACE_LIST[@]}"; do
+      echo "Check the CA configuration in namespace ${ns}"
+      check_in_namespace "${ns}" "cert" "default" "${CA_CERT}"
+    done
 }
 
 complete_subcommand() {
-  #TODO: Remove old CA trust anchor from mesh trustAnchors
   parse_args "${@}"
   check_empty_args "REVISION"
   update_migration_cm "COMPLETE"
 }
 
-#TODO: Restore old CA configuration and remove new CA trust anchors
 rollback_subcommand() {
   parse_args "${@}"
-
+  local REVISION; REVISION="$(context_get-option "REVISION")"
   # Remove CA config
   kube delete ProxyConfig/${CA_MIGRATION_CR_PREFIX}-${REVISION} -n istio-system
-
-  # TODO Remove trustAnchor
 
   # update the final state
   update_migration_cm "ROLLBACK"
@@ -775,10 +814,6 @@ main() {
       shift 1
       verify-ca_subcommand "${@}"
       ;;
-    complete)
-      shift 1
-      complete_subcommand "${@}"
-      ;;
     rollback)
       shift 1
       rollback_subcommand "${@}"
@@ -788,7 +823,6 @@ main() {
   esac
 }
 
-#TODO: Add script usage introduction
 usage() {
   cat << EOF
 usage: ${SCRIPT_NAME} [SUBCOMMAND] [OPTION]...
@@ -802,7 +836,6 @@ SUBCOMMANDS:
   check-trust-anchor                            Check all cluster workloads have newer CA's trustAnchor in trustbundle
   migrate-ca                                    Migrate ASM CA to newer CA
   verify-ca                                     Check all cluster workloads have certificates signed by newer CA
-  complete                                      Complete CA migration
   rollback                                      Rollback CA migration to older CA
 OPTIONS:
   --kubeconfig           <KUBECONFIG_FILE>      (Optional) Path to the kubeconfig file to use for CLI requests.
