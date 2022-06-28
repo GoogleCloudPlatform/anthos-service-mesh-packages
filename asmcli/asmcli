@@ -2174,18 +2174,18 @@ x_wait_for_enabling_workload_certificates() {
   # Check the connection to k8s is recovered.
   local REACHABLE; REACHABLE=0
   for i in {1..3}; do
-    local OUT; OUT=$(kubectl version -o json 2>/dev/null | jq .serverVersion.major -r 2>/dev/null)
-    if [[ $OUT -eq 1 ]]; then
-      info "The k8s cluster is reachable."
+    local OUT; OUT=$(kubectl get ds -n kube-system gke-spiffe-node-agent 2>/dev/null | grep -i "gke-spiffe-node-agent")
+    if [[ -z "$OUT" ]]; then
+      info "The k8s cluster is reachable and gke-spiffe-node-agent is found."
       REACHABLE=1
       break
     else
-      info "The k8s cluster not reachable, try again ..."
+      info "The k8s cluster is not reachable or gke-spiffe-node-agent is not found, try again ..."
       sleep 60
     fi
   done
   if [[ "${REACHABLE}" -eq 0 ]]; then
-    fatal "The k8s cluster is not reachable, exit."
+    fatal "The k8s cluster is not reachable or gke-spiffe-node-agent is not found, exit."
   fi
 }
 
