@@ -55,8 +55,7 @@ validate_dependencies() {
         enable_service_mesh_feature
       fi
       if [[ "${CA}" == "managed_cas" ]]; then
-        info "Wait 3 minutes for GKE HUB API enablement to propagate to the systems ..."
-        sleep 180
+        x_wait_for_gke_hub_api_enablement
         x_enable_workload_certificate_on_fleet "gkehub.googleapis.com"
       fi
     else
