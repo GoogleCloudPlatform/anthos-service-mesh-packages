@@ -55,6 +55,7 @@ validate_dependencies() {
         enable_service_mesh_feature
       fi
       if [[ "${CA}" == "managed_cas" ]]; then
+        x_wait_for_gke_hub_api_enablement
         x_enable_workload_certificate_on_fleet "gkehub.googleapis.com"
       fi
     else
@@ -73,6 +74,7 @@ validate_dependencies() {
     local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
     if [[ "${CA}" == "managed_cas" ]]; then
       x_enable_workload_certificate_on_membership "gkehub.googleapis.com" "${FLEET_ID}" "${HUB_MEMBERSHIP_ID}"
+      x_wait_for_enabling_workload_certificates "gkehub.googleapis.com" "${FLEET_ID}"
     fi
   elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 || "${USE_VM}" -eq 1 ]]; then
     exit_if_cluster_unregistered
