@@ -191,13 +191,13 @@ istioctl_path() {
 set_up_local_workspace() {
   local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
 
-  info "Setting up necessary working directory ......"
   if [[ -z "${OUTPUT_DIR}" ]]; then
-    info "Creating temp directory..."
+    info "Setting up necessary working directory ......"
     OUTPUT_DIR="$(mktemp -d)"
     if [[ -z "${OUTPUT_DIR}" ]]; then
       fatal "Encountered error when running mktemp -d!"
     fi
+
     info ""
     info "$(starline)"
     info "No output folder was specified with --output_dir|-D, so configuration and"
@@ -206,21 +206,13 @@ set_up_local_workspace() {
     info "$(starline)"
     info ""
     sleep 2
-  else
-    OUTPUT_DIR="$(apath -f "${OUTPUT_DIR}")"
-    if [[ ! -a "${OUTPUT_DIR}" ]]; then
-        fatal "directory ${OUTPUT_DIR} does not exist"
-    elif [[ ! -d "${OUTPUT_DIR}" ]]; then
-      fatal "${OUTPUT_DIR} exists and is not a directory, please specify another directory."
-    fi
-  fi
 
-  context_set-option "OUTPUT_DIR" "${OUTPUT_DIR}"
-  if [[ ! -f "${OUTPUT_DIR}/${context_FILE_LOCATION}" ]]; then
-    mv ${context_FILE_LOCATION} ${OUTPUT_DIR}
+    context_set-option "OUTPUT_DIR" "${OUTPUT_DIR}"
+    if [[ ! -f "${OUTPUT_DIR}/${context_FILE_LOCATION}" ]]; then
+      mv ${context_FILE_LOCATION} ${OUTPUT_DIR} &> /dev/null
+    fi
+    context_FILE_LOCATION="${OUTPUT_DIR}/${context_FILE_LOCATION}"; readonly context_FILE_LOCATION
   fi
-  context_FILE_LOCATION="${OUTPUT_DIR}/${context_FILE_LOCATION}"; readonly context_FILE_LOCATION
-  pushd "$OUTPUT_DIR" > /dev/null
 }
 
 
@@ -334,65 +326,77 @@ EOF
 }
 
 parse_args() {
+
+  local OUTPUT_DIR
+  declare -A argMap
+  
   while [[ $# != 0 ]]; do
     case "${1}" in
       --kubeconfig | --kc)
         arg_required "${@}"
-        context_set-option "KUBECONFIG" "${2}"
+        argMap["KUBECONFIG"]="${2}"
         shift 2
         ;;
       --context | --ctx)
         arg_required "${@}"
-        context_set-option "CONTEXT" "${2}"
+        argMap["CONTEXT"]="${2}"
         shift 2
         ;;  
       --ca)
         arg_required "${@}"
-        context_set-option "CA" "$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+        local CA; CA="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+        argMap["CA"]=${CA}
         shift 2
         ;;
       --ca_pool | --ca-pool)
         arg_required "${@}"
-        context_set-option "CA_NAME" "${2}"
+        argMap["CA_NAME"]="${2}"
         shift 2
         ;;
       --fleet_id | --fleet-id)
         arg_required "${@}"
-        context_set-option "FLEET_ID" "${2}"
+        argMap["FLEET_ID"]="$2"
         shift 2
         ;;
       --revision)
         arg_required "${@}"
-        context_set-option "REVISION" "${2}"
+        argMap["REVISION"]="$2"
         shift 2
         ;;
       --namespaces)
         arg_required "${@}"
-        context_set-option "NAMESPACES" "${2}"
+        argMap["NAMESPACES"]="$2"
         shift 2
         ;;
       --ca_cert | --ca-cert)
         arg_required "${@}"
-        context_set-option "CA_CERT" "${2}"
+        argMap["CA_CERT"]="$2"
         shift 2
         ;;
       --ca_old | --ca-old)
         arg_required "${@}"
-        context_set-option "CA_OLD" "$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+        local CA_OLD; CA_OLD="$(echo "${2}" | tr '[:upper:]' '[:lower:]')"
+        argMap["CA_OLD"]="${CA_OLD}"
         shift 2
         ;;
       --ca_pool_old | --ca-pool-old )
         arg_required "${@}"
-        context_set-option "CA_NAME_OLD" "${2}"
+        argMap["CA_NAME_OLD"]="$2"
         shift 2
         ;;         
       --force | -f)
-        context_set-option "FORCE" "true"
+        argMap["FORCE"]="true"
         shift 1
         ;;
       -D | --output_dir | --output-dir)
         arg_required "${@}"
-        context_set-option "OUTPUT_DIR" "${2}"
+        OUTPUT_DIR="$(apath -f "${2}")"
+        if [[ ! -a "${OUTPUT_DIR}" ]]; then
+          fatal "directory ${OUTPUT_DIR} does not exist"
+        elif [[ ! -d "${OUTPUT_DIR}" ]]; then
+          fatal "${OUTPUT_DIR} exists and is not a directory, please specify another directory."
+        fi
+        argMap["OUTPUT_DIR"]="${2}"
         shift 2
         ;;
       *)
@@ -400,9 +404,15 @@ parse_args() {
         ;;
     esac
   done
+
+  if [[ -n ${OUTPUT_DIR} ]]; then
+    context_FILE_LOCATION="${OUTPUT_DIR}/${context_FILE_LOCATION}"; readonly context_FILE_LOCATION
+  fi
+
+  for argName in ${!argMap[@]}; do
+    context_set-option "$argName" "${argMap[$argName]}"
+  done
 }
-
-
 
 check-prerequisite_subcommand() {
   local NOTFOUND; NOTFOUND="";
@@ -656,11 +666,21 @@ add_to_rootmap() {
   local tmp_file; tmp_file="$(mktemp).pem"
   echo "${roots}" | sed 's/\"//g' | base64 -d > ${tmp_file}
   # Search for trustAnchor in workload trustBundle
-  if [[ "$CACERT" = "$(grep -f ${tmp_file} <(echo "$CACERT"))" ]]; then
-    rootmap[$3]=true
-  else
-    rootmap[$3]=false
-  fi
+  rootmap[$3]=true
+
+  while read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" == *"-BEGIN CERTIFICATE-"* ]]; then
+        cert=$line
+    else
+        cert="$cert"$'\n'"$line"
+        if [[ "$line" == *"-END CERTIFICATE-"* ]]; then
+            if [[ "${cert}" != "$(grep -f ${tmp_file} <(echo "${cert}"))" ]]; then
+              rootmap[$3]=false
+            fi
+        fi
+    fi
+  done < "${CACERT}"
+
 }
 
 # $1: pod
@@ -672,6 +692,8 @@ check_cert_in_pod() {
   local NS; NS="$2"
   local TARGET; TARGET="$3"
   local CA_CERT; CA_CERT="$4"
+  local ERR; ERR=0
+
   if [ "$TARGET" = "ROOTCA" ]; then
     # Example format:
     # RESOURCE NAME   TYPE   STATUS   VALID CERT  SERIAL NUMBER        NOT AFTER            NOT BEFORE
@@ -688,6 +710,7 @@ check_cert_in_pod() {
     fi
     if ! ${rootmap[${SN}]}; then
       echo "${POD}.${NS} does not trust ${CA_CERT}"
+      ERR=1
     else
       echo "${POD}.${NS} trusts ${CA_CERT}"
     fi
@@ -711,9 +734,14 @@ check_cert_in_pod() {
     openssl verify -CAfile "${CA_CERT}" "${POD}-${NS}-${TARGET}".pem &> /dev/null
     if [[ "$?" != "0" ]]; then
       echo "${POD}.${NS} is not signed by ${CA_CERT}"
+      ERR=1
     else
       echo "${POD}.${NS} is signed by ${CA_CERT}"
     fi
+  fi
+
+  if [[ ${ERR} -eq 1 ]]; then
+    exit 2
   fi
 }
 
