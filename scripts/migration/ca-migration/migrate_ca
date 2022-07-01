@@ -405,8 +405,9 @@ parse_args() {
     esac
   done
 
-  if [[ -n ${OUTPUT_DIR} ]]; then
-    context_FILE_LOCATION="${OUTPUT_DIR}/${context_FILE_LOCATION}"; readonly context_FILE_LOCATION
+  if [[ -n "${OUTPUT_DIR}" ]] && [[ ! -f "${OUTPUT_DIR}/${context_FILE_LOCATION}" ]]; then
+      mv ${context_FILE_LOCATION} ${OUTPUT_DIR} &> /dev/null
+      context_FILE_LOCATION="${OUTPUT_DIR}/${context_FILE_LOCATION}"
   fi
 
   for argName in ${!argMap[@]}; do
