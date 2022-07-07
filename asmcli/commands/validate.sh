@@ -81,12 +81,11 @@ validate_dependencies() {
   fi
 
   get_project_number "${FLEET_ID}"
-  if is_gcp; then
-    if can_modify_cluster_labels; then
-      add_cluster_labels
-    elif should_validate; then
-      exit_if_cluster_unlabeled
-    fi
+
+  if can_modify_cluster_labels; then
+    add_cluster_labels
+  elif should_validate; then
+    exit_if_cluster_unlabeled
   fi
 
   if can_modify_cluster_roles; then
