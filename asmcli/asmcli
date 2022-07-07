@@ -3732,6 +3732,7 @@ generate_membership_name() {
   else
     MEMBERSHIP_NAME="$(date +%s%N)"
   fi
+  context_set-option "MEMBERSHIP_NAME" "${MEMBERSHIP_NAME}"
   echo "${MEMBERSHIP_NAME}"
 }
 
