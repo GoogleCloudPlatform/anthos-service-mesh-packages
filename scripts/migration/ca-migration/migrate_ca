@@ -606,7 +606,7 @@ add_trust_anchor() {
 
 check-trust-anchor_subcommand() {
   parse_args "${@}"
-  check_empty_args "CA_CERT" "FLEET_ID" "REVISION" "NAMESPACES"
+  check_empty_args "CA_CERT" "FLEET_ID" "REVISION"
   local CA_CERT; CA_CERT="$(context_get-option "CA_CERT")"
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local REVISION; REVISION="$(context_get-option "REVISION")"
@@ -762,7 +762,7 @@ migrate-ca_subcommand() {
 
 verify-ca_subcommand() {
     parse_args "${@}"
-    check_empty_args "CA_CERT" "FLEET_ID" "REVISION" "NAMESPACES"
+    check_empty_args "CA_CERT" "FLEET_ID" "REVISION"
     local CA_CERT; CA_CERT="$(context_get-option "CA_CERT")"
     local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
     local REVISION; REVISION="$(context_get-option "REVISION")"
