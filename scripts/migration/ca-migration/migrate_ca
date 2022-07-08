@@ -240,13 +240,6 @@ EOF
 
   echo "${CONTEXT_JSON}" | jq -S '.' >| "${context_FILE_LOCATION}"
 
-  # BSD-style readlink apparently doesn't have the same -f toggle on readlink
-  case "$(uname)" in
-    Linux ) APATH="readlink";;
-    Darwin) APATH="stat";;
-    *);;
-  esac
-  readonly APATH
 }
 
 context_set-option() {
@@ -405,9 +398,11 @@ parse_args() {
     esac
   done
 
-  if [[ -n "${OUTPUT_DIR}" ]] && [[ ! -f "${OUTPUT_DIR}/${context_FILE_LOCATION}" ]]; then
+  if [[ -n "${OUTPUT_DIR}" ]]; then
+    if [[ ! -f "${OUTPUT_DIR}/${context_FILE_LOCATION}" ]]; then
       mv ${context_FILE_LOCATION} ${OUTPUT_DIR} &> /dev/null
-      context_FILE_LOCATION="${OUTPUT_DIR}/${context_FILE_LOCATION}"
+    fi
+    context_FILE_LOCATION="${OUTPUT_DIR}/${context_FILE_LOCATION}"
   fi
 
   for argName in ${!argMap[@]}; do
@@ -805,6 +800,14 @@ helper_subcommand() {
 }
 
 main() {
+  # BSD-style readlink apparently doesn't have the same -f toggle on readlink
+  case "$(uname)" in
+    Linux ) APATH="readlink";;
+    Darwin) APATH="stat";;
+    *);;
+  esac
+  readonly APATH
+
   if [[ "${*}" = '' ]]; then
     usage >&2
     exit 2
