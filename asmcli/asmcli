@@ -3656,7 +3656,7 @@ get_cluster_labels() {
 }
 
 generate_membership_name() {
-  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(context_get-option "MEMBERSHIP_NAME")"
+  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(context_get-option "HUB_MEMBERSHIP_ID")"
   if [[ -n "${MEMBERSHIP_NAME}" ]]; then echo "${MEMBERSHIP_NAME}"; return; fi
 
   if is_gcp; then
@@ -3679,7 +3679,7 @@ generate_membership_name() {
   else
     MEMBERSHIP_NAME="$(date +%s%N)"
   fi
-  context_set-option "MEMBERSHIP_NAME" "${MEMBERSHIP_NAME}"
+  context_set-option "HUB_MEMBERSHIP_ID" "${MEMBERSHIP_NAME}"
   echo "${MEMBERSHIP_NAME}"
 }
 
@@ -3769,7 +3769,7 @@ add_cluster_labels(){
 
   info "Adding labels to ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
   if ! is_gcp; then
-    local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(context_get-option "MEMBERSHIP_NAME")"
+    local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name)"
     retry 2 gcloud container hub memberships update "${MEMBERSHIP_NAME}" \
       --project="${PROJECT_ID}" \
       --update-labels="${LABELS}"
