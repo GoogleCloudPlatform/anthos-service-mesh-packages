@@ -143,7 +143,9 @@ retry() {
 }
 
 download_istioctl_tarball() {
-  local OS
+  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+  pushd ${OUTPUT_DIR}
+
   case "$(uname)" in
     Linux ) OS="linux-amd64";;
     Darwin) OS="osx";;
@@ -164,6 +166,7 @@ EOF
   fi
   local ISTIOCTL_REL_PATH; ISTIOCTL_REL_PATH="$(pwd)/istio-${RELEASE}/bin/istioctl";
   context_set-option "ISTIOCTL_REL_PATH" "${ISTIOCTL_REL_PATH}"
+  popd
 }
 
 istioctl() {
@@ -276,8 +279,6 @@ update_migration_cm() {
     START_TIME="$(kube get cm/"${NAME}" -n istio-system -ojsonpath={.data.start_time})"
     CA_OLD="$(kube get cm/"${NAME}" -n istio-system -ojsonpath={.data.old_ca} | cut -d":" -f 1)"
     CA_POOL_OLD="$(kube get cm/"${NAME}" -n istio-system -ojsonpath={.data.old_ca} | cut -d":" -f 2-)"
-    CA="$(kube get cm/"${NAME}" -n istio-system -ojsonpath={.data.target_ca} | cut -d":" -f 1)"
-    CA_POOL="$(kube get cm/"${NAME}" -n istio-system -ojsonpath={.data.target_ca} | cut -d":" -f 2-)" 
   fi
 
   local CA_NAME; CA_NAME="${CA}:${CA_POOL}"
@@ -389,7 +390,7 @@ parse_args() {
         elif [[ ! -d "${OUTPUT_DIR}" ]]; then
           fatal "${OUTPUT_DIR} exists and is not a directory, please specify another directory."
         fi
-        argMap["OUTPUT_DIR"]="${2}"
+        argMap["OUTPUT_DIR"]="${OUTPUT_DIR}"
         shift 2
         ;;
       *)
@@ -584,11 +585,13 @@ add-trust-anchor_subcommand() {
 backup_resources() {
   local REVISION; REVISION="$(context_get-option "REVISION")"
   local REV_NAME; REV_NAME="istio-${REVISION}"
+  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+
   if [[ "${REVISION}" = default ]]; then
     REV_NAME="istio"
   fi
-  rm "backup-${REV_NAME}" &> /dev/null
-  kube get cm/${REV_NAME} -n istio-system -oyaml > "backup-${REV_NAME}"
+  rm ${OUTPUT_DIR}/"backup-${REV_NAME}" &> /dev/null || true
+  kube get cm/${REV_NAME} -n istio-system -oyaml > ${OUTPUT_DIR}/"backup-${REV_NAME}"
 }
 
 add_trust_anchor() {
@@ -675,8 +678,20 @@ add_to_rootmap() {
             fi
         fi
     fi
-  done < "${CACERT}"
+  done < "${4}"
 
+}
+
+extract_root() {
+  local cert
+  while read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" == *"-BEGIN CERTIFICATE-"* ]]; then
+      cert=$line
+    else
+      cert="$cert"$'\n'"$line"
+    fi
+  done < "${1}"
+  echo "${cert}"
 }
 
 # $1: pod
@@ -689,6 +704,7 @@ check_cert_in_pod() {
   local TARGET; TARGET="$3"
   local CA_CERT; CA_CERT="$4"
   local ERR; ERR=0
+  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
 
   if [ "$TARGET" = "ROOTCA" ]; then
     # Example format:
@@ -713,6 +729,8 @@ check_cert_in_pod() {
   elif [ "$TARGET" = "default" ]; then
     local OUTPUT
     local CERT_CHAIN
+    local ROOT_CERT_FILE; ROOT_CERT_FILE="${OUTPUT_DIR}/${POD}-${NS}-${TARGET}.pem"
+
     OUTPUT=$(istioctl pc secret "${POD}" -n "${NS}" -o json)
     if [ "$(echo "${OUTPUT}" | jq '.dynamicActiveSecrets[0].name')" = "\"default\"" ]; then
       CERT_CHAIN=$(echo "${OUTPUT}" | jq '.dynamicActiveSecrets[0].secret.tlsCertificate.certificateChain.inlineBytes')
@@ -723,12 +741,13 @@ check_cert_in_pod() {
       echo "Cannot find certificate chain for ${POD}.${NS}"
       exit 1
     fi
-    if [ -f "${POD}-${NS}-${TARGET}".pem ]; then
-       rm "${POD}-${NS}-${TARGET}".pem
+    if [ -f "${ROOT_CERT_FILE}" ]; then
+       rm ${ROOT_CERT_FILE}
     fi
-    echo "${CERT_CHAIN}" | sed 's/\"//g' | base64 -d > "${POD}-${NS}-${TARGET}".pem
-    openssl verify -CAfile "${CA_CERT}" "${POD}-${NS}-${TARGET}".pem &> /dev/null
-    if [[ "$?" != "0" ]]; then
+    echo "${CERT_CHAIN}" | sed 's/\"//g' | base64 -d > ${ROOT_CERT_FILE}
+    cert=$(extract_root ${ROOT_CERT_FILE})
+
+    if [[ "${cert}" != "$(grep -f ${CA_CERT} <(echo "${cert}"))" ]]; then
       echo "${POD}.${NS} is not signed by ${CA_CERT}"
       ERR=1
     else
