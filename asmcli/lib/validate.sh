@@ -489,6 +489,14 @@ enable_service_mesh_feature() {
   retry 2 run_command gcloud container fleet mesh enable --project="${FLEET_ID}"
 }
 
+enable_workload_certificate_api() {
+  local GKEHUB_API; GKEHUB_API="$1"
+  local WORKLOAD_CERT_API; WORKLOAD_CERT_API="$2"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  info "Enabling the workload identity API for ${FLEET_ID} ..."
+  retry 2 run_command gcloud services enable --project="${FLEET_ID}" "${GKEHUB_API}" "${WORKLOAD_CERT_API}"
+}
+
 check_istio_deployed(){
   local ISTIOD_COUNT; ISTIOD_COUNT="$(get_istio_deployment_count)";
 
@@ -541,6 +549,7 @@ validate_args() {
   local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
   local ONLY_ENABLE; ONLY_ENABLE="$(context_get-option "ONLY_ENABLE")"
   local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
+  local MANAGED_CERTIFICATES; MANAGED_CERTIFICATES="$(context_get-option "MANAGED_CERTIFICATES")"
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
   local LEGACY; LEGACY="$(context_get-option "LEGACY")"
   local MANAGED_SERVICE_ACCOUNT; MANAGED_SERVICE_ACCOUNT="$(context_get-option "MANAGED_SERVICE_ACCOUNT")"
@@ -562,8 +571,15 @@ validate_args() {
   fi
 
   if [[ -z "${CA}" ]]; then
-    CA="mesh_ca"
+    if [[ "${MANAGED_CERTIFICATES}" -eq 1 ]]; then
+      fail_if_not_experimental
+      CA="managed_cas"
+    else
+      CA="mesh_ca"
+    fi
     context_set-option "CA" "${CA}"
+  elif [[ "${MANAGED_CERTIFICATES}" -eq 1 ]]; then
+    fatal "When --managed_certificates is enabled, the --ca option should not be specified."
   fi
 
   if [[ "${CUSTOM_REVISION}" -eq 1 ]]; then
@@ -761,6 +777,13 @@ EOF
   WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"; readonly WORKLOAD_POOL
 }
 
+fail_if_not_experimental() {
+  local EXPERIMENTAL; EXPERIMENTAL="$(context_get-option "EXPERIMENTAL")"
+  if [[ "${EXPERIMENTAL}" -ne 1 ]]; then
+    fatal "The selected features are in preview and only available when using the experimental install subcommand."
+  fi
+}
+      
 validate_kubeconfig_context() {
   local CONTEXT_CLUSTER; CONTEXT_CLUSTER="${1}"
 

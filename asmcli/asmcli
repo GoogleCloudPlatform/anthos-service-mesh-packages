@@ -1322,7 +1322,6 @@ FLAGS:
                                       package in the output directory. If the directory is not
                                       specified or does not contain the required files, the 
                                       script will exit with error.
-
      --print_config                   Instead of installing ASM, print all of
                                       the compiled YAML to stdout. All other
                                       output will be written to stderr, even if
@@ -1331,6 +1330,9 @@ FLAGS:
      --disable_canonical_service      Do not install the CanonicalService
                                       controller. This is required for ASM UI to
                                       support various features.
+     --managed_certificates           Enable the managed certificates, which automatically manages
+                                      the workload certificates. When this flag is enabled,
+                                      you should not specify the --ca option.
   -v|--verbose                        Print commands before and after execution.
      --dry_run                        Print commands, but don't execute them.
      --only_validate                  Run validation, but don't install.
@@ -1420,6 +1422,7 @@ FLAGS:
 
      --print_config
      --disable_canonical_service
+  --managed_certificates
   -v|--verbose
      --dry_run
      --only_validate
@@ -3229,6 +3232,7 @@ context_init() {
     "ONLY_VALIDATE": ${ONLY_VALIDATE:-0},
     "VALIDATION_ERROR": ${VALIDATION_ERROR:-0},
     "ONLY_ENABLE": ${ONLY_ENABLE:-0},
+    "MANAGED_CERTIFICATES": ${MANAGED_CERTIFICATES:-0},
     "VERBOSE": ${VERBOSE:-0},
     "MANAGED": ${MANAGED:-0},
     "LEGACY": ${LEGACY:-0},
@@ -3360,6 +3364,7 @@ DRY_RUN
 ONLY_VALIDATE
 VALIDATION_ERROR
 ONLY_ENABLE
+MANAGED_CERTIFICATES
 VERBOSE
 MANAGED
 LEGACY
@@ -3619,6 +3624,12 @@ enable_gcloud_apis(){
   # shellcheck disable=SC2046
   retry 3 gcloud services enable --project="${PROJECT_ID}" $(required_apis | tr '\n' ' ')
 
+  local CA; CA="$(context_get-option "CA")"
+  if [[ "${CA}" = "managed_cas" ]]; then
+    fail_if_not_experimental
+    enable_workload_certificate_api "gkehub.googleapis.com" "workloadcertificate.googleapis.com"
+  fi
+
   if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
     local REQUIRED_FLEET_APIS; REQUIRED_FLEET_APIS="$(required_fleet_apis | tr '\n' ' ')"
     if [[ -n "${REQUIRED_FLEET_APIS// }" ]]; then
@@ -3776,6 +3787,7 @@ register_cluster() {
   local KCF; KCF="$(context_get-option "KUBECONFIG")"
   local KCC; KCC="$(context_get-option "CONTEXT")"
   local PRIVATE_ISSUER; PRIVATE_ISSUER="$(context_get-option "PRIVATE_ISSUER")"
+  local CA; CA="$(context_get-option "CA")"
 
   if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
     ensure_cross_project_service_accounts "${FLEET_ID}" "${PROJECT_ID}"
@@ -4105,6 +4117,10 @@ parse_args() {
         ;;
       --offline)
         context_set-option "OFFLINE" 1
+        shift 1
+        ;;
+      --managed_certificates)
+        context_set-option "MANAGED_CERTIFICATES" 1
         shift 1
         ;;
       -v | --verbose)
@@ -5658,6 +5674,14 @@ enable_service_mesh_feature() {
   retry 2 run_command gcloud container fleet mesh enable --project="${FLEET_ID}"
 }
 
+enable_workload_certificate_api() {
+  local GKEHUB_API; GKEHUB_API="$1"
+  local WORKLOAD_CERT_API; WORKLOAD_CERT_API="$2"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  info "Enabling the workload identity API for ${FLEET_ID} ..."
+  retry 2 run_command gcloud services enable --project="${FLEET_ID}" "${GKEHUB_API}" "${WORKLOAD_CERT_API}"
+}
+
 check_istio_deployed(){
   local ISTIOD_COUNT; ISTIOD_COUNT="$(get_istio_deployment_count)";
 
@@ -5710,6 +5734,7 @@ validate_args() {
   local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
   local ONLY_ENABLE; ONLY_ENABLE="$(context_get-option "ONLY_ENABLE")"
   local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
+  local MANAGED_CERTIFICATES; MANAGED_CERTIFICATES="$(context_get-option "MANAGED_CERTIFICATES")"
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
   local LEGACY; LEGACY="$(context_get-option "LEGACY")"
   local MANAGED_SERVICE_ACCOUNT; MANAGED_SERVICE_ACCOUNT="$(context_get-option "MANAGED_SERVICE_ACCOUNT")"
@@ -5731,8 +5756,15 @@ validate_args() {
   fi
 
   if [[ -z "${CA}" ]]; then
-    CA="mesh_ca"
+    if [[ "${MANAGED_CERTIFICATES}" -eq 1 ]]; then
+      fail_if_not_experimental
+      CA="managed_cas"
+    else
+      CA="mesh_ca"
+    fi
     context_set-option "CA" "${CA}"
+  elif [[ "${MANAGED_CERTIFICATES}" -eq 1 ]]; then
+    fatal "When --managed_certificates is enabled, the --ca option should not be specified."
   fi
 
   if [[ "${CUSTOM_REVISION}" -eq 1 ]]; then
@@ -5930,6 +5962,13 @@ EOF
   WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"; readonly WORKLOAD_POOL
 }
 
+fail_if_not_experimental() {
+  local EXPERIMENTAL; EXPERIMENTAL="$(context_get-option "EXPERIMENTAL")"
+  if [[ "${EXPERIMENTAL}" -ne 1 ]]; then
+    fatal "The selected features are in preview and only available when using the experimental install subcommand."
+  fi
+}
+      
 validate_kubeconfig_context() {
   local CONTEXT_CLUSTER; CONTEXT_CLUSTER="${1}"
 
