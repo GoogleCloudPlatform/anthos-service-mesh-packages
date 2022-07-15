@@ -802,7 +802,6 @@ prepare_cluster_subcommand() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
-  local CA; CA="$(context_get-option "CA")"
   if [[ "${INSTALL_EXPANSION_GATEWAY}" -eq 1 ]] || [[ "${INSTALL_IDENTITY_PROVIDER}" -eq 1 ]]; then
     set_up_local_workspace
     configure_kubectl "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}"
@@ -1323,7 +1322,6 @@ FLAGS:
                                       package in the output directory. If the directory is not
                                       specified or does not contain the required files, the 
                                       script will exit with error.
-
      --print_config                   Instead of installing ASM, print all of
                                       the compiled YAML to stdout. All other
                                       output will be written to stderr, even if
@@ -1332,7 +1330,7 @@ FLAGS:
      --disable_canonical_service      Do not install the CanonicalService
                                       controller. This is required for ASM UI to
                                       support various features.
-  --managed_certificates              Enable the managed certificates, which automatically manages
+     --managed_certificates           Enable the managed certificates, which automatically manages
                                       the workload certificates. When this flag is enabled,
                                       you should not specify the --ca option.
   -v|--verbose                        Print commands before and after execution.
@@ -3628,6 +3626,7 @@ enable_gcloud_apis(){
 
   local CA; CA="$(context_get-option "CA")"
   if [[ "${CA}" = "managed_cas" ]]; then
+    fail_if_not_experimental
     enable_workload_certificate_api "gkehub.googleapis.com" "workloadcertificate.googleapis.com"
   fi
 
@@ -5758,6 +5757,7 @@ validate_args() {
 
   if [[ -z "${CA}" ]]; then
     if [[ "${MANAGED_CERTIFICATES}" -eq 1 ]]; then
+      fail_if_not_experimental
       CA="managed_cas"
     else
       CA="mesh_ca"
@@ -5962,6 +5962,13 @@ EOF
   WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"; readonly WORKLOAD_POOL
 }
 
+fail_if_not_experimental() {
+  local EXPERIMENTAL; EXPERIMENTAL="$(context_get-option "EXPERIMENTAL")"
+  if [[ "${EXPERIMENTAL}" -ne 1 ]]; then
+    fatal "The selected features are in preview and only available when using the experimental install subcommand."
+  fi
+}
+      
 validate_kubeconfig_context() {
   local CONTEXT_CLUSTER; CONTEXT_CLUSTER="${1}"
 

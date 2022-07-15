@@ -572,6 +572,7 @@ validate_args() {
 
   if [[ -z "${CA}" ]]; then
     if [[ "${MANAGED_CERTIFICATES}" -eq 1 ]]; then
+      fail_if_not_experimental
       CA="managed_cas"
     else
       CA="mesh_ca"
@@ -776,6 +777,13 @@ EOF
   WORKLOAD_POOL="${PROJECT_ID}.svc.id.goog"; readonly WORKLOAD_POOL
 }
 
+fail_if_not_experimental() {
+  local EXPERIMENTAL; EXPERIMENTAL="$(context_get-option "EXPERIMENTAL")"
+  if [[ "${EXPERIMENTAL}" -ne 1 ]]; then
+    fatal "The selected features are in preview and only available when using the experimental install subcommand."
+  fi
+}
+      
 validate_kubeconfig_context() {
   local CONTEXT_CLUSTER; CONTEXT_CLUSTER="${1}"
 

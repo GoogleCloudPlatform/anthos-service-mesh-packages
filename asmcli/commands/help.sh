@@ -192,7 +192,6 @@ FLAGS:
                                       package in the output directory. If the directory is not
                                       specified or does not contain the required files, the 
                                       script will exit with error.
-
      --print_config                   Instead of installing ASM, print all of
                                       the compiled YAML to stdout. All other
                                       output will be written to stderr, even if
@@ -201,7 +200,7 @@ FLAGS:
      --disable_canonical_service      Do not install the CanonicalService
                                       controller. This is required for ASM UI to
                                       support various features.
-  --managed_certificates              Enable the managed certificates, which automatically manages
+     --managed_certificates           Enable the managed certificates, which automatically manages
                                       the workload certificates. When this flag is enabled,
                                       you should not specify the --ca option.
   -v|--verbose                        Print commands before and after execution.
