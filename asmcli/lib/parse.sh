@@ -385,6 +385,10 @@ x_parse_install_args() {
         context_set-option "CHANNEL" "${2}"
         shift 2
         ;;
+      --managed_certificates)
+        context_set-option "MANAGED_CERTIFICATES" 1
+        shift 1
+        ;;
       -v | --verbose)
         context_set-option "VERBOSE" 1
         shift 1
