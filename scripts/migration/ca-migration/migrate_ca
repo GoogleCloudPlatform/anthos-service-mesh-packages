@@ -5,6 +5,7 @@ set -o pipefail
 SCRIPT_NAME="${0##*/}"; readonly SCRIPT_NAME
 _CI_ASM_PKG_LOCATION="${_CI_ASM_PKG_LOCATION:=}"; readonly _CI_ASM_PKG_LOCATION;
 _CI_ISTIOCTL_REL_PATH="${_CI_ISTIOCTL_REL_PATH:=}"; readonly _CI_ISTIOCTL_REL_PATH;
+_SLEEP_INTERVAL=5; readonly _SLEEP_INTERVAL;
 AKUBECTL="$(which kubectl || true)"; readonly AKUBECTL;
 AGCLOUD="$(which gcloud || true)"; readonly AGCLOUD;
 AOPENSSL="$(which openssl || true)"; readonly AOPENSSL;
@@ -113,9 +114,19 @@ kube() {
   fi
 
   # shellcheck disable=SC2086
-  ${CMD} "${@}"
+  retry 3 ${CMD} "${@}"
 }
 
+get_cm() {
+  local cm
+  local REVISION; REVISION="$(context_get-option "REVISION")"
+  if [[ -z "${REVISION}" ]] || [[ "${REVISION}" = default ]]; then
+    cm="istio"
+  else
+    cm="istio-${REVISION}"
+  fi
+  echo "${cm}"
+}
 
 check_empty_args() {
   for arg in "$@"; do
@@ -128,6 +139,7 @@ check_empty_args() {
 
 retry() {
   local MAX_TRIES; MAX_TRIES="${1}";
+  local SLEEP_INTERVAL; SLEEP_INTERVAL=${_SLEEP_INTERVAL};
   shift 1
   for i in $(seq 0 "${MAX_TRIES}"); do
     if [[ "${i}" -eq "${MAX_TRIES}" ]]; then
@@ -135,7 +147,7 @@ retry() {
     fi
     { "${@}" && return 0; } || true
     warn "Failed, retrying...($((i+1)) of ${MAX_TRIES})"
-    sleep 2
+    sleep ${SLEEP_INTERVAL}
   done
   local CMD="'$*'"
   warn "Command $CMD failed."
@@ -175,9 +187,9 @@ istioctl() {
   KCC="$(context_get-option "CONTEXT")"
 
   if [[ -n "${KCF}" ]]; then
-    "$(istioctl_path)" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
+    retry 3 "$(istioctl_path)" --kubeconfig "${KCF}" --context "${KCC}" "${@}"
   else
-    "$(istioctl_path)" "${@}"
+    retry 3 "$(istioctl_path)" "${@}"
   fi
 }
 
@@ -583,24 +595,17 @@ add-trust-anchor_subcommand() {
 }
 
 backup_resources() {
-  local REVISION; REVISION="$(context_get-option "REVISION")"
-  local REV_NAME; REV_NAME="istio-${REVISION}"
+  local REV_NAME; REV_NAME="$(get_cm)"
   local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
 
-  if [[ "${REVISION}" = default ]]; then
-    REV_NAME="istio"
-  fi
   rm ${OUTPUT_DIR}/"backup-${REV_NAME}" &> /dev/null || true
   kube get cm/${REV_NAME} -n istio-system -oyaml > ${OUTPUT_DIR}/"backup-${REV_NAME}"
 }
 
 add_trust_anchor() {
-  local REVISION; REVISION="$(context_get-option "REVISION")"
-  local REV_NAME; REV_NAME="istio-${REVISION}"
+  local REV_NAME; REV_NAME="$(get_cm)"
   local CA_CERT; CA_CERT="$(context_get-option "CA_CERT")"
-  if [[ "${REVISION}" = default ]]; then
-    REV_NAME="istio"
-  fi
+
   info "Adding new CA trust anchor to ${REV_NAME} configmap"
   local CA_CERT_CONTENT; CA_CERT_CONTENT=$(cat "$CA_CERT")
   local NEW_MESH_CONFIG; NEW_MESH_CONFIG=$(kube -n istio-system get configmaps ${REV_NAME} -o jsonpath='{.data.mesh}' | yq eval -o=json | jq '.caCertificates[.caCertificates| length] |= . + {"pem": "'"$CA_CERT_CONTENT"'"}' | yq eval -P)
@@ -609,10 +614,9 @@ add_trust_anchor() {
 
 check-trust-anchor_subcommand() {
   parse_args "${@}"
-  check_empty_args "CA_CERT" "FLEET_ID" "REVISION"
+  check_empty_args "CA_CERT" "FLEET_ID"
   local CA_CERT; CA_CERT="$(context_get-option "CA_CERT")"
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
-  local REVISION; REVISION="$(context_get-option "REVISION")"
   local NAMESPACES; NAMESPACES="$(context_get-option "NAMESPACES")"
   if [[ -z "${NAMESPACES}" ]]; then
     ns="$(kube get ns -ojsonpath={.items[*].metadata.name} | sed "s/ /\n/g" | grep -Ev "istio-system|kube-system" )"
@@ -781,10 +785,9 @@ migrate-ca_subcommand() {
 
 verify-ca_subcommand() {
     parse_args "${@}"
-    check_empty_args "CA_CERT" "FLEET_ID" "REVISION"
+    check_empty_args "CA_CERT" "FLEET_ID"
     local CA_CERT; CA_CERT="$(context_get-option "CA_CERT")"
     local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
-    local REVISION; REVISION="$(context_get-option "REVISION")"
     local NAMESPACES; NAMESPACES="$(context_get-option "NAMESPACES")"
     if [[ -z "${NAMESPACES}" ]]; then
       ns="$(kube get ns -ojsonpath={.items[*].metadata.name} | sed "s/ /\n/g" | grep -Ev "istio-system|kube-system" )"
