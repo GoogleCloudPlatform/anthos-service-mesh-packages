@@ -16,7 +16,6 @@ fi
 BUCKET_URL="https://storage.googleapis.com"
 BUCKET_PATH="csm-artifacts/asm"; readonly BUCKET_PATH
 
-CURRENT_RELEASE="release-1.13"; readonly CURRENT_RELEASE
 
 STABLE_VERSION_FILE="ASMCLI_VERSIONS"; readonly STABLE_VERSION_FILE
 STABLE_VERSION_FILE_PATH="${BUCKET_PATH}/${STABLE_VERSION_FILE}"; readonly STABLE_VERSION_FILE_PATH
@@ -25,17 +24,19 @@ trap 'gsutil retention "${HOLD_TYPE}" release gs://"${STABLE_VERSION_FILE_PATH}"
 
 prod_releases() {
   cat << EOF
-release 1.11
 release 1.12
 release 1.13
+release 1.14
 EOF
 }
 
+CURRENT_RELEASE="release-1.14"; readonly CURRENT_RELEASE
+
 staging_releases() {
   cat << EOF
-staging 1.11
 staging 1.12
 staging 1.13
+staging 1.14
 EOF
 }
 
