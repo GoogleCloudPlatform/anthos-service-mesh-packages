@@ -250,12 +250,14 @@ get_cluster_labels() {
 }
 
 generate_membership_name() {
+  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(context_get-option "HUB_MEMBERSHIP_ID")"
+  if [[ -n "${MEMBERSHIP_NAME}" ]]; then echo "${MEMBERSHIP_NAME}"; return; fi
+
   if is_gcp; then
     local PROJECT_ID; PROJECT_ID="${1}"
     local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}"
     local CLUSTER_NAME; CLUSTER_NAME="${3}"
 
-    local MEMBERSHIP_NAME
     MEMBERSHIP_NAME="${CLUSTER_NAME}"
     if [[ "$(retry 2 gcloud container hub memberships list --format='value(name)' \
     --project "${PROJECT_ID}" | grep -c "^${MEMBERSHIP_NAME}$" || true)" -ne 0 ]]; then
@@ -271,6 +273,7 @@ generate_membership_name() {
   else
     MEMBERSHIP_NAME="$(date +%s%N)"
   fi
+  context_set-option "HUB_MEMBERSHIP_ID" "${MEMBERSHIP_NAME}"
   echo "${MEMBERSHIP_NAME}"
 }
 
@@ -329,14 +332,14 @@ register_cluster() {
 
 add_cluster_labels(){
   local LABELS; LABELS="$(get_cluster_labels)";
-
   local WANT; WANT="$(mesh_id_label)"
-
   local NOTFOUND; NOTFOUND="$(find_missing_strings "${WANT}" "${LABELS}")"
 
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+
+  local PLATFORM; PLATFORM="$(context_get-option "PLATFORM")"
 
   if [[ -z "${NOTFOUND}" ]]; then return 0; fi
 
@@ -346,10 +349,17 @@ add_cluster_labels(){
   LABELS="${LABELS}${NOTFOUND}"
 
   info "Adding labels to ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
-  retry 2 gcloud container clusters update "${CLUSTER_NAME}" \
-    --project="${PROJECT_ID}" \
-    --zone="${CLUSTER_LOCATION}" \
-    --update-labels="${LABELS}"
+  if ! is_gcp; then
+    local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name)"
+    retry 2 gcloud container hub memberships update "${MEMBERSHIP_NAME}" \
+      --project="${PROJECT_ID}" \
+      --update-labels="${LABELS}"
+  else
+    retry 2 gcloud container clusters update "${CLUSTER_NAME}" \
+      --project="${PROJECT_ID}" \
+      --zone="${CLUSTER_LOCATION}" \
+      --update-labels="${LABELS}"
+  fi
 }
 
 populate_fleet_info() {

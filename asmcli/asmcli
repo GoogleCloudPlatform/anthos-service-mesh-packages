@@ -40,7 +40,7 @@ _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"; readonly _CI_I_AM_A_TEST_RO
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=12}"; readonly MINOR;
-POINT="${POINT:=7}"; readonly POINT;
+POINT="${POINT:=8}"; readonly POINT;
 REV="${REV:=2}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1"}"; readonly CONFIG_VER;
 K8S_MINOR=0
@@ -1891,12 +1891,11 @@ validate_dependencies() {
   fi
 
   get_project_number "${FLEET_ID}"
-  if is_gcp; then
-    if can_modify_cluster_labels; then
-      add_cluster_labels
-    elif should_validate; then
-      exit_if_cluster_unlabeled
-    fi
+
+  if can_modify_cluster_labels; then
+    add_cluster_labels
+  elif should_validate; then
+    exit_if_cluster_unlabeled
   fi
 
   if can_modify_cluster_roles; then
@@ -2014,6 +2013,13 @@ configure_citadel() {
 
 install_citadel() {
   local CUSTOM_CA; CUSTOM_CA="$(context_get-option "CUSTOM_CA")"
+  local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
+  local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
+  local INCLUDES_STACKDRIVER; INCLUDES_STACKDRIVER="$(context_get-option "INCLUDES_STACKDRIVER")"
+
+  if [[ "${USE_HUB_WIP}" -eq 1 && "${INCLUDES_STACKDRIVER}" -eq 1 ]]; then
+    kpt cfg set asm anthos.servicemesh.idp-url "${HUB_IDP_URL}"
+  fi
 
   if [[ "${CUSTOM_CA}" -eq 1 ]]; then
     install_custom_certificates
@@ -3503,12 +3509,14 @@ get_cluster_labels() {
 }
 
 generate_membership_name() {
+  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(context_get-option "HUB_MEMBERSHIP_ID")"
+  if [[ -n "${MEMBERSHIP_NAME}" ]]; then echo "${MEMBERSHIP_NAME}"; return; fi
+
   if is_gcp; then
     local PROJECT_ID; PROJECT_ID="${1}"
     local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}"
     local CLUSTER_NAME; CLUSTER_NAME="${3}"
 
-    local MEMBERSHIP_NAME
     MEMBERSHIP_NAME="${CLUSTER_NAME}"
     if [[ "$(retry 2 gcloud container hub memberships list --format='value(name)' \
     --project "${PROJECT_ID}" | grep -c "^${MEMBERSHIP_NAME}$" || true)" -ne 0 ]]; then
@@ -3524,6 +3532,7 @@ generate_membership_name() {
   else
     MEMBERSHIP_NAME="$(date +%s%N)"
   fi
+  context_set-option "HUB_MEMBERSHIP_ID" "${MEMBERSHIP_NAME}"
   echo "${MEMBERSHIP_NAME}"
 }
 
@@ -3582,14 +3591,14 @@ register_cluster() {
 
 add_cluster_labels(){
   local LABELS; LABELS="$(get_cluster_labels)";
-
   local WANT; WANT="$(mesh_id_label)"
-
   local NOTFOUND; NOTFOUND="$(find_missing_strings "${WANT}" "${LABELS}")"
 
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+
+  local PLATFORM; PLATFORM="$(context_get-option "PLATFORM")"
 
   if [[ -z "${NOTFOUND}" ]]; then return 0; fi
 
@@ -3599,10 +3608,17 @@ add_cluster_labels(){
   LABELS="${LABELS}${NOTFOUND}"
 
   info "Adding labels to ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
-  retry 2 gcloud container clusters update "${CLUSTER_NAME}" \
-    --project="${PROJECT_ID}" \
-    --zone="${CLUSTER_LOCATION}" \
-    --update-labels="${LABELS}"
+  if ! is_gcp; then
+    local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name)"
+    retry 2 gcloud container hub memberships update "${MEMBERSHIP_NAME}" \
+      --project="${PROJECT_ID}" \
+      --update-labels="${LABELS}"
+  else
+    retry 2 gcloud container clusters update "${CLUSTER_NAME}" \
+      --project="${PROJECT_ID}" \
+      --zone="${CLUSTER_LOCATION}" \
+      --update-labels="${LABELS}"
+  fi
 }
 
 populate_fleet_info() {
