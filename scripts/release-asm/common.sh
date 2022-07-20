@@ -43,6 +43,7 @@ EOF
 other_releases() {
   cat << EOF
 main alpha
+managed-cert-preview managed-cert-preview
 EOF
 }
 
