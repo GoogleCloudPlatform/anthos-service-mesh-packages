@@ -70,9 +70,20 @@ x_enable_workload_certificate_on_membership() {
     }
   }"
 
-  curl -H "Authorization: Bearer ${AUTHTOKEN}" \
-     -X PATCH -H "Content-Type: application/json" -H "Accept: application/json" \
-     -d "${ENABLEFEATURE}" "https://${GKEHUB_API}/v1alpha/projects/${FLEET_ID}/locations/global/features/workloadcertificate?update_mask=membership_specs"
+  # The enablement sometimes fails with an error (an example error is attached below).
+  # Therefore, the enablement is conducted with retries.
+  # "error": {
+  #    "code": 429,
+  #    "message": "Too many requests are currently being executed, try again later.",
+  #    "status": "RESOURCE_EXHAUSTED",
+  #    "details": [...]
+  info "The enablement may take a few minutes ..."
+  for i in {1..3}; do
+    curl -H "Authorization: Bearer ${AUTHTOKEN}" \
+       -X PATCH -H "Content-Type: application/json" -H "Accept: application/json" \
+       -d "${ENABLEFEATURE}" "https://${GKEHUB_API}/v1alpha/projects/${FLEET_ID}/locations/global/features/workloadcertificate?update_mask=membership_specs"
+    sleep 60
+  done
 }
 
 x_wait_for_gke_hub_api_enablement() {
@@ -88,7 +99,7 @@ x_wait_for_enabling_workload_certificates() {
   # Enabling workload certificate feature on a cluster will result in
   # the cluster restarting and the cluster becoming unreachable for minutes.
   # The cluster restart may happen at a random time after the enablement.
-  # Check the connection to k8s is recovered.
+  # The time to complete a cluster restart varies based on cluster region and size.
   # Therefore, wait 15 minutes before checking the connection to k8s is recovered.
   sleep 900
 
