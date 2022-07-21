@@ -489,7 +489,7 @@ enable_service_mesh_feature() {
   retry 2 run_command gcloud container fleet mesh enable --project="${FLEET_ID}"
 }
 
-enable_workload_certificate_api() {
+x_enable_workload_certificate_api() {
   local GKEHUB_API; GKEHUB_API="$1"
   local WORKLOAD_CERT_API; WORKLOAD_CERT_API="$2"
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
