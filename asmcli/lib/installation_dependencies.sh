@@ -204,7 +204,7 @@ enable_gcloud_apis(){
   local CA; CA="$(context_get-option "CA")"
   if [[ "${CA}" = "managed_cas" ]]; then
     fail_if_not_experimental
-    enable_workload_certificate_api "gkehub.googleapis.com" "workloadcertificate.googleapis.com"
+    x_enable_workload_certificate_api "gkehub.googleapis.com" "workloadcertificate.googleapis.com"
   fi
 
   if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then

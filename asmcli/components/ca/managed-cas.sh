@@ -84,6 +84,31 @@ x_wait_for_enabling_workload_certificates() {
   local GKEHUB_API; GKEHUB_API="$1"
   local FLEET_ID; FLEET_ID="$2"
 
+  info "Waiting for the workload certificates enablement on cluster. This may take up to 20 minutes ..."
+  # Enabling workload certificate feature on a cluster will result in
+  # the cluster restarting and the cluster becoming unreachable for minutes.
+  # The cluster restart may happen at a random time after the enablement.
+  # Check the connection to k8s is recovered.
+  # Therefore, wait 15 minutes before checking the connection to k8s is recovered.
+  sleep 900
+
+  # Checking the k8s cluster is reachable and the gke-spiffe-node-agent is present for the workload certificate.
+  local REACHABLE; REACHABLE=0
+  for i in {1..3}; do
+    local OUT; OUT=$(kubectl get ds -n kube-system gke-spiffe-node-agent 2>/dev/null | grep -i "gke-spiffe-node-agent" || true)
+    if [[ -z "$OUT" ]]; then
+      info "The k8s cluster is unreachable or gke-spiffe-node-agent is not present, try again ..."
+      sleep 60
+    else
+      info "The k8s cluster is reachable and gke-spiffe-node-agent is present"
+      REACHABLE=1
+      break
+    fi
+  done
+  if [[ "${REACHABLE}" -eq 0 ]]; then
+    fatal "The k8s cluster is unreachable or gke-spiffe-node-agent is not present, exit."
+  fi
+
   # Check the status of workload certificate feature
   local ENABLED; ENABLED=0
   for i in {1..2}; do
@@ -101,31 +126,7 @@ x_wait_for_enabling_workload_certificates() {
     fi
   done
   if [[ "${ENABLED}" -eq 0 ]]; then
-    warn "The workload certificate management is not enabled. The workload certificates may not work until the management is enabled."
-  fi
-
-  # Enabling workload certificate feature on a cluster will result in
-  # the cluster restarting and the cluster becoming unreachable for minutes.
-  # The cluster restart may happen at a random time after the enablement.
-  # Check the connection to k8s is recovered.
-  # Therefore, wait 15 minutes before checking the connection to k8s is recovered.
-  info "Waiting for the workload certificates enablement on cluster. This may take up to 20 minutes ..."
-  sleep 900
-
-  local REACHABLE; REACHABLE=0
-  for i in {1..3}; do
-    local OUT; OUT=$(kubectl get ds -n kube-system gke-spiffe-node-agent 2>/dev/null | grep -i "gke-spiffe-node-agent" || true)
-    if [[ -z "$OUT" ]]; then
-      info "The k8s cluster is unreachable or workload certificate feature is not active, try again ..."
-      sleep 60
-    else
-      info "The k8s cluster is reachable and workload certificate feature is active"
-      REACHABLE=1
-      break
-    fi
-  done
-  if [[ "${REACHABLE}" -eq 0 ]]; then
-    fatal "The k8s cluster is unreachable or workload certificate feature is not active, exit."
+    fatal "The workload certificate management is not enabled. The workload certificates may not work until the management is enabled. Exit."
   fi
 }
 
