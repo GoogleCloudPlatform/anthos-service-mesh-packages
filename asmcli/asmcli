@@ -2158,7 +2158,7 @@ x_wait_for_enabling_workload_certificates() {
   # Enabling workload certificate feature on a cluster will result in
   # the cluster restarting and the cluster becoming unreachable for minutes.
   # The cluster restart may happen at a random time after the enablement.
-  # The time to complete a cluster varies based on cluster region and size.
+  # The time to complete a cluster restart varies based on cluster region and size.
   # Therefore, wait 15 minutes before checking the connection to k8s is recovered.
   sleep 900
 
