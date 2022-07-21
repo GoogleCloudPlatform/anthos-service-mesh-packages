@@ -100,8 +100,8 @@ x_wait_for_enabling_workload_certificates() {
   # the cluster restarting and the cluster becoming unreachable for minutes.
   # The cluster restart may happen at a random time after the enablement.
   # The time to complete a cluster varies based on cluster region and size.
-  # Therefore, wait 25 minutes before checking the connection to k8s is recovered.
-  sleep 1500
+  # Therefore, wait 15 minutes before checking the connection to k8s is recovered.
+  sleep 900
 
   # Checking the k8s cluster is reachable and the gke-spiffe-node-agent is present for the workload certificate.
   local REACHABLE; REACHABLE=0
