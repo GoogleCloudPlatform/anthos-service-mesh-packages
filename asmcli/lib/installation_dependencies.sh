@@ -355,13 +355,16 @@ register_cluster() {
 }
 
 add_cluster_labels(){
-  local LABELS; LABELS="$(get_cluster_labels)";
-  local WANT; WANT="$(mesh_id_label)"
-  local NOTFOUND; NOTFOUND="$(find_missing_strings "${WANT}" "${LABELS}")"
-
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+
+  # temp workaround for attached clusters
+  if [[ -z "${CLUSTER_LOCATION}" ]]; then return 0; fi
+
+  local LABELS; LABELS="$(get_cluster_labels)";
+  local WANT; WANT="$(mesh_id_label)"
+  local NOTFOUND; NOTFOUND="$(find_missing_strings "${WANT}" "${LABELS}")"
 
   local PLATFORM; PLATFORM="$(context_get-option "PLATFORM")"
 
