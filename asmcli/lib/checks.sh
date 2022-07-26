@@ -246,9 +246,9 @@ is_service_mesh_feature_enabled() {
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   local RESPONSE
-  RESPONSE="$(run_command gcloud container fleet mesh describe --project="${FLEET_ID}")"
+  RESPONSE="$(run_command gcloud container fleet mesh describe --project="${FLEET_ID} --format=json")"
 
-  if [[ "$(echo "${RESPONSE}" | jq -r '.featureState.lifecycleState' 2>/dev/null)" != "ENABLED" ]]; then
+  if [[ "$(echo "${RESPONSE}" | jq -r '.resourceState.state' 2>/dev/null)" != "ACTIVE" ]]; then
     false
   fi
 }
