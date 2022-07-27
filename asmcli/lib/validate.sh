@@ -398,10 +398,10 @@ EOF
 }
 
 exit_if_service_mesh_feature_not_enabled() {
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   if ! is_service_mesh_feature_enabled; then
     { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
-The service mesh feature is not enabled on project ${PROJECT_ID}.
+The service mesh feature is not enabled on project ${FLEET_ID}.
 Please run the script with the '--enable_gcp_components' flag to allow the
 script to enable it on your behalf.
 $(enable_common_message)
