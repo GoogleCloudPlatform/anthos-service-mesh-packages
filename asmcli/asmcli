@@ -2655,9 +2655,9 @@ is_service_mesh_feature_enabled() {
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   local RESPONSE
-  RESPONSE="$(run_command gcloud container fleet mesh describe --project="${FLEET_ID}")"
+  RESPONSE="$(run_command gcloud container fleet mesh describe --project="${FLEET_ID}" --format=json)"
 
-  if [[ "$(echo "${RESPONSE}" | jq -r '.featureState.lifecycleState')" != "ENABLED" ]]; then
+  if [[ "$(echo "${RESPONSE}" | jq -r '.resourceState.state' 2>/dev/null)" != "ACTIVE" ]]; then
     false
   fi
 }
@@ -3592,13 +3592,16 @@ register_cluster() {
 }
 
 add_cluster_labels(){
-  local LABELS; LABELS="$(get_cluster_labels)";
-  local WANT; WANT="$(mesh_id_label)"
-  local NOTFOUND; NOTFOUND="$(find_missing_strings "${WANT}" "${LABELS}")"
-
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+
+  # temp workaround for attached clusters
+  if [[ -z "${CLUSTER_LOCATION}" ]]; then return 0; fi
+
+  local LABELS; LABELS="$(get_cluster_labels)";
+  local WANT; WANT="$(mesh_id_label)"
+  local NOTFOUND; NOTFOUND="$(find_missing_strings "${WANT}" "${LABELS}")"
 
   local PLATFORM; PLATFORM="$(context_get-option "PLATFORM")"
 
@@ -5331,10 +5334,10 @@ EOF
 }
 
 exit_if_service_mesh_feature_not_enabled() {
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   if ! is_service_mesh_feature_enabled; then
     { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
-The service mesh feature is not enabled on project ${PROJECT_ID}.
+The service mesh feature is not enabled on project ${FLEET_ID}.
 Please run the script with the '--enable_gcp_components' flag to allow the
 script to enable it on your behalf.
 $(enable_common_message)
