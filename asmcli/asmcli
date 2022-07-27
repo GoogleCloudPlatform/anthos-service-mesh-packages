@@ -2758,7 +2758,7 @@ is_service_mesh_feature_enabled() {
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   local RESPONSE
-  RESPONSE="$(run_command gcloud container fleet mesh describe --project=${FLEET_ID} --format=json)"
+  RESPONSE="$(run_command gcloud container fleet mesh describe --project="${FLEET_ID}" --format=json)"
 
   if [[ "$(echo "${RESPONSE}" | jq -r '.resourceState.state' 2>/dev/null)" != "ACTIVE" ]]; then
     false
@@ -5524,10 +5524,10 @@ EOF
 }
 
 exit_if_service_mesh_feature_not_enabled() {
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   if ! is_service_mesh_feature_enabled; then
     { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
-The service mesh feature is not enabled on project ${PROJECT_ID}.
+The service mesh feature is not enabled on project ${FLEET_ID}.
 Please run the script with the '--enable_gcp_components' flag to allow the
 script to enable it on your behalf.
 $(enable_common_message)
