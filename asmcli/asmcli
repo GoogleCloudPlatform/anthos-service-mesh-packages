@@ -3849,7 +3849,6 @@ add_cluster_labels(){
   fi
   LABELS="${LABELS}${NOTFOUND}"
 
-
   if ! is_gcp; then
     local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}")"
     info "Adding labels to ${MEMBERSHIP_NAME}"

@@ -287,18 +287,26 @@ get_cluster_labels() {
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
 
-  info "Reading labels for ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
   local LABELS
-  LABELS="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
-    --zone="${CLUSTER_LOCATION}" \
-    --project="${PROJECT_ID}" \
-    --format='value(resourceLabels)[delimiter=","]')";
+  if ! is_gcp; then
+    local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}")"
+    info "Reading labels for ${MEMBERSHIP_NAME}"
+    LABELS="$(retry 2 gcloud container hub memberships describe "${MEMBERSHIP_NAME}" \
+      --project="${PROJECT_ID}" \
+      --format='value(resourceLabels)[delimiter=","]')";
+  else
+    info "Reading labels for ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
+    LABELS="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
+      --zone="${CLUSTER_LOCATION}" \
+      --project="${PROJECT_ID}" \
+      --format='value(resourceLabels)[delimiter=","]')";
   echo "${LABELS}"
+  fi
 }
 
 generate_membership_name() {
   local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(context_get-option "HUB_MEMBERSHIP_ID")"
-  if [[ -n "${MEMBERSHIP_NAME}" ]]; then echo "${MEMBERSHIP_NAME}"; return; fi
+  if [[ ! -n "${MEMBERSHIP_NAME}" ]]; then echo "${MEMBERSHIP_NAME}"; return; fi
 
   if is_gcp; then
     local PROJECT_ID; PROJECT_ID="${1}"
@@ -318,7 +326,8 @@ generate_membership_name() {
       MEMBERSHIP_NAME="${CLUSTER_NAME:0:54}-${RAND}"
     fi
   else
-    MEMBERSHIP_NAME="$(date +%s%N)"
+    local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
+    MEMBERSHIP_NAME="${HUB_MEMBERSHIP_ID}"
   fi
   context_set-option "HUB_MEMBERSHIP_ID" "${MEMBERSHIP_NAME}"
   echo "${MEMBERSHIP_NAME}"
@@ -393,9 +402,6 @@ add_cluster_labels(){
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
 
-  # temp workaround for attached clusters
-  if [[ -z "${CLUSTER_LOCATION}" ]]; then return 0; fi
-
   local LABELS; LABELS="$(get_cluster_labels)";
   local WANT; WANT="$(mesh_id_label)"
   local NOTFOUND; NOTFOUND="$(find_missing_strings "${WANT}" "${LABELS}")"
@@ -409,13 +415,14 @@ add_cluster_labels(){
   fi
   LABELS="${LABELS}${NOTFOUND}"
 
-  info "Adding labels to ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
   if ! is_gcp; then
-    local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name)"
+    local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}")"
+    info "Adding labels to ${MEMBERSHIP_NAME}"
     retry 2 gcloud container hub memberships update "${MEMBERSHIP_NAME}" \
       --project="${PROJECT_ID}" \
       --update-labels="${LABELS}"
   else
+    info "Adding labels to ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
     retry 2 gcloud container clusters update "${CLUSTER_NAME}" \
       --project="${PROJECT_ID}" \
       --zone="${CLUSTER_LOCATION}" \
