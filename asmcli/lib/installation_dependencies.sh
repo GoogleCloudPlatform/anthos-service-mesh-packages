@@ -325,9 +325,6 @@ generate_membership_name() {
       RAND="$(tr -dc "a-z0-9" </dev/urandom | head -c8 || true)"
       MEMBERSHIP_NAME="${CLUSTER_NAME:0:54}-${RAND}"
     fi
-  else
-    local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
-    MEMBERSHIP_NAME="${HUB_MEMBERSHIP_ID}"
   fi
   context_set-option "HUB_MEMBERSHIP_ID" "${MEMBERSHIP_NAME}"
   echo "${MEMBERSHIP_NAME}"
