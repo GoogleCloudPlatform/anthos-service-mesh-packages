@@ -296,6 +296,17 @@ get_cluster_labels() {
   echo "${LABELS}"
 }
 
+sanitize_label() {
+  local LABEL; LABEL="${1}"
+
+  LABEL="${LABEL//_/-}"
+  LABEL="${LABEL//\./-}"
+  LABEL="${LABEL//@/-}"
+  LABEL="${LABEL//:/-}"
+
+  echo "${LABEL}"
+}
+
 generate_membership_name() {
   local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(context_get-option "HUB_MEMBERSHIP_ID")"
   if [[ -n "${MEMBERSHIP_NAME}" ]]; then echo "${MEMBERSHIP_NAME}"; return; fi
@@ -326,6 +337,8 @@ generate_membership_name() {
 
 generate_secret_name() {
   local SECRET_NAME; SECRET_NAME="${1}"
+
+  SECRET_NAME="$(sanitize_label "${SECRET_NAME}")"
 
   if [[ "${#SECRET_NAME}" -gt "${KUBE_TAG_MAX_LEN}" ]]; then
     local DIGEST

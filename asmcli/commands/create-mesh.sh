@@ -187,9 +187,7 @@ install_one_remote_secret() {
   context_set-option "KUBECONFIG" "${KCF1}"
   CTX1="$(kubectl config current-context)"
 
-  SECRET_NAME="${CTX1//_/-}"
-  SECRET_NAME="${SECRET_NAME//\./-}"
-  SECRET_NAME="${SECRET_NAME//@/-}"
+  SECRET_NAME="${CTX1}"
   if [[ "${CTX1}" =~ ^gke_[^_]+_[^_]+_.+ ]]; then
     SECRET_NAME="${SECRET_NAME/#gke-/cn-}"
   fi
