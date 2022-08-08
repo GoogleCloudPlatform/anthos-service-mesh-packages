@@ -3740,7 +3740,7 @@ get_cluster_labels() {
 
 generate_membership_name() {
   local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(context_get-option "HUB_MEMBERSHIP_ID")"
-  if [[ ! -n "${MEMBERSHIP_NAME}" ]]; then echo "${MEMBERSHIP_NAME}"; return; fi
+  if [[ -n "${MEMBERSHIP_NAME}" ]]; then echo "${MEMBERSHIP_NAME}"; return; fi
 
   if is_gcp; then
     local PROJECT_ID; PROJECT_ID="${1}"
@@ -3759,6 +3759,8 @@ generate_membership_name() {
       RAND="$(tr -dc "a-z0-9" </dev/urandom | head -c8 || true)"
       MEMBERSHIP_NAME="${CLUSTER_NAME:0:54}-${RAND}"
     fi
+  else
+    MEMBERSHIP_NAME="$(date +%s%N)"
   fi
   context_set-option "HUB_MEMBERSHIP_ID" "${MEMBERSHIP_NAME}"
   echo "${MEMBERSHIP_NAME}"
