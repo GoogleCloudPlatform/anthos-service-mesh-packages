@@ -184,14 +184,11 @@ FLAGS:
 
      --managed                        Provision a remote, managed control plane
                                       instead of installing one in-cluster.
-     --legacy                         Provision a remote, managed control plane with
-                                      the legacy asmcli installer that runs client-side.
      --use_vpcsc                      Provision a remote, managed control plane in
-                                      VPCSC environment. Not supported for --legacy
-                                      installation method.
+                                      VPCSC environment.
      --offline                        Perform an offline installation using the pre-downloaded
                                       package in the output directory. If the directory is not
-                                      specified or does not contain the required files, the 
+                                      specified or does not contain the required files, the
                                       script will exit with error.
      --print_config                   Instead of installing ASM, print all of
                                       the compiled YAML to stdout. All other
@@ -286,7 +283,6 @@ FLAGS:
      --use_managed_cni
 
      --managed
-     --legacy
      --use_vpcsc
 
      --offline

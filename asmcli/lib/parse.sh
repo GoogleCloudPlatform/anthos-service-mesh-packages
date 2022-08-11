@@ -137,7 +137,7 @@ parse_args() {
         shift 1
         ;;
       --legacy)
-        context_set-option "LEGACY" 1
+        warn "The legacy option is no longer supported--continuing with normal installation."
         shift 1
         ;;
       --use_vpcsc | --use-vpcsc)
@@ -315,10 +315,6 @@ x_parse_install_args() {
         ;;
       --managed)
         context_set-option "MANAGED" 1
-        shift 1
-        ;;
-      --legacy)
-        context_set-option "LEGACY" 1
         shift 1
         ;;
       --use_vpcsc | --use-vpcsc)
