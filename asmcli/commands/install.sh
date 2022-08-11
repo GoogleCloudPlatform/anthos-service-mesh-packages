@@ -126,7 +126,7 @@ install_canonical_controller() {
 
 install_control_plane_revisions() {
   info "Configuring ASM managed control plane revision CR for channels..."
-  
+
   local CHANNEL CR REVISION
   while read -r CHANNEL; do
     read -r CR REVISION<<EOF
@@ -135,13 +135,11 @@ EOF
     info "Installing ASM Control Plane Revision CR with ${REVISION} channel in istio-system namespace..."
     retry 3 kubectl apply -f "${CR}"
 
-    if ! is_legacy; then
-      info "Waiting for deployment..."
-      retry 3 kubectl wait --for=condition=ProvisioningFinished \
-        controlplanerevision "${REVISION}" -n istio-system --timeout 600s
-    fi
+    info "Waiting for deployment..."
+    retry 3 kubectl wait --for=condition=ProvisioningFinished \
+      controlplanerevision "${REVISION}" -n istio-system --timeout 600s
   done <<EOF
-$(get_cr_channels)
+$(get_cr_channel)
 EOF
 }
 

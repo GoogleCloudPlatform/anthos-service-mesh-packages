@@ -208,6 +208,24 @@ teardown() {
   [ "${RETVAL}" -ne 0 ]
 }
 
+@test "MAIN: passing legacy flag should continue" {
+  local CMD
+  CMD="validate"
+  CMD="${CMD} -l this_should_pass"
+  CMD="${CMD} -n this_should_pass"
+  CMD="${CMD} -p this_should_pass"
+  CMD="${CMD} -c mesh_ca"
+  CMD="${CMD} --legacy"
+
+  local RETVAL=0
+  local OUTPUT
+  OUTPUT="$(main ${CMD} 2>&1)" || RETVAL="${?}"
+
+  assert_equal "${RETVAL}" 0
+
+  echo "${OUTPUT}" | grep -q 'The legacy option is no longer supported--continuing with normal installation.'
+}
+
 @test "MAIN: good case for permissions" {
   context_init
 
