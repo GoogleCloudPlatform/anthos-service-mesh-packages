@@ -551,7 +551,6 @@ validate_args() {
   local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
   local MANAGED_CERTIFICATES; MANAGED_CERTIFICATES="$(context_get-option "MANAGED_CERTIFICATES")"
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
-  local LEGACY; LEGACY="$(context_get-option "LEGACY")"
   local MANAGED_SERVICE_ACCOUNT; MANAGED_SERVICE_ACCOUNT="$(context_get-option "MANAGED_SERVICE_ACCOUNT")"
   local PRINT_HELP; PRINT_HELP="$(context_get-option "PRINT_HELP")"
   local PRINT_VERSION; PRINT_VERSION="$(context_get-option "PRINT_VERSION")"
@@ -565,10 +564,6 @@ validate_args() {
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
   local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
   local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
-
-  if is_legacy && ! is_managed; then
-      fatal "The --legacy option is only supported with managed control plane."
-  fi
 
   if [[ -z "${CA}" ]]; then
     if [[ "${MANAGED_CERTIFICATES}" -eq 1 ]]; then
@@ -730,7 +725,6 @@ ENABLE_GCP_IAM_ROLES
 ENABLE_GCP_COMPONENTS
 ENABLE_REGISTRATION
 MANAGED
-LEGACY
 DISABLE_CANONICAL_SERVICE
 ONLY_VALIDATE
 ONLY_ENABLE
@@ -783,7 +777,7 @@ fail_if_not_experimental() {
     fatal "The selected features are in preview and only available when using the experimental install subcommand."
   fi
 }
-      
+
 validate_kubeconfig_context() {
   local CONTEXT_CLUSTER; CONTEXT_CLUSTER="${1}"
 
@@ -817,7 +811,6 @@ x_validate_install_args() {
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local MANAGED; MANAGED="$(context_get-option "MANAGED")"
-  local LEGACY; LEGACY="$(context_get-option "LEGACY")"
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local CA; CA="$(context_get-option "CA")"
   local ENABLE_ALL; ENABLE_ALL="$(context_get-option "ENABLE_ALL")"
@@ -867,10 +860,6 @@ EOF
 
   if [[ "${MANAGED}" -eq 0 ]]; then
     fatal "Currently only managed control plane installation is supported by experimental install."
-  fi
-
-  if [[ "${LEGACY}" -eq 1 ]]; then
-    fatal "The legacy install subcommand is not available in the experimental install command."
   fi
 
   if [[ -n "${CHANNEL}" ]]; then
