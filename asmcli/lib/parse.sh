@@ -136,6 +136,10 @@ parse_args() {
         REVISION_LABEL="asm-managed"
         shift 1
         ;;
+      --legacy)
+        warn "The legacy option is no longer supported--continuing with normal installation."
+        shift 1
+        ;;
       --use_vpcsc | --use-vpcsc)
         context_set-option "USE_VPCSC" 1
         shift 1
