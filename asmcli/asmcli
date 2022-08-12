@@ -3235,7 +3235,12 @@ context_post-init() {
   for opt in $(default_empty_opts); do
     VALUE="$(context_get-option "${opt}")"
     if [[ -n "${VALUE}" ]]; then
-      info "Using ${opt} = ${VALUE} from environment."
+      # Some proxies use basic auth, don't print passwords to terminal
+      if [[ "${opt}" = "HTTPS_PROXY" ]]; then
+        info "Using ${opt} (value hidden) from environment."
+      else
+        info "Using ${opt} = ${VALUE} from environment."
+      fi
     fi
   done
 
@@ -4684,7 +4689,14 @@ apath() {
 }
 
 gcloud() {
-  run_command "${AGCLOUD}" "${@}"
+  local HTTPS_PROXY
+  HTTPS_PROXY="$(context_get-option "HTTPS_PROXY")"
+
+  if [[ -n "${HTTPS_PROXY}" ]]; then
+    HTTPS_PROXY="${HTTPS_PROXY}" run_command "${AGCLOUD}" "${@}"
+  else
+    run_command "${AGCLOUD}" "${@}"
+  fi
 }
 
 kubectl() {
