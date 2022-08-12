@@ -103,7 +103,12 @@ context_post-init() {
   for opt in $(default_empty_opts); do
     VALUE="$(context_get-option "${opt}")"
     if [[ -n "${VALUE}" ]]; then
-      info "Using ${opt} = ${VALUE} from environment."
+      # Some proxies use basic auth, don't print passwords to terminal
+      if [[ "${opt}" = "HTTPS_PROXY" ]]; then
+        info "Using ${opt} (value hidden) from environment."
+      else
+        info "Using ${opt} = ${VALUE} from environment."
+      fi
     fi
   done
 
