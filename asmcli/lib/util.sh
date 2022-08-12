@@ -427,7 +427,14 @@ apath() {
 }
 
 gcloud() {
-  run_command "${AGCLOUD}" "${@}"
+  local HTTPS_PROXY
+  HTTPS_PROXY="$(context_get-option "HTTPS_PROXY")"
+
+  if [[ -n "${HTTPS_PROXY}" ]]; then
+    HTTPS_PROXY="${HTTPS_PROXY}" run_command "${AGCLOUD}" "${@}"
+  else
+    run_command "${AGCLOUD}" "${@}"
+  fi
 }
 
 kubectl() {
