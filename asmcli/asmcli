@@ -3727,15 +3727,15 @@ get_cluster_labels() {
     info "Reading labels for ${MEMBERSHIP_NAME}"
     LABELS="$(retry 2 gcloud container hub memberships describe "${MEMBERSHIP_NAME}" \
       --project="${PROJECT_ID}" \
-      --format='value(resourceLabels)[delimiter=","]')";
+      --format='value(labels)[delimiter=","]')";
   else
     info "Reading labels for ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
     LABELS="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
       --zone="${CLUSTER_LOCATION}" \
       --project="${PROJECT_ID}" \
       --format='value(resourceLabels)[delimiter=","]')";
-  echo "${LABELS}"
   fi
+  echo "${LABELS}"
 }
 
 generate_membership_name() {
