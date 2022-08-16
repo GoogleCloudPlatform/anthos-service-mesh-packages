@@ -3753,9 +3753,6 @@ add_cluster_labels(){
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
 
-  # temp workaround for attached clusters
-  if [[ -z "${CLUSTER_LOCATION}" ]]; then return 0; fi
-
   local LABELS; LABELS="$(get_cluster_labels)";
   local WANT; WANT="$(mesh_id_label)"
   local NOTFOUND; NOTFOUND="$(find_missing_strings "${WANT}" "${LABELS}")"
@@ -3769,13 +3766,14 @@ add_cluster_labels(){
   fi
   LABELS="${LABELS}${NOTFOUND}"
 
-  info "Adding labels to ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
   if ! is_gcp; then
-    local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name)"
+    local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}")"
+    info "Adding labels to ${MEMBERSHIP_NAME}"
     retry 2 gcloud container hub memberships update "${MEMBERSHIP_NAME}" \
       --project="${PROJECT_ID}" \
       --update-labels="${LABELS}"
   else
+    info "Adding labels to ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
     retry 2 gcloud container clusters update "${CLUSTER_NAME}" \
       --project="${PROJECT_ID}" \
       --zone="${CLUSTER_LOCATION}" \
