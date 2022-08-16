@@ -45,7 +45,6 @@ context_init() {
     "MANAGED_CERTIFICATES": ${MANAGED_CERTIFICATES:-0},
     "VERBOSE": ${VERBOSE:-0},
     "MANAGED": ${MANAGED:-0},
-    "LEGACY": ${LEGACY:-0},
     "MANAGED_SERVICE_ACCOUNT": "${MANAGED_SERVICE_ACCOUNT:-}",
     "PRINT_HELP": ${PRINT_HELP:-0},
     "PRINT_VERSION": ${PRINT_VERSION:-0},
@@ -104,7 +103,12 @@ context_post-init() {
   for opt in $(default_empty_opts); do
     VALUE="$(context_get-option "${opt}")"
     if [[ -n "${VALUE}" ]]; then
-      info "Using ${opt} = ${VALUE} from environment."
+      # Some proxies use basic auth, don't print passwords to terminal
+      if [[ "${opt}" = "HTTPS_PROXY" ]]; then
+        info "Using ${opt} (value hidden) from environment."
+      else
+        info "Using ${opt} = ${VALUE} from environment."
+      fi
     fi
   done
 
@@ -179,7 +183,6 @@ ONLY_ENABLE
 MANAGED_CERTIFICATES
 VERBOSE
 MANAGED
-LEGACY
 PRINT_HELP
 PRINT_VERSION
 CUSTOM_CA

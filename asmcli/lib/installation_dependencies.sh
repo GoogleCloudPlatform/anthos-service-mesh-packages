@@ -289,8 +289,8 @@ get_cluster_labels() {
 
   local LABELS
   if ! is_gcp; then
-    local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}")"
-    info "Reading labels for ${MEMBERSHIP_NAME}"
+    local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name)"
+    info "Reading labels for ${MEMBERSHIP_NAME}..."
     LABELS="$(retry 2 gcloud container hub memberships describe "${MEMBERSHIP_NAME}" \
       --project="${PROJECT_ID}" \
       --format='value(labels)[delimiter=","]')";
@@ -302,6 +302,17 @@ get_cluster_labels() {
       --format='value(resourceLabels)[delimiter=","]')";
   fi
   echo "${LABELS}"
+}
+
+sanitize_label() {
+  local LABEL; LABEL="${1}"
+
+  LABEL="${LABEL//_/-}"
+  LABEL="${LABEL//\./-}"
+  LABEL="${LABEL//@/-}"
+  LABEL="${LABEL//:/-}"
+
+  echo "${LABEL}"
 }
 
 generate_membership_name() {
@@ -334,6 +345,8 @@ generate_membership_name() {
 
 generate_secret_name() {
   local SECRET_NAME; SECRET_NAME="${1}"
+
+  SECRET_NAME="$(sanitize_label "${SECRET_NAME}")"
 
   if [[ "${#SECRET_NAME}" -gt "${KUBE_TAG_MAX_LEN}" ]]; then
     local DIGEST
