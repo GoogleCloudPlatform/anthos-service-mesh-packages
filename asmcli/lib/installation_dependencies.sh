@@ -259,12 +259,20 @@ get_cluster_labels() {
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
 
-  info "Reading labels for ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
   local LABELS
-  LABELS="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
-    --zone="${CLUSTER_LOCATION}" \
-    --project="${PROJECT_ID}" \
-    --format='value(resourceLabels)[delimiter=","]')";
+  if ! is_gcp; then
+    local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name)"
+    info "Reading labels for ${MEMBERSHIP_NAME}..."
+    LABELS="$(retry 2 gcloud container hub memberships describe "${MEMBERSHIP_NAME}" \
+      --project="${PROJECT_ID}" \
+      --format='value(labels)[delimiter=","]')";
+  else
+    info "Reading labels for ${CLUSTER_LOCATION}/${CLUSTER_NAME}..."
+    LABELS="$(retry 2 gcloud container clusters describe "${CLUSTER_NAME}" \
+      --zone="${CLUSTER_LOCATION}" \
+      --project="${PROJECT_ID}" \
+      --format='value(resourceLabels)[delimiter=","]')";
+  fi
   echo "${LABELS}"
 }
 
