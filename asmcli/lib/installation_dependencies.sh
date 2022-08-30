@@ -287,6 +287,9 @@ get_cluster_labels() {
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
 
+  # temp workaround for attached clusters again
+  if [[ -z "${CLUSTER_LOCATION}" ]]; then return 0; fi
+
   local LABELS
   if ! is_gcp; then
     local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name)"
