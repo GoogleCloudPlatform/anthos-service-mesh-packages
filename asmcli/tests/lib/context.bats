@@ -221,9 +221,27 @@ EOF
   context_set-option "FLEET_ID" ""
 }
 
-@test "CONTEXT: test that we properly save and recover large numbers" {
+@test "CONTEXT: test that context_set-option and context_get-option properly save and recover large numbers" {
   run context_set-option "TEST_VALUE" "1661901090017863022"
   assert_success
+  assert_equal $(context_get-option "TEST_VALUE") "1661901090017863022"
+}
 
-  assert_equal $(context_get-option "TEST_VALUE" "1661901090017863022")
+@test "CONTEXT: test that context_set-option and context_get-option properly save and recover small numbers" {
+  run context_set-option "TEST_VALUE" "123"
+  assert_success
+  assert_equal $(context_get-option "TEST_VALUE") "123"
+}
+
+@test "CONTEXT: test that context_set-option and context_get-option properly save and recover small text" {
+  run context_set-option "TEST_VALUE" "blah"
+  assert_success
+  assert_equal $(context_get-option "TEST_VALUE") "blah"
+}
+
+@test "CONTEXT: test that context_set-option and context_get-option properly save and recover long text" {
+  LONGTEXT="$(/bin/yes | tr '\n' 'y' | head -c 10000)"
+  run context_set-option "TEST_VALUE" "${LONGTEXT}"
+  assert_success
+  assert_equal $(context_get-option "TEST_VALUE") "${LONGTEXT}"
 }
