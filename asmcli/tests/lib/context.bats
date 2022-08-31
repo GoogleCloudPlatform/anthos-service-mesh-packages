@@ -240,7 +240,7 @@ EOF
 }
 
 @test "CONTEXT: test that context_set-option and context_get-option properly save and recover long text" {
-  LONGTEXT="$(/bin/yes | tr '\n' 'y' | head -c 10000)"
+  LONGTEXT="$(head -c 10000 /dev/zero | tr '\0' '\141')"
   run context_set-option "TEST_VALUE" "${LONGTEXT}"
   assert_success
   assert_equal $(context_get-option "TEST_VALUE") "${LONGTEXT}"
