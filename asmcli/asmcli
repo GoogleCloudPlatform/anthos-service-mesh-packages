@@ -3322,13 +3322,13 @@ context_set-option() {
   # Test if $VALUE is a number. If it is less than json max int,
   # let JQ cast it; otherwise, save as a string.
   if [ "${VALUE}" -lt 2147483647 ] 2>/dev/null; then
-  jq -S --arg OPTION "${OPTION}" --arg VALUE "${VALUE}" \
-    '.flags[$OPTION]=($VALUE | try tonumber catch $VALUE)' "${context_FILE_LOCATION}" >| "${TEMP_FILE}" \
-    && mv "${TEMP_FILE}" "${context_FILE_LOCATION}"
+    jq -S --arg OPTION "${OPTION}" --arg VALUE "${VALUE}" \
+      '.flags[$OPTION]=($VALUE | try tonumber catch $VALUE)' "${context_FILE_LOCATION}" >| "${TEMP_FILE}" \
+      && mv "${TEMP_FILE}" "${context_FILE_LOCATION}"
   else
     jq -S --arg OPTION "${OPTION}" --arg VALUE "${VALUE}" \
-    '.flags[$OPTION]=($VALUE)' "${context_FILE_LOCATION}" >| "${TEMP_FILE}" \
-    && mv "${TEMP_FILE}" "${context_FILE_LOCATION}"
+      '.flags[$OPTION]=($VALUE)' "${context_FILE_LOCATION}" >| "${TEMP_FILE}" \
+      && mv "${TEMP_FILE}" "${context_FILE_LOCATION}"
   fi
 }
 
