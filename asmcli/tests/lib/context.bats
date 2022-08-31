@@ -220,3 +220,10 @@ EOF
   assert_equal $(context_get-option "FLEET_ID") "${FLEET_ID}"
   context_set-option "FLEET_ID" ""
 }
+
+@test "CONTEXT: test that we properly save and recover large numbers" {
+  run context_set-option "TEST_VALUE" "1661901090017863022"
+  assert_success
+
+  assert_equal $(context_get-option "TEST_VALUE" "1661901090017863022")
+}
