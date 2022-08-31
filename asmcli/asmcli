@@ -3320,7 +3320,7 @@ context_set-option() {
   local TEMP_FILE; TEMP_FILE="$(mktemp)"
 
   jq -S --arg OPTION "${OPTION}" --arg VALUE "${VALUE}" \
-  '.flags[$OPTION]=($VALUE | try tonumber catch $VALUE)' "${context_FILE_LOCATION}" >| "${TEMP_FILE}" \
+  '.flags[$OPTION]=($VALUE)' "${context_FILE_LOCATION}" >| "${TEMP_FILE}" \
   && mv "${TEMP_FILE}" "${context_FILE_LOCATION}"
 }
 
