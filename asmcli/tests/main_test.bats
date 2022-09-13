@@ -246,6 +246,20 @@ teardown() {
   fi
 }
 
+@test "MAIN: kubeconfig path is canonicalized" {
+  context_init
+  touch temp-kc-for-test
+
+  local CMD
+  CMD="--kubeconfig temp-kc-for-test"
+
+  APATH="readlink"
+  parse_args ${CMD}
+
+  run context_get-option "KUBECONFIG"
+  assert_output "${PWD}/temp-kc-for-test"
+}
+
 @test "MAIN: --enable-all should grant all permissions" {
   context_init
 
