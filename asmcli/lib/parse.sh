@@ -20,7 +20,7 @@ parse_args() {
         ;;
       --kc | --kubeconfig)
         arg_required "${@}"
-        context_set-option "KUBECONFIG" "${2}"
+        context_set-option "KUBECONFIG" "$(apath -f "${2}")"
         context_set-option "KUBECONFIG_SUPPLIED" 1
         shift 2
         ;;
