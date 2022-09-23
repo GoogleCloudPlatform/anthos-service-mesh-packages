@@ -1,36 +1,7 @@
-validate_managed_control_plane_legacy() {
-  if can_modify_gcp_iam_roles; then
-    bind_user_to_iam_policy "roles/meshconfig.admin" "$(local_iam_user)"
-  fi
-  if can_init_meshconfig; then
-    if ! init_meshconfig_managed; then
-      fatal "Couldn't initialize meshconfig, do you have the required permission resourcemanager.projects.setIamPolicy?"
-    fi
-  fi
-}
-
-call_runIstiod() {
-  local PROJECT_ID; PROJECT_ID="${1}";
-  local CLUSTER_LOCATION; CLUSTER_LOCATION="${2}";
-  local CLUSTER_NAME; CLUSTER_NAME="${3}";
-  local POST_DATA; POST_DATA="${4}";
-
-  check_curl --request POST \
-    "https://meshconfig.googleapis.com/v1alpha1/projects/${PROJECT_ID}/locations/${CLUSTER_LOCATION}/clusters/${CLUSTER_NAME}:runIstiod" \
-    --data "${POST_DATA}" \
-    --header "X-Server-Timeout: 600" \
-    --header "Content-Type: application/json" \
-    -K <(auth_header "$(get_auth_token)")
-}
-
 install_managed_control_plane() {
   local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
   local CA; CA="$(context_get-option "CA")"
-  if is_legacy; then
-    provision_mcp_legacy
-  else
-    wait_for_cpr_crd
-  fi
+  wait_for_cpr_crd
 
   if [[ "${USE_MANAGED_CNI}" -eq 0 ]]; then
     install_managed_cni_static
@@ -45,49 +16,6 @@ install_managed_control_plane() {
   fi
 
   install_managed_startup_config
-}
-
-provision_mcp_legacy() {
-  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
-  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
-  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
-  local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
-
-  local POST_DATA; POST_DATA="{}";
-  if [[ -n "${_CI_CLOUDRUN_IMAGE_HUB}" ]]; then
-    POST_DATA="$(echo "${POST_DATA}" | jq -r --arg IMAGE "${_CI_CLOUDRUN_IMAGE_HUB}:${_CI_CLOUDRUN_IMAGE_TAG}" '. + {image: $IMAGE}')"
-  fi
-
-  if [[ "${FLEET_ID}" != "${PROJECT_ID}" ]]; then
-    POST_DATA="$(echo "${POST_DATA}" | jq -r --arg MEMBERSHIP "${HUB_IDP_URL/*projects/projects}" '. + {membership: $MEMBERSHIP}')"
-  fi
-
-  info "Provisioning control plane..."
-  retry 2 call_runIstiod "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}" "${POST_DATA}"
-
-  local MUTATING_WEBHOOK_URL
-  MUTATING_WEBHOOK_URL=$(get_managed_mutating_webhook_url)
-
-  local VALIDATION_URL
-  # shellcheck disable=SC2001
-  VALIDATION_URL="$(echo "${MUTATING_WEBHOOK_URL}" | sed 's/inject.*$/validate/g')"
-
-  local CLOUDRUN_ADDR
-  # shellcheck disable=SC2001
-  CLOUDRUN_ADDR=$(echo "${MUTATING_WEBHOOK_URL}" | cut -d'/' -f3)
-
-  kpt cfg set asm anthos.servicemesh.controlplane.validation-url "${VALIDATION_URL}"
-  kpt cfg set asm anthos.servicemesh.managed-controlplane.cloudrun-addr "${CLOUDRUN_ADDR}"
-
-  info "Configuring ASM managed control plane revision CRD..."
-  context_append "kubectlFiles" "${CRD_CONTROL_PLANE_REVISION}"
-
-  info "Configuring base installation for managed control plane..."
-  context_append "kubectlFiles" "${BASE_REL_PATH}"
-
-  info "Configuring ASM managed control plane validating webhook config..."
-  context_append "kubectlFiles" "${MANAGED_WEBHOOKS}"
 }
 
 wait_for_cpr_crd() {
@@ -131,7 +59,7 @@ install_managed_cni_static() {
 
 Nodepool Workload identity is not enabled or only partially enabled. CNI components will be installed but won't be used.
 To use CNI, please follow:
-  https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity#migrate_applications_to 
+  https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity#migrate_applications_to
 to migrate or update to a Workload Identity Enabled Node pool.
 
 EOF

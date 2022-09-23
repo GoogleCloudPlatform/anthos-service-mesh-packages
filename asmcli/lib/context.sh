@@ -44,7 +44,6 @@ context_init() {
     "ONLY_ENABLE": ${ONLY_ENABLE:-0},
     "VERBOSE": ${VERBOSE:-0},
     "MANAGED": ${MANAGED:-0},
-    "LEGACY": ${LEGACY:-0},
     "MANAGED_SERVICE_ACCOUNT": "${MANAGED_SERVICE_ACCOUNT:-}",
     "PRINT_HELP": ${PRINT_HELP:-0},
     "PRINT_VERSION": ${PRINT_VERSION:-0},
@@ -182,7 +181,6 @@ VALIDATION_ERROR
 ONLY_ENABLE
 VERBOSE
 MANAGED
-LEGACY
 PRINT_HELP
 PRINT_VERSION
 CUSTOM_CA
@@ -218,9 +216,17 @@ context_set-option() {
   local VALUE; VALUE="${2}"
   local TEMP_FILE; TEMP_FILE="$(mktemp)"
 
-  jq -S --arg OPTION "${OPTION}" --arg VALUE "${VALUE}" \
-  '.flags[$OPTION]=($VALUE | try tonumber catch $VALUE)' "${context_FILE_LOCATION}" >| "${TEMP_FILE}" \
-  && mv "${TEMP_FILE}" "${context_FILE_LOCATION}"
+  # Test if $VALUE is a number. If it is less than json max int,
+  # let JQ cast it; otherwise, save as a string.
+  if [[ "${VALUE}" =~ ^[0-9]+$ && "${VALUE}" -lt 2147483647 ]]; then
+    jq -S --arg OPTION "${OPTION}" --arg VALUE "${VALUE}" \
+      '.flags[$OPTION]=($VALUE | try tonumber catch $VALUE)' "${context_FILE_LOCATION}" >| "${TEMP_FILE}" \
+      && mv "${TEMP_FILE}" "${context_FILE_LOCATION}"
+  else
+    jq -S --arg OPTION "${OPTION}" --arg VALUE "${VALUE}" \
+      '.flags[$OPTION]=($VALUE)' "${context_FILE_LOCATION}" >| "${TEMP_FILE}" \
+      && mv "${TEMP_FILE}" "${context_FILE_LOCATION}"
+  fi
 }
 
 context_append() {

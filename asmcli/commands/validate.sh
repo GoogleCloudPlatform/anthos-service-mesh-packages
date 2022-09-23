@@ -102,13 +102,7 @@ validate_dependencies() {
 validate_control_plane() {
   if is_autopilot; then
     validate_autopilot
-  elif is_managed; then
-    if is_legacy; then
-      # Managed legacy must be able to set IAM permissions on a generated user, so the flow
-      # is a bit different
-      validate_managed_control_plane_legacy
-    fi
-  else
+  elif ! is_managed; then
     validate_in_cluster_control_plane
   fi
 }
@@ -116,9 +110,6 @@ validate_control_plane() {
 validate_autopilot() {
   if ! is_managed; then
     fatal "Autopilot clusters are only supported with managed control plane."
-  fi
-  if is_legacy; then
-    fatal "Autopilot clusters are not supported with legacy managed control plane."
   fi
   # Autopilot requires managed CNI
   local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
