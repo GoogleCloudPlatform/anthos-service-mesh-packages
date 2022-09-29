@@ -39,6 +39,8 @@ SUB_COMMAND=""
 ZERO_DOWNTIME=""
 # SUCCESS represents the state when migration is complete
 SUCCESS="SUCCESS"
+MIGRATION_CONFIG_ERROR="MIGRATION_CONFIG_ERROR"
+CUSTOM_CONFIGS_DETECTED="CUSTOM_CONFIGS_DETECTED"
 # default to regular
 REVISION="asm-managed"
 
@@ -132,6 +134,33 @@ CLEANUP_RESOURCES=(
   "Secret/istio-ca-secret/istio-system"
 )
 
+write_marker() {
+  local STATUS; STATUS="${1:-${SUCCESS}}"
+
+  heading "Current migration state: ${STATUS}"
+  cat <<EOF | kube apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: asm-addon-migration-state
+  namespace: istio-system
+data:
+  migrationStatus: ${STATUS}
+EOF
+
+  echo -e "${green}OK${clr}"
+}
+
+write_marker_on_exit() {
+  local status=$?
+  if [[ ${status} == 1 ]];then
+    write_marker "${MIGRATION_CONFIG_ERROR}"
+  fi
+  exit $status
+}
+
+trap write_marker_on_exit EXIT
+
 die() {
     echo -e "${red}$*${clr}" >&2 ; exit 1;
 }
@@ -162,7 +191,9 @@ prompt() {
 prompt_unsupported() {
   echo -e "${yellow}${1}${clr}\n${2}"
   if [[ -n "${SKIP_CONFIRM}" ]]; then
-    die "--skip-confirm set but an unsupported configuration was detected"
+    echo "--skip-confirm set but an unsupported configuration was detected"
+    write_marker "${CUSTOM_CONFIGS_DETECTED}"
+    exit 2
   fi
   read -r -p "Continue anyways? [y/N] " response
   case "$response" in
@@ -253,6 +284,11 @@ configure_mesh_ca_16() {
 
   # Update the trust domain aliases
   kube get cm istio-istio-1611 -n istio-system -o yaml | sed "s/trustDomainAliases\:.*$/trustDomainAliases\: [\"${HUB_WIP}\"]/g" | kube replace -f -
+  # reattempt replace with force flag if the first replace fails, for example gets conflict from cache.
+  # shellcheck disable=SC2181
+  if [[ $? != 0 ]]; then
+      kube get cm istio-istio-1611 -n istio-system -o yaml | sed "s/trustDomainAliases\:.*$/trustDomainAliases\: [\"${HUB_WIP}\"]/g" | kube replace --force -f -
+  fi
 
   # Patch the Istiod image to a version that has support for trust domain alias.
   # The operator probably won't actually update Istiod faster than we will manually below, but this ensures it
@@ -264,7 +300,13 @@ configure_mesh_ca_16() {
   # Next we insert the mesh ca root cert so that it is trusted
   orig="$(kube -n istio-system get secret istio-ca-secret -ojsonpath='{.data.ca-cert\.pem}' | base64 -d)"
   encoded="$(echo "${orig}" "${MESH_CA_ROOT}" | base64 -w 0)"
-  kube -n istio-system patch secret istio-ca-secret -p="{\"data\":{\"ca-cert.pem\":\"${encoded}\"}}"
+  patchfile="${TMP_DIR}/cacert.yaml"
+  cat <<EOF > "${patchfile}"
+data:
+  ca-cert.pem: ${encoded}
+EOF
+
+  kube -n istio-system patch secret istio-ca-secret --patch-file "${patchfile}"
 
   # We need to restart Istiod to pick up the new image, the TD alias, and the new root cert.
   # Patch the new image, in case operator isn't fast enough, and insert an annotation to make sure we are change something
@@ -542,23 +584,11 @@ replace_webhook() {
   prompt "Configuring sidecar injection to use Anthos Service Mesh by default..."
   kube patch mutatingwebhookconfigurations istio-sidecar-injector --type=json -p='[{"op": "replace", "path": "/webhooks"}]'
   ${ISTIOCTL_BIN} x revision tag set default --revision=${REVISION} --overwrite
-  echo -e "${green}OK${clr}"
-}
-
-write_marker() {
-  local STATUS; STATUS="${1:-${SUCCESS}}"
-
-  heading "Current migration state: ${STATUS}"
-  cat <<EOF | kube apply -f -
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: asm-addon-migration-state
-  namespace: istio-system
-data:
-  migrationStatus: ${STATUS}
-EOF
-
+  # we cannot use the tagging here because the update maybe reverted by the 1.6 operator.
+  for nsname in $(kube get namespaces -l istio.io/rev=istio-1611 -oname | cut -d/ -f2);do
+    kube label namespace "${nsname}" istio.io/rev=${REVISION} --overwrite
+    prompt "Relabelled 1.6 ${nsname} for ${REVISION}"
+  done
   echo -e "${green}OK${clr}"
 }
 
@@ -669,7 +699,7 @@ config_check_custom_gateway(){
   for depl in ${deploymentIndices}; do
     deploymentName=$(echo "${deployments}" | jq .items[$(( depl - 1 ))].metadata.name)
     if [[ "${deploymentName}" != "\"istio-ingressgateway\"" ]]; then
-      prompt_unsupported "Deployment ${deploymentName} appears to be a gateway. Please migrate this manually"
+      prompt_unsupported "Detected Custom Gateway" "Deployment ${deploymentName} appears to be a gateway. Please migrate this manually"
       heading "Deployment ${deploymentName} could be a custom gateway. Please migrate this manually"
     fi
   done
@@ -787,13 +817,7 @@ arg_required() {
   fi
 }
 
-# TODO(iamwen)
-rollback_all() {
-  heading "Start rolling back to Istio addon"
-  MG_STATE="$(kube get cm -n istio-system asm-addon-migration-state -ojsonpath='{.data.migrationStatus}' || true)"
-  if [[ -z "${MG_STATE}" ]]; then
-    die "There was no prior migration effort, skip rollback"
-  fi
+rollback_mutatingwebhook() {
   # rollback webook
   cat <<EOF | kube apply -f -
 apiVersion: admissionregistration.k8s.io/v1
@@ -832,6 +856,16 @@ webhooks:
     - pods
 EOF
   kube delete mutatingwebhookconfigurations/istio-revision-tag-default || true
+}
+
+# TODO(iamwen)
+rollback_all() {
+  heading "Start rolling back to Istio addon"
+  MG_STATE="$(kube get cm -n istio-system asm-addon-migration-state -ojsonpath='{.data.migrationStatus}' || true)"
+  if [[ -z "${MG_STATE}" ]]; then
+    die "There was no prior migration effort, skip rollback"
+  fi
+  rollback_mutatingwebhook
   rollback_mesh_ca
   rollback_gateway
   enable_galley_webhook
