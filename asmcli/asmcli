@@ -3333,40 +3333,6 @@ required_iam_roles_registration() {
   echo roles/gkehub.admin
 }
 
-old_required_apis() {
-  local CA; CA="$(context_get-option "CA")"
-    cat << EOF
-container.googleapis.com
-monitoring.googleapis.com
-logging.googleapis.com
-cloudtrace.googleapis.com
-meshconfig.googleapis.com
-iamcredentials.googleapis.com
-gkeconnect.googleapis.com
-gkehub.googleapis.com
-cloudresourcemanager.googleapis.com
-stackdriver.googleapis.com
-EOF
-   case "${CA}" in
-   mesh_ca)
-     echo meshca.googleapis.com
-     ;;
-   gcp_cas)
-     echo privateca.googleapis.com
-     ;;
-   managed_cas)
-     echo workloadcertificate.googleapis.com
-     ;;
-    *);;
-  esac
-}
-
-old_managed_required_apis() {
-    cat << EOF
-connectgateway.googleapis.com
-EOF
-}
-
 # [START required_apis]
 required_apis() {
   local CA; CA="$(context_get-option "CA")"
@@ -5316,23 +5282,10 @@ EOF
 exit_if_apis_not_enabled() {
   local ENABLED; ENABLED="$(get_enabled_apis)";
   local REQUIRED; REQUIRED="$(required_apis)";
-  local OLD_REQUIRED; OLD_REQUIRED="$(old_required_apis)";
-  if is_managed; then
-    OLD_REQUIRED="${OLD_REQUIRED} $(old_managed_required_apis)"
-  fi
   local NOTFOUND; NOTFOUND="";
-  local OLD_NOTFOUND; OLD_NOTFOUND="";
 
   info "Checking required APIs..."
   NOTFOUND="$(find_missing_strings "${REQUIRED}" "${ENABLED}")"
-  OLD_NOTFOUND="$(find_missing_strings "${OLD_REQUIRED}" "${ENABLED}")"
-
-  if [[ -z "${OLD_NOTFOUND}" ]]; then
-    if [[ -n "${NOTFOUND}" ]]; then
-      warn "mesh.googleapis.com will be required in future versions of ASM."
-    fi
-    return;
-  fi
 
   if [[ -n "${NOTFOUND}" ]]; then
     for api in $(echo "${NOTFOUND}" | tr ' ' '\n'); do
