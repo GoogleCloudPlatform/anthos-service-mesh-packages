@@ -42,30 +42,6 @@ run_command() {
   return $RETVAL
 }
 
-######
-# check_curl calls curl and returns non-zero if the http code is not 200 or the
-# curl command fails.
-######
-check_curl() {
-  local TMPFILE; TMPFILE=$(mktemp)
-
-  local HTTPCODE;
-  local RETVAL;
-  HTTPCODE=$(run_command curl --write-out '%{http_code}' --silent --show-error --output "$TMPFILE" "${@}")
-  RETVAL="$?"
-  if [[ "$RETVAL" != "0" ]] ; then
-    return "$RETVAL"
-  fi
-  if [[ "$HTTPCODE" != "200" ]] ; then
-    warn "HTTP response code: ${HTTPCODE}"
-  fi
-  cat "$TMPFILE"
-  if [[ "$HTTPCODE" != "200" ]] ; then
-    false
-    return
-  fi
-}
-
 #######
 # retry takes an integer N as the first argument, and a list of arguments
 # representing a command afterwards. It will retry the given command up to N
@@ -388,8 +364,6 @@ init() {
   KPT_URL="${KPT_URL}.git/asm@${KPT_BRANCH}"; readonly KPT_URL;
   ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
   ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
-  BASE_REL_PATH="${_CI_BASE_REL_PATH:-${ISTIO_FOLDER_NAME}/manifests/charts/base/files/gen-istio-cluster.yaml}"
-  readonly BASE_REL_PATH
   PACKAGE_DIRECTORY="asm/istio"; readonly PACKAGE_DIRECTORY;
   VALIDATION_FIX_FILE_NAME="istiod-service.yaml"; readonly VALIDATION_FIX_FILE_NAME;
   VALIDATION_FIX_SERVICE="${PACKAGE_DIRECTORY}/${VALIDATION_FIX_FILE_NAME}"; readonly VALIDATION_FIX_SERVICE;
@@ -399,7 +373,6 @@ init() {
   CITADEL_MANIFEST="${OPTIONS_DIRECTORY}/citadel-ca.yaml"; readonly CITADEL_MANIFEST;
   MANAGED_CNI="${OPTIONS_DIRECTORY}/cni-managed.yaml"; readonly MANAGED_CNI;
   MANAGED_MANIFEST="${OPTIONS_DIRECTORY}/managed-control-plane.yaml"; readonly MANAGED_MANIFEST;
-  MANAGED_WEBHOOKS="${OPTIONS_DIRECTORY}/managed-control-plane-webhooks.yaml"; readonly MANAGED_WEBHOOKS;
   EXPOSE_ISTIOD_DEFAULT_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_DEFAULT_SERVICE;
   EXPOSE_ISTIOD_REVISION_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod-rev.yaml"; readonly EXPOSE_ISTIOD_REVISION_SERVICE;
   EXPANSION_GATEWAY_FILE="${PACKAGE_DIRECTORY}/expansion/vm-eastwest-gateway.yaml"; readonly EXPANSION_GATEWAY_FILE;
@@ -407,7 +380,6 @@ init() {
   ASM_VERSION_FILE=".asm_version"; readonly ASM_VERSION_FILE;
   ASM_SETTINGS_FILE=".asm_settings"; readonly ASM_SETTINGS_FILE;
 
-  CRD_CONTROL_PLANE_REVISION="asm/control-plane-revision/crd.yaml"; readonly CRD_CONTROL_PLANE_REVISION;
   CR_CONTROL_PLANE_REVISION_REGULAR="asm/control-plane-revision/cr_regular.yaml"; readonly CR_CONTROL_PLANE_REVISION_REGULAR;
   CR_CONTROL_PLANE_REVISION_RAPID="asm/control-plane-revision/cr_rapid.yaml"; readonly CR_CONTROL_PLANE_REVISION_RAPID;
   CR_CONTROL_PLANE_REVISION_STABLE="asm/control-plane-revision/cr_stable.yaml"; readonly CR_CONTROL_PLANE_REVISION_STABLE;
@@ -717,12 +689,24 @@ get_context_cluster() {
 init_meshconfig_curl() {
   local POST_DATA; POST_DATA="${1}"
   local ID; ID="${2}"
-  run_command curl --request POST --fail \
-    --data "${POST_DATA}" -o /dev/null \
-    "https://meshconfig.googleapis.com/v1alpha1/projects/${ID}:initialize" \
-    --header "X-Server-Timeout: 600" \
-    --header "Content-Type: application/json" \
-    -K <(auth_header "$(get_auth_token)")
+  local HTTPS_PROXY
+  HTTPS_PROXY="$(context_get-option "HTTPS_PROXY")"
+
+  if [[ -n "${HTTPS_PROXY}" ]]; then
+    HTTPS_PROXY="${HTTPS_PROXY}" run_command curl --request POST --fail \
+      --data "${POST_DATA}" -o /dev/null \
+      "https://meshconfig.googleapis.com/v1alpha1/projects/${ID}:initialize" \
+      --header "X-Server-Timeout: 600" \
+      --header "Content-Type: application/json" \
+      -K <(auth_header "$(get_auth_token)")
+  else
+    run_command curl --request POST --fail \
+      --data "${POST_DATA}" -o /dev/null \
+      "https://meshconfig.googleapis.com/v1alpha1/projects/${ID}:initialize" \
+      --header "X-Server-Timeout: 600" \
+      --header "Content-Type: application/json" \
+      -K <(auth_header "$(get_auth_token)")
+  fi
 }
 
 get_gke_release_channel() {
