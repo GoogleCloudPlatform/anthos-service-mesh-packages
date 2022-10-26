@@ -33,8 +33,12 @@ install_managed_startup_config() {
   local ASM_OPTS=""
   local MCP_CONFIG
 
+  declare -A mcp_map
   for MCP_CONFIG in $(context_list "mcpOptions"); do
-    ASM_OPTS="${MCP_CONFIG};${ASM_OPTS}"
+    if [[ -z "${mcp_map[$MCP_CONFIG]}" ]]; then
+      ASM_OPTS="${MCP_CONFIG};${ASM_OPTS}"
+      mcp_map[${MCP_CONFIG}]=true
+    fi
   done
 
   cat >|mcp_configmap.yaml <<EOF
