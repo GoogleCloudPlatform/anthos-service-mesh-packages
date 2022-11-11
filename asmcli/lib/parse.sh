@@ -245,6 +245,10 @@ parse_args() {
         context_set-option "PRINT_VERSION" 1
         shift 1
         ;;
+      --disable_ui)
+        context_set-option "UI_DISABLED" 1
+        shift 1
+        ;;
       *)
         fatal_with_usage "Unknown option ${1}"
         ;;
@@ -395,6 +399,10 @@ x_parse_install_args() {
         ;;
       --version)
         context_set-option "PRINT_VERSION" 1
+        shift 1
+        ;;
+      --disable_ui)
+        context_set-option "UI_DISABLED" 1
         shift 1
         ;;
       *)

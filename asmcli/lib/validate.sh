@@ -330,7 +330,11 @@ exit_if_cluster_unlabeled() {
   local LABELS; LABELS="$(get_cluster_labels)";
   local REQUIRED; REQUIRED="$(mesh_id_label)";
   local NOTFOUND; NOTFOUND="$(find_missing_strings "${REQUIRED}" "${LABELS}")"
-
+  local UI_DISABLED; UI_DISABLED="$(context_get-option "UI_DISABLED")"
+  if [[ -n "${UI_DISABLED}" ]]; then
+    warn "UI Disabled by command line option; skipping cluster label check."
+    return
+  fi
   if [[ -n "${NOTFOUND}" ]]; then
     for label in $(echo "${NOTFOUND}" | tr ',' '\n'); do
       warn "Cluster label not found - ${label}"
