@@ -3227,7 +3227,7 @@ context_post-init() {
     fi
   done
 
-  if [[ "${FOUND}" = 1 ]]; then
+  if [[ "${FOUND}" -eq 1 ]]; then
     info "Use \`unset \$VAR\` if configuring using environment is unexpected."
     sleep 1
   fi
