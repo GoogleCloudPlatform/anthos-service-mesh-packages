@@ -246,7 +246,7 @@ parse_args() {
         shift 1
         ;;
       --disable_ui)
-        context_set-option "UI_DISABLED" 1
+        context_set-option "DISABLE_UI" 1
         shift 1
         ;;
       *)
@@ -402,7 +402,7 @@ x_parse_install_args() {
         shift 1
         ;;
       --disable_ui)
-        context_set-option "UI_DISABLED" 1
+        context_set-option "DISABLE_UI" 1
         shift 1
         ;;
       *)
