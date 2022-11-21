@@ -41,7 +41,7 @@ _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"; readonly _CI_I_AM_A_TEST_RO
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=15}"; readonly MINOR;
 POINT="${POINT:=3}"; readonly POINT;
-REV="${REV:=1}"; readonly REV;
+REV="${REV:=6}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
@@ -1274,6 +1274,8 @@ FLAGS:
   every necessary action, pass the -e|--enable_all flag. All of these flags
   are incompatible with --only_validate.
 
+     --disable_ui                     Indicates that you do not wish to use the ASM UI, disabling
+                                      some feature checks.
   -e|--enable_all                     Allow the script to perform all of the
                                       individual enable actions below. (Fleet
                                       registration won't happen unless necessary
@@ -1386,6 +1388,7 @@ OPTIONS:
   --channel              <CHANNEL>
 
 FLAGS:
+  --disable_ui
   -e|--enable_all
      --enable_cluster_roles
      --enable_cluster_labels
@@ -3111,6 +3114,7 @@ context_init() {
     "CUSTOM_OVERLAY": "${CUSTOM_OVERLAY:-}",
     "OPTIONAL_OVERLAY": "${OPTIONAL_OVERLAY:-}",
     "NETWORK_ID": "${NETWORK_ID:-}",
+    "DISABLE_UI": "${DISABLE_UI:-0}",
     "ENABLE_ALL": ${ENABLE_ALL:-0},
     "ENABLE_CLUSTER_ROLES": ${ENABLE_CLUSTER_ROLES:-0},
     "ENABLE_CLUSTER_LABELS": ${ENABLE_CLUSTER_LABELS:-0},
@@ -3193,7 +3197,8 @@ context_post-init() {
   # break.
   unset HTTPS_PROXY
 
-  local VALUE
+  local VALUE FOUND
+  FOUND=0
   # When we pull values from environment variables, we
   # should print them to make it obvious.
   for opt in $(default_empty_opts); do
@@ -3201,9 +3206,11 @@ context_post-init() {
     if [[ -n "${VALUE}" ]]; then
       # Some proxies use basic auth, don't print passwords to terminal
       if [[ "${opt}" = "HTTPS_PROXY" ]]; then
-        info "Using ${opt} (value hidden) from environment."
+        info "Using ${opt} (value hidden) from environment variable."
+        FOUND=1
       else
-        info "Using ${opt} = ${VALUE} from environment."
+        info "Using ${opt} = ${VALUE} from environment variable."
+        FOUND=1
       fi
     fi
   done
@@ -3211,16 +3218,23 @@ context_post-init() {
   for opt in $(default_zero_opts); do
     VALUE="$(context_get-option "${opt}")"
     if [[ "${VALUE}" -ne 0 ]]; then
-      info "Using ${opt} = ${VALUE} from environment."
+      info "Using ${opt} = ${VALUE} from environment variable."
+      FOUND=1
     fi
   done
 
   for opt in $(default_one_opts); do
     VALUE="$(context_get-option "${opt}")"
     if [[ "${VALUE}" -ne 1 ]]; then
-      info "Using ${opt} = ${VALUE} from environment."
+      info "Using ${opt} = ${VALUE} from environment variable."
+      FOUND=1
     fi
   done
+
+  if [[ "${FOUND}" -eq 1 ]]; then
+    info "Use \`unset \$VAR\` if configuring using environment is unexpected."
+    sleep 1
+  fi
 }
 
 default_empty_opts() {
@@ -3258,6 +3272,7 @@ EOF
 default_zero_opts() {
   cat <<EOF
 KUBECONFIG_SUPPLIED
+DISABLE_UI
 ENABLE_ALL
 ENABLE_CLUSTER_ROLES
 ENABLE_CLUSTER_LABELS
@@ -4045,6 +4060,10 @@ parse_args() {
         context_set-option "PRINT_VERSION" 1
         shift 1
         ;;
+      --disable_ui)
+        context_set-option "DISABLE_UI" 1
+        shift 1
+        ;;
       *)
         fatal_with_usage "Unknown option ${1}"
         ;;
@@ -4195,6 +4214,10 @@ x_parse_install_args() {
         ;;
       --version)
         context_set-option "PRINT_VERSION" 1
+        shift 1
+        ;;
+      --disable_ui)
+        context_set-option "DISABLE_UI" 1
         shift 1
         ;;
       *)
@@ -5397,10 +5420,15 @@ EOF
 }
 
 exit_if_cluster_unlabeled() {
+  local DISABLE_UI; DISABLE_UI="$(context_get-option "DISABLE_UI")"
+  if [[ "${DISABLE_UI}" -eq 1 ]]; then
+    info "Skipping cluster label check because UI is not enabled."
+    return
+  fi
+
   local LABELS; LABELS="$(get_cluster_labels)";
   local REQUIRED; REQUIRED="$(mesh_id_label)";
   local NOTFOUND; NOTFOUND="$(find_missing_strings "${REQUIRED}" "${LABELS}")"
-
   if [[ -n "${NOTFOUND}" ]]; then
     for label in $(echo "${NOTFOUND}" | tr ',' '\n'); do
       warn "Cluster label not found - ${label}"
