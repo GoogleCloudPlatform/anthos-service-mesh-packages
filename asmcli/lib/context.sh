@@ -15,6 +15,7 @@ context_init() {
     "CUSTOM_OVERLAY": "${CUSTOM_OVERLAY:-}",
     "OPTIONAL_OVERLAY": "${OPTIONAL_OVERLAY:-}",
     "NETWORK_ID": "${NETWORK_ID:-}",
+    "DISABLE_UI": "${DISABLE_UI:-0}",
     "ENABLE_ALL": ${ENABLE_ALL:-0},
     "ENABLE_CLUSTER_ROLES": ${ENABLE_CLUSTER_ROLES:-0},
     "ENABLE_CLUSTER_LABELS": ${ENABLE_CLUSTER_LABELS:-0},
@@ -98,29 +99,44 @@ context_post-init() {
   # break.
   unset HTTPS_PROXY
 
-  local VALUE
+  local VALUE FOUND
+  FOUND=0
   # When we pull values from environment variables, we
   # should print them to make it obvious.
   for opt in $(default_empty_opts); do
     VALUE="$(context_get-option "${opt}")"
     if [[ -n "${VALUE}" ]]; then
-      info "Using ${opt} = ${VALUE} from environment."
+      # Some proxies use basic auth, don't print passwords to terminal
+      if [[ "${opt}" = "HTTPS_PROXY" ]]; then
+        info "Using ${opt} (value hidden) from environment variable."
+        FOUND=1
+      else
+        info "Using ${opt} = ${VALUE} from environment variable."
+        FOUND=1
+      fi
     fi
   done
 
   for opt in $(default_zero_opts); do
     VALUE="$(context_get-option "${opt}")"
     if [[ "${VALUE}" -ne 0 ]]; then
-      info "Using ${opt} = ${VALUE} from environment."
+      info "Using ${opt} = ${VALUE} from environment variable."
+      FOUND=1
     fi
   done
 
   for opt in $(default_one_opts); do
     VALUE="$(context_get-option "${opt}")"
     if [[ "${VALUE}" -ne 1 ]]; then
-      info "Using ${opt} = ${VALUE} from environment."
+      info "Using ${opt} = ${VALUE} from environment variable."
+      FOUND=1
     fi
   done
+
+  if [[ "${FOUND}" -eq 1 ]]; then
+    info "Use \`unset \$VAR\` if configuring using environment is unexpected."
+    sleep 1
+  fi
 }
 
 default_empty_opts() {
@@ -158,6 +174,7 @@ EOF
 default_zero_opts() {
   cat <<EOF
 KUBECONFIG_SUPPLIED
+DISABLE_UI
 ENABLE_ALL
 ENABLE_CLUSTER_ROLES
 ENABLE_CLUSTER_LABELS
