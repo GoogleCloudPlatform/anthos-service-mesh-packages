@@ -4854,11 +4854,14 @@ get_context_cluster() {
 init_meshconfig_curl() {
   local POST_DATA; POST_DATA="${1}"
   local ID; ID="${2}"
-  local HTTPS_PROXY
-  HTTPS_PROXY="$(context_get-option "HTTPS_PROXY")"
+  local HTTPS_PROXY; HTTPS_PROXY="$(context_get-option "HTTPS_PROXY")"
+  local DRY_RUN; DRY_RUN="$(context_get-option "DRY_RUN")"
 
-  if [[ -n "${HTTPS_PROXY}" ]]; then
-    HTTPS_PROXY="${HTTPS_PROXY}" run_command curl --request POST --fail \
+  # The proxy data gets eaten by run_command but we don't want to print
+  # it anyways, so we only use the top version if we have proxy info
+  # AND it's not a dry run.
+  if [[ -n "${HTTPS_PROXY}" && "${DRY_RUN}" -eq 0 ]]; then
+    HTTPS_PROXY="${HTTPS_PROXY}" curl --request POST --fail \
       --data "${POST_DATA}" -o /dev/null \
       "https://meshconfig.googleapis.com/v1alpha1/projects/${ID}:initialize" \
       --header "X-Server-Timeout: 600" \
