@@ -156,6 +156,8 @@ FLAGS:
   every necessary action, pass the -e|--enable_all flag. All of these flags
   are incompatible with --only_validate.
 
+     --disable_ui                     Indicates that you do not wish to use the ASM UI, disabling
+                                      some feature checks.
   -e|--enable_all                     Allow the script to perform all of the
                                       individual enable actions below. (Fleet
                                       registration won't happen unless necessary
@@ -268,6 +270,7 @@ OPTIONS:
   --channel              <CHANNEL>
 
 FLAGS:
+  --disable_ui
   -e|--enable_all
      --enable_cluster_roles
      --enable_cluster_labels
