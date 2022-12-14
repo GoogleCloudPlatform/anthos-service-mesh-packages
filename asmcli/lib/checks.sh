@@ -466,12 +466,13 @@ istio_namespace_exists() {
 is_autopilot() {
   if [[ "${IS_AUTOPILOT}" -eq 1 ]]; then return; fi
 
-  local _IS_AUTOPILOT; _IS_AUTOPILOT="$(gcloud container clusters describe "${CLUSTER_NAME}" \
+  local AUTOPILOT_MODE; AUTOPILOT_MODE="$(gcloud container clusters describe "${CLUSTER_NAME}" \
     --region "${CLUSTER_LOCATION}" \
-    --project "${PROJECT_ID}" | \
+    --project "${PROJECT_ID}" \
+    --format json | \
     jq '.autopilot.enabled')"
 
-  if [[ "${_IS_AUTOPILOT}" = 'null' ]]; then
+  if [[ "${AUTOPILOT_MODE}" = 'null' ]]; then
     false
   else
     IS_AUTOPILOT=1; readonly IS_AUTOPILOT
