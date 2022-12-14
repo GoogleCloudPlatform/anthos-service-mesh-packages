@@ -2949,7 +2949,7 @@ is_autopilot() {
     --format json | \
     jq '.autopilot.enabled')"
 
-  if [[ "${AUTOPILOT_MODE}" = 'true' ]]; then
+  if [[ "${AUTOPILOT_MODE}" != 'true' ]]; then
     false
   else
     IS_AUTOPILOT=1; readonly IS_AUTOPILOT
