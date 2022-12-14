@@ -2941,12 +2941,14 @@ istio_namespace_exists() {
 }
 
 is_autopilot() {
-  # TODO: wait till https://pkg.go.dev/google.golang.org/genproto/googleapis/container/v1#Cluster  
-  # publish the `Autopilot` field
-  # This is a temporary workaround to check if a cluster is Autopilot or GKE
-  # This CRD will be installed only if the cluster is Autopilot
   if [[ "${IS_AUTOPILOT}" -eq 1 ]]; then return; fi
-  if ! retry 2 kubectl get crd allowlistedworkloads.auto.gke.io 1>/dev/null 2>/dev/null; then
+
+  local _IS_AUTOPILOT; _IS_AUTOPILOT="$(gcloud container clusters describe "${CLUSTER_NAME}" \
+    --region "${CLUSTER_LOCATION}" \
+    --project "${PROJECT_ID}" | \
+    jq '.autopilot.enabled')"
+
+  if [[ "${_IS_AUTOPILOT}" = 'null' ]]; then
     false
   else
     IS_AUTOPILOT=1; readonly IS_AUTOPILOT
