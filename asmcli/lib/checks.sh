@@ -88,6 +88,9 @@ is_managed_cas_installed() {
 }
 
 is_cluster_registered() {
+  local VERIFIED_REGISTRATION; VERIFIED_REGISTRATION="$(context_get-option "VERIFIED_REGISTRATION")"
+  if [[ "${VERIFIED_REGISTRATION}" -eq 1 ]]; then return; fi
+
   info "Verifying cluster registration."
 
   if ! is_membership_crd_installed; then
@@ -113,6 +116,9 @@ EOF
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   populate_fleet_info
+
+  local FLEET_HOST_PROJECT_NUMBER
+  FLEET_HOST_PROJECT_NUMBER="$(gcloud projects describe "${FLEET_ID}" --format "value(projectNumber)")"
   local MEMBERSHIP LOCATION WANT LIST G_DATA
   LOCATION="$(echo "${MEMBERSHIP_DATA}" \
     | jq -r .spec.owner.id \
@@ -123,9 +129,6 @@ EOF
   WANT="name.*projects/${FLEET_ID}/locations/${LOCATION}/memberships/${MEMBERSHIP}"
   G_DATA="$(gcloud container hub memberships list --project "${FLEET_ID}" --format=json)"
   LIST="$(echo "${G_DATA}" | grep "${WANT}")"
-
-  local FLEET_HOST_PROJECT_NUMBER
-  FLEET_HOST_PROJECT_NUMBER="$(gcloud projects describe "${FLEET_ID}" --format "value(projectNumber)")"
 
   if [[ "${IDENTITY_PROVIDER}" != "${FLEET_ID}" ]] && \
      [[ "${IDENTITY_PROVIDER}" != "${FLEET_HOST_PROJECT_NUMBER}" ]] || \
@@ -150,6 +153,7 @@ EOF
     context_set-option "CLUSTER_NAME" "${C_NAME}"
   fi
 
+  context_set-option "VERIFIED_REGISTRATION" 1
   info "Verified cluster is registered to ${IDENTITY_PROVIDER}"
 }
 
