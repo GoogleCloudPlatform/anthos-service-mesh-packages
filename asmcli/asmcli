@@ -103,6 +103,7 @@ main() {
   shopt -s nocasematch
 
   context_init
+  debug "Debug logging enabled."
   init
   case "${1}" in
     install)
@@ -3148,6 +3149,7 @@ context_init() {
     "ONLY_ENABLE": ${ONLY_ENABLE:-0},
     "MANAGED_CERTIFICATES": ${MANAGED_CERTIFICATES:-0},
     "VERBOSE": ${VERBOSE:-0},
+    "DEBUG": ${_DEBUG:-0},
     "MANAGED": ${MANAGED:-0},
     "MANAGED_SERVICE_ACCOUNT": "${MANAGED_SERVICE_ACCOUNT:-}",
     "PRINT_HELP": ${PRINT_HELP:-0},
@@ -3276,6 +3278,7 @@ EOF
 
 default_zero_opts() {
   cat <<EOF
+DEBUG
 KUBECONFIG_SUPPLIED
 DISABLE_UI
 ENABLE_ALL
@@ -4354,6 +4357,13 @@ warn_pause() {
 
 error() {
   info "[ERROR]: ${1}" >&2
+}
+
+debug() {
+  local DEBUG; DEBUG="$(context_get-option "DEBUG")"
+  if [[ "${DEBUG}" -eq 1 ]]; then
+    info "[DEBUG]: ${1}" >&2
+  fi
 }
 
 info() {

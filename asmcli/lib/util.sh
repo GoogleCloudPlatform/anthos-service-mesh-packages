@@ -104,6 +104,13 @@ error() {
   info "[ERROR]: ${1}" >&2
 }
 
+debug() {
+  local DEBUG; DEBUG="$(context_get-option "DEBUG")"
+  if [[ "${DEBUG}" -eq 1 ]]; then
+    info "[DEBUG]: ${1}" >&2
+  fi
+}
+
 info() {
   local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
   if hash ts 2>/dev/null && [[ "${VERBOSE}" -eq 1 ]]; then
