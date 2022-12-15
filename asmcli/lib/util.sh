@@ -49,6 +49,8 @@ run_command() {
 # re-get credentials in case something caused the k8s IP to change.
 #######
 retry() {
+  local CMD="'$*'"
+  debug "Attempting to run \`${CMD}\`."
   local MAX_TRIES; MAX_TRIES="${1}";
   shift 1
   for i in $(seq 0 "${MAX_TRIES}"); do
@@ -59,7 +61,6 @@ retry() {
     warn "Failed, retrying...($((i+1)) of ${MAX_TRIES})"
     sleep 2
   done
-  local CMD="'$*'"
   warn "Command $CMD failed."
   false
 }

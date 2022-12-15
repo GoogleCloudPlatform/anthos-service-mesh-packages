@@ -43,7 +43,7 @@ EOF
   # Test starts here
   echo "Validating the clusters are unregistered..."
   while read -r CLUSTER_NAME; do
-    configure_kubectl "${CLUSTER_NAME}" "${PROJECT_ID}" "${CLUSTER_LOCATION}"
+    configure_test_kubectl "${CLUSTER_NAME}" "${PROJECT_ID}" "${CLUSTER_LOCATION}"
     if is_cluster_registered "${CLUSTER_NAME}"; then
       echo "Cluster ${CLUSTER_NAME} is already registered before the test to ${PROJECT_ID}".
       exit 2
@@ -82,7 +82,7 @@ set_up_clusters() {
 
   local CLUSTER_NAME
   while read -r CLUSTER_NAME; do
-    configure_kubectl "${CLUSTER_NAME}" "${PROJECT_ID}" "${CLUSTER_LOCATION}"
+    configure_test_kubectl "${CLUSTER_NAME}" "${PROJECT_ID}" "${CLUSTER_LOCATION}"
 
     create_ns "${ISTIO_NAMESPACE}"
 
@@ -110,7 +110,7 @@ EOF
 clean_up_clusters() {
   local CLUSTER_NAME
   while read -r CLUSTER_NAME; do
-    configure_kubectl "${CLUSTER_NAME}" "${PROJECT_ID}" "${CLUSTER_LOCATION}"
+    configure_test_kubectl "${CLUSTER_NAME}" "${PROJECT_ID}" "${CLUSTER_LOCATION}"
     unregister_cluster_if_possible "${CLUSTER_NAME}" "${PROJECT_ID}" "${CLUSTER_LOCATION}"
     cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}"
   done <<EOF
