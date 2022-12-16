@@ -103,6 +103,7 @@ main() {
   shopt -s nocasematch
 
   context_init
+  debug "Debug logging enabled."
   init
   case "${1}" in
     install)
@@ -2565,20 +2566,28 @@ is_managed_cas_installed() {
 }
 
 is_cluster_registered() {
+  debug "is_cluster_registered()"
+  local VERIFIED_REGISTRATION; VERIFIED_REGISTRATION="$(context_get-option "VERIFIED_REGISTRATION")"
+  if [[ "${VERIFIED_REGISTRATION}" -eq 1 ]]; then return; fi
+
   info "Verifying cluster registration."
 
   if ! is_membership_crd_installed; then
+    debug "Couldn't find membership CRD."
     false
     return
   fi
 
   local MEMBERSHIP_DATA IDENTITY_PROVIDER
   MEMBERSHIP_DATA="$(retry 2 kubectl get memberships.hub.gke.io membership -ojson 2>/dev/null)"
+  debug "${MEMBERSHIP_DATA}"
 
   # expected value is the project id to which the cluster is registered
   IDENTITY_PROVIDER="$(echo "${MEMBERSHIP_DATA}" \
     | jq .spec.identity_provider \
     | sed -E 's/.*projects\/|\/locations.*//g')"
+  debug "${IDENTITY_PROVIDER}"
+
   if [[ -z "${IDENTITY_PROVIDER}" || "${IDENTITY_PROVIDER}" == 'null' ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Cluster has memberships.hub.gke.io CRD but no identity provider specified.
@@ -2590,19 +2599,23 @@ EOF
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   populate_fleet_info
+
+  local FLEET_HOST_PROJECT_NUMBER
+  FLEET_HOST_PROJECT_NUMBER="$(gcloud projects describe "${FLEET_ID}" --format "value(projectNumber)")"
   local MEMBERSHIP LOCATION WANT LIST G_DATA
   LOCATION="$(echo "${MEMBERSHIP_DATA}" \
     | jq -r .spec.owner.id \
     | sed -E 's/.*locations\/|\/memberships.*//g')"
+  debug "${LOCATION}"
   MEMBERSHIP="$(echo "${MEMBERSHIP_DATA}" \
     | jq -r .spec.owner.id \
     | sed -E 's/.*memberships\///g')"
+  debug "${MEMBERSHIP}"
   WANT="name.*projects/${FLEET_ID}/locations/${LOCATION}/memberships/${MEMBERSHIP}"
   G_DATA="$(gcloud container hub memberships list --project "${FLEET_ID}" --format=json)"
+  debug "${G_DATA}"
   LIST="$(echo "${G_DATA}" | grep "${WANT}")"
-
-  local FLEET_HOST_PROJECT_NUMBER
-  FLEET_HOST_PROJECT_NUMBER="$(gcloud projects describe "${FLEET_ID}" --format "value(projectNumber)")"
+  debug "${LIST}"
 
   if [[ "${IDENTITY_PROVIDER}" != "${FLEET_ID}" ]] && \
      [[ "${IDENTITY_PROVIDER}" != "${FLEET_HOST_PROJECT_NUMBER}" ]] || \
@@ -2627,6 +2640,7 @@ EOF
     context_set-option "CLUSTER_NAME" "${C_NAME}"
   fi
 
+  context_set-option "VERIFIED_REGISTRATION" 1
   info "Verified cluster is registered to ${IDENTITY_PROVIDER}"
 }
 
@@ -2656,20 +2670,22 @@ is_workload_identity_enabled() {
 
 is_membership_crd_installed() {
   local OUTPUT
-  if ! OUTPUT="$(retry 2 kubectl get crd memberships.hub.gke.io -ojsonpath="{..metadata.name}" 2>/dev/null)"; then
+  if ! OUTPUT="$(kubectl get crd memberships.hub.gke.io -ojsonpath="{..metadata.name}" 2>/dev/null)"; then
     false
     return
   fi
+  debug "${OUTPUT}"
 
   if [[ "$(echo "${OUTPUT}" | grep -w -c memberships || true)" -eq 0 ]]; then
     false
     return
   fi
 
-  if ! OUTPUT="$(retry 2 kubectl get memberships.hub.gke.io -ojsonpath="{..metadata.name}" 2>/dev/null)"; then
+  if ! OUTPUT="$(kubectl get memberships.hub.gke.io -ojsonpath="{..metadata.name}" 2>/dev/null)"; then
     false
     return
   fi
+  debug "${OUTPUT}"
 
   if [[ "$(echo "${OUTPUT}" | grep -w -c membership || true)" -eq 0 ]]; then
     false
@@ -3144,6 +3160,7 @@ context_init() {
     "ONLY_ENABLE": ${ONLY_ENABLE:-0},
     "MANAGED_CERTIFICATES": ${MANAGED_CERTIFICATES:-0},
     "VERBOSE": ${VERBOSE:-0},
+    "DEBUG": ${_DEBUG:-0},
     "MANAGED": ${MANAGED:-0},
     "MANAGED_SERVICE_ACCOUNT": "${MANAGED_SERVICE_ACCOUNT:-}",
     "PRINT_HELP": ${PRINT_HELP:-0},
@@ -3162,6 +3179,7 @@ context_init() {
     "INSTALL_IDENTITY_PROVIDER": ${INSTALL_IDENTITY_PROVIDER:-0},
     "EXPERIMENTAL": ${EXPERIMENTAL:-0},
     "KC_VIA_CONNECT": ${KC_VIA_CONNECT:-0},
+    "VERIFIED_REGISTRATION": 0,
     "OFFLINE": "${OFFLINE:-0}",
     "INCLUDES_PROMETHEUS": "${INCLUDES_PROMETHEUS:-0}",
     "INCLUDES_STACKDRIVER": "${INCLUDES_STACKDRIVER:-1}",
@@ -3271,6 +3289,7 @@ EOF
 
 default_zero_opts() {
   cat <<EOF
+DEBUG
 KUBECONFIG_SUPPLIED
 DISABLE_UI
 ENABLE_ALL
@@ -3643,6 +3662,8 @@ sanitize_label() {
 
 generate_membership_name() {
   local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(context_get-option "HUB_MEMBERSHIP_ID")"
+  if [[ -n "${MEMBERSHIP_NAME}" ]]; then echo "${MEMBERSHIP_NAME}"; return; fi
+  populate_fleet_info
   if [[ -n "${MEMBERSHIP_NAME}" ]]; then echo "${MEMBERSHIP_NAME}"; return; fi
 
   if is_gcp; then
@@ -4294,6 +4315,8 @@ run_command() {
 # re-get credentials in case something caused the k8s IP to change.
 #######
 retry() {
+  local CMD="'$*'"
+  debug "Attempting to run \`${CMD}\`."
   local MAX_TRIES; MAX_TRIES="${1}";
   shift 1
   for i in $(seq 0 "${MAX_TRIES}"); do
@@ -4304,7 +4327,6 @@ retry() {
     warn "Failed, retrying...($((i+1)) of ${MAX_TRIES})"
     sleep 2
   done
-  local CMD="'$*'"
   warn "Command $CMD failed."
   false
 }
@@ -4347,6 +4369,13 @@ warn_pause() {
 
 error() {
   info "[ERROR]: ${1}" >&2
+}
+
+debug() {
+  local DEBUG; DEBUG="$(context_get-option "DEBUG")"
+  if [[ "${DEBUG}" -eq 1 ]]; then
+    info "[DEBUG]: ${1}" >&2
+  fi
 }
 
 info() {

@@ -88,20 +88,28 @@ is_managed_cas_installed() {
 }
 
 is_cluster_registered() {
+  debug "is_cluster_registered()"
+  local VERIFIED_REGISTRATION; VERIFIED_REGISTRATION="$(context_get-option "VERIFIED_REGISTRATION")"
+  if [[ "${VERIFIED_REGISTRATION}" -eq 1 ]]; then return; fi
+
   info "Verifying cluster registration."
 
   if ! is_membership_crd_installed; then
+    debug "Couldn't find membership CRD."
     false
     return
   fi
 
   local MEMBERSHIP_DATA IDENTITY_PROVIDER
   MEMBERSHIP_DATA="$(retry 2 kubectl get memberships.hub.gke.io membership -ojson 2>/dev/null)"
+  debug "${MEMBERSHIP_DATA}"
 
   # expected value is the project id to which the cluster is registered
   IDENTITY_PROVIDER="$(echo "${MEMBERSHIP_DATA}" \
     | jq .spec.identity_provider \
     | sed -E 's/.*projects\/|\/locations.*//g')"
+  debug "${IDENTITY_PROVIDER}"
+
   if [[ -z "${IDENTITY_PROVIDER}" || "${IDENTITY_PROVIDER}" == 'null' ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
 Cluster has memberships.hub.gke.io CRD but no identity provider specified.
@@ -113,19 +121,23 @@ EOF
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
   populate_fleet_info
+
+  local FLEET_HOST_PROJECT_NUMBER
+  FLEET_HOST_PROJECT_NUMBER="$(gcloud projects describe "${FLEET_ID}" --format "value(projectNumber)")"
   local MEMBERSHIP LOCATION WANT LIST G_DATA
   LOCATION="$(echo "${MEMBERSHIP_DATA}" \
     | jq -r .spec.owner.id \
     | sed -E 's/.*locations\/|\/memberships.*//g')"
+  debug "${LOCATION}"
   MEMBERSHIP="$(echo "${MEMBERSHIP_DATA}" \
     | jq -r .spec.owner.id \
     | sed -E 's/.*memberships\///g')"
+  debug "${MEMBERSHIP}"
   WANT="name.*projects/${FLEET_ID}/locations/${LOCATION}/memberships/${MEMBERSHIP}"
   G_DATA="$(gcloud container hub memberships list --project "${FLEET_ID}" --format=json)"
+  debug "${G_DATA}"
   LIST="$(echo "${G_DATA}" | grep "${WANT}")"
-
-  local FLEET_HOST_PROJECT_NUMBER
-  FLEET_HOST_PROJECT_NUMBER="$(gcloud projects describe "${FLEET_ID}" --format "value(projectNumber)")"
+  debug "${LIST}"
 
   if [[ "${IDENTITY_PROVIDER}" != "${FLEET_ID}" ]] && \
      [[ "${IDENTITY_PROVIDER}" != "${FLEET_HOST_PROJECT_NUMBER}" ]] || \
@@ -150,6 +162,7 @@ EOF
     context_set-option "CLUSTER_NAME" "${C_NAME}"
   fi
 
+  context_set-option "VERIFIED_REGISTRATION" 1
   info "Verified cluster is registered to ${IDENTITY_PROVIDER}"
 }
 
@@ -179,20 +192,22 @@ is_workload_identity_enabled() {
 
 is_membership_crd_installed() {
   local OUTPUT
-  if ! OUTPUT="$(retry 2 kubectl get crd memberships.hub.gke.io -ojsonpath="{..metadata.name}" 2>/dev/null)"; then
+  if ! OUTPUT="$(kubectl get crd memberships.hub.gke.io -ojsonpath="{..metadata.name}" 2>/dev/null)"; then
     false
     return
   fi
+  debug "${OUTPUT}"
 
   if [[ "$(echo "${OUTPUT}" | grep -w -c memberships || true)" -eq 0 ]]; then
     false
     return
   fi
 
-  if ! OUTPUT="$(retry 2 kubectl get memberships.hub.gke.io -ojsonpath="{..metadata.name}" 2>/dev/null)"; then
+  if ! OUTPUT="$(kubectl get memberships.hub.gke.io -ojsonpath="{..metadata.name}" 2>/dev/null)"; then
     false
     return
   fi
+  debug "${OUTPUT}"
 
   if [[ "$(echo "${OUTPUT}" | grep -w -c membership || true)" -eq 0 ]]; then
     false

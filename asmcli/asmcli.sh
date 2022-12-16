@@ -99,6 +99,7 @@ main() {
   shopt -s nocasematch
 
   context_init
+  debug "Debug logging enabled."
   init
   case "${1}" in
     install)

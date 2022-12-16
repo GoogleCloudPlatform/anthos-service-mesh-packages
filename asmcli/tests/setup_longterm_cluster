@@ -28,7 +28,7 @@ setup_cluster() {
       -p "${LT_PROJECT_ID}" \
       -D "${OUTPUT_DIR}" > /dev/null
 
-    configure_kubectl "${cluster}" "${LT_PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
+    configure_test_kubectl "${cluster}" "${LT_PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
     kubectl delete validatingwebhookconfiguration istiod-istio-system || true
     cleanup_old_test_namespaces "${OUTPUT_DIR}"
   else
@@ -66,6 +66,7 @@ setup_cluster() {
 
   echo "Performing necessary cluster setup on ${cluster}"
 
+  _DEBUG=1 \
   _CI_I_AM_A_TEST_ROBOT=1 \
   ../asmcli \
     install \

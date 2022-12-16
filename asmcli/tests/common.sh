@@ -292,11 +292,11 @@ create_working_cluster() {
 
   KUBECONFIG="$(mktemp)"
   export KUBECONFIG
-  configure_kubectl  "${CLUSTER_NAME}" "${PROJECT_ID}" "${CLUSTER_LOCATION}"
+  configure_test_kubectl  "${CLUSTER_NAME}" "${PROJECT_ID}" "${CLUSTER_LOCATION}"
 
 }
 
-configure_kubectl() {
+configure_test_kubectl() {
   local CLUSTER_NAME; CLUSTER_NAME="${1}";
   local PROJECT_ID; PROJECT_ID="${2}";
   local CLUSTER_LOCATION; CLUSTER_LOCATION="${3}";
@@ -631,7 +631,7 @@ run_required_role() {
 
   OUTPUT_DIR="$(mktemp -d)"
 
-  configure_kubectl "${LT_CLUSTER_NAME}" "${PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
+  configure_test_kubectl "${LT_CLUSTER_NAME}" "${PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
 
   if [[ -n "${KEY_FILE}" && -n "${SERVICE_ACCOUNT}" ]]; then
     KEY_FILE="-k ${KEY_FILE}"
@@ -700,7 +700,7 @@ run_basic_test() {
   LT_NAMESPACE="$(uniq_name "${SCRIPT_NAME}" "${BUILD_ID}")"
   OUTPUT_DIR="${OUTPUT_DIR:=$(mktemp -d)}"
 
-  configure_kubectl "${LT_CLUSTER_NAME}" "${PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
+  configure_test_kubectl "${LT_CLUSTER_NAME}" "${PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
 
   trap 'remove_ns "${LT_NAMESPACE}"; rm "${LT_NAMESPACE}"; exit 1' ERR
 
