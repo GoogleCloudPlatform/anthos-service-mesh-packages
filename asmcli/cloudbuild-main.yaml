@@ -69,12 +69,11 @@ steps:
       - '-c'
       - |
         date
-        gcloud secrets versions access latest \
-        --secret="${_SECRET_NAME}" \
-        --format='get(payload.data)' \
-        --project="${PROJECT_ID}" \
-        | tr '_-' '/+' \
-        | base64 -d > "${_KEY_FILE}"
+        gcloud iam service-accounts keys create "${_KEY_FILE}" \
+        --iam-account="${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com" \
+        --project="${PROJECT_ID}"
+    env:
+      - 'USE_GKE_GCLOUD_AUTH_PLUGIN=True'
 
   - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
     dir: 'asmcli'
@@ -87,6 +86,7 @@ steps:
     env:
       - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
       - 'KEY_FILE=${_KEY_FILE}'
+      - 'USE_GKE_GCLOUD_AUTH_PLUGIN=True'
       - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
       - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
       - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
@@ -110,7 +110,6 @@ steps:
     env:
       - '_DEBUG=1'
     timeout: 10s
-
   - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
     dir: 'asmcli'
     id: 'run-print-config-test'
@@ -125,6 +124,7 @@ steps:
       - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
       - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
       - 'KEY_FILE=${_KEY_FILE}'
+      - 'USE_GKE_GCLOUD_AUTH_PLUGIN=True'
       - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
       - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
       - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
@@ -146,6 +146,7 @@ steps:
     env:
       - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
       - 'KEY_FILE=${_KEY_FILE}'
+      - 'USE_GKE_GCLOUD_AUTH_PLUGIN=True'
       - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
       - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
       - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
@@ -164,6 +165,7 @@ steps:
     env:
       - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
       - 'KEY_FILE=${_KEY_FILE}'
+      - 'USE_GKE_GCLOUD_AUTH_PLUGIN=True'
       - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
       - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
       - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
