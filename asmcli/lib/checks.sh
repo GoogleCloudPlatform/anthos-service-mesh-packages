@@ -464,6 +464,9 @@ istio_namespace_exists() {
 
 is_autopilot() {
   if [[ "${IS_AUTOPILOT}" -eq 1 ]]; then return; fi
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
 
   local AUTOPILOT_MODE; AUTOPILOT_MODE="$(gcloud container clusters describe "${CLUSTER_NAME}" \
     --region "${CLUSTER_LOCATION}" \
