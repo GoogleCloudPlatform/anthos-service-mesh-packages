@@ -4,8 +4,10 @@ FROM gcr.io/google.com/cloudsdktool/cloud-sdk:slim
 ENV SERVICE_ACCOUNT my_sa_email_goes_here
 # cloudbuild will override this variable:
 ENV KEY_FILE path_to_a_key_file_goes_here
+# cloudbuild will override this variable:
+ENV USE_GKE_GCLOUD_AUTH_PLUGIN gcloud_plugin_goes_here
 # install script dependencies
-RUN apt-get install google-cloud-sdk-kpt jq kubectl -y
+RUN apt-get install google-cloud-sdk-kpt jq kubectl google-cloud-sdk-gke-gcloud-auth-plugin -y
 # install test dependencies
 RUN apt-get install shellcheck posh bc procps openssl yamllint -y
 
