@@ -2875,12 +2875,18 @@ istio_namespace_exists() {
 }
 
 is_autopilot() {
-  # TODO: wait till https://pkg.go.dev/google.golang.org/genproto/googleapis/container/v1#Cluster  
-  # publish the `Autopilot` field
-  # This is a temporary workaround to check if a cluster is Autopilot or GKE
-  # This CRD will be installed only if the cluster is Autopilot
   if [[ "${IS_AUTOPILOT}" -eq 1 ]]; then return; fi
-  if ! retry 2 kubectl get crd allowlistedworkloads.auto.gke.io 1>/dev/null 2>/dev/null; then
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+
+  local AUTOPILOT_MODE; AUTOPILOT_MODE="$(gcloud container clusters describe "${CLUSTER_NAME}" \
+    --region "${CLUSTER_LOCATION}" \
+    --project "${PROJECT_ID}" \
+    --format json | \
+    jq '.autopilot.enabled')"
+
+  if [[ "${AUTOPILOT_MODE}" != 'true' ]]; then
     false
   else
     IS_AUTOPILOT=1; readonly IS_AUTOPILOT
@@ -4854,11 +4860,14 @@ get_context_cluster() {
 init_meshconfig_curl() {
   local POST_DATA; POST_DATA="${1}"
   local ID; ID="${2}"
-  local HTTPS_PROXY
-  HTTPS_PROXY="$(context_get-option "HTTPS_PROXY")"
+  local HTTPS_PROXY; HTTPS_PROXY="$(context_get-option "HTTPS_PROXY")"
+  local DRY_RUN; DRY_RUN="$(context_get-option "DRY_RUN")"
 
-  if [[ -n "${HTTPS_PROXY}" ]]; then
-    HTTPS_PROXY="${HTTPS_PROXY}" run_command curl --request POST --fail \
+  # The proxy data gets eaten by run_command but we don't want to print
+  # it anyways, so we only use the top version if we have proxy info
+  # AND it's not a dry run.
+  if [[ -n "${HTTPS_PROXY}" && "${DRY_RUN}" -eq 0 ]]; then
+    HTTPS_PROXY="${HTTPS_PROXY}" curl --request POST --fail \
       --data "${POST_DATA}" -o /dev/null \
       "https://meshconfig.googleapis.com/v1alpha1/projects/${ID}:initialize" \
       --header "X-Server-Timeout: 600" \
