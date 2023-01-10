@@ -69,9 +69,12 @@ steps:
       - '-c'
       - |
         date
-        gcloud iam service-accounts keys create "${_KEY_FILE}" \
-        --iam-account="${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com" \
-        --project="${PROJECT_ID}"
+        gcloud secrets versions access latest \
+        --secret="${_SECRET_NAME}" \
+        --format='get(payload.data)' \
+        --project="${PROJECT_ID}" \
+        | tr '_-' '/+' \
+        | base64 -d > "${_KEY_FILE}"
     env:
       - 'USE_GKE_GCLOUD_AUTH_PLUGIN=True'
 
