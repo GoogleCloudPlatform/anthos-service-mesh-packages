@@ -88,7 +88,7 @@ EOF
   trap "$(shopt -p nocasematch)" RETURN
   shopt -s nocasematch
   if [[ "$(uname -m)" != "x86_64" ]]; then
-    fatal "Installation is only supported on x86_64."
+    warn "Installation is only supported on x86_64."
   fi
 }
 
