@@ -206,7 +206,10 @@ download_asm() {
 
   case "$(uname)" in
     Linux ) OS="linux-amd64";;
-    Darwin) OS="osx";;
+    Darwin)
+      OS="osx"
+      if [[ "$(uname -a)" = "arm64" ]]; then OS="${OS}-arm64"; fi
+    ;;
     *     ) fatal "$(uname) is not a supported OS.";;
   esac
 
