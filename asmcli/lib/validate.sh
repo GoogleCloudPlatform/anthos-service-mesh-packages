@@ -297,7 +297,7 @@ exit_if_out_of_iam_policy() {
     done
     { read -r -d '' MSG; validation_error "${MSG}"; } <<EOF || true
 One or more IAM roles required to install ASM is missing. Please add
-${GCLOUD_MEMBER} to the roles above, or run
+$(local_iam_user) to the roles above, or run
 the script with "--enable_gcp_iam_roles" to allow the script to add
 them on your behalf.
 $(enable_common_message)
