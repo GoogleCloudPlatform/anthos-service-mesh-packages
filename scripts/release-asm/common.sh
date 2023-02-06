@@ -37,6 +37,7 @@ staging_releases() {
 staging 1.13
 staging 1.14
 staging 1.15
+staging 1.16
 EOF
 }
 
