@@ -76,7 +76,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.tag
-          value: 1.16.2-asm.1
+          value: 1.16.2-asm.2
           isSet: true
     io.k8s.cli.setters.anthos.servicemesh.managed-controlplane.vpcsc.enabled:
       type: string
