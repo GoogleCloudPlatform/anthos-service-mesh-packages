@@ -27,6 +27,7 @@ prod_releases() {
 release 1.13
 release 1.14
 release 1.15
+release 1.16
 EOF
 }
 
