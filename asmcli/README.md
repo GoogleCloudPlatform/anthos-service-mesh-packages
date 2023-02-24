@@ -60,9 +60,11 @@ This script requires access to the following tools:
 - kubectl
 - sed
 - tr
+- readlink
 
-Google Cloud Shell pre-installs these tools except `kpt`, which
-you can install by using `sudo apt-get install google-cloud-sdk-kpt`.
+Google Cloud Shell pre-installs these tools except `kpt` and `readlink` (only for BSD-style OS).
+Install `readlink` on macos by using `brew install coreutils`.
+`kpt` is installed automatically when using `asmcli` script (with a fixed version).
 
 In addition, you need a GKE Kubernetes cluster with at least 8 vCPUs that use
 machine types with at least 4 vCPUs. If you are not the Project Owner for

@@ -4588,12 +4588,7 @@ EOF
 }
 
 init() {
-  # BSD-style readlink apparently doesn't have the same -f toggle on readlink
-  case "$(uname)" in
-    Linux ) APATH="readlink";;
-    Darwin) APATH="stat";;
-    *);;
-  esac
+  APATH="readlink"
   readonly APATH
 
   local REVISION_LABEL
@@ -5161,6 +5156,7 @@ sed
 tr
 head
 csplit
+readlink
 EOF
 
   while read -r FLAG; do
