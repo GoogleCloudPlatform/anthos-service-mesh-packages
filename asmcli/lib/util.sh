@@ -378,7 +378,6 @@ init() {
   MANAGED_MANIFEST="${OPTIONS_DIRECTORY}/managed-control-plane.yaml"; readonly MANAGED_MANIFEST;
   EXPOSE_ISTIOD_DEFAULT_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_DEFAULT_SERVICE;
   EXPOSE_ISTIOD_REVISION_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod-rev.yaml"; readonly EXPOSE_ISTIOD_REVISION_SERVICE;
-  EXPANSION_GATEWAY_FILE="${PACKAGE_DIRECTORY}/expansion/vm-eastwest-gateway.yaml"; readonly EXPANSION_GATEWAY_FILE;
   CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
   ASM_VERSION_FILE=".asm_version"; readonly ASM_VERSION_FILE;
   ASM_SETTINGS_FILE=".asm_settings"; readonly ASM_SETTINGS_FILE;
