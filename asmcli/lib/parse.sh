@@ -83,10 +83,6 @@ parse_args() {
 
         OPTIONAL_OVERLAY="${2},${OPTIONAL_OVERLAY}"
         context_set-option "OPTIONAL_OVERLAY" "${OPTIONAL_OVERLAY}"
-
-        if [[ "${2}" == "vm" ]]; then
-          context_set-option "USE_VM" 1
-        fi
         shift 2
         ;;
       --co | --custom_overlay | --custom-overlay)
