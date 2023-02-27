@@ -173,9 +173,9 @@ download_kpt() {
 
   info "Downloading kpt.."
   if [[ -n "${HTTPS_PROXY}" ]]; then
-    HTTPS_PROXY="${HTTPS_PROXY}" curl -L "${KPT_TGZ}" | tar xz
+    HTTPS_PROXY="${HTTPS_PROXY}" curl -sSL "${KPT_TGZ}" | tar xz
   else
-    curl -L "${KPT_TGZ}" | tar xz
+    curl -sSL "${KPT_TGZ}" | tar xz
   fi
   AKPT="$(apath -f kpt)"
 }
@@ -214,15 +214,15 @@ download_asm() {
   local TARBALL; TARBALL="istio-${RELEASE}-${OS}.tar.gz"
   if [[ -z "${_CI_ASM_PKG_LOCATION}" ]]; then
     if [[ -n "${HTTPS_PROXY}" ]]; then
-      HTTPS_PROXY="${HTTPS_PROXY}" curl -L "https://storage.googleapis.com/gke-release/asm/${TARBALL}" \
+      HTTPS_PROXY="${HTTPS_PROXY}" curl -sSL "https://storage.googleapis.com/gke-release/asm/${TARBALL}" \
         | tar xz
     else
-      curl -L "https://storage.googleapis.com/gke-release/asm/${TARBALL}" \
+      curl -sSL "https://storage.googleapis.com/gke-release/asm/${TARBALL}" \
         | tar xz
     fi
   else
     local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
-    run_command curl -L "https://storage.googleapis.com/${_CI_ASM_PKG_LOCATION}/asm/${TARBALL}" \
+    run_command curl -sSL "https://storage.googleapis.com/${_CI_ASM_PKG_LOCATION}/asm/${TARBALL}" \
       --header @- <<EOF | tar xz
 Authorization: Bearer ${TOKEN}
 EOF
