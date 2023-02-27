@@ -35,7 +35,6 @@ validate() {
 
 validate_dependencies() {
   local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
-  local USE_VM; USE_VM="$(context_get-option "USE_VM")"
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local CA; CA="$(context_get-option "CA")"
 
@@ -74,7 +73,7 @@ validate_dependencies() {
     if [[ "${CA}" == "managed_cas" ]]; then
       x_enable_workload_certificate_on_membership "gkehub.googleapis.com" "${FLEET_ID}" "${HUB_MEMBERSHIP_ID}"
     fi
-  elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 || "${USE_VM}" -eq 1 ]]; then
+  elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 ]]; then
     exit_if_cluster_unregistered
   fi
 
