@@ -141,7 +141,8 @@ parse_args() {
         shift 1
         ;;
       --use_managed_cni | --use-managed-cni)
-        context_set-option "USE_MANAGED_CNI" 1
+        # Kept to not break customers' CI.
+        warn "The managed CNI now defaults to be on--continuing with normal installation."
         shift 1
         ;;
       --disable_canonical_service | --disable-canonical-service)
@@ -350,7 +351,8 @@ x_parse_install_args() {
         shift 1
         ;;
       --use_managed_cni | --use-managed-cni)
-        context_set-option "USE_MANAGED_CNI" 1
+        # Kept to not break customers' CI.
+        warn "The managed CNI now defaults to be on--continuing with normal installation."
         shift 1
         ;;
       --disable_canonical_service | --disable-canonical-service)
