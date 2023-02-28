@@ -2012,9 +2012,27 @@ EOF
 if node_pool_wi_enabled && [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=on"* && "${ASM_OPTS}" != *"CNI=off"* ]]; then
     context_append "mcpOptions" "CNI=on"
   else
+    ASM_OPTS=$(strip_ca_configs "${ASM_OPTS}")
     context_append "mcpOptions" "${ASM_OPTS}"
   fi
   context_append "kubectlFiles" "${MANAGED_CNI}"
+}
+
+
+strip_ca_configs() {
+  local asm_opts; asm_opts="${1}"
+  local option_count; option_count=$(echo "${asm_opts}" | tr -cd ';' | wc -c)
+  option_count=$(( option_count + 1 ))
+  local count; count=1
+  local new_asm_opts=""
+  while [ $count -le $option_count ]; do
+    config=$(echo "$asm_opts" | cut -f $count -d ";" )
+    if [[ -n $config ]] && [[ $config != *CA=* ]] && [[ $config != *CAAddr=* ]]; then
+      new_asm_opts=${config}";${new_asm_opts}"
+    fi
+    count=$(( count + 1 ))
+  done
+  echo "$new_asm_opts"
 }
 
 install_managed_privateca() {
