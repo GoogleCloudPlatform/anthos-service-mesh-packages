@@ -8,7 +8,6 @@ configure_package() {
   local CA; CA="$(context_get-option "CA")"
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
   local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
-  local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
   local USE_VPCSC; USE_VPCSC="$(context_get-option "USE_VPCSC")"
   local ASMCLI_VERSION; ASMCLI_VERSION="$(version_message)"
   local INCLUDES_STACKDRIVER; INCLUDES_STACKDRIVER="$(context_get-option "INCLUDES_STACKDRIVER")"
@@ -58,13 +57,6 @@ configure_package() {
   kpt cfg set asm anthos.servicemesh.tokenAudiences "istio-ca,${FLEET_ID}.svc.id.goog"
   if [[ "${CA}" == "mesh_ca" ]]; then
     kpt cfg set asm anthos.servicemesh.spiffeBundleEndpoints "${FLEET_ID}.svc.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json"
-  fi
-
-  if [[ "${USE_MANAGED_CNI}" -eq 1 ]]; then
-    kpt cfg set asm anthos.servicemesh.use-managed-cni "true"
-  fi
-  if ! node_pool_wi_enabled; then
-    kpt cfg set asm anthos.servicemesh.managed-cni.cni-enable-install "false"
   fi
   if [[ "${USE_VPCSC}" -eq 1 ]]; then
     kpt cfg set asm anthos.servicemesh.managed-controlplane.vpcsc.enabled "true"
