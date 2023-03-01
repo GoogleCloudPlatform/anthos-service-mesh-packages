@@ -57,7 +57,6 @@ OPTIONS_DIRECTORY=""
 OPERATOR_MANIFEST=""
 BETA_CRD_MANIFEST=""
 CITADEL_MANIFEST=""
-MANAGED_CNI=""
 MANAGED_MANIFEST=""
 EXPOSE_ISTIOD_DEFAULT_SERVICE=""
 EXPOSE_ISTIOD_REVISION_SERVICE=""
@@ -588,11 +587,7 @@ x_install() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
-  local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
 
-  if [[ "${USE_MANAGED_CNI}" -eq 0 ]]; then
-    install_mananged_cni_static
-  fi
   apply_kube_yamls
 
   # `kubectl wait` for non-existent resources will return error directly so we wait in loop
@@ -612,7 +607,6 @@ x_install() {
 }
 
 x_configure_package() {
-  local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
   local USE_VPCSC; USE_VPCSC="$(context_get-option "USE_VPCSC")"
   local ASMCLI_VERSION; ASMCLI_VERSION="$(version_message)"
   kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
@@ -621,9 +615,6 @@ x_configure_package() {
   fi
   if [[ -n "${_CI_ASM_IMAGE_TAG}" ]]; then
     kpt cfg set asm anthos.servicemesh.tag "${_CI_ASM_IMAGE_TAG}"
-  fi
-  if [[ "${USE_MANAGED_CNI}" -eq 1 ]]; then
-    kpt cfg set asm anthos.servicemesh.use-managed-cni "true"
   fi
   if [[ "${USE_VPCSC}" -eq 1 ]]; then
     kpt cfg set asm anthos.servicemesh.managed-controlplane.vpcsc.enabled "true"
@@ -914,10 +905,7 @@ FLAGS:
                                       to a fleet
      --enable_namespace_creation      Allow the script to create the istio-system
                                       namespace for the user
-     --use_managed_cni                Use managed CNI experience. Experimental install
-                                      only. If not passed, asmcli will apply the static
-                                      CNI manifests.
-
+     --use_managed_cni                Deprecated. Managed CNI now defaults to be on.
      --managed                        Provision a remote, managed control plane
                                       instead of installing one in-cluster.
      --use_vpcsc                      Provision a remote, managed control plane in
@@ -1015,7 +1003,6 @@ FLAGS:
      --enable_meshconfig_init
      --enable_registration
      --enable_namespace_creation
-     --use_managed_cni
 
      --managed
      --use_vpcsc
@@ -1506,23 +1493,32 @@ validate_dependencies() {
 validate_control_plane() {
   if is_autopilot; then
     validate_autopilot
-  elif ! is_managed; then
-    validate_in_cluster_control_plane
+    return
   fi
+  if ! is_managed; then
+    validate_in_cluster_control_plane
+    return
+  fi
+  validate_managed_cni
 }
 
 validate_autopilot() {
   if ! is_managed; then
     fatal "Autopilot clusters are only supported with managed control plane."
   fi
-  # Autopilot requires managed CNI
-  local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
-  if [[ "${USE_MANAGED_CNI}" -eq 0 ]]; then
-    warn "Managed CNI is required to continue installing managed ASM on GKE Autopilot."
-    warn "Confirm or pass --use-managed-cni flag to asmcli."
-    if ! prompt_default_no "Continue?"; then fatal "Stopping installation at user request."; fi
+}
+
+validate_managed_cni() {
+  if ! node_pool_wi_enabled; then
+  { read -r -d '' MSG; warn_pause "${MSG}"; } <<EOF || true
+
+Nodepool Workload identity is not enabled or only partially enabled. CNI components will be installed but won't be used.
+To use CNI, please follow:
+  https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity#migrate_applications_to
+to migrate or update to a Workload Identity Enabled Node pool.
+
+EOF
   fi
-  context_set-option "USE_MANAGED_CNI" 1
 }
 validate_custom_ca() {
   local CA_ROOT; CA_ROOT="$(context_get-option "CA_ROOT")"
@@ -1876,13 +1872,10 @@ init_meshconfig() {
   fi
 }
 install_managed_control_plane() {
-  local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
   local CA; CA="$(context_get-option "CA")"
   wait_for_cpr_crd
 
-  if [[ "${USE_MANAGED_CNI}" -eq 0 ]]; then
-    install_managed_cni_static
-  fi
+  append_existing_asm_opts
 
   if [[ "${CA}" = "gcp_cas" ]]; then
     install_managed_privateca
@@ -1927,31 +1920,6 @@ EOF
 
   context_append "kubectlFiles" "mcp_configmap.yaml"
 
-}
-
-install_managed_cni_static() {
-  info "Configuring CNI..."
-  if ! node_pool_wi_enabled; then
-  { read -r -d '' MSG; warn_pause "${MSG}"; } <<EOF || true
-
-Nodepool Workload identity is not enabled or only partially enabled. CNI components will be installed but won't be used.
-To use CNI, please follow:
-  https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity#migrate_applications_to
-to migrate or update to a Workload Identity Enabled Node pool.
-
-EOF
-  fi
-  local ASM_OPTS
-  ASM_OPTS="$(kubectl -n istio-system \
-    get --ignore-not-found cm asm-options \
-    -o jsonpath='{.data.ASM_OPTS}' || true)"
-
-if node_pool_wi_enabled && [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=on"* && "${ASM_OPTS}" != *"CNI=off"* ]]; then
-    context_append "mcpOptions" "CNI=on"
-  else
-    context_append "mcpOptions" "${ASM_OPTS}"
-  fi
-  context_append "kubectlFiles" "${MANAGED_CNI}"
 }
 
 install_managed_privateca() {
@@ -2003,6 +1971,14 @@ init_meshconfig_managed() {
     POST_DATA='{"workloadIdentityPools":["'${FLEET_ID}'.hub.id.goog","'${FLEET_ID}'.svc.id.goog","'${PROJECT_ID}'.svc.id.goog"], "prepare_istiod": true}'
     init_meshconfig_curl "${POST_DATA}" "${PROJECT_ID}"
   fi
+}
+
+append_existing_asm_opts() {
+  local ASM_OPTS
+  ASM_OPTS="$(kubectl -n istio-system \
+    get --ignore-not-found cm asm-options \
+    -o jsonpath='{.data.ASM_OPTS}' || true)"
+  context_append "mcpOptions" "${ASM_OPTS}"
 }
 has_value() {
   local VALUE; VALUE="$(context_get-option "${1}")"
@@ -2518,7 +2494,6 @@ configure_package() {
   local CA; CA="$(context_get-option "CA")"
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
   local HUB_IDP_URL; HUB_IDP_URL="$(context_get-option "HUB_IDP_URL")"
-  local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
   local USE_VPCSC; USE_VPCSC="$(context_get-option "USE_VPCSC")"
   local ASMCLI_VERSION; ASMCLI_VERSION="$(version_message)"
   local INCLUDES_STACKDRIVER; INCLUDES_STACKDRIVER="$(context_get-option "INCLUDES_STACKDRIVER")"
@@ -2568,13 +2543,6 @@ configure_package() {
   kpt cfg set asm anthos.servicemesh.tokenAudiences "istio-ca,${FLEET_ID}.svc.id.goog"
   if [[ "${CA}" == "mesh_ca" ]]; then
     kpt cfg set asm anthos.servicemesh.spiffeBundleEndpoints "${FLEET_ID}.svc.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json"
-  fi
-
-  if [[ "${USE_MANAGED_CNI}" -eq 1 ]]; then
-    kpt cfg set asm anthos.servicemesh.use-managed-cni "true"
-  fi
-  if ! node_pool_wi_enabled; then
-    kpt cfg set asm anthos.servicemesh.managed-cni.cni-enable-install "false"
   fi
   if [[ "${USE_VPCSC}" -eq 1 ]]; then
     kpt cfg set asm anthos.servicemesh.managed-controlplane.vpcsc.enabled "true"
@@ -2645,7 +2613,6 @@ context_init() {
     "ENABLE_REGISTRATION": ${ENABLE_REGISTRATION:-0},
     "ENABLE_NAMESPACE_CREATION": ${ENABLE_NAMESPACE_CREATION:-0},
     "ENABLE_MESHCONFIG_INIT": ${ENABLE_MESHCONFIG_INIT:-0},
-    "USE_MANAGED_CNI": ${USE_MANAGED_CNI:-0},
     "USE_VPCSC": ${USE_VPCSC:-0},
     "DISABLE_CANONICAL_SERVICE": ${DISABLE_CANONICAL_SERVICE:-0},
     "TRUST_FLEET_IDENTITY": ${TRUST_FLEET_IDENTITY:-1},
@@ -2800,7 +2767,6 @@ ENABLE_GCP_COMPONENTS
 ENABLE_REGISTRATION
 ENABLE_NAMESPACE_CREATION
 ENABLE_MESHCONFIG_INIT
-USE_MANAGED_CNI
 USE_VPCSC
 DISABLE_CANONICAL_SERVICE
 PRINT_CONFIG
@@ -3448,7 +3414,8 @@ parse_args() {
         shift 1
         ;;
       --use_managed_cni | --use-managed-cni)
-        context_set-option "USE_MANAGED_CNI" 1
+        # Kept to not break customers' CI.
+        warn "The managed CNI now defaults to be on--continuing with normal installation."
         shift 1
         ;;
       --disable_canonical_service | --disable-canonical-service)
@@ -3653,7 +3620,8 @@ x_parse_install_args() {
         shift 1
         ;;
       --use_managed_cni | --use-managed-cni)
-        context_set-option "USE_MANAGED_CNI" 1
+        # Kept to not break customers' CI.
+        warn "The managed CNI now defaults to be on--continuing with normal installation."
         shift 1
         ;;
       --disable_canonical_service | --disable-canonical-service)
@@ -4096,7 +4064,6 @@ init() {
   OPERATOR_MANIFEST="${PACKAGE_DIRECTORY}/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
   BETA_CRD_MANIFEST="${OPTIONS_DIRECTORY}/v1beta1-crds.yaml"; readonly BETA_CRD_MANIFEST;
   CITADEL_MANIFEST="${OPTIONS_DIRECTORY}/citadel-ca.yaml"; readonly CITADEL_MANIFEST;
-  MANAGED_CNI="${OPTIONS_DIRECTORY}/cni-managed.yaml"; readonly MANAGED_CNI;
   MANAGED_MANIFEST="${OPTIONS_DIRECTORY}/managed-control-plane.yaml"; readonly MANAGED_MANIFEST;
   EXPOSE_ISTIOD_DEFAULT_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_DEFAULT_SERVICE;
   EXPOSE_ISTIOD_REVISION_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod-rev.yaml"; readonly EXPOSE_ISTIOD_REVISION_SERVICE;
