@@ -173,9 +173,9 @@ download_kpt() {
 
   info "Downloading kpt.."
   if [[ -n "${HTTPS_PROXY}" ]]; then
-    HTTPS_PROXY="${HTTPS_PROXY}" curl -L "${KPT_TGZ}" | tar xz
+    HTTPS_PROXY="${HTTPS_PROXY}" curl -sSL "${KPT_TGZ}" | tar xz
   else
-    curl -L "${KPT_TGZ}" | tar xz
+    curl -sSL "${KPT_TGZ}" | tar xz
   fi
   AKPT="$(apath -f kpt)"
 }
@@ -217,15 +217,15 @@ download_asm() {
   local TARBALL; TARBALL="istio-${RELEASE}-${OS}.tar.gz"
   if [[ -z "${_CI_ASM_PKG_LOCATION}" ]]; then
     if [[ -n "${HTTPS_PROXY}" ]]; then
-      HTTPS_PROXY="${HTTPS_PROXY}" curl -L "https://storage.googleapis.com/gke-release/asm/${TARBALL}" \
+      HTTPS_PROXY="${HTTPS_PROXY}" curl -sSL "https://storage.googleapis.com/gke-release/asm/${TARBALL}" \
         | tar xz
     else
-      curl -L "https://storage.googleapis.com/gke-release/asm/${TARBALL}" \
+      curl -sSL "https://storage.googleapis.com/gke-release/asm/${TARBALL}" \
         | tar xz
     fi
   else
     local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
-    run_command curl -L "https://storage.googleapis.com/${_CI_ASM_PKG_LOCATION}/asm/${TARBALL}" \
+    run_command curl -sSL "https://storage.googleapis.com/${_CI_ASM_PKG_LOCATION}/asm/${TARBALL}" \
       --header @- <<EOF | tar xz
 Authorization: Bearer ${TOKEN}
 EOF
@@ -374,11 +374,9 @@ init() {
   OPERATOR_MANIFEST="${PACKAGE_DIRECTORY}/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
   BETA_CRD_MANIFEST="${OPTIONS_DIRECTORY}/v1beta1-crds.yaml"; readonly BETA_CRD_MANIFEST;
   CITADEL_MANIFEST="${OPTIONS_DIRECTORY}/citadel-ca.yaml"; readonly CITADEL_MANIFEST;
-  MANAGED_CNI="${OPTIONS_DIRECTORY}/cni-managed.yaml"; readonly MANAGED_CNI;
   MANAGED_MANIFEST="${OPTIONS_DIRECTORY}/managed-control-plane.yaml"; readonly MANAGED_MANIFEST;
   EXPOSE_ISTIOD_DEFAULT_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_DEFAULT_SERVICE;
   EXPOSE_ISTIOD_REVISION_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod-rev.yaml"; readonly EXPOSE_ISTIOD_REVISION_SERVICE;
-  EXPANSION_GATEWAY_FILE="${PACKAGE_DIRECTORY}/expansion/vm-eastwest-gateway.yaml"; readonly EXPANSION_GATEWAY_FILE;
   CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
   ASM_VERSION_FILE=".asm_version"; readonly ASM_VERSION_FILE;
   ASM_SETTINGS_FILE=".asm_settings"; readonly ASM_SETTINGS_FILE;
