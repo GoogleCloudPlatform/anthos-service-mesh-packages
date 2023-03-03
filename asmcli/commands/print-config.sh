@@ -12,11 +12,6 @@ print-config_subcommand() {
   ### Validate ###
   validate
 
-  local USE_VM; USE_VM="$(context_get-option "USE_VM")"
-  if [[ "${USE_VM}" -eq 1 ]]; then
-    register_gce_identity_provider
-  fi
-
   ### Configure ###
   configure_package
   post_process_istio_yamls

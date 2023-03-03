@@ -548,7 +548,6 @@ validate_args() {
   local PRINT_VERSION; PRINT_VERSION="$(context_get-option "PRINT_VERSION")"
   local CUSTOM_CA; CUSTOM_CA="$(context_get-option "CUSTOM_CA")"
   local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
-  local USE_VM; USE_VM="$(context_get-option "USE_VM")"
   local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="$(context_get-option "HUB_MEMBERSHIP_ID")"
   local CUSTOM_REVISION; CUSTOM_REVISION="$(context_get-option "CUSTOM_REVISION")"
   local WI_ENABLED; WI_ENABLED="$(context_get-option "WI_ENABLED")"

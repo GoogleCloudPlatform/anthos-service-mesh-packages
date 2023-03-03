@@ -6,16 +6,6 @@ LT_NAMESPACE=""
 OUTPUT_DIR=""
 SAMPLE_INGRESS_FILE="../../samples/gateways/istio-ingressgateway.yaml"
 
-### vm related variables
-WORKLOAD_NAME="vm"
-WORKLOAD_SERVICE_ACCOUNT=""
-INSTANCE_TEMPLATE_NAME=""
-SOURCE_INSTANCE_TEMPLATE_NAME="vm-source"
-CUSTOM_SOURCE_INSTANCE_TEMPLATE_NAME="vm-customsourcetemplate"
-CUSTOM_IMAGE_LOCATION="us-central1-c"
-CUSTOM_IMAGE_NAME="vm-customsourcetemplateimage"
-CREATE_FROM_SOURCE=0
-
 _EXTRA_FLAGS="${_EXTRA_FLAGS:=}"; export _EXTRA_FLAGS;
 
 BUILD_ID="${BUILD_ID:=}"; export BUILD_ID;
