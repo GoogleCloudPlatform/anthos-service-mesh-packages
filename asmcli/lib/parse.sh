@@ -83,10 +83,6 @@ parse_args() {
 
         OPTIONAL_OVERLAY="${2},${OPTIONAL_OVERLAY}"
         context_set-option "OPTIONAL_OVERLAY" "${OPTIONAL_OVERLAY}"
-
-        if [[ "${2}" == "vm" ]]; then
-          context_set-option "USE_VM" 1
-        fi
         shift 2
         ;;
       --co | --custom_overlay | --custom-overlay)
@@ -145,7 +141,8 @@ parse_args() {
         shift 1
         ;;
       --use_managed_cni | --use-managed-cni)
-        context_set-option "USE_MANAGED_CNI" 1
+        # Kept to not break customers' CI.
+        warn "The managed CNI now defaults to be on--continuing with normal installation."
         shift 1
         ;;
       --disable_canonical_service | --disable-canonical-service)
@@ -350,7 +347,8 @@ x_parse_install_args() {
         shift 1
         ;;
       --use_managed_cni | --use-managed-cni)
-        context_set-option "USE_MANAGED_CNI" 1
+        # Kept to not break customers' CI.
+        warn "The managed CNI now defaults to be on--continuing with normal installation."
         shift 1
         ;;
       --disable_canonical_service | --disable-canonical-service)

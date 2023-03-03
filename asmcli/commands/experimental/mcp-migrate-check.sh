@@ -46,11 +46,11 @@ x_download_istioctl_tarball() {
   info "Downloading ASM.."
   local TARBALL; TARBALL="istio-${RELEASE}-${OS}.tar.gz"
   if [[ -z "${_CI_ASM_PKG_LOCATION}" ]]; then
-    curl -L "https://storage.googleapis.com/gke-release/asm/${TARBALL}" \
+    curl -sSL "https://storage.googleapis.com/gke-release/asm/${TARBALL}" \
       | tar xz
   else
     local TOKEN; TOKEN="$(retry 2 gcloud auth print-access-token)"
-    run_command curl -L "https://storage.googleapis.com/${_CI_ASM_PKG_LOCATION}/asm/${TARBALL}" \
+    run_command curl -sSL "https://storage.googleapis.com/${_CI_ASM_PKG_LOCATION}/asm/${TARBALL}" \
       --header @- <<EOF | tar xz
 Authorization: Bearer ${TOKEN}
 EOF
