@@ -24,11 +24,6 @@ install() {
 }
 
 install_in_cluster_control_plane() {
-  if ! does_istiod_exist && [[ "${_CI_NO_REVISION}" -ne 1 ]]; then
-    info "Installing validation webhook fix..."
-    retry 3 kubectl apply --overwrite=true -f "${VALIDATION_FIX_SERVICE}"
-  fi
-
   local PARAMS; PARAMS="$(gen_install_params)"
 
   if [[ "${_CI_NO_REVISION}" -ne 1 ]]; then

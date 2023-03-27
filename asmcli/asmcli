@@ -46,13 +46,11 @@ CONFIG_VER="${CONFIG_VER:="1-unstable"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
 ### File related constants ###
-VALIDATION_FIX_FILE_NAME=""
 ASM_VERSION_FILE=""
 ASM_SETTINGS_FILE=""
 ISTIO_FOLDER_NAME=""
 ISTIOCTL_REL_PATH=""
 PACKAGE_DIRECTORY=""
-VALIDATION_FIX_SERVICE=""
 OPTIONS_DIRECTORY=""
 OPERATOR_MANIFEST=""
 BETA_CRD_MANIFEST=""
@@ -1143,11 +1141,6 @@ install() {
 }
 
 install_in_cluster_control_plane() {
-  if ! does_istiod_exist && [[ "${_CI_NO_REVISION}" -ne 1 ]]; then
-    info "Installing validation webhook fix..."
-    retry 3 kubectl apply --overwrite=true -f "${VALIDATION_FIX_SERVICE}"
-  fi
-
   local PARAMS; PARAMS="$(gen_install_params)"
 
   if [[ "${_CI_NO_REVISION}" -ne 1 ]]; then
@@ -4159,8 +4152,6 @@ init() {
   ISTIO_FOLDER_NAME="istio-${RELEASE}"; readonly ISTIO_FOLDER_NAME;
   ISTIOCTL_REL_PATH="${ISTIO_FOLDER_NAME}/bin/istioctl"; readonly ISTIOCTL_REL_PATH;
   PACKAGE_DIRECTORY="asm/istio"; readonly PACKAGE_DIRECTORY;
-  VALIDATION_FIX_FILE_NAME="istiod-service.yaml"; readonly VALIDATION_FIX_FILE_NAME;
-  VALIDATION_FIX_SERVICE="${PACKAGE_DIRECTORY}/${VALIDATION_FIX_FILE_NAME}"; readonly VALIDATION_FIX_SERVICE;
   OPTIONS_DIRECTORY="${PACKAGE_DIRECTORY}/options"; readonly OPTIONS_DIRECTORY;
   OPERATOR_MANIFEST="${PACKAGE_DIRECTORY}/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
   BETA_CRD_MANIFEST="${OPTIONS_DIRECTORY}/v1beta1-crds.yaml"; readonly BETA_CRD_MANIFEST;
