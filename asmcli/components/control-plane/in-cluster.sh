@@ -14,6 +14,8 @@ validate_in_cluster_control_plane() {
     warn "flag. Otherwise, installation will succeed but Anthos Service Mesh"
     warn_pause "will not function correctly."
   fi
+
+  if ! is_gcp; then return; fi
   if can_modify_gcp_iam_roles; then
     bind_user_to_iam_policy "$(required_iam_roles)" "$(local_iam_user)"
   elif should_validate; then
