@@ -31,7 +31,7 @@ release 1.17
 EOF
 }
 
-CURRENT_RELEASE="release-1.15"; readonly CURRENT_RELEASE
+CURRENT_RELEASE="$(prod_releases | tail -n 1)"; readonly CURRENT_RELEASE
 
 staging_releases() {
   cat << EOF
