@@ -13,8 +13,6 @@ Use features/services in beta or preview states. Can also be accessed using
 SUBCOMMANDS:
   install                             Install using a Google backend service
                                       instead of client-side tools
-  vm                                  Functions to configure a mesh to
-                                      allow external VM workloads.
   mcp-migrate-check                   Checks IstioOperator config for
                                       compatibility with a Google managed
                                       control plane and generates new config

@@ -35,7 +35,6 @@ validate() {
 
 validate_dependencies() {
   local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
-  local USE_VM; USE_VM="$(context_get-option "USE_VM")"
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local CA; CA="$(context_get-option "CA")"
 
@@ -76,7 +75,7 @@ validate_dependencies() {
       x_enable_workload_certificate_on_membership "gkehub.googleapis.com" "${FLEET_ID}" "${HUB_MEMBERSHIP_ID}"
       x_wait_for_enabling_workload_certificates "gkehub.googleapis.com" "${FLEET_ID}"
     fi
-  elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 || "${USE_VM}" -eq 1 ]]; then
+  elif should_validate && [[ "${USE_HUB_WIP}" -eq 1 ]]; then
     exit_if_cluster_unregistered
   fi
 
@@ -104,21 +103,30 @@ validate_dependencies() {
 validate_control_plane() {
   if is_autopilot; then
     validate_autopilot
-  elif ! is_managed; then
-    validate_in_cluster_control_plane
+    return
   fi
+  if ! is_managed; then
+    validate_in_cluster_control_plane
+    return
+  fi
+  validate_managed_cni
 }
 
 validate_autopilot() {
   if ! is_managed; then
     fatal "Autopilot clusters are only supported with managed control plane."
   fi
-  # Autopilot requires managed CNI
-  local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
-  if [[ "${USE_MANAGED_CNI}" -eq 0 ]]; then
-    warn "Managed CNI is required to continue installing managed ASM on GKE Autopilot."
-    warn "Confirm or pass --use-managed-cni flag to asmcli."
-    if ! prompt_default_no "Continue?"; then fatal "Stopping installation at user request."; fi
+}
+
+validate_managed_cni() {
+  if ! node_pool_wi_enabled; then
+  { read -r -d '' MSG; warn_pause "${MSG}"; } <<EOF || true
+
+Nodepool Workload identity is not enabled or only partially enabled. CNI components will be installed but won't be used.
+To use CNI, please follow:
+  https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity#migrate_applications_to
+to migrate or update to a Workload Identity Enabled Node pool.
+
+EOF
   fi
-  context_set-option "USE_MANAGED_CNI" 1
 }
