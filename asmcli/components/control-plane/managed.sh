@@ -1,11 +1,8 @@
 install_managed_control_plane() {
-  local USE_MANAGED_CNI; USE_MANAGED_CNI="$(context_get-option "USE_MANAGED_CNI")"
   local CA; CA="$(context_get-option "CA")"
   wait_for_cpr_crd
 
-  if [[ "${USE_MANAGED_CNI}" -eq 0 ]]; then
-    install_managed_cni_static
-  fi
+  append_existing_asm_opts
 
   if [[ "${CA}" = "gcp_cas" ]]; then
     install_managed_privateca
@@ -50,31 +47,6 @@ EOF
 
   context_append "kubectlFiles" "mcp_configmap.yaml"
 
-}
-
-install_managed_cni_static() {
-  info "Configuring CNI..."
-  if ! node_pool_wi_enabled; then
-  { read -r -d '' MSG; warn_pause "${MSG}"; } <<EOF || true
-
-Nodepool Workload identity is not enabled or only partially enabled. CNI components will be installed but won't be used.
-To use CNI, please follow:
-  https://cloud.google.com/kubernetes-engine/docs/how-to/workload-identity#migrate_applications_to
-to migrate or update to a Workload Identity Enabled Node pool.
-
-EOF
-  fi
-  local ASM_OPTS
-  ASM_OPTS="$(kubectl -n istio-system \
-    get --ignore-not-found cm asm-options \
-    -o jsonpath='{.data.ASM_OPTS}' || true)"
-
-if node_pool_wi_enabled && [[ -z "${ASM_OPTS}" || "${ASM_OPTS}" != *"CNI=on"* && "${ASM_OPTS}" != *"CNI=off"* ]]; then
-    context_append "mcpOptions" "CNI=on"
-  else
-    context_append "mcpOptions" "${ASM_OPTS}"
-  fi
-  context_append "kubectlFiles" "${MANAGED_CNI}"
 }
 
 install_managed_privateca() {
@@ -126,4 +98,12 @@ init_meshconfig_managed() {
     POST_DATA='{"workloadIdentityPools":["'${FLEET_ID}'.hub.id.goog","'${FLEET_ID}'.svc.id.goog","'${PROJECT_ID}'.svc.id.goog"], "prepare_istiod": true}'
     init_meshconfig_curl "${POST_DATA}" "${PROJECT_ID}"
   fi
+}
+
+append_existing_asm_opts() {
+  local ASM_OPTS
+  ASM_OPTS="$(kubectl -n istio-system \
+    get --ignore-not-found cm asm-options \
+    -o jsonpath='{.data.ASM_OPTS}' || true)"
+  context_append "mcpOptions" "${ASM_OPTS}"
 }
