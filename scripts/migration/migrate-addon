@@ -599,7 +599,7 @@ download_and_install_migration_tool () {
   if [[ ! -f "${TMP_DIR}/convert" ]]; then
     heading "Installing the authentication CR migration tool..."
     pushd "${TMP_DIR}" > /dev/null
-    curl -L -s https://github.com/istio-ecosystem/security-policy-migrate/releases/latest/download/convert.tar.gz | tar xz
+    curl -sSL https://github.com/istio-ecosystem/security-policy-migrate/releases/latest/download/convert.tar.gz | tar xz
     chmod +x convert
     popd > /dev/null
     echo -e "${green}OK${clr}"

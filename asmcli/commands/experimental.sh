@@ -5,10 +5,6 @@ experimental_subcommand() {
   fi
 
   case "${1}" in
-    vm)
-      shift 1
-      vm_subcommand "${@}"
-      ;;
     install)
       shift 1
       x_install_subcommand "${@}"
