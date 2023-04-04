@@ -563,7 +563,7 @@ download_kpt() {
   KPT_TGZ="https://github.com/GoogleContainerTools/kpt/releases/download/v0.39.3/kpt_${OS}-0.39.3.tar.gz"
 
   info "Downloading kpt.."
-  curl -L "${KPT_TGZ}" | tar xz
+  curl -sSL "${KPT_TGZ}" | tar xz
   AKPT="./kpt"
 }
 
@@ -591,7 +591,7 @@ download_asm() {
 
   info "Downloading ASM.."
   local TARBALL; TARBALL="istio-${ASM_VERSION}-${OS}.tar.gz"
-  curl -L "https://storage.googleapis.com/gke-release/asm/${TARBALL}" \
+  curl -sSL "https://storage.googleapis.com/gke-release/asm/${TARBALL}" \
     | tar xz
 
   info "Downloaded to ${ISTIO_FOLDER_NAME}"
