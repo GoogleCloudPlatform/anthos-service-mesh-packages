@@ -91,6 +91,28 @@ strip_trailing_commas() {
   echo "${1}" | sed 's/,*$//g'
 }
 
+warn() {
+  info "[WARNING]: ${1}" >&2
+}
+
+warn_pause() {
+  warn "${1}"
+  sleep 2
+}
+
+error() {
+  info "[ERROR]: ${1}" >&2
+}
+
+info() {
+  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
+  if hash ts 2>/dev/null && [[ "${VERBOSE}" -eq 1 ]]; then
+    echo "${SCRIPT_NAME}: ${1}" | TZ=utc ts '%Y-%m-%dT%.T' >&2
+  else
+    echo "${SCRIPT_NAME}: ${1}" >&2
+  fi
+}
+
 validation_error() {
   error "${1}"
   if only_validate; then
@@ -99,6 +121,17 @@ validation_error() {
   else
     exit 2
   fi
+}
+
+fatal() {
+  error "${1}"
+  exit 2
+}
+
+fatal_with_usage() {
+  error "${1}"
+  usage_short >&2
+  exit 2
 }
 
 prompt_user_for_value() {

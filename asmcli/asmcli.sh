@@ -130,6 +130,4 @@ main() {
       help_subcommand "${@}"
       ;;
   esac
-
-  cleanup
 }
