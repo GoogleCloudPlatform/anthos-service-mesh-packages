@@ -2698,6 +2698,7 @@ context_init() {
     "SERVICE_ACCOUNT": "${SERVICE_ACCOUNT:-}",
     "KEY_FILE": "${KEY_FILE:-}",
     "OUTPUT_DIR": "${OUTPUT_DIR:-}",
+    "LOG_FILE_LOCATION": "${LOG_FILE_LOCATION:-}",
     "CA_CERT": "${CA_CERT:-}",
     "CA_KEY": "${CA_KEY:-}",
     "CA_ROOT": "${CA_ROOT:-}",
@@ -2817,6 +2818,7 @@ NETWORK_ID
 SERVICE_ACCOUNT
 KEY_FILE
 OUTPUT_DIR
+LOG_FILE_LOCATION
 CA_CERT
 CA_KEY
 CA_ROOT
@@ -3373,8 +3375,6 @@ get_auth_token() {
   local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
   echo "${TOKEN}"
 }
-LOG_FILE_PATH="$(pwd)/$(uuidgen).txt"; readonly LOG_FILE_PATH;
-
 info() {
   local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
   if hash ts 2>/dev/null && [[ "${VERBOSE}" -eq 1 ]]; then
@@ -3409,8 +3409,12 @@ fatal_with_usage() {
 }
 
 echo_log() {
-  echo $@
-  echo $@ >> $LOG_FILE_PATH
+  local LOG_FILE_LOCATION; LOG_FILE_LOCATION="$(context_get-option "LOG_FILE_LOCATION")"
+
+  echo "${@}"
+  if [[ ! -z "${LOG_FILE_LOCATION}" ]]; then
+    echo "${@}" >> "${LOG_FILE_LOCATION}";
+  fi
 }
 parse_args() {
   # shellcheck disable=SC2064
@@ -4362,6 +4366,10 @@ set_up_local_workspace() {
 
   pushd "$OUTPUT_DIR" > /dev/null
   context_set-option "OUTPUT_DIR" "${OUTPUT_DIR}"
+
+  LOG_FILE_LOCATION="${OUTPUT_DIR}/logs.txt"
+  touch "${LOG_FILE_LOCATION}"
+  context_set-option "LOG_FILE_LOCATION" "${LOG_FILE_LOCATION}"
 
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
     KUBECONFIG="$(pwd)/asm_kubeconfig"

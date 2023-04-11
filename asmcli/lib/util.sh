@@ -521,6 +521,10 @@ set_up_local_workspace() {
   pushd "$OUTPUT_DIR" > /dev/null
   context_set-option "OUTPUT_DIR" "${OUTPUT_DIR}"
 
+  LOG_FILE_LOCATION="${OUTPUT_DIR}/logs.txt"
+  touch "${LOG_FILE_LOCATION}"
+  context_set-option "LOG_FILE_LOCATION" "${LOG_FILE_LOCATION}"
+
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
     KUBECONFIG="$(pwd)/asm_kubeconfig"
     context_set-option "KUBECONFIG" "${KUBECONFIG}"

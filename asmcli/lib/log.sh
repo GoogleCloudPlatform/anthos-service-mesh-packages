@@ -1,5 +1,3 @@
-LOG_FILE_PATH="$(pwd)/$(uuidgen).txt"; readonly LOG_FILE_PATH;
-
 info() {
   local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
   if hash ts 2>/dev/null && [[ "${VERBOSE}" -eq 1 ]]; then
@@ -34,6 +32,10 @@ fatal_with_usage() {
 }
 
 echo_log() {
-  echo $@
-  echo $@ >> $LOG_FILE_PATH
+  local LOG_FILE_LOCATION; LOG_FILE_LOCATION="$(context_get-option "LOG_FILE_LOCATION")"
+
+  echo "${@}"
+  if [[ ! -z "${LOG_FILE_LOCATION}" ]]; then
+    echo "${@}" >> "${LOG_FILE_LOCATION}";
+  fi
 }
