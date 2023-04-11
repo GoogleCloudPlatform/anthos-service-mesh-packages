@@ -96,7 +96,6 @@ main() {
 
   # shellcheck disable=SC2064
   trap "$(shopt -p nocasematch)" RETURN
-  trap cleanup EXIT
   shopt -s nocasematch
 
   context_init
@@ -2544,22 +2543,6 @@ node_pool_wi_enabled(){
     fi
   done
   NODE_POOL_WI_ENABLED=1; readonly NODE_POOL_WI_ENABLED
-}
-cleanup() {
-  relocate_log_file
-}
-
-relocate_log_file() {
-    local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
-    local NEW_LOG_FILE_PATH; NEW_LOG_FILE_PATH="${OUTPUT_DIR}/logs.txt"
-
-    if [[ ! -f $LOG_FILE_PATH ]]
-    then
-        return 0
-    fi
-
-    # Relocate the log file to the working directory.
-    mv $LOG_FILE_PATH $NEW_LOG_FILE_PATH
 }
 configure_package() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"

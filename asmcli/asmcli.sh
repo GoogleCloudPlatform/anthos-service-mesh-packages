@@ -92,7 +92,6 @@ main() {
 
   # shellcheck disable=SC2064
   trap "$(shopt -p nocasematch)" RETURN
-  trap cleanup EXIT
   shopt -s nocasematch
 
   context_init
