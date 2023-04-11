@@ -3395,7 +3395,7 @@ echo_log() {
   local LOG_FILE_LOCATION; LOG_FILE_LOCATION="$(context_get-option "LOG_FILE_LOCATION")"
 
   echo "${@}"
-  if [[ ! -z "${LOG_FILE_LOCATION}" ]]; then
+  if [[ -n "${LOG_FILE_LOCATION}" ]]; then
     echo "${@}" >> "${LOG_FILE_LOCATION}";
   fi
 }
