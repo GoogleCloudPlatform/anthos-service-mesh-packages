@@ -130,3 +130,17 @@ EOF
     exit 1
   fi
 }
+
+@test "UTIL: LOG_FILE_LOCATION is required to write log file" {
+  run echo_log "Hello"
+
+  local LOG_FILE_LOCATION; LOG_FILE_LOCATION="$(pwd)/logs.txt"
+  run context_set-option "LOG_FILE_LOCATION" "${LOG_FILE_LOCATION}"
+  touch "${LOG_FILE_LOCATION}"
+  
+  run echo_log "World"
+  cat "${LOG_FILE_LOCATION}"
+  assert_output "World"
+  
+  rm "${LOG_FILE_LOCATION}"
+}
