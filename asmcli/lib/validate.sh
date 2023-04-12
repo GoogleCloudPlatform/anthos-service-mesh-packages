@@ -554,7 +554,7 @@ validate_args() {
   local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
   local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
-  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+  local WORKING_DIR; WORKING_DIR="$(context_get-option "WORKING_DIR")"
 
   if [[ -z "${CA}" ]]; then
     if [[ "${MANAGED_CERTIFICATES}" -eq 1 ]]; then
@@ -692,7 +692,7 @@ EOF
     validate_custom_ca
   fi
 
-  if is_offline && [[ -z "${OUTPUT_DIR}" ]]; then
+  if is_offline && [[ -z "${WORKING_DIR}" ]]; then
       MISSING_ARGS=1
       warn "Output directory must be specified in offline mode."
   fi

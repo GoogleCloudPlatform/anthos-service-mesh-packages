@@ -155,8 +155,8 @@ retry() {
 }
 
 download_istioctl_tarball() {
-  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
-  pushd ${OUTPUT_DIR}
+  local WORKING_DIR; WORKING_DIR="$(context_get-option "WORKING_DIR")"
+  pushd ${WORKING_DIR}
 
   case "$(uname)" in
     Linux ) OS="linux-amd64";;
@@ -204,29 +204,29 @@ istioctl_path() {
 
 
 set_up_local_workspace() {
-  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+  local WORKING_DIR; WORKING_DIR="$(context_get-option "WORKING_DIR")"
 
-  if [[ -z "${OUTPUT_DIR}" ]]; then
+  if [[ -z "${WORKING_DIR}" ]]; then
     info "Setting up necessary working directory ......"
-    OUTPUT_DIR="$(mktemp -d)"
-    if [[ -z "${OUTPUT_DIR}" ]]; then
+    WORKING_DIR="$(mktemp -d)"
+    if [[ -z "${WORKING_DIR}" ]]; then
       fatal "Encountered error when running mktemp -d!"
     fi
 
     info ""
     info "$(starline)"
-    info "No output folder was specified with --output_dir|-D, so configuration and"
+    info "No working folder was specified with --working_dir|-D, so configuration and"
     info "binaries will be stored in the following directory."
-    info "${OUTPUT_DIR}"
+    info "${WORKING_DIR}"
     info "$(starline)"
     info ""
     sleep 2
 
-    context_set-option "OUTPUT_DIR" "${OUTPUT_DIR}"
-    if [[ ! -f "${OUTPUT_DIR}/${context_FILE_LOCATION}" ]]; then
-      mv ${context_FILE_LOCATION} ${OUTPUT_DIR} &> /dev/null
+    context_set-option "WORKING_DIR" "${WORKING_DIR}"
+    if [[ ! -f "${WORKING_DIR}/${context_FILE_LOCATION}" ]]; then
+      mv ${context_FILE_LOCATION} ${WORKING_DIR} &> /dev/null
     fi
-    context_FILE_LOCATION="${OUTPUT_DIR}/${context_FILE_LOCATION}"; readonly context_FILE_LOCATION
+    context_FILE_LOCATION="${WORKING_DIR}/${context_FILE_LOCATION}"; readonly context_FILE_LOCATION
   fi
 }
 
@@ -237,7 +237,7 @@ context_init() {
   "flags": {
     "KUBECONFIG": "${KUBECONFIG:-}",
     "CONTEXT": "${CONTEXT:-}",
-    "OUTPUT_DIR": "${OUTPUT_DIR:-}",
+    "WORKING_DIR": "${WORKING_DIR:-}",
     "CA": "${CA:-}",
     "CA_OLD": "${CA_OLD:-}",
     "CA_NAME": "${CA_NAME:-}",
@@ -333,7 +333,7 @@ EOF
 
 parse_args() {
 
-  local OUTPUT_DIR
+  local WORKING_DIR
   declare -A argMap
   
   while [[ $# != 0 ]]; do
@@ -394,15 +394,15 @@ parse_args() {
         argMap["FORCE"]="true"
         shift 1
         ;;
-      -D | --output_dir | --output-dir)
+      -D | --working_dir | --working-dir)
         arg_required "${@}"
-        OUTPUT_DIR="$(apath -f "${2}")"
-        if [[ ! -a "${OUTPUT_DIR}" ]]; then
-          fatal "directory ${OUTPUT_DIR} does not exist"
-        elif [[ ! -d "${OUTPUT_DIR}" ]]; then
-          fatal "${OUTPUT_DIR} exists and is not a directory, please specify another directory."
+        WORKING_DIR="$(apath -f "${2}")"
+        if [[ ! -a "${WORKING_DIR}" ]]; then
+          fatal "directory ${WORKING_DIR} does not exist"
+        elif [[ ! -d "${WORKING_DIR}" ]]; then
+          fatal "${WORKING_DIR} exists and is not a directory, please specify another directory."
         fi
-        argMap["OUTPUT_DIR"]="${OUTPUT_DIR}"
+        argMap["WORKING_DIR"]="${WORKING_DIR}"
         shift 2
         ;;
       *)
@@ -411,11 +411,11 @@ parse_args() {
     esac
   done
 
-  if [[ -n "${OUTPUT_DIR}" ]]; then
-    if [[ ! -f "${OUTPUT_DIR}/${context_FILE_LOCATION}" ]]; then
-      mv ${context_FILE_LOCATION} ${OUTPUT_DIR} &> /dev/null
+  if [[ -n "${WORKING_DIR}" ]]; then
+    if [[ ! -f "${WORKING_DIR}/${context_FILE_LOCATION}" ]]; then
+      mv ${context_FILE_LOCATION} ${WORKING_DIR} &> /dev/null
     fi
-    context_FILE_LOCATION="${OUTPUT_DIR}/${context_FILE_LOCATION}"
+    context_FILE_LOCATION="${WORKING_DIR}/${context_FILE_LOCATION}"
   fi
 
   for argName in ${!argMap[@]}; do
@@ -569,7 +569,7 @@ initialize_subcommand() {
     citadel) initialize_istiod_ca;;
   esac
    # infer_older_ca_proxyconfig
-   # working directory should be OUTPUT_DIR before this command
+   # working directory should be WORKING_DIR before this command
    update_migration_cm "INITIALIZE"
 }
 
@@ -596,10 +596,10 @@ add-trust-anchor_subcommand() {
 
 backup_resources() {
   local REV_NAME; REV_NAME="$(get_cm)"
-  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+  local WORKING_DIR; WORKING_DIR="$(context_get-option "WORKING_DIR")"
 
-  rm ${OUTPUT_DIR}/"backup-${REV_NAME}" &> /dev/null || true
-  kube get cm/${REV_NAME} -n istio-system -oyaml > ${OUTPUT_DIR}/"backup-${REV_NAME}"
+  rm ${WORKING_DIR}/"backup-${REV_NAME}" &> /dev/null || true
+  kube get cm/${REV_NAME} -n istio-system -oyaml > ${WORKING_DIR}/"backup-${REV_NAME}"
 }
 
 add_trust_anchor() {
@@ -708,7 +708,7 @@ check_cert_in_pod() {
   local TARGET; TARGET="$3"
   local CA_CERT; CA_CERT="$4"
   local ERR; ERR=0
-  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+  local WORKING_DIR; WORKING_DIR="$(context_get-option "WORKING_DIR")"
 
   if [ "$TARGET" = "ROOTCA" ]; then
     # Example format:
@@ -733,7 +733,7 @@ check_cert_in_pod() {
   elif [ "$TARGET" = "default" ]; then
     local OUTPUT
     local CERT_CHAIN
-    local ROOT_CERT_FILE; ROOT_CERT_FILE="${OUTPUT_DIR}/${POD}-${NS}-${TARGET}.pem"
+    local ROOT_CERT_FILE; ROOT_CERT_FILE="${WORKING_DIR}/${POD}-${NS}-${TARGET}.pem"
 
     OUTPUT=$(istioctl pc secret "${POD}" -n "${NS}" -o json)
     if [ "$(echo "${OUTPUT}" | jq '.dynamicActiveSecrets[0].name')" = "\"default\"" ]; then
@@ -909,7 +909,7 @@ OPTIONS:
   --ca_pool_old|--ca-pool-old <CA_OLD_NAME>     Required only if --ca_old option is gcp_cas.
                                                 Similar to --ca_name
   --ca_cert              <CA CERT FILE>         Absolute to CA cert file of newer CA
-  -D|--output_dir        <DIR PATH>             The directory where script will
+  -D|--working_dir        <DIR PATH>             The directory where script will
                                                 download and backup all migration artifacts
   --revision             <FILE NAME>            ASM revision/channel where CA migration is being performed
   --namespaces           <Namespaces>           Comma seperated list of namespaces where ASM workloads are deployed

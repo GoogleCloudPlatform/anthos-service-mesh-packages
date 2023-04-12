@@ -16,13 +16,13 @@ main() {
   parse_args "$@"
   local REVISION_LABEL; REVISION_LABEL="$(uniq_name "${SCRIPT_NAME}" "${BUILD_ID}")"
 
-  export OUTPUT_DIR="$(mktemp -d)"
+  export WORKING_DIR="$(mktemp -d)"
 
-  run_build_offline_package "${OUTPUT_DIR}"
+  run_build_offline_package "${WORKING_DIR}"
 
   # Perform an offline install
   run_basic_test "install" "mesh_ca" "--revision_name ${REVISION_LABEL} --offline"; RETVAL=$?;
-  cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"
+  cleanup_lt_cluster "${LT_NAMESPACE}" "${WORKING_DIR}" "${REV}"
 
   exit "${RETVAL}"
 }

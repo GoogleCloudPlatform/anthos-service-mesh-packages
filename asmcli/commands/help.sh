@@ -95,7 +95,7 @@ OPTIONS:
   -k|--key_file          <FILE PATH>  The key file for a service account. This
                                       option can be omitted if not using a
                                       service account.
-  -D|--output_dir        <DIR PATH>   The directory where this script will place
+  -D|--working_dir       <DIR PATH>   The directory where this script will place
                                       downloaded ASM packages and configuration.
                                       If not specified, a temporary directory
                                       will be created. If specified and the
@@ -186,7 +186,7 @@ FLAGS:
      --use_vpcsc                      Provision a remote, managed control plane in
                                       VPCSC environment.
      --offline                        Perform an offline installation using the pre-downloaded
-                                      package in the output directory. If the directory is not
+                                      package in the working directory. If the directory is not
                                       specified or does not contain the required files, the
                                       script will exit with error.
      --print_config                   Instead of installing ASM, print all of
@@ -257,7 +257,7 @@ OPTIONS:
   -o|--option            <FILE NAME>
   -s|--service_account   <ACCOUNT>
   -k|--key_file          <FILE PATH>
-  -D|--output_dir        <DIR PATH>
+  -D|--working_dir       <DIR PATH>
   --co|--custom_overlay  <FILE NAME>
 
   --ca_cert              <FILE PATH>
@@ -319,7 +319,7 @@ specified by FLEET_ID.
 
 FLAGS:
   All flags must come AFTER the FLEET_ID.
-  -D|--output_dir        <DIR PATH>   The directory where this script will place
+  -D|--working_dir        <DIR PATH>  The directory where this script will place
                                       downloaded ASM packages and configuration.
                                       If not specified, a temporary directory
                                       will be created. If specified and the
@@ -354,7 +354,7 @@ Create a multi-cluster service mesh and allow cross-cluster service discovery.
 Use -h|--help with -v|--verbose to show detailed descriptions.
 
 FLAGS:
-  -D|--output_dir <DIR PATH>
+  -D|--working_dir <DIR PATH>
   -v|--verbose
   -h|--help
   --version
@@ -367,10 +367,10 @@ build-offline-package_usage(){
 ${SCRIPT_NAME} $(version_message)
 usage: ${SCRIPT_NAME} build-offline-package [FLAGS]...
 
-Download ASM and KPT packages to the specified output directory or a temporary directory.
+Download ASM and KPT packages to the specified working directory or a temporary directory.
 
 FLAGS:
-  -D|--output_dir        <DIR PATH>   The directory where this script will place
+  -D|--working_dir        <DIR PATH>  The directory where this script will place
                                       downloaded ASM packages and configuration.
                                       If not specified, a temporary directory
                                       will be created. If specified and the
@@ -389,10 +389,10 @@ build-offline-package_usage_short(){
 ${SCRIPT_NAME} $(version_message)
 usage: ${SCRIPT_NAME} build-offline-package [FLAGS]...
 
-Download ASM and KPT packages to the specified output directory or a temporary directory.
+Download ASM and KPT packages to the specified working directory or a temporary directory.
 
 FLAGS:
-  -D|--output_dir <DIR PATH>
+  -D|--working_dir <DIR PATH>
   -v|--verbose
   -h|--help
   --version

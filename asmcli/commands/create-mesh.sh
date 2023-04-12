@@ -43,9 +43,9 @@ create-mesh_parse_args() {
 
   while [[ $# != 0 ]]; do
     case "${1}" in
-      -D | --output_dir | --output-dir)
+      -D | --working_dir | --working-dir)
         arg_required "${@}"
-        context_set-option "OUTPUT_DIR" "${2}"
+        context_set-option "WORKING_DIR" "${2}"
         shift 2
         ;;
       -v | --verbose)

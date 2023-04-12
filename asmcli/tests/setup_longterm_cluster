@@ -17,7 +17,7 @@ setup_cluster() {
     --filter="name = ${cluster} and location = ${LT_CLUSTER_LOCATION}" \
     --format="value(name)" || true)"
 
-  OUTPUT_DIR=$(mktemp -d)
+  WORKING_DIR=$(mktemp -d)
   if [[ -n "${RESULT}" ]]; then
     echo "Long term test cluster ${cluster} exists already."
 
@@ -26,11 +26,11 @@ setup_cluster() {
       -l "${LT_CLUSTER_LOCATION}" \
       -n "${cluster}" \
       -p "${LT_PROJECT_ID}" \
-      -D "${OUTPUT_DIR}" > /dev/null
+      -D "${WORKING_DIR}" > /dev/null
 
     configure_kubectl "${cluster}" "${LT_PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
     kubectl delete validatingwebhookconfiguration istiod-istio-system || true
-    cleanup_old_test_namespaces "${OUTPUT_DIR}"
+    cleanup_old_test_namespaces "${WORKING_DIR}"
   else
     echo "Creating long term test cluster ${cluster}"
     gcloud beta container \

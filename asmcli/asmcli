@@ -162,9 +162,9 @@ build-offline-package() {
 build-offline-package_parse_args() {
   while [[ $# != 0 ]]; do
     case "${1}" in
-      -D | --output_dir | --output-dir)
+      -D | --working_dir | --working-dir)
         arg_required "${@}"
-        context_set-option "OUTPUT_DIR" "${2}"
+        context_set-option "WORKING_DIR" "${2}"
         shift 2
         ;;
       -v | --verbose)
@@ -198,7 +198,7 @@ build-offline-package_parse_args() {
 }
 
 build-offline-package_outro() {
-  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+  local WORKING_DIR; WORKING_DIR="$(context_get-option "WORKING_DIR")"
 
   info ""
   info "$(starline)"
@@ -207,16 +207,16 @@ build-offline-package_outro() {
   info "The offline package download is now complete."
 
   info "The ASM package used for installation can be found at:"
-  info "${OUTPUT_DIR}/asm"
+  info "${WORKING_DIR}/asm"
   info "The version of istioctl that matches the installation can be found at:"
-  info "${OUTPUT_DIR}/${ISTIOCTL_REL_PATH}"
+  info "${WORKING_DIR}/${ISTIOCTL_REL_PATH}"
   info "A symlink to the istioctl binary can be found at:"
-  info "${OUTPUT_DIR}/istioctl"
+  info "${WORKING_DIR}/istioctl"
   if ! is_managed; then
     info "The combined configuration generated for installation can be found at:"
-    info "${OUTPUT_DIR}/${RAW_YAML}"
+    info "${WORKING_DIR}/${RAW_YAML}"
     info "The full, expanded set of kubernetes resources can be found at:"
-    info "${OUTPUT_DIR}/${EXPANDED_YAML}"
+    info "${WORKING_DIR}/${EXPANDED_YAML}"
   fi
 
   info "$(starline)"
@@ -266,9 +266,9 @@ create-mesh_parse_args() {
 
   while [[ $# != 0 ]]; do
     case "${1}" in
-      -D | --output_dir | --output-dir)
+      -D | --working_dir | --working-dir)
         arg_required "${@}"
-        context_set-option "OUTPUT_DIR" "${2}"
+        context_set-option "WORKING_DIR" "${2}"
         shift 2
         ;;
       -v | --verbose)
@@ -812,7 +812,7 @@ OPTIONS:
   -k|--key_file          <FILE PATH>  The key file for a service account. This
                                       option can be omitted if not using a
                                       service account.
-  -D|--output_dir        <DIR PATH>   The directory where this script will place
+  -D|--working_dir       <DIR PATH>   The directory where this script will place
                                       downloaded ASM packages and configuration.
                                       If not specified, a temporary directory
                                       will be created. If specified and the
@@ -903,7 +903,7 @@ FLAGS:
      --use_vpcsc                      Provision a remote, managed control plane in
                                       VPCSC environment.
      --offline                        Perform an offline installation using the pre-downloaded
-                                      package in the output directory. If the directory is not
+                                      package in the working directory. If the directory is not
                                       specified or does not contain the required files, the
                                       script will exit with error.
      --print_config                   Instead of installing ASM, print all of
@@ -974,7 +974,7 @@ OPTIONS:
   -o|--option            <FILE NAME>
   -s|--service_account   <ACCOUNT>
   -k|--key_file          <FILE PATH>
-  -D|--output_dir        <DIR PATH>
+  -D|--working_dir       <DIR PATH>
   --co|--custom_overlay  <FILE NAME>
 
   --ca_cert              <FILE PATH>
@@ -1036,7 +1036,7 @@ specified by FLEET_ID.
 
 FLAGS:
   All flags must come AFTER the FLEET_ID.
-  -D|--output_dir        <DIR PATH>   The directory where this script will place
+  -D|--working_dir        <DIR PATH>  The directory where this script will place
                                       downloaded ASM packages and configuration.
                                       If not specified, a temporary directory
                                       will be created. If specified and the
@@ -1071,7 +1071,7 @@ Create a multi-cluster service mesh and allow cross-cluster service discovery.
 Use -h|--help with -v|--verbose to show detailed descriptions.
 
 FLAGS:
-  -D|--output_dir <DIR PATH>
+  -D|--working_dir <DIR PATH>
   -v|--verbose
   -h|--help
   --version
@@ -1084,10 +1084,10 @@ build-offline-package_usage(){
 ${SCRIPT_NAME} $(version_message)
 usage: ${SCRIPT_NAME} build-offline-package [FLAGS]...
 
-Download ASM and KPT packages to the specified output directory or a temporary directory.
+Download ASM and KPT packages to the specified working directory or a temporary directory.
 
 FLAGS:
-  -D|--output_dir        <DIR PATH>   The directory where this script will place
+  -D|--working_dir        <DIR PATH>  The directory where this script will place
                                       downloaded ASM packages and configuration.
                                       If not specified, a temporary directory
                                       will be created. If specified and the
@@ -1106,10 +1106,10 @@ build-offline-package_usage_short(){
 ${SCRIPT_NAME} $(version_message)
 usage: ${SCRIPT_NAME} build-offline-package [FLAGS]...
 
-Download ASM and KPT packages to the specified output directory or a temporary directory.
+Download ASM and KPT packages to the specified working directory or a temporary directory.
 
 FLAGS:
-  -D|--output_dir <DIR PATH>
+  -D|--working_dir <DIR PATH>
   -v|--verbose
   -h|--help
   --version
@@ -1250,7 +1250,7 @@ expose_istiod() {
 }
 
 outro() {
-  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+  local WORKING_DIR; WORKING_DIR="$(context_get-option "WORKING_DIR")"
   local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
   local MANAGED_REVISION_LABEL; MANAGED_REVISION_LABEL="${REVISION_LABEL}"
   if is_managed; then
@@ -1283,16 +1283,16 @@ outro() {
   info "https://cloud.google.com/service-mesh/docs/proxy-injection"
 
   info "The ASM package used for installation can be found at:"
-  info "${OUTPUT_DIR}/asm"
+  info "${WORKING_DIR}/asm"
   info "The version of istioctl that matches the installation can be found at:"
-  info "${OUTPUT_DIR}/${ISTIOCTL_REL_PATH}"
+  info "${WORKING_DIR}/${ISTIOCTL_REL_PATH}"
   info "A symlink to the istioctl binary can be found at:"
-  info "${OUTPUT_DIR}/istioctl"
+  info "${WORKING_DIR}/istioctl"
   if ! is_managed; then
     info "The combined configuration generated for installation can be found at:"
-    info "${OUTPUT_DIR}/${RAW_YAML}"
+    info "${WORKING_DIR}/${RAW_YAML}"
     info "The full, expanded set of kubernetes resources can be found at:"
-    info "${OUTPUT_DIR}/${EXPANDED_YAML}"
+    info "${WORKING_DIR}/${EXPANDED_YAML}"
   fi
 
   info "$(starline)"
@@ -2680,7 +2680,7 @@ context_init() {
     "NON_INTERACTIVE": ${NON_INTERACTIVE:-0},
     "SERVICE_ACCOUNT": "${SERVICE_ACCOUNT:-}",
     "KEY_FILE": "${KEY_FILE:-}",
-    "OUTPUT_DIR": "${OUTPUT_DIR:-}",
+    "WORKING_DIR": "${WORKING_DIR:-}",
     "LOG_FILE_LOCATION": "${LOG_FILE_LOCATION:-}",
     "CA_CERT": "${CA_CERT:-}",
     "CA_KEY": "${CA_KEY:-}",
@@ -2800,7 +2800,7 @@ OPTIONAL_OVERLAY
 NETWORK_ID
 SERVICE_ACCOUNT
 KEY_FILE
-OUTPUT_DIR
+WORKING_DIR
 LOG_FILE_LOCATION
 CA_CERT
 CA_KEY
@@ -3564,9 +3564,9 @@ parse_args() {
         context_set-option "KEY_FILE" "${2}"
         shift 2
         ;;
-      -D | --output_dir | --output-dir)
+      -D | --working_dir | --working-dir)
         arg_required "${@}"
-        context_set-option "OUTPUT_DIR" "${2}"
+        context_set-option "WORKING_DIR" "${2}"
         shift 2
         ;;
       --dry_run | --dry-run)
@@ -3770,9 +3770,9 @@ x_parse_install_args() {
         context_set-option "KEY_FILE" "${2}"
         shift 2
         ;;
-      -D | --output_dir | --output-dir)
+      -D | --working_dir | --working-dir)
         arg_required "${@}"
-        context_set-option "OUTPUT_DIR" "${2}"
+        context_set-option "WORKING_DIR" "${2}"
         shift 2
         ;;
       --dry_run | --dry-run)
@@ -4312,45 +4312,45 @@ auth_service_account() {
 # polluting the environment or current working directory
 #######
 set_up_local_workspace() {
-  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+  local WORKING_DIR; WORKING_DIR="$(context_get-option "WORKING_DIR")"
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
   local KUBECONFIG; KUBECONFIG="$(context_get-option "KUBECONFIG")"
 
   info "Setting up necessary files..."
-  if [[ -z "${OUTPUT_DIR}" ]]; then
+  if [[ -z "${WORKING_DIR}" ]]; then
     info "Creating temp directory..."
-    OUTPUT_DIR="$(mktemp -d)"
-    if [[ -z "${OUTPUT_DIR}" ]]; then
+    WORKING_DIR="$(mktemp -d)"
+    if [[ -z "${WORKING_DIR}" ]]; then
       fatal "Encountered error when running mktemp -d!"
     fi
     info ""
     info "$(starline)"
-    info "No output folder was specified with --output_dir|-D, so configuration and"
+    info "No working folder was specified with --working_dir|-D, so configuration and"
     info "binaries will be stored in the following directory."
-    info "${OUTPUT_DIR}"
+    info "${WORKING_DIR}"
     info "$(starline)"
     info ""
     sleep 2
   else
-    OUTPUT_DIR="$(apath -f "${OUTPUT_DIR}")"
-    if [[ ! -a "${OUTPUT_DIR}" ]]; then
+    WORKING_DIR="$(apath -f "${WORKING_DIR}")"
+    if [[ ! -a "${WORKING_DIR}" ]]; then
       if is_offline; then
-        fatal "${OUTPUT_DIR} must exist for offline installation."
+        fatal "${WORKING_DIR} must exist for offline installation."
       fi
-      if ! mkdir -p "${OUTPUT_DIR}"; then
-        fatal "Failed to create directory ${OUTPUT_DIR}"
+      if ! mkdir -p "${WORKING_DIR}"; then
+        fatal "Failed to create directory ${WORKING_DIR}"
       fi
-    elif [[ ! -d "${OUTPUT_DIR}" ]]; then
-      fatal "${OUTPUT_DIR} exists and is not a directory, please specify another directory."
+    elif [[ ! -d "${WORKING_DIR}" ]]; then
+      fatal "${WORKING_DIR} exists and is not a directory, please specify another directory."
     fi
   fi
 
-  if [[ -x "${OUTPUT_DIR}/kpt" ]]; then AKPT="$(apath -f "${OUTPUT_DIR}/kpt")"; fi
+  if [[ -x "${WORKING_DIR}/kpt" ]]; then AKPT="$(apath -f "${WORKING_DIR}/kpt")"; fi
 
-  pushd "$OUTPUT_DIR" > /dev/null
-  context_set-option "OUTPUT_DIR" "${OUTPUT_DIR}"
+  pushd "$WORKING_DIR" > /dev/null
+  context_set-option "WORKING_DIR" "${WORKING_DIR}"
 
-  local LOG_FILE_LOCATION; LOG_FILE_LOCATION="${OUTPUT_DIR}/logs.txt"
+  local LOG_FILE_LOCATION; LOG_FILE_LOCATION="${WORKING_DIR}/logs.txt"
   touch "${LOG_FILE_LOCATION}"
   context_set-option "LOG_FILE_LOCATION" "${LOG_FILE_LOCATION}"
 
@@ -4426,30 +4426,30 @@ EOF
 }
 
 necessary_files_exist() {
-  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+  local WORKING_DIR; WORKING_DIR="$(context_get-option "WORKING_DIR")"
 
-  if [[ ! -f "${OUTPUT_DIR}/${ISTIOCTL_REL_PATH}" ]]; then
+  if [[ ! -f "${WORKING_DIR}/${ISTIOCTL_REL_PATH}" ]]; then
     false
     return
-  elif [[ ! -f "${OUTPUT_DIR}/${OPERATOR_MANIFEST}" ]]; then
+  elif [[ ! -f "${WORKING_DIR}/${OPERATOR_MANIFEST}" ]]; then
     false
     return
   fi
 
   # Refuse to overwrite configuration downloaded from a different version
-  if [[ ! -f "${OUTPUT_DIR}/${ASM_VERSION_FILE}" ]]; then
-    warn "Re-using existing configuration in ${OUTPUT_DIR}."
-    warn_pause "If this was unintentional, please re-run with a different output directory."
+  if [[ ! -f "${WORKING_DIR}/${ASM_VERSION_FILE}" ]]; then
+    warn "Re-using existing configuration in ${WORKING_DIR}."
+    warn_pause "If this was unintentional, please re-run with a different working directory."
     return
   fi
 
   local EXISTING_VER; EXISTING_VER="$(cat "${ASM_VERSION_FILE}")";
   if [[ "${EXISTING_VER}" != "$(version_message)" ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-The existing configuration in ${OUTPUT_DIR} is from a different version.
+The existing configuration in ${WORKING_DIR} is from a different version.
 Existing: ${EXISTING_VER}
 Current: $(version_message)
-Please try again and specify a different output directory.
+Please try again and specify a different working directory.
 EOF
   fi
 }
@@ -5204,7 +5204,7 @@ validate_args() {
   local CONTEXT; CONTEXT="$(context_get-option "CONTEXT")"
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
   local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
-  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+  local WORKING_DIR; WORKING_DIR="$(context_get-option "WORKING_DIR")"
 
   if [[ -z "${CA}" ]]; then
     if [[ "${MANAGED_CERTIFICATES}" -eq 1 ]]; then
@@ -5342,7 +5342,7 @@ EOF
     validate_custom_ca
   fi
 
-  if is_offline && [[ -z "${OUTPUT_DIR}" ]]; then
+  if is_offline && [[ -z "${WORKING_DIR}" ]]; then
       MISSING_ARGS=1
       warn "Output directory must be specified in offline mode."
   fi

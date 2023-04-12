@@ -77,7 +77,7 @@ set_up_clusters() {
   fi
 
   LT_NAMESPACE="$(uniq_name "${SCRIPT_NAME}" "${BUILD_ID}")"
-  OUTPUT_DIR="$(mktemp -d)"
+  WORKING_DIR="$(mktemp -d)"
   REVISION_LABEL="$(uniq_name "${SCRIPT_NAME}" "${BUILD_ID}")"
 
   local CLUSTER_NAME
@@ -89,7 +89,7 @@ set_up_clusters() {
     echo "Installing ASM with MeshCA..."
     echo "_CI_REVISION_PREFIX=${LT_NAMESPACE} \
     ../asmcli install --kc ${KUBECONFIG} -v \
-      --output-dir ${OUTPUT_DIR} \
+      --working-dir ${WORKING_DIR} \
       --revision_name ${REVISION_LABEL}"
     # shellcheck disable=SC2086
     CLUSTER_LOCATION="" \
@@ -97,7 +97,7 @@ set_up_clusters() {
     PROJECT_ID="" \
     _CI_REVISION_PREFIX="${LT_NAMESPACE}" \
       ../asmcli install --kc "${KUBECONFIG}" -v \
-      --output-dir "${OUTPUT_DIR}" \
+      --working-dir "${WORKING_DIR}" \
       --revision_name ${REVISION_LABEL}
 
     unregister_cluster_if_possible "${CLUSTER_NAME}" "${PROJECT_ID}" "${CLUSTER_LOCATION}"
@@ -112,7 +112,7 @@ clean_up_clusters() {
   while read -r CLUSTER_NAME; do
     configure_kubectl "${CLUSTER_NAME}" "${PROJECT_ID}" "${CLUSTER_LOCATION}"
     unregister_cluster_if_possible "${CLUSTER_NAME}" "${PROJECT_ID}" "${CLUSTER_LOCATION}"
-    cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}"
+    cleanup_lt_cluster "${LT_NAMESPACE}" "${WORKING_DIR}"
   done <<EOF
 $(get_test_clusters)
 EOF

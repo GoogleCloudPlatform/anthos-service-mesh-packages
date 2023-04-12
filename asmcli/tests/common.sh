@@ -3,7 +3,7 @@ LT_ENVIRON_CLUSTER_NAME="long-term-test-cluster-environ"
 LT_CLUSTER_LOCATION="us-central1-c"
 LT_PROJECT_ID="asm-scriptaro-oss"
 LT_NAMESPACE=""
-OUTPUT_DIR=""
+WORKING_DIR=""
 SAMPLE_INGRESS_FILE="../../samples/gateways/istio-ingressgateway.yaml"
 
 _EXTRA_FLAGS="${_EXTRA_FLAGS:=}"; export _EXTRA_FLAGS;
@@ -619,7 +619,7 @@ run_required_role() {
     auth_service_account
   fi
 
-  OUTPUT_DIR="$(mktemp -d)"
+  WORKING_DIR="$(mktemp -d)"
 
   configure_kubectl "${LT_CLUSTER_NAME}" "${PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
 
@@ -638,7 +638,7 @@ run_required_role() {
     -n ${LT_CLUSTER_NAME} \
     -p ${PROJECT_ID} \
     -c ${CA} -v \
-    --output-dir ${OUTPUT_DIR} \
+    --working-dir ${WORKING_DIR} \
     ${EXTRA_FLAGS}"
   # shellcheck disable=SC2086
   _CI_REVISION_PREFIX="${LT_NAMESPACE}" \
@@ -647,7 +647,7 @@ run_required_role() {
     -n "${LT_CLUSTER_NAME}" \
     -p "${PROJECT_ID}" \
     -c "${CA}" -v \
-    --output-dir "${OUTPUT_DIR}" \
+    --working-dir "${WORKING_DIR}" \
     ${EXTRA_FLAGS} ${_EXTRA_FLAGS} 2>&1
 
 
@@ -688,7 +688,7 @@ run_basic_test() {
   fi
 
   LT_NAMESPACE="$(uniq_name "${SCRIPT_NAME}" "${BUILD_ID}")"
-  OUTPUT_DIR="${OUTPUT_DIR:=$(mktemp -d)}"
+  WORKING_DIR="${WORKING_DIR:=$(mktemp -d)}"
 
   configure_kubectl "${LT_CLUSTER_NAME}" "${PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
 
@@ -720,7 +720,7 @@ run_basic_test() {
   ../asmcli ${SUBCOMMAND} ${KEY_FILE} ${SERVICE_ACCOUNT} \
     --kc ${KUBECONFIG} \
     ${CA} -v \
-    --output-dir ${OUTPUT_DIR} \
+    --working-dir ${WORKING_DIR} \
     ${EXTRA_FLAGS}"
   # shellcheck disable=SC2086
   CLUSTER_LOCATION="" \
@@ -730,7 +730,7 @@ run_basic_test() {
     ../asmcli ${SUBCOMMAND} ${KEY_FILE} ${SERVICE_ACCOUNT} \
     --kc "${KUBECONFIG}" \
     ${CA} -v \
-    --output-dir "${OUTPUT_DIR}" \
+    --working-dir "${WORKING_DIR}" \
     ${EXTRA_FLAGS} ${_EXTRA_FLAGS} 2>&1 | tee "${LT_NAMESPACE}" &
 
 
@@ -805,19 +805,19 @@ run_basic_test() {
 }
 
 run_build_offline_package() {
-  local OUTPUT_DIR; OUTPUT_DIR="${1}"
+  local WORKING_DIR; WORKING_DIR="${1}"
   echo "Build offline package..."
   echo "../asmcli build-offline-package -v \
-    --output-dir ${OUTPUT_DIR}"
+    --working-dir ${WORKING_DIR}"
   # shellcheck disable=SC2086
     ../asmcli build-offline-package -v \
-    --output-dir "${OUTPUT_DIR}" 2>&1
+    --working-dir "${WORKING_DIR}" 2>&1
 
   # Check downloaded packages
-  [ -s "${OUTPUT_DIR}" ]
-  ls "${OUTPUT_DIR}/asm" 1>/dev/null
-  ls "${OUTPUT_DIR}/istioctl" 1>/dev/null
-  ls "${OUTPUT_DIR}/istio-"* 1>/dev/null
+  [ -s "${WORKING_DIR}" ]
+  ls "${WORKING_DIR}/asm" 1>/dev/null
+  ls "${WORKING_DIR}/istioctl" 1>/dev/null
+  ls "${WORKING_DIR}/istio-"* 1>/dev/null
 }
 
 delete_service_mesh_feature() {

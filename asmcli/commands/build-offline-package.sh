@@ -25,9 +25,9 @@ build-offline-package() {
 build-offline-package_parse_args() {
   while [[ $# != 0 ]]; do
     case "${1}" in
-      -D | --output_dir | --output-dir)
+      -D | --working_dir | --working-dir)
         arg_required "${@}"
-        context_set-option "OUTPUT_DIR" "${2}"
+        context_set-option "WORKING_DIR" "${2}"
         shift 2
         ;;
       -v | --verbose)
@@ -61,7 +61,7 @@ build-offline-package_parse_args() {
 }
 
 build-offline-package_outro() {
-  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+  local WORKING_DIR; WORKING_DIR="$(context_get-option "WORKING_DIR")"
 
   info ""
   info "$(starline)"
@@ -70,16 +70,16 @@ build-offline-package_outro() {
   info "The offline package download is now complete."
 
   info "The ASM package used for installation can be found at:"
-  info "${OUTPUT_DIR}/asm"
+  info "${WORKING_DIR}/asm"
   info "The version of istioctl that matches the installation can be found at:"
-  info "${OUTPUT_DIR}/${ISTIOCTL_REL_PATH}"
+  info "${WORKING_DIR}/${ISTIOCTL_REL_PATH}"
   info "A symlink to the istioctl binary can be found at:"
-  info "${OUTPUT_DIR}/istioctl"
+  info "${WORKING_DIR}/istioctl"
   if ! is_managed; then
     info "The combined configuration generated for installation can be found at:"
-    info "${OUTPUT_DIR}/${RAW_YAML}"
+    info "${WORKING_DIR}/${RAW_YAML}"
     info "The full, expanded set of kubernetes resources can be found at:"
-    info "${OUTPUT_DIR}/${EXPANDED_YAML}"
+    info "${WORKING_DIR}/${EXPANDED_YAML}"
   fi
 
   info "$(starline)"

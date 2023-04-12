@@ -483,45 +483,45 @@ auth_service_account() {
 # polluting the environment or current working directory
 #######
 set_up_local_workspace() {
-  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+  local WORKING_DIR; WORKING_DIR="$(context_get-option "WORKING_DIR")"
   local KUBECONFIG_SUPPLIED; KUBECONFIG_SUPPLIED="$(context_get-option "KUBECONFIG_SUPPLIED")"
   local KUBECONFIG; KUBECONFIG="$(context_get-option "KUBECONFIG")"
 
   info "Setting up necessary files..."
-  if [[ -z "${OUTPUT_DIR}" ]]; then
+  if [[ -z "${WORKING_DIR}" ]]; then
     info "Creating temp directory..."
-    OUTPUT_DIR="$(mktemp -d)"
-    if [[ -z "${OUTPUT_DIR}" ]]; then
+    WORKING_DIR="$(mktemp -d)"
+    if [[ -z "${WORKING_DIR}" ]]; then
       fatal "Encountered error when running mktemp -d!"
     fi
     info ""
     info "$(starline)"
-    info "No output folder was specified with --output_dir|-D, so configuration and"
+    info "No working folder was specified with --working_dir|-D, so configuration and"
     info "binaries will be stored in the following directory."
-    info "${OUTPUT_DIR}"
+    info "${WORKING_DIR}"
     info "$(starline)"
     info ""
     sleep 2
   else
-    OUTPUT_DIR="$(apath -f "${OUTPUT_DIR}")"
-    if [[ ! -a "${OUTPUT_DIR}" ]]; then
+    WORKING_DIR="$(apath -f "${WORKING_DIR}")"
+    if [[ ! -a "${WORKING_DIR}" ]]; then
       if is_offline; then
-        fatal "${OUTPUT_DIR} must exist for offline installation."
+        fatal "${WORKING_DIR} must exist for offline installation."
       fi
-      if ! mkdir -p "${OUTPUT_DIR}"; then
-        fatal "Failed to create directory ${OUTPUT_DIR}"
+      if ! mkdir -p "${WORKING_DIR}"; then
+        fatal "Failed to create directory ${WORKING_DIR}"
       fi
-    elif [[ ! -d "${OUTPUT_DIR}" ]]; then
-      fatal "${OUTPUT_DIR} exists and is not a directory, please specify another directory."
+    elif [[ ! -d "${WORKING_DIR}" ]]; then
+      fatal "${WORKING_DIR} exists and is not a directory, please specify another directory."
     fi
   fi
 
-  if [[ -x "${OUTPUT_DIR}/kpt" ]]; then AKPT="$(apath -f "${OUTPUT_DIR}/kpt")"; fi
+  if [[ -x "${WORKING_DIR}/kpt" ]]; then AKPT="$(apath -f "${WORKING_DIR}/kpt")"; fi
 
-  pushd "$OUTPUT_DIR" > /dev/null
-  context_set-option "OUTPUT_DIR" "${OUTPUT_DIR}"
+  pushd "$WORKING_DIR" > /dev/null
+  context_set-option "WORKING_DIR" "${WORKING_DIR}"
 
-  local LOG_FILE_LOCATION; LOG_FILE_LOCATION="${OUTPUT_DIR}/logs.txt"
+  local LOG_FILE_LOCATION; LOG_FILE_LOCATION="${WORKING_DIR}/logs.txt"
   touch "${LOG_FILE_LOCATION}"
   context_set-option "LOG_FILE_LOCATION" "${LOG_FILE_LOCATION}"
 
@@ -597,30 +597,30 @@ EOF
 }
 
 necessary_files_exist() {
-  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+  local WORKING_DIR; WORKING_DIR="$(context_get-option "WORKING_DIR")"
 
-  if [[ ! -f "${OUTPUT_DIR}/${ISTIOCTL_REL_PATH}" ]]; then
+  if [[ ! -f "${WORKING_DIR}/${ISTIOCTL_REL_PATH}" ]]; then
     false
     return
-  elif [[ ! -f "${OUTPUT_DIR}/${OPERATOR_MANIFEST}" ]]; then
+  elif [[ ! -f "${WORKING_DIR}/${OPERATOR_MANIFEST}" ]]; then
     false
     return
   fi
 
   # Refuse to overwrite configuration downloaded from a different version
-  if [[ ! -f "${OUTPUT_DIR}/${ASM_VERSION_FILE}" ]]; then
-    warn "Re-using existing configuration in ${OUTPUT_DIR}."
-    warn_pause "If this was unintentional, please re-run with a different output directory."
+  if [[ ! -f "${WORKING_DIR}/${ASM_VERSION_FILE}" ]]; then
+    warn "Re-using existing configuration in ${WORKING_DIR}."
+    warn_pause "If this was unintentional, please re-run with a different working directory."
     return
   fi
 
   local EXISTING_VER; EXISTING_VER="$(cat "${ASM_VERSION_FILE}")";
   if [[ "${EXISTING_VER}" != "$(version_message)" ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
-The existing configuration in ${OUTPUT_DIR} is from a different version.
+The existing configuration in ${WORKING_DIR} is from a different version.
 Existing: ${EXISTING_VER}
 Current: $(version_message)
-Please try again and specify a different output directory.
+Please try again and specify a different working directory.
 EOF
   fi
 }

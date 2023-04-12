@@ -163,9 +163,9 @@ parse_args() {
         context_set-option "KEY_FILE" "${2}"
         shift 2
         ;;
-      -D | --output_dir | --output-dir)
+      -D | --working_dir | --working-dir)
         arg_required "${@}"
-        context_set-option "OUTPUT_DIR" "${2}"
+        context_set-option "WORKING_DIR" "${2}"
         shift 2
         ;;
       --dry_run | --dry-run)
@@ -369,9 +369,9 @@ x_parse_install_args() {
         context_set-option "KEY_FILE" "${2}"
         shift 2
         ;;
-      -D | --output_dir | --output-dir)
+      -D | --working_dir | --working-dir)
         arg_required "${@}"
-        context_set-option "OUTPUT_DIR" "${2}"
+        context_set-option "WORKING_DIR" "${2}"
         shift 2
         ;;
       --dry_run | --dry-run)

@@ -18,7 +18,7 @@ main() {
   local EXPECTED_ROLES; EXPECTED_ROLES="$(expected_roles)"
 
   run_required_role "install" "mesh_ca" "${EXPECTED_ROLES}" "--revision_name ${REVISION_LABEL}" "--enable_gcp_iam_roles" "--enable_cluster_roles"; RETVAL=$?;
-  cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}"
+  cleanup_lt_cluster "${LT_NAMESPACE}" "${WORKING_DIR}"
 
   exit "${RETVAL}"
 }

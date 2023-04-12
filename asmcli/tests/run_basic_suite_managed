@@ -16,7 +16,7 @@ main() {
   parse_args "$@"
 
   run_basic_test "install" "mesh_ca" "--managed --enable-registration"; RETVAL=$?;
-  cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"
+  cleanup_lt_cluster "${LT_NAMESPACE}" "${WORKING_DIR}" "${REV}"
 
   exit "${RETVAL}"
 }
