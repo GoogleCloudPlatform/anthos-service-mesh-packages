@@ -25,7 +25,7 @@ build-offline-package() {
 build-offline-package_parse_args() {
   while [[ $# != 0 ]]; do
     case "${1}" in
-      -D | --output_dir | --output-dir)
+      -D | --output_dir | --output-dir | --working_dir | --working-dir)
         arg_required "${@}"
         context_set-option "OUTPUT_DIR" "${2}"
         shift 2
