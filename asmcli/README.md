@@ -78,7 +78,7 @@ instead of executing them, or use the `--verbose` flag to display _and_ execute
 the commands. Combine the --verbose flag with --help to see extended help.
 
 The script will by default create a temporary directory in order to download
-files and configuration necessary for installing ASM. Specify the --output-dir
+files and configuration necessary for installing ASM. Specify the `--output-dir` (or `--working-dir`)
 flag in order to designate an existing folder to use instead. Upon completion,
 the directory will contain the configuration used for installationm, as well as
 the ASM package which notably contains the istioctl binary for the installed
