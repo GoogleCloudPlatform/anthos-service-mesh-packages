@@ -394,7 +394,7 @@ parse_args() {
         argMap["FORCE"]="true"
         shift 1
         ;;
-      -D | --output_dir | --output-dir)
+      -D | --output_dir | --output-dir | --working_dir | --working-dir)
         arg_required "${@}"
         OUTPUT_DIR="$(apath -f "${2}")"
         if [[ ! -a "${OUTPUT_DIR}" ]]; then
