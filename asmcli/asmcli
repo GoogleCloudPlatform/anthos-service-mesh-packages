@@ -41,7 +41,7 @@ _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"; readonly _CI_I_AM_A_TEST_RO
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=17}"; readonly MINOR;
 POINT="${POINT:=2}"; readonly POINT;
-REV="${REV:=1}"; readonly REV;
+REV="${REV:=8}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
@@ -162,7 +162,7 @@ build-offline-package() {
 build-offline-package_parse_args() {
   while [[ $# != 0 ]]; do
     case "${1}" in
-      -D | --output_dir | --output-dir)
+      -D | --output_dir | --output-dir | --working_dir | --working-dir)
         arg_required "${@}"
         context_set-option "OUTPUT_DIR" "${2}"
         shift 2
@@ -266,7 +266,7 @@ create-mesh_parse_args() {
 
   while [[ $# != 0 ]]; do
     case "${1}" in
-      -D | --output_dir | --output-dir)
+      -D | --output_dir | --output-dir | --working_dir | --working-dir)
         arg_required "${@}"
         context_set-option "OUTPUT_DIR" "${2}"
         shift 2
@@ -2681,6 +2681,7 @@ context_init() {
     "SERVICE_ACCOUNT": "${SERVICE_ACCOUNT:-}",
     "KEY_FILE": "${KEY_FILE:-}",
     "OUTPUT_DIR": "${OUTPUT_DIR:-}",
+    "LOG_FILE_LOCATION": "${LOG_FILE_LOCATION:-}",
     "CA_CERT": "${CA_CERT:-}",
     "CA_KEY": "${CA_KEY:-}",
     "CA_ROOT": "${CA_ROOT:-}",
@@ -2800,6 +2801,7 @@ NETWORK_ID
 SERVICE_ACCOUNT
 KEY_FILE
 OUTPUT_DIR
+LOG_FILE_LOCATION
 CA_CERT
 CA_KEY
 CA_ROOT
@@ -3356,6 +3358,47 @@ get_auth_token() {
   local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
   echo "${TOKEN}"
 }
+info() {
+  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
+  if hash ts 2>/dev/null && [[ "${VERBOSE}" -eq 1 ]]; then
+    echo_log "${SCRIPT_NAME}: ${1}" | TZ=utc ts '%Y-%m-%dT%.T' >&2
+  else
+    echo_log "${SCRIPT_NAME}: ${1}" >&2
+  fi
+}
+
+warn() {
+  info "[WARNING]: ${1}" >&2
+}
+
+warn_pause() {
+  warn "${1}"
+  sleep 2
+}
+
+error() {
+  info "[ERROR]: ${1}" >&2
+}
+
+fatal() {
+  error "${1}"
+  exit 2
+}
+
+fatal_with_usage() {
+  error "${1}"
+  usage_short >&2
+  exit 2
+}
+
+echo_log() {
+  local LOG_FILE_LOCATION; LOG_FILE_LOCATION="$(context_get-option "LOG_FILE_LOCATION")"
+
+  echo "${@}"
+  if [[ -n "${LOG_FILE_LOCATION}" ]]; then
+    echo "${@}" >> "${LOG_FILE_LOCATION}";
+  fi
+}
 parse_args() {
   # shellcheck disable=SC2064
   trap "$(shopt -p nocasematch)" RETURN
@@ -3521,7 +3564,7 @@ parse_args() {
         context_set-option "KEY_FILE" "${2}"
         shift 2
         ;;
-      -D | --output_dir | --output-dir)
+      -D | --output_dir | --output-dir | --working_dir | --working-dir)
         arg_required "${@}"
         context_set-option "OUTPUT_DIR" "${2}"
         shift 2
@@ -3727,7 +3770,7 @@ x_parse_install_args() {
         context_set-option "KEY_FILE" "${2}"
         shift 2
         ;;
-      -D | --output_dir | --output-dir)
+      -D | --output_dir | --output-dir | --working_dir | --working-dir)
         arg_required "${@}"
         context_set-option "OUTPUT_DIR" "${2}"
         shift 2
@@ -3877,28 +3920,6 @@ strip_trailing_commas() {
   echo "${1}" | sed 's/,*$//g'
 }
 
-warn() {
-  info "[WARNING]: ${1}" >&2
-}
-
-warn_pause() {
-  warn "${1}"
-  sleep 2
-}
-
-error() {
-  info "[ERROR]: ${1}" >&2
-}
-
-info() {
-  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
-  if hash ts 2>/dev/null && [[ "${VERBOSE}" -eq 1 ]]; then
-    echo "${SCRIPT_NAME}: ${1}" | TZ=utc ts '%Y-%m-%dT%.T' >&2
-  else
-    echo "${SCRIPT_NAME}: ${1}" >&2
-  fi
-}
-
 validation_error() {
   error "${1}"
   if only_validate; then
@@ -3907,17 +3928,6 @@ validation_error() {
   else
     exit 2
   fi
-}
-
-fatal() {
-  error "${1}"
-  exit 2
-}
-
-fatal_with_usage() {
-  error "${1}"
-  usage_short >&2
-  exit 2
 }
 
 prompt_user_for_value() {
@@ -4339,6 +4349,10 @@ set_up_local_workspace() {
 
   pushd "$OUTPUT_DIR" > /dev/null
   context_set-option "OUTPUT_DIR" "${OUTPUT_DIR}"
+
+  local LOG_FILE_LOCATION; LOG_FILE_LOCATION="${OUTPUT_DIR}/logs.txt"
+  touch "${LOG_FILE_LOCATION}"
+  context_set-option "LOG_FILE_LOCATION" "${LOG_FILE_LOCATION}"
 
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
     KUBECONFIG="$(pwd)/asm_kubeconfig"

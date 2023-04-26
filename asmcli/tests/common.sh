@@ -808,10 +808,10 @@ run_build_offline_package() {
   local OUTPUT_DIR; OUTPUT_DIR="${1}"
   echo "Build offline package..."
   echo "../asmcli build-offline-package -v \
-    --output-dir ${OUTPUT_DIR}"
+    --working-dir ${OUTPUT_DIR}"
   # shellcheck disable=SC2086
     ../asmcli build-offline-package -v \
-    --output-dir "${OUTPUT_DIR}" 2>&1
+    --working-dir "${OUTPUT_DIR}" 2>&1
 
   # Check downloaded packages
   [ -s "${OUTPUT_DIR}" ]
