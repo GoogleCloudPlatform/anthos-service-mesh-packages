@@ -163,7 +163,7 @@ parse_args() {
         context_set-option "KEY_FILE" "${2}"
         shift 2
         ;;
-      -D | --output_dir | --output-dir)
+      -D | --output_dir | --output-dir | --working_dir | --working-dir)
         arg_required "${@}"
         context_set-option "OUTPUT_DIR" "${2}"
         shift 2
@@ -369,7 +369,7 @@ x_parse_install_args() {
         context_set-option "KEY_FILE" "${2}"
         shift 2
         ;;
-      -D | --output_dir | --output-dir)
+      -D | --output_dir | --output-dir | --working_dir | --working-dir)
         arg_required "${@}"
         context_set-option "OUTPUT_DIR" "${2}"
         shift 2
