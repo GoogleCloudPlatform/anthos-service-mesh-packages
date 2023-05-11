@@ -30,6 +30,9 @@ spec:
     port: 80
   - name: https
     port: 443
+  - port: 31400
+    targetPort: 31400
+    name: tcp
   selector:
     istio: ingressgateway
     app: istio-ingressgateway
