@@ -29,7 +29,6 @@ spec:
         GCP_METADATA: "PROJECT_ID|PROJECT_NUMBER|asm-cluster|us-central1-c" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-metadata"}
         CA_PROVIDER: "GoogleCA"
         PLUGINS: "GoogleTokenExchange"
-        USE_TOKEN_FOR_CSR: "true"
         GCE_METADATA_HOST: "metadata.google.internal"
     # Locality load balancing is not supported
     localityLbSetting:
@@ -67,8 +66,6 @@ spec:
             value: "" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.idp-url"}
           - name: GCP_METADATA
             value: "PROJECT_ID|PROJECT_NUMBER|asm-cluster|us-central1-c" # {"$ref":"#/definitions/io.k8s.cli.substitutions.gke-metadata"}
-          - name: SPIFFE_BUNDLE_ENDPOINTS
-            value: "" # {"$ref":"#/definitions/io.k8s.cli.substitutions.spiffe-bundle-endpoints"}
           - name: ENABLE_STACKDRIVER_MONITORING
             value: "true" # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.controlplane.monitoring.enabled"}
           - name: TOKEN_AUDIENCES
