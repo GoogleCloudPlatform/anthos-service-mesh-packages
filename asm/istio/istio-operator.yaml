@@ -17,7 +17,7 @@ apiVersion: install.istio.io/v1alpha1
 kind: IstioOperator
 spec:
   profile: empty
-  hub: gcr.io/gke-release/asm # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}
+  hub: gke.gcr.io/asm # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.hub"}
   tag: 1.10.2-asm.1 # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.tag"}
   meshConfig:
     trustDomainAliases: # {"$ref":"#/definitions/io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases"}
