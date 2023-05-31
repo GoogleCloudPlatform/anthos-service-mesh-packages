@@ -64,6 +64,10 @@ create-mesh_parse_args() {
         context_set-option "TRUST_FLEET_IDENTITY" 0
         shift 1
         ;;
+      --offline)
+        context_set-option "OFFLINE" 1
+        shift 1
+        ;;
       *)
         if [ -f "$1" ]; then
           local KCF; KCF="${1}"
@@ -227,7 +231,11 @@ create-mesh_prepare_environment() {
       download_asm
     fi
     if should_download_kpt_package; then
-      download_kpt_package
+      if is_offline; then
+        warn "Skipping downloading configuration templates because offline mode was specified."
+      else
+        download_kpt_package
+      fi
     fi
     organize_kpt_files
   fi
