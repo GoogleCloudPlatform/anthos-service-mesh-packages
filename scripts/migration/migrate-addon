@@ -295,7 +295,7 @@ configure_mesh_ca_16() {
   # The operator probably won't actually update Istiod faster than we will manually below, but this ensures it
   # will not be reverted back
   kube patch -n istio-system  istiooperators.install.istio.io istio-1-6-11-gke-0 --type=merge -p='{"spec":{
-    "components":{"pilot":{"hub":"gcr.io/gke-release/istio","tag":"1.6.14-gke.7"}}}
+    "components":{"pilot":{"hub":"gke.gcr.io/istio","tag":"1.6.14-gke.7"}}}
   }'
 
   # Next we insert the mesh ca root cert so that it is trusted
@@ -313,7 +313,7 @@ EOF
   # Patch the new image, in case operator isn't fast enough, and insert an annotation to make sure we are change something
   kube patch deploy istiod-istio-1611 -n istio-system -p='{"spec":{"template":{"spec":{"containers":[{
     "name":"discovery",
-    "image":"gcr.io/gke-release/istio/pilot:1.6.14-gke.7"
+    "image":"gke.gcr.io/istio/pilot:1.6.14-gke.7"
   }]}}},
   "metadata":{"annotations":{"istio-addon-migrate-start":"true"}}}'
   echo "Restarting 1.6 istiod"
@@ -403,7 +403,7 @@ EOF
   kube get deploy istio-pilot -n istio-system -o yaml > configure_mesh_ca_istio_pilot_deploy.yaml
   kube patch deploy istio-pilot -n istio-system -p='{"spec":{"template":{"spec":{"containers":[{
     "name":"discovery",
-    "image":"gcr.io/gke-release/istio/pilot:1.4.10-gke.21",
+    "image":"gke.gcr.io/istio/pilot:1.4.10-gke.21",
     "env":[{"name":"PILOT_SKIP_VALIDATE_TRUST_DOMAIN","value":"true"}]
   }]}}}}'
 
