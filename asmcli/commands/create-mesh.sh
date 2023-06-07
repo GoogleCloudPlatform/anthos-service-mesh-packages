@@ -222,13 +222,21 @@ create-mesh_prepare_environment() {
   fi
 
   if needs_asm && needs_kpt; then
-    download_kpt
+      if is_offline; then
+        warn "Skipping downloading kpt because offline mode was specified."
+      else
+        download_kpt
+      fi
   fi
   readonly AKPT
 
   if needs_asm; then
     if ! necessary_files_exist; then
-      download_asm
+      if is_offline; then
+        warn "Skipping downloading mesh tarball because offline mode was specified."
+      else
+        download_asm
+      fi
     fi
     if should_download_kpt_package; then
       if is_offline; then
