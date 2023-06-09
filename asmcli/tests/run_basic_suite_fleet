@@ -1,0 +1,94 @@
+#!/bin/bash
+set -CeEu
+set -o pipefail
+
+SPATH="$(readlink -f "$0")"
+SDIR="$(dirname "${SPATH}")"; export SDIR;
+SCRIPT_NAME="${0##*/}"
+
+# shellcheck source=common.sh
+. "${SDIR}/common.sh"
+
+cd "${SDIR}"
+
+main() {
+  # CLI setup
+  parse_args "$@"
+
+  date +"%T"
+
+  if [[ -n "${SERVICE_ACCOUNT}" ]]; then
+    echo "Authorizing service acount..."
+    auth_service_account
+  fi
+
+  local CLUSTER_NAME; CLUSTER_NAME="ephem-fleetapi-${BUILD_ID}"
+  local NAMESPACE; NAMESPACE="namespace-${BUILD_ID}"
+  readonly CLUSTER_NAME
+  readonly NAMESPACE
+  create_working_cluster "${PROJECT_ID}" "${CLUSTER_NAME}" "${LT_CLUSTER_LOCATION}"
+
+  OUTPUT_DIR="${OUTPUT_DIR:=$(mktemp -d)}"
+
+  # Demo app setup
+  echo "Installing and verifying demo app..."
+  install_demo_app "${NAMESPACE}"
+
+  local GATEWAY; GATEWAY="$(kube_ingress "${NAMESPACE}")";
+  verify_demo_app "$GATEWAY"
+
+  if [[ -n "${KEY_FILE}" && -n "${SERVICE_ACCOUNT}" ]]; then
+    KEY_FILE="-k ${KEY_FILE}"
+    SERVICE_ACCOUNT="-s ${SERVICE_ACCOUNT}"
+  fi
+
+  create_ns "${ISTIO_NAMESPACE}"
+
+  # Test starts here
+  echo "Installing ASM via Fleet API..."
+  echo "_CI_REVISION_PREFIX=${NAMESPACE} \
+  ../asmcli install ${KEY_FILE} ${SERVICE_ACCOUNT} \
+    -l ${LT_CLUSTER_LOCATION} \
+    -n ${CLUSTER_NAME} \
+    -p ${PROJECT_ID} \
+    --enable-cluster-labels \
+    --enable-registration \
+    --use-fleet-api --managed -v \
+    --output-dir ${OUTPUT_DIR}"
+
+  # shellcheck disable=SC2086
+  CLUSTER_LOCATION="${LT_CLUSTER_LOCATION}" \
+  _CI_REVISION_PREFIX="${NAMESPACE}" \
+    ../asmcli install ${KEY_FILE} ${SERVICE_ACCOUNT} \
+    -l "${LT_CLUSTER_LOCATION}" \
+    -n "${CLUSTER_NAME}" \
+    -p "${PROJECT_ID}" \
+    --enable-cluster-labels \
+    --enable-registration \
+    --use-fleet-api --managed -v \
+    --output-dir "${OUTPUT_DIR}"
+
+  echo "Installing Istio manifests for demo app..."
+  install_demo_app_istio_manifests "${NAMESPACE}"
+
+  echo "Performing a rolling restart of the demo app..."
+  local LABEL; LABEL="istio-injection=enabled"
+  kubectl label \
+    namespace "${NAMESPACE}" \
+    "${LABEL}" \
+    --overwrite
+  roll "${NAMESPACE}"
+
+  local READY; READY=0
+  for _ in {1..5}; do
+    check_cni_ready && READY=1 && break || echo "Retrying checking CNI..." && sleep 10
+  done
+  if [[ "${READY}" -eq 0 ]]; then
+    warn "CNI daemonset never becomes ready."
+  fi
+
+  kubectl get pods -ns "${NAMESPACE}"
+  delete_cluster "${PROJECT_ID}" "${CLUSTER_NAME}" "${LT_CLUSTER_LOCATION}"
+}
+
+main "$@"
