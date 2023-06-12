@@ -1061,6 +1061,10 @@ FLAGS:
                                       downloading them again.
   The following several flags are used to display help texts and the version message.
   -v|--verbose                        Print commands before and after execution.
+     --offline                        Perform an offline configuration using the pre-downloaded
+                                      package in the output directory. If the directory is not
+                                      specified or does not contain the required files, the
+                                      script will exit with error.
   -h|--help                           Show this message and exit.
   --version                           Print the version of this tool and exit.
 
@@ -1089,6 +1093,7 @@ Use -h|--help with -v|--verbose to show detailed descriptions.
 FLAGS:
   -D|--output_dir <DIR PATH>
   -v|--verbose
+     --offline
   -h|--help
   --version
 EOF
