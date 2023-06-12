@@ -433,8 +433,12 @@ istioctl() {
 }
 
 istioctl_path() {
+  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+
   if [[ -n "${_CI_ISTIOCTL_REL_PATH}" && -f "${_CI_ISTIOCTL_REL_PATH}" ]]; then
     echo "${_CI_ISTIOCTL_REL_PATH}"
+  elif [[ -f "${OUTPUT_DIR}/istioctl" ]]; then
+    echo "${OUTPUT_DIR}/istioctl"
   else
     echo "./${ISTIOCTL_REL_PATH}"
   fi
