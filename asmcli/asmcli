@@ -40,8 +40,8 @@ _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"; readonly _CI_I_AM_A_TEST_RO
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=17}"; readonly MINOR;
-POINT="${POINT:=2}"; readonly POINT;
-REV="${REV:=8}"; readonly REV;
+POINT="${POINT:=3}"; readonly POINT;
+REV="${REV:=1}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
@@ -287,6 +287,10 @@ create-mesh_parse_args() {
         context_set-option "TRUST_FLEET_IDENTITY" 0
         shift 1
         ;;
+      --offline)
+        context_set-option "OFFLINE" 1
+        shift 1
+        ;;
       *)
         if [ -f "$1" ]; then
           local KCF; KCF="${1}"
@@ -441,16 +445,28 @@ create-mesh_prepare_environment() {
   fi
 
   if needs_asm && needs_kpt; then
-    download_kpt
+      if is_offline; then
+        warn "Skipping downloading kpt because offline mode was specified."
+      else
+        download_kpt
+      fi
   fi
   readonly AKPT
 
   if needs_asm; then
     if ! necessary_files_exist; then
-      download_asm
+      if is_offline; then
+        warn "Skipping downloading mesh tarball because offline mode was specified."
+      else
+        download_asm
+      fi
     fi
     if should_download_kpt_package; then
-      download_kpt_package
+      if is_offline; then
+        warn "Skipping downloading configuration templates because offline mode was specified."
+      else
+        download_kpt_package
+      fi
     fi
     organize_kpt_files
   fi
@@ -1045,6 +1061,10 @@ FLAGS:
                                       downloading them again.
   The following several flags are used to display help texts and the version message.
   -v|--verbose                        Print commands before and after execution.
+     --offline                        Perform an offline configuration using the pre-downloaded
+                                      package in the output directory. If the directory is not
+                                      specified or does not contain the required files, the
+                                      script will exit with error.
   -h|--help                           Show this message and exit.
   --version                           Print the version of this tool and exit.
 
@@ -1073,6 +1093,7 @@ Use -h|--help with -v|--verbose to show detailed descriptions.
 FLAGS:
   -D|--output_dir <DIR PATH>
   -v|--verbose
+     --offline
   -h|--help
   --version
 EOF
@@ -2601,9 +2622,7 @@ configure_package() {
 
   kpt cfg set asm anthos.servicemesh.trustDomain "${FLEET_ID}.svc.id.goog"
   kpt cfg set asm anthos.servicemesh.tokenAudiences "istio-ca,${FLEET_ID}.svc.id.goog"
-  if [[ "${CA}" == "mesh_ca" ]]; then
-    kpt cfg set asm anthos.servicemesh.spiffeBundleEndpoints "${FLEET_ID}.svc.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json"
-  fi
+
   if [[ "${USE_VPCSC}" -eq 1 ]]; then
     kpt cfg set asm anthos.servicemesh.managed-controlplane.vpcsc.enabled "true"
   fi
@@ -4109,12 +4128,15 @@ prepare_environment() {
     # Offline mode should not trigger any download
     if is_offline; then
       if needs_kpt || ! necessary_files_exist || should_download_kpt_package; then
-        { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+        { read -r -d '' MSG; warn_pause "${MSG}"; } <<EOF || true
 Critical components not found in the offline mode. Note that if the installation configuration has changed,
 kpt packages would have to be re-downloaded. Please run "asmcli build-offline-package"
 and pass the directory containing the required files to install ASM successfully offline.
+
+Installation will continue, but may not succeed.
 EOF
       fi
+      return
     fi
 
     if needs_kpt; then
@@ -4259,8 +4281,12 @@ istioctl() {
 }
 
 istioctl_path() {
+  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+
   if [[ -n "${_CI_ISTIOCTL_REL_PATH}" && -f "${_CI_ISTIOCTL_REL_PATH}" ]]; then
     echo "${_CI_ISTIOCTL_REL_PATH}"
+  elif [[ -f "${OUTPUT_DIR}/istioctl" ]]; then
+    echo "${OUTPUT_DIR}/istioctl"
   else
     echo "./${ISTIOCTL_REL_PATH}"
   fi
