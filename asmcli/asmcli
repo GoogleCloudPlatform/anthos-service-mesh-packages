@@ -40,8 +40,8 @@ _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"; readonly _CI_I_AM_A_TEST_RO
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=17}"; readonly MINOR;
-POINT="${POINT:=2}"; readonly POINT;
-REV="${REV:=8}"; readonly REV;
+POINT="${POINT:=3}"; readonly POINT;
+REV="${REV:=1}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
@@ -2622,9 +2622,7 @@ configure_package() {
 
   kpt cfg set asm anthos.servicemesh.trustDomain "${FLEET_ID}.svc.id.goog"
   kpt cfg set asm anthos.servicemesh.tokenAudiences "istio-ca,${FLEET_ID}.svc.id.goog"
-  if [[ "${CA}" == "mesh_ca" ]]; then
-    kpt cfg set asm anthos.servicemesh.spiffeBundleEndpoints "${FLEET_ID}.svc.id.goog|https://storage.googleapis.com/mesh-ca-resources/spiffe_bundle.json"
-  fi
+
   if [[ "${USE_VPCSC}" -eq 1 ]]; then
     kpt cfg set asm anthos.servicemesh.managed-controlplane.vpcsc.enabled "true"
   fi
