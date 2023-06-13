@@ -43,7 +43,7 @@ create-mesh_parse_args() {
 
   while [[ $# != 0 ]]; do
     case "${1}" in
-      -D | --output_dir | --output-dir)
+      -D | --output_dir | --output-dir | --working_dir | --working-dir)
         arg_required "${@}"
         context_set-option "OUTPUT_DIR" "${2}"
         shift 2
@@ -62,6 +62,10 @@ create-mesh_parse_args() {
         ;;
       --ignore_workload_identity_mismatch | --ignore-workload-identity-mismatch)
         context_set-option "TRUST_FLEET_IDENTITY" 0
+        shift 1
+        ;;
+      --offline)
+        context_set-option "OFFLINE" 1
         shift 1
         ;;
       *)
@@ -218,16 +222,28 @@ create-mesh_prepare_environment() {
   fi
 
   if needs_asm && needs_kpt; then
-    download_kpt
+      if is_offline; then
+        warn "Skipping downloading kpt because offline mode was specified."
+      else
+        download_kpt
+      fi
   fi
   readonly AKPT
 
   if needs_asm; then
     if ! necessary_files_exist; then
-      download_asm
+      if is_offline; then
+        warn "Skipping downloading mesh tarball because offline mode was specified."
+      else
+        download_asm
+      fi
     fi
     if should_download_kpt_package; then
-      download_kpt_package
+      if is_offline; then
+        warn "Skipping downloading configuration templates because offline mode was specified."
+      else
+        download_kpt_package
+      fi
     fi
     organize_kpt_files
   fi
