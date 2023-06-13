@@ -91,28 +91,6 @@ strip_trailing_commas() {
   echo "${1}" | sed 's/,*$//g'
 }
 
-warn() {
-  info "[WARNING]: ${1}" >&2
-}
-
-warn_pause() {
-  warn "${1}"
-  sleep 2
-}
-
-error() {
-  info "[ERROR]: ${1}" >&2
-}
-
-info() {
-  local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
-  if hash ts 2>/dev/null && [[ "${VERBOSE}" -eq 1 ]]; then
-    echo "${SCRIPT_NAME}: ${1}" | TZ=utc ts '%Y-%m-%dT%.T' >&2
-  else
-    echo "${SCRIPT_NAME}: ${1}" >&2
-  fi
-}
-
 validation_error() {
   error "${1}"
   if only_validate; then
@@ -121,17 +99,6 @@ validation_error() {
   else
     exit 2
   fi
-}
-
-fatal() {
-  error "${1}"
-  exit 2
-}
-
-fatal_with_usage() {
-  error "${1}"
-  usage_short >&2
-  exit 2
 }
 
 prompt_user_for_value() {
@@ -313,12 +280,15 @@ prepare_environment() {
     # Offline mode should not trigger any download
     if is_offline; then
       if needs_kpt || ! necessary_files_exist || should_download_kpt_package; then
-        { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+        { read -r -d '' MSG; warn_pause "${MSG}"; } <<EOF || true
 Critical components not found in the offline mode. Note that if the installation configuration has changed,
 kpt packages would have to be re-downloaded. Please run "asmcli build-offline-package"
 and pass the directory containing the required files to install ASM successfully offline.
+
+Installation will continue, but may not succeed.
 EOF
       fi
+      return
     fi
 
     if needs_kpt; then
@@ -465,8 +435,12 @@ istioctl() {
 }
 
 istioctl_path() {
+  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+
   if [[ -n "${_CI_ISTIOCTL_REL_PATH}" && -f "${_CI_ISTIOCTL_REL_PATH}" ]]; then
     echo "${_CI_ISTIOCTL_REL_PATH}"
+  elif [[ -f "${OUTPUT_DIR}/istioctl" ]]; then
+    echo "${OUTPUT_DIR}/istioctl"
   else
     echo "./${ISTIOCTL_REL_PATH}"
   fi
@@ -555,6 +529,10 @@ set_up_local_workspace() {
 
   pushd "$OUTPUT_DIR" > /dev/null
   context_set-option "OUTPUT_DIR" "${OUTPUT_DIR}"
+
+  local LOG_FILE_LOCATION; LOG_FILE_LOCATION="${OUTPUT_DIR}/logs.txt"
+  touch "${LOG_FILE_LOCATION}"
+  context_set-option "LOG_FILE_LOCATION" "${LOG_FILE_LOCATION}"
 
   if [[ "${KUBECONFIG_SUPPLIED}" -eq 0 ]]; then
     KUBECONFIG="$(pwd)/asm_kubeconfig"

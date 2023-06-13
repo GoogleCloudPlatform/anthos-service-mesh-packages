@@ -71,12 +71,12 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.hub
-          value: gcr.io/gke-release/asm
+          value: gke.gcr.io/asm
     io.k8s.cli.setters.anthos.servicemesh.tag:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.tag
-          value: 1.15.7-asm.8
+          value: 1.15.7-asm.16
           isSet: true
     io.k8s.cli.setters.anthos.servicemesh.managed-controlplane.vpcsc.enabled:
       type: string
@@ -113,7 +113,7 @@ openAPI:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.canonicalServiceHub
-          value: gcr.io/gke-release/asm/canonical-service-controller:1.7.3-asm.6
+          value: gke.gcr.io/asm/canonical-service-controller:1.7.3-asm.6
           isSet: true
     io.k8s.cli.setters.anthos.servicemesh.idp-url:
       type: string
