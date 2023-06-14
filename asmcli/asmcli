@@ -351,7 +351,9 @@ create-mesh_validate_args() {
   while read -r KCF; do
     context_set-option "KUBECONFIG" "${KCF}"
     context_set-option "CONTEXT" "$(kubectl config current-context)"
-    is_cluster_registered
+    if ! is_cluster_registered; then
+      warn_pause "Couldn't verify cluster registration! Please check proxy config/network connectivity."
+    fi
   done <<EOF
 $(context_list "kubeconfigFiles")
 EOF
@@ -4471,11 +4473,11 @@ necessary_files_exist() {
 
   local EXISTING_VER; EXISTING_VER="$(cat "${ASM_VERSION_FILE}")";
   if [[ "${EXISTING_VER}" != "$(version_message)" ]]; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+    { read -r -d '' MSG; warn_pause "${MSG}"; } <<EOF || true
 The existing configuration in ${OUTPUT_DIR} is from a different version.
 Existing: ${EXISTING_VER}
 Current: $(version_message)
-Please try again and specify a different output directory.
+If this is unexpected, try again and specify a different output directory.
 EOF
   fi
 }
