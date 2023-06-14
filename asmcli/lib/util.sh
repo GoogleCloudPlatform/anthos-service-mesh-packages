@@ -625,11 +625,11 @@ necessary_files_exist() {
 
   local EXISTING_VER; EXISTING_VER="$(cat "${ASM_VERSION_FILE}")";
   if [[ "${EXISTING_VER}" != "$(version_message)" ]]; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+    { read -r -d '' MSG; warn_pause "${MSG}"; } <<EOF || true
 The existing configuration in ${OUTPUT_DIR} is from a different version.
 Existing: ${EXISTING_VER}
 Current: $(version_message)
-Please try again and specify a different output directory.
+If this is unexpected, try again and specify a different output directory.
 EOF
   fi
 }
