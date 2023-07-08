@@ -280,12 +280,15 @@ prepare_environment() {
     # Offline mode should not trigger any download
     if is_offline; then
       if needs_kpt || ! necessary_files_exist || should_download_kpt_package; then
-        { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+        { read -r -d '' MSG; warn_pause "${MSG}"; } <<EOF || true
 Critical components not found in the offline mode. Note that if the installation configuration has changed,
 kpt packages would have to be re-downloaded. Please run "asmcli build-offline-package"
 and pass the directory containing the required files to install ASM successfully offline.
+
+Installation will continue, but may not succeed.
 EOF
       fi
+      return
     fi
 
     if needs_kpt; then
@@ -430,8 +433,12 @@ istioctl() {
 }
 
 istioctl_path() {
+  local OUTPUT_DIR; OUTPUT_DIR="$(context_get-option "OUTPUT_DIR")"
+
   if [[ -n "${_CI_ISTIOCTL_REL_PATH}" && -f "${_CI_ISTIOCTL_REL_PATH}" ]]; then
     echo "${_CI_ISTIOCTL_REL_PATH}"
+  elif [[ -f "${OUTPUT_DIR}/istioctl" ]]; then
+    echo "${OUTPUT_DIR}/istioctl"
   else
     echo "./${ISTIOCTL_REL_PATH}"
   fi
@@ -616,11 +623,11 @@ necessary_files_exist() {
 
   local EXISTING_VER; EXISTING_VER="$(cat "${ASM_VERSION_FILE}")";
   if [[ "${EXISTING_VER}" != "$(version_message)" ]]; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+    { read -r -d '' MSG; warn_pause "${MSG}"; } <<EOF || true
 The existing configuration in ${OUTPUT_DIR} is from a different version.
 Existing: ${EXISTING_VER}
 Current: $(version_message)
-Please try again and specify a different output directory.
+If this is unexpected, try again and specify a different output directory.
 EOF
   fi
 }

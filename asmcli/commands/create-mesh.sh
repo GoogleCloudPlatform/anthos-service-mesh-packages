@@ -64,6 +64,10 @@ create-mesh_parse_args() {
         context_set-option "TRUST_FLEET_IDENTITY" 0
         shift 1
         ;;
+      --offline)
+        context_set-option "OFFLINE" 1
+        shift 1
+        ;;
       *)
         if [ -f "$1" ]; then
           local KCF; KCF="${1}"
@@ -124,7 +128,9 @@ create-mesh_validate_args() {
   while read -r KCF; do
     context_set-option "KUBECONFIG" "${KCF}"
     context_set-option "CONTEXT" "$(kubectl config current-context)"
-    is_cluster_registered
+    if ! is_cluster_registered; then
+      warn_pause "Couldn't verify cluster registration! Please check proxy config/network connectivity."
+    fi
   done <<EOF
 $(context_list "kubeconfigFiles")
 EOF
@@ -218,16 +224,28 @@ create-mesh_prepare_environment() {
   fi
 
   if needs_asm && needs_kpt; then
-    download_kpt
+      if is_offline; then
+        warn "Skipping downloading kpt because offline mode was specified."
+      else
+        download_kpt
+      fi
   fi
   readonly AKPT
 
   if needs_asm; then
     if ! necessary_files_exist; then
-      download_asm
+      if is_offline; then
+        warn "Skipping downloading mesh tarball because offline mode was specified."
+      else
+        download_asm
+      fi
     fi
     if should_download_kpt_package; then
-      download_kpt_package
+      if is_offline; then
+        warn "Skipping downloading configuration templates because offline mode was specified."
+      else
+        download_kpt_package
+      fi
     fi
     organize_kpt_files
   fi
