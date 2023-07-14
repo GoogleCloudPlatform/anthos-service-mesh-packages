@@ -2645,7 +2645,7 @@ configure_off_gcp_gcp_metadata(){
   if [[ "${OFF_GCP_MEMBERSHIP_NAME}" == "cluster" ]]; then
     kpt cfg set asm gcloud.compute.location "global"
   else
-    OFF_GCP_CLUSTER_LOCATION=$(get_monitoring_config_membership_location "${OFF_GCP_MEMBERSHIP_NAME}" "${PROJECT_ID}")
+    local OFF_GCP_CLUSTER_LOCATION=$(get_monitoring_config_membership_location "${OFF_GCP_MEMBERSHIP_NAME}" "${PROJECT_ID}")
     if [[ -z "${OFF_GCP_CLUSTER_LOCATION}" ]]; then
       # "global" is the current default value for off-GCP
       OFF_GCP_CLUSTER_LOCATION="global"
