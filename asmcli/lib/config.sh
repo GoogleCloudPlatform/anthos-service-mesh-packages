@@ -25,14 +25,8 @@ configure_package() {
     kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
     kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
   else
-    kpt cfg set asm gcloud.core.project "${FLEET_ID}"
-    if [[ -n "${HUB_MEMBERSHIP_ID}" ]]; then
-      kpt cfg set asm gcloud.container.cluster "${HUB_MEMBERSHIP_ID}"
-    else
-      kpt cfg set asm gcloud.container.cluster "cluster" # default off-GCP cluster name
-    fi
-    # "global" is the current default value for off-GCP
-    kpt cfg set asm gcloud.compute.location "global"
+    configure_off_gcp_gcp_metadata "${FLEET_ID}" "${HUB_MEMBERSHIP_ID}" "${PROJECT_ID}"
+
     if [[ "${CA}" == "citadel" && "${INCLUDES_STACKDRIVER}" -eq 0 ]]; then
       kpt cfg set asm anthos.servicemesh.controlplane.monitoring.enabled "false"
     fi
@@ -64,6 +58,31 @@ configure_package() {
 
   configure_ca
   configure_control_plane
+}
+
+configure_off_gcp_gcp_metadata(){
+  local FLEET_ID; FLEET_ID="${1}"
+  local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="${2}"
+  local PROJECT_ID; PROJECT_ID="${3}"
+
+  kpt cfg set asm gcloud.core.project "${FLEET_ID}"
+
+  local OFF_GCP_MEMBERSHIP_NAME="cluster" # default off-GCP cluster name
+  if [[ -n "${HUB_MEMBERSHIP_ID}" ]]; then
+    OFF_GCP_MEMBERSHIP_NAME="${HUB_MEMBERSHIP_ID}" # off-GCP cluster name is used for membership name
+  fi
+  kpt cfg set asm gcloud.container.cluster "${OFF_GCP_MEMBERSHIP_NAME}"
+
+  if [[ "${OFF_GCP_MEMBERSHIP_NAME}" == "cluster" ]]; then
+    kpt cfg set asm gcloud.compute.location "global"
+  else
+    OFF_GCP_CLUSTER_LOCATION=$(get_monitoring_config_membership_location "${OFF_GCP_MEMBERSHIP_NAME}" "${PROJECT_ID}")
+    if [[ -z "${OFF_GCP_CLUSTER_LOCATION}" ]]; then
+      # "global" is the current default value for off-GCP
+      OFF_GCP_CLUSTER_LOCATION="global"
+    fi
+    kpt cfg set asm gcloud.compute.location "${OFF_GCP_CLUSTER_LOCATION}"
+  fi
 }
 
 configure_kubectl(){
