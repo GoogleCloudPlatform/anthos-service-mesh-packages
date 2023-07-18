@@ -623,11 +623,11 @@ necessary_files_exist() {
 
   local EXISTING_VER; EXISTING_VER="$(cat "${ASM_VERSION_FILE}")";
   if [[ "${EXISTING_VER}" != "$(version_message)" ]]; then
-    { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
+    { read -r -d '' MSG; warn_pause "${MSG}"; } <<EOF || true
 The existing configuration in ${OUTPUT_DIR} is from a different version.
 Existing: ${EXISTING_VER}
 Current: $(version_message)
-Please try again and specify a different output directory.
+If this is unexpected, try again and specify a different output directory.
 EOF
   fi
 }
@@ -824,5 +824,14 @@ ensure_cross_project_sa() {
     return
   fi
   false
+}
+
+get_monitoring_config_membership_location () {
+  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="${1}"
+  local PROJECT_ID; PROJECT_ID="${2}"
+
+  LOCATION="$(gcloud container hub memberships describe "${MEMBERSHIP_NAME}" --project "${PROJECT_ID}" --format="value(monitoringConfig.location)")"
+  
+  echo "${LOCATION}"
 }
 
