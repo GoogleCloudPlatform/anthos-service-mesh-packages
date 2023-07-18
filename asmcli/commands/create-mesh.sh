@@ -128,7 +128,9 @@ create-mesh_validate_args() {
   while read -r KCF; do
     context_set-option "KUBECONFIG" "${KCF}"
     context_set-option "CONTEXT" "$(kubectl config current-context)"
-    is_cluster_registered
+    if ! is_cluster_registered; then
+      warn_pause "Couldn't verify cluster registration! Please check proxy config/network connectivity."
+    fi
   done <<EOF
 $(context_list "kubeconfigFiles")
 EOF
