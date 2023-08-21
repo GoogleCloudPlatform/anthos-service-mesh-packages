@@ -1435,7 +1435,7 @@ set_default_tag() {
   info "Setting $(asm_revision_label) as the target for \"istio-injection=enabled\"..."
   kubectl patch mutatingwebhookconfigurations istio-sidecar-injector \
     --type=json -p='[{"op": "replace", "path": "/webhooks"}]'
-  run istioctl x revision tag \
+  run istioctl tag \
     set default --revision="$(asm_revision_label)" \
     --overwrite
 }

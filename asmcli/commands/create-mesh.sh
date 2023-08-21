@@ -204,7 +204,7 @@ install_one_remote_secret() {
 
   info "Installing remote secret ${SECRET_NAME} on ${KCF2}..."
 
-  retry 2 istioctl x create-remote-secret \
+  retry 2 istioctl create-remote-secret \
     --kubeconfig="${KCF1}" \
     --context="${CTX1}" \
     --name="${SECRET_NAME}" | \
