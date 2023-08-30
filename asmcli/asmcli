@@ -859,21 +859,6 @@ OPTIONS:
                                       cluster. Defaults to "gcp" (for GKE clusters).
                                       For all other platforms use "multicloud".
                                       Allowed values for <PLATFORM> are {gcp|multicloud}.
-  --channel              <CHANNEL>    The release channel for the control plane revision.
-                                      If the user specifies the channel to be used, only
-                                      the Control Plane Revision associated with this
-                                      channel will be provisioned. Otherwise, the mapping
-                                      between Multicloud/GKE channel and the ASM Channel is
-                                      as following:
-                                      For Multicloud:
-                                        ASM provisions Regular channel.
-                                      For GKE:
-                                        GKE Channel  |  ASM Channel
-                                        -------------|----------------
-                                        Rapid        |  Rapid
-                                        Regular      |  Regular
-                                        Stable       |  Stable
-                                        Static       |  Regular
 
   The following four options must be passed together and are only necessary
   for using a custom certificate for Citadel. Users that aren't sure whether
@@ -918,6 +903,15 @@ FLAGS:
      --use_managed_cni                Deprecated. Managed CNI now defaults to be on.
      --managed                        Provision a remote, managed control plane
                                       instead of installing one in-cluster.
+                                      The channel matches with the GKE version:
+                                        GKE Channel  |  ASM Channel
+                                        -------------|----------------
+                                        Rapid        |  Rapid
+                                        Regular      |  Regular
+                                        Stable       |  Stable
+                                        Static       |  Regular
+                                      Any non-GKE cluster gets the Regular
+                                      channel.
      --use_vpcsc                      Provision a remote, managed control plane in
                                       VPCSC environment.
      --offline                        Perform an offline installation using the pre-downloaded
@@ -1071,8 +1065,9 @@ FLAGS:
   --version                           Print the version of this tool and exit.
 
 EXAMPLE:
-The following invocation will create a mesh using the provided 6 clusters
-by registering them to a fleet named "my_cluster" and install remote secrets on each pair of clusters:
+The following invocation will create a mesh using the provided 3 clusters
+by registering them to a fleet named "my-fleet" and install remote secrets (if
+necessary) on each pair of clusters:
 
   $> ${SCRIPT_NAME} \\
       create-mesh \\
