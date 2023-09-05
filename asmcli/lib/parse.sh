@@ -218,8 +218,8 @@ parse_args() {
         shift 2
         ;;
       --channel)
-        warn "Specifying --channel is not supported as of 1.17, channels are assigned automatically."
-        warn "See verbose help output or Google Cloud docs for details on how channels are chosen."
+        arg_required "${@}"
+        context_set-option "CHANNEL" "${2}"
         shift 2
         ;;
       --offline)
