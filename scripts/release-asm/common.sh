@@ -24,10 +24,10 @@ trap 'gsutil retention "${HOLD_TYPE}" release gs://"${STABLE_VERSION_FILE_PATH}"
 
 prod_releases() {
   cat << EOF
-release 1.14
 release 1.15
 release 1.16
 release 1.17
+release 1.18
 EOF
 }
 
@@ -35,10 +35,10 @@ CURRENT_RELEASE="$(prod_releases | tail -n 1)"; readonly CURRENT_RELEASE
 
 staging_releases() {
   cat << EOF
-staging 1.14
 staging 1.15
 staging 1.16
 staging 1.17
+staging 1.18
 EOF
 }
 

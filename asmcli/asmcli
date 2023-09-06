@@ -41,7 +41,7 @@ _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"; readonly _CI_I_AM_A_TEST_RO
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=18}"; readonly MINOR;
 POINT="${POINT:=2}"; readonly POINT;
-REV="${REV:=0}"; readonly REV;
+REV="${REV:=4}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
@@ -427,7 +427,7 @@ install_one_remote_secret() {
 
   info "Installing remote secret ${SECRET_NAME} on ${KCF2}..."
 
-  retry 2 istioctl x create-remote-secret \
+  retry 2 istioctl create-remote-secret \
     --kubeconfig="${KCF1}" \
     --context="${CTX1}" \
     --name="${SECRET_NAME}" | \
@@ -859,21 +859,6 @@ OPTIONS:
                                       cluster. Defaults to "gcp" (for GKE clusters).
                                       For all other platforms use "multicloud".
                                       Allowed values for <PLATFORM> are {gcp|multicloud}.
-  --channel              <CHANNEL>    The release channel for the control plane revision.
-                                      If the user specifies the channel to be used, only
-                                      the Control Plane Revision associated with this
-                                      channel will be provisioned. Otherwise, the mapping
-                                      between Multicloud/GKE channel and the ASM Channel is
-                                      as following:
-                                      For Multicloud:
-                                        ASM provisions Regular channel.
-                                      For GKE:
-                                        GKE Channel  |  ASM Channel
-                                        -------------|----------------
-                                        Rapid        |  Rapid
-                                        Regular      |  Regular
-                                        Stable       |  Stable
-                                        Static       |  Regular
 
   The following four options must be passed together and are only necessary
   for using a custom certificate for Citadel. Users that aren't sure whether
@@ -918,6 +903,15 @@ FLAGS:
      --use_managed_cni                Deprecated. Managed CNI now defaults to be on.
      --managed                        Provision a remote, managed control plane
                                       instead of installing one in-cluster.
+                                      The channel matches with the GKE version:
+                                        GKE Channel  |  ASM Channel
+                                        -------------|----------------
+                                        Rapid        |  Rapid
+                                        Regular      |  Regular
+                                        Stable       |  Stable
+                                        Static       |  Regular
+                                      Any non-GKE cluster gets the Regular
+                                      channel.
      --use_vpcsc                      Provision a remote, managed control plane in
                                       VPCSC environment.
      --offline                        Perform an offline installation using the pre-downloaded
@@ -1071,8 +1065,9 @@ FLAGS:
   --version                           Print the version of this tool and exit.
 
 EXAMPLE:
-The following invocation will create a mesh using the provided 6 clusters
-by registering them to a fleet named "my_cluster" and install remote secrets on each pair of clusters:
+The following invocation will create a mesh using the provided 3 clusters
+by registering them to a fleet named "my-fleet" and install remote secrets (if
+necessary) on each pair of clusters:
 
   $> ${SCRIPT_NAME} \\
       create-mesh \\
@@ -2594,8 +2589,14 @@ configure_package() {
     kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
     kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
   else
-    configure_off_gcp_gcp_metadata "${FLEET_ID}" "${HUB_MEMBERSHIP_ID}" "${PROJECT_ID}"
-
+    kpt cfg set asm gcloud.core.project "${FLEET_ID}"
+    if [[ -n "${HUB_MEMBERSHIP_ID}" ]]; then
+      kpt cfg set asm gcloud.container.cluster "${HUB_MEMBERSHIP_ID}"
+    else
+      kpt cfg set asm gcloud.container.cluster "cluster" # default off-GCP cluster name
+    fi
+    # "global" is the current default value for off-GCP
+    kpt cfg set asm gcloud.compute.location "global"
     if [[ "${CA}" == "citadel" && "${INCLUDES_STACKDRIVER}" -eq 0 ]]; then
       kpt cfg set asm anthos.servicemesh.controlplane.monitoring.enabled "false"
     fi
@@ -2627,34 +2628,6 @@ configure_package() {
 
   configure_ca
   configure_control_plane
-}
-
-configure_off_gcp_gcp_metadata(){
-  local FLEET_ID; FLEET_ID="${1}"
-  local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="${2}"
-  local PROJECT_ID; PROJECT_ID="${3}"
-  
-  local OFF_GCP_MEMBERSHIP_NAME;
-  local OFF_GCP_CLUSTER_LOCATION;
-
-  kpt cfg set asm gcloud.core.project "${FLEET_ID}"
-
-  OFF_GCP_MEMBERSHIP_NAME="cluster" # default off-GCP cluster name
-  if [[ -n "${HUB_MEMBERSHIP_ID}" ]]; then
-    OFF_GCP_MEMBERSHIP_NAME="${HUB_MEMBERSHIP_ID}" # off-GCP cluster name is used for membership name
-  fi
-  kpt cfg set asm gcloud.container.cluster "${OFF_GCP_MEMBERSHIP_NAME}"
-
-  if [[ "${OFF_GCP_MEMBERSHIP_NAME}" == "cluster" ]]; then
-    kpt cfg set asm gcloud.compute.location "global"
-  else
-    OFF_GCP_CLUSTER_LOCATION=$(get_monitoring_config_membership_location "${OFF_GCP_MEMBERSHIP_NAME}" "${PROJECT_ID}")
-    if [[ -z "${OFF_GCP_CLUSTER_LOCATION}" ]]; then
-      # "global" is the current default value for off-GCP
-      OFF_GCP_CLUSTER_LOCATION="global"
-    fi
-    kpt cfg set asm gcloud.compute.location "${OFF_GCP_CLUSTER_LOCATION}"
-  fi
 }
 
 configure_kubectl(){
@@ -3366,7 +3339,7 @@ populate_fleet_info() {
     -n "${HUB_IDP_URL}" ]]; then return; fi
 
   if ! is_membership_crd_installed; then return; fi
-HUB_MEMBERSHIP_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.owner.id | sed 's/^\"\/\/\(autopush-\)\{0,1\}gkehub\(.sandbox\)\{0,1\}.googleapis.com\/projects\/\(.*\)\/locations\/global\/memberships\/\(.*\)\"$/\4/g')"
+  HUB_MEMBERSHIP_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.owner.id | sed 's/^\"\/\/\(autopush-\)\{0,1\}gkehub\(.sandbox\)\{0,1\}.googleapis.com\/projects\/\(.*\)\/locations\/\(.*\)\/memberships\/\(.*\)\"$/\5/g')"
   context_set-option "HUB_MEMBERSHIP_ID" "${HUB_MEMBERSHIP_ID}"
   HUB_IDP_URL="$(kubectl get memberships.hub.gke.io membership -o=jsonpath='{.spec.identity_provider}')"
   context_set-option "HUB_IDP_URL" "${HUB_IDP_URL}"
@@ -4696,15 +4669,6 @@ ensure_cross_project_sa() {
     return
   fi
   false
-}
-
-get_monitoring_config_membership_location () {
-  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="${1}"
-  local PROJECT_ID; PROJECT_ID="${2}"
-
-  LOCATION="$(gcloud container hub memberships describe "${MEMBERSHIP_NAME}" --project "${PROJECT_ID}" --format="value(monitoringConfig.location)")"
-  
-  echo "${LOCATION}"
 }
 
 validate_revision_label() {
