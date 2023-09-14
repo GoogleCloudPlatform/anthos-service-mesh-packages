@@ -16,7 +16,7 @@ validate_revision_label() {
 }
 
 validate_hub() {
-  if ! is_cluster_registered && ! can_register_cluster ; then
+  if ! is_cluster_registered && ! can_register_cluster && ! use_fleet_api ; then
     context_set-option "USE_HUB_WIP" 0
   fi
 }

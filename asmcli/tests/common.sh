@@ -263,7 +263,7 @@ create_working_cluster() {
   local CLUSTER_NAME; CLUSTER_NAME="$2"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$3"
 
-  gcloud beta container \
+  gcloud container \
     --project "${PROJECT_ID}" \
     clusters create "${CLUSTER_NAME}" \
     --zone "${CLUSTER_LOCATION}" \

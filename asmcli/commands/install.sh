@@ -106,6 +106,44 @@ install_canonical_controller() {
   info "...done!"
 }
 
+install_fleet_api() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}")"
+
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+
+  local MEMBERSHIP_LOCATION
+  MEMBERSHIP_LOCATION="$(gcloud container fleet memberships list \
+    --project "${FLEET_ID}" \
+    --filter=name:"${MEMBERSHIP_NAME}" \
+    --format=json | jq .[].name | sed 's/^.*locations\/\(.*\)\/memberships.*/\1/')"
+
+  info "Calling Fleet API to enable control plane management..."
+  run_command gcloud container fleet mesh update \
+     --management automatic \
+     --memberships "${MEMBERSHIP_NAME}" \
+     --project "${FLEET_ID}" \
+     --location "${MEMBERSHIP_LOCATION}"
+
+  local LIMIT; LIMIT=5
+  info "Waiting for revision to become ready (${LIMIT} minutes)..."
+  for i in $(seq 0 "${LIMIT}"); do
+    if ! gcloud container fleet mesh describe --project "${FLEET_ID}" --format=json | \
+      jq '.membershipStates | with_entries(select(.key|test("'"${MEMBERSHIP_NAME}"'")))[].servicemesh.controlPlaneManagement' | \
+      grep -q "REVISION_READY"; then
+      echo -n "."
+      sleep 60
+    else break
+    fi
+    if [[ "${i}" -eq "${LIMIT}" ]]; then
+      warn "Not ready after ${LIMIT} minutes. Installation may eventually be successful."
+    fi
+  done
+  info "...done!"
+}
+
 install_control_plane_revisions() {
   info "Configuring ASM managed control plane revision CR for channels..."
 
@@ -205,7 +243,6 @@ install_ca() {
 }
 
 install_control_plane() {
-  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
   local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
 
   label_istio_namespace
@@ -218,7 +255,7 @@ install_control_plane() {
   apply_kube_yamls
 
   if is_managed; then
-    install_control_plane_revisions
+    if use_fleet_api; then install_fleet_api; else install_control_plane_revisions; fi
   fi
 
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]] && ! is_managed; then

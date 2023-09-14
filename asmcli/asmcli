@@ -1241,6 +1241,44 @@ install_canonical_controller() {
   info "...done!"
 }
 
+install_fleet_api() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}")"
+
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+
+  local MEMBERSHIP_LOCATION
+  MEMBERSHIP_LOCATION="$(gcloud container fleet memberships list \
+    --project "${FLEET_ID}" \
+    --filter=name:"${MEMBERSHIP_NAME}" \
+    --format=json | jq .[].name | sed 's/^.*locations\/\(.*\)\/memberships.*/\1/')"
+
+  info "Calling Fleet API to enable control plane management..."
+  run_command gcloud container fleet mesh update \
+     --management automatic \
+     --memberships "${MEMBERSHIP_NAME}" \
+     --project "${FLEET_ID}" \
+     --location "${MEMBERSHIP_LOCATION}"
+
+  local LIMIT; LIMIT=5
+  info "Waiting for revision to become ready (${LIMIT} minutes)..."
+  for i in $(seq 0 "${LIMIT}"); do
+    if ! gcloud container fleet mesh describe --project "${FLEET_ID}" --format=json | \
+      jq '.membershipStates | with_entries(select(.key|test("'"${MEMBERSHIP_NAME}"'")))[].servicemesh.controlPlaneManagement' | \
+      grep -q "REVISION_READY"; then
+      echo -n "."
+      sleep 60
+    else break
+    fi
+    if [[ "${i}" -eq "${LIMIT}" ]]; then
+      warn "Not ready after ${LIMIT} minutes. Installation may eventually be successful."
+    fi
+  done
+  info "...done!"
+}
+
 install_control_plane_revisions() {
   info "Configuring ASM managed control plane revision CR for channels..."
 
@@ -1340,7 +1378,6 @@ install_ca() {
 }
 
 install_control_plane() {
-  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
   local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
 
   label_istio_namespace
@@ -1353,7 +1390,7 @@ install_control_plane() {
   apply_kube_yamls
 
   if is_managed; then
-    install_control_plane_revisions
+    if use_fleet_api; then install_fleet_api; else install_control_plane_revisions; fi
   fi
 
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]] && ! is_managed; then
@@ -2680,6 +2717,7 @@ context_init() {
     "OPTIONAL_OVERLAY": "${OPTIONAL_OVERLAY:-}",
     "NETWORK_ID": "${NETWORK_ID:-}",
     "DISABLE_UI": "${DISABLE_UI:-0}",
+    "EXPLICIT_FLEET_API": ${EXPLICIT_FLEET_API:-0},
     "ENABLE_ALL": ${ENABLE_ALL:-0},
     "ENABLE_CLUSTER_ROLES": ${ENABLE_CLUSTER_ROLES:-0},
     "ENABLE_CLUSTER_LABELS": ${ENABLE_CLUSTER_LABELS:-0},
@@ -2837,6 +2875,7 @@ default_zero_opts() {
   cat <<EOF
 KUBECONFIG_SUPPLIED
 DISABLE_UI
+EXPLICIT_FLEET_API
 ENABLE_ALL
 ENABLE_CLUSTER_ROLES
 ENABLE_CLUSTER_LABELS
@@ -3512,6 +3551,10 @@ parse_args() {
         context_set-option "ENABLE_ALL" 1
         shift 1
         ;;
+      --use_fleet_api | --use-fleet-api)
+        context_set-option "EXPLICIT_FLEET_API" 1
+        shift 1
+        ;;
       --enable_cluster_roles | --enable-cluster-roles)
         context_set-option "ENABLE_CLUSTER_ROLES" 1
         shift 1
@@ -3844,6 +3887,7 @@ x_parse_install_args() {
   fi
 }
 KUBE_TAG_MAX_LEN=63; readonly KUBE_TAG_MAX_LEN
+GKE_RELEASE_CHANNEL="";
 
 gen_install_params() {
   local CA; CA="$(context_get-option "CA")"
@@ -4539,14 +4583,35 @@ init_meshconfig_curl() {
 }
 
 get_gke_release_channel() {
+  if [[ -n "${GKE_RELEASE_CHANNEL}" ]]; then echo "${GKE_RELEASE_CHANNEL}"; return; fi
+
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
-  gcloud container clusters describe \
+  GKE_RELEASE_CHANNEL="$(gcloud container clusters describe \
     --project="${PROJECT_ID}" \
     --region "${CLUSTER_LOCATION}" \
     "${CLUSTER_NAME}" \
-    --format="value(releaseChannel.channel)"
+    --format="value(releaseChannel.channel)")"
+  readonly GKE_RELEASE_CHANNEL; echo "${GKE_RELEASE_CHANNEL}"
+}
+
+channels_match() {
+  [[ "$(get_cr_channel)" == "$(get_gke_release_channel)" ]]
+}
+
+use_fleet_api() {
+  # At first, must be explicitly asked for as well as meeting criteria.
+  local EXPLICIT_FLEET_API; EXPLICIT_FLEET_API="$(context_get-option "EXPLICIT_FLEET_API")"
+  if [[ "${EXPLICIT_FLEET_API}" -ne 1 ]]; then
+    false
+    return
+  fi
+
+  local CA; CA="$(context_get-option "CA")"
+  if channels_match && [[ "$(get_cr_channel)" != "stable" ]] && [[ "${CA}" != *cas ]]; then return; fi
+
+  fatal "Fleet API requested, but requirements not met."
 }
 
 get_cr_channel() {
@@ -4689,7 +4754,7 @@ validate_revision_label() {
 }
 
 validate_hub() {
-  if ! is_cluster_registered && ! can_register_cluster ; then
+  if ! is_cluster_registered && ! can_register_cluster && ! use_fleet_api ; then
     context_set-option "USE_HUB_WIP" 0
   fi
 }

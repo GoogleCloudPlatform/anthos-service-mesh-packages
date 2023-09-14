@@ -95,6 +95,10 @@ parse_args() {
         context_set-option "ENABLE_ALL" 1
         shift 1
         ;;
+      --use_fleet_api | --use-fleet-api)
+        context_set-option "EXPLICIT_FLEET_API" 1
+        shift 1
+        ;;
       --enable_cluster_roles | --enable-cluster-roles)
         context_set-option "ENABLE_CLUSTER_ROLES" 1
         shift 1

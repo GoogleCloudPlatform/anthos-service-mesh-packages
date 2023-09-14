@@ -1,4 +1,5 @@
 KUBE_TAG_MAX_LEN=63; readonly KUBE_TAG_MAX_LEN
+GKE_RELEASE_CHANNEL="";
 
 gen_install_params() {
   local CA; CA="$(context_get-option "CA")"
@@ -694,14 +695,35 @@ init_meshconfig_curl() {
 }
 
 get_gke_release_channel() {
+  if [[ -n "${GKE_RELEASE_CHANNEL}" ]]; then echo "${GKE_RELEASE_CHANNEL}"; return; fi
+
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
-  gcloud container clusters describe \
+  GKE_RELEASE_CHANNEL="$(gcloud container clusters describe \
     --project="${PROJECT_ID}" \
     --region "${CLUSTER_LOCATION}" \
     "${CLUSTER_NAME}" \
-    --format="value(releaseChannel.channel)"
+    --format="value(releaseChannel.channel)")"
+  readonly GKE_RELEASE_CHANNEL; echo "${GKE_RELEASE_CHANNEL}"
+}
+
+channels_match() {
+  [[ "$(get_cr_channel)" == "$(get_gke_release_channel)" ]]
+}
+
+use_fleet_api() {
+  # At first, must be explicitly asked for as well as meeting criteria.
+  local EXPLICIT_FLEET_API; EXPLICIT_FLEET_API="$(context_get-option "EXPLICIT_FLEET_API")"
+  if [[ "${EXPLICIT_FLEET_API}" -ne 1 ]]; then
+    false
+    return
+  fi
+
+  local CA; CA="$(context_get-option "CA")"
+  if channels_match && [[ "$(get_cr_channel)" != "stable" ]] && [[ "${CA}" != *cas ]]; then return; fi
+
+  fatal "Fleet API requested, but requirements not met."
 }
 
 get_cr_channel() {

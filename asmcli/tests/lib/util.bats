@@ -7,6 +7,48 @@ setup() {
   context_init
 }
 
+@test "UTIL: Fleet API should work with compatible settings" {
+  run context_set-option "EXPLICIT_FLEET_API" "1"
+  run context_set-option "CA" "mesh_ca"
+  GKE_RELEASE_CHANNEL="regular"
+  CHANNEL="regular"
+  assert use_fleet_api
+}
+
+@test "UTIL: Fleet API should only work when requested" {
+  run context_set-option "CA" "mesh_ca"
+  GKE_RELEASE_CHANNEL="regular"
+  CHANNEL="regular"
+  refute use_fleet_api
+}
+
+@test "UTIL: Fleet API should not work with stable channel" {
+  run context_set-option "EXPLICIT_FLEET_API" "1"
+  run context_set-option "CA" "mesh_ca"
+  GKE_RELEASE_CHANNEL="stable"
+  CHANNEL="stable"
+  run use_fleet_api
+  assert_failure
+}
+
+@test "UTIL: Fleet API should not work with mismatched channels" {
+  run context_set-option "EXPLICIT_FLEET_API" "1"
+  run context_set-option "CA" "mesh_ca"
+  GKE_RELEASE_CHANNEL="rapid"
+  CHANNEL="regular"
+  run use_fleet_api
+  assert_failure
+}
+
+@test "UTIL: Fleet API should not work with CAS" {
+  run context_set-option "EXPLICIT_FLEET_API" "1"
+  run context_set-option "CA" "managed_cas"
+  GKE_RELEASE_CHANNEL="regular"
+  CHANNEL="regular"
+  run use_fleet_api
+  assert_failure
+}
+
 @test "UTIL: Citadel CA should include citadel-ca overlay" {
   run context_set-option "CA" "citadel"
   run gen_install_params
