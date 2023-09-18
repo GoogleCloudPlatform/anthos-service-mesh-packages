@@ -20,19 +20,34 @@ configure_package() {
 
   populate_fleet_info
 
-  if is_gcp; then
-    kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
-    kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
-    kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
+  local MONITORING_CONFIG_JSON; MONITORING_CONFIG_JSON=$(get_monitoring_config_membership_json "${HUB_MEMBERSHIP_ID}" "${PROJECT_ID}")
+  if [ -n "$MONITORING_CONFIG_JSON" ]
+  then
+    MONITORING_CONFIG_PROJECT_ID="$(echo "${MONITORING_CONFIG_JSON}" | jq -r '.monitoringConfig.projectId')"
+    MONITORING_CONFIG_CLUSTER_NAME="$(echo "${MONITORING_CONFIG_JSON}" | jq -r '.monitoringConfig.cluster')"
+    MONITORING_CONFIG_CLUSTER_LOCATION="$(echo "${MONITORING_CONFIG_JSON}" | jq -r '.monitoringConfig.location')"
+
+    kpt cfg set asm gcloud.core.project "${MONITORING_CONFIG_PROJECT_ID}"
+    kpt cfg set asm gcloud.container.cluster "${MONITORING_CONFIG_CLUSTER_NAME}"
+    kpt cfg set asm gcloud.compute.location "${MONITORING_CONFIG_CLUSTER_LOCATION}"
   else
-    kpt cfg set asm gcloud.core.project "${FLEET_ID}"
-    if [[ -n "${HUB_MEMBERSHIP_ID}" ]]; then
-      kpt cfg set asm gcloud.container.cluster "${HUB_MEMBERSHIP_ID}"
+    if is_gcp; then
+      kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
+      kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
+      kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
     else
-      kpt cfg set asm gcloud.container.cluster "cluster" # default off-GCP cluster name
+      kpt cfg set asm gcloud.core.project "${FLEET_ID}"
+      if [[ -n "${HUB_MEMBERSHIP_ID}" ]]; then
+        kpt cfg set asm gcloud.container.cluster "${HUB_MEMBERSHIP_ID}"
+      else
+        kpt cfg set asm gcloud.container.cluster "cluster" # default off-GCP cluster name
+      fi
+      # "global" is the current default value for off-GCP
+      kpt cfg set asm gcloud.compute.location "global"
     fi
-    # "global" is the current default value for off-GCP
-    kpt cfg set asm gcloud.compute.location "global"
+  fi
+
+  if ! is_gcp; then
     if [[ "${CA}" == "citadel" && "${INCLUDES_STACKDRIVER}" -eq 0 ]]; then
       kpt cfg set asm anthos.servicemesh.controlplane.monitoring.enabled "false"
     fi
