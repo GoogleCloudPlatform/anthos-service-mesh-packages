@@ -67,9 +67,9 @@ configure_off_gcp_gcp_metadata(){
 
   MONITORING_CONFIG_JSON=$(get_monitoring_config_membership_json "${HUB_MEMBERSHIP_ID}" "${PROJECT_ID}")
   
-  kpt cfg set asm gcloud.core.project "$(echo $MONITORING_CONFIG_JSON | jq '.monitoringConfig.projectId')"
-  kpt cfg set asm gcloud.container.cluster "$(echo $MONITORING_CONFIG_JSON | jq '.monitoringConfig.cluster')"
-  kpt cfg set asm gcloud.compute.location "$(echo $MONITORING_CONFIG_JSON | jq '.monitoringConfig.location')"
+  kpt cfg set asm gcloud.core.project "$(echo "${MONITORING_CONFIG_JSON}" | jq '.monitoringConfig.projectId')"
+  kpt cfg set asm gcloud.container.cluster "$(echo "${MONITORING_CONFIG_JSON}" | jq '.monitoringConfig.cluster')"
+  kpt cfg set asm gcloud.compute.location "$(echo "${MONITORING_CONFIG_JSON}" | jq '.monitoringConfig.location')"
 }
 
 configure_kubectl(){
