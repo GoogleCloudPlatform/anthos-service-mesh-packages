@@ -2664,10 +2664,13 @@ configure_package() {
 configure_off_gcp_gcp_metadata(){
   local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="${1}"
   local PROJECT_ID; PROJECT_ID="${2}"
+  local MONITORING_CONFIG_JSON;
+
+  MONITORING_CONFIG_JSON=$(get_monitoring_config_membership_json "${HUB_MEMBERSHIP_ID}" "${PROJECT_ID}")
   
-  kpt cfg set asm gcloud.core.project "$(get_monitoring_config_membership_project_id "${OFF_GCP_MEMBERSHIP_NAME}" "${PROJECT_ID}")"
-  kpt cfg set asm gcloud.container.cluster "$(get_monitoring_config_membership_cluster "${OFF_GCP_MEMBERSHIP_NAME}" "${PROJECT_ID}")"
-  kpt cfg set asm gcloud.compute.location "$(get_monitoring_config_membership_location "${OFF_GCP_MEMBERSHIP_NAME}" "${PROJECT_ID}")"
+  kpt cfg set asm gcloud.core.project "$(echo $MONITORING_CONFIG_JSON | jq '.monitoringConfig.projectId')"
+  kpt cfg set asm gcloud.container.cluster "$(echo $MONITORING_CONFIG_JSON | jq '.monitoringConfig.cluster')"
+  kpt cfg set asm gcloud.compute.location "$(echo $MONITORING_CONFIG_JSON | jq '.monitoringConfig.location')"
 }
 
 configure_kubectl(){
@@ -4739,36 +4742,15 @@ ensure_cross_project_sa() {
   false
 }
 
-get_monitoring_config_membership_location () {
+get_monitoring_config_membership_json () {
   local MEMBERSHIP_NAME; MEMBERSHIP_NAME="${1}"
   local PROJECT_ID; PROJECT_ID="${2}"
-  local CONFIG_LOCATION; 
+  local CONFIG; 
   
-  CONFIG_LOCATION="$(gcloud container hub memberships describe "${MEMBERSHIP_NAME}" --project "${PROJECT_ID}" --format="value(monitoringConfig.location)")"
+  CONFIG="$(gcloud container hub memberships describe "${MEMBERSHIP_NAME}" --project "${PROJECT_ID}" --format="json(monitoringConfig)")"
   
-  echo "${CONFIG_LOCATION}"
+  echo "${CONFIG}"
 }
-
-get_monitoring_config_membership_cluster () {
-  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="${1}"
-  local PROJECT_ID; PROJECT_ID="${2}"
-  local CONFIG_CLUSTER; 
-
-  CONFIG_CLUSTER="$(gcloud container hub memberships describe "${MEMBERSHIP_NAME}" --project "${PROJECT_ID}" --format="value(monitoringConfig.cluster)")"
-  
-  echo "${CONFIG_CLUSTER}"
-}
-
-get_monitoring_config_membership_project_id () {
-  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="${1}"
-  local PROJECT_ID; PROJECT_ID="${2}"
-  local CONFIG_PROJECT_ID; 
-
-  CONFIG_PROJECT_ID="$(gcloud container hub memberships describe "${MEMBERSHIP_NAME}" --project "${PROJECT_ID}" --format="value(monitoringConfig.projectId)")"
-  
-  echo "${CONFIG_PROJECT_ID}"
-}
-
 validate_revision_label() {
   # Matches DNS label formats of RFC 1123
   local DNS_1123_LABEL_MAX_LEN; DNS_1123_LABEL_MAX_LEN=63;

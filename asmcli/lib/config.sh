@@ -63,10 +63,13 @@ configure_package() {
 configure_off_gcp_gcp_metadata(){
   local HUB_MEMBERSHIP_ID; HUB_MEMBERSHIP_ID="${1}"
   local PROJECT_ID; PROJECT_ID="${2}"
+  local MONITORING_CONFIG_JSON;
+
+  MONITORING_CONFIG_JSON=$(get_monitoring_config_membership_json "${HUB_MEMBERSHIP_ID}" "${PROJECT_ID}")
   
-  kpt cfg set asm gcloud.core.project "$(get_monitoring_config_membership_project_id "${OFF_GCP_MEMBERSHIP_NAME}" "${PROJECT_ID}")"
-  kpt cfg set asm gcloud.container.cluster "$(get_monitoring_config_membership_cluster "${OFF_GCP_MEMBERSHIP_NAME}" "${PROJECT_ID}")"
-  kpt cfg set asm gcloud.compute.location "$(get_monitoring_config_membership_location "${OFF_GCP_MEMBERSHIP_NAME}" "${PROJECT_ID}")"
+  kpt cfg set asm gcloud.core.project "$(echo $MONITORING_CONFIG_JSON | jq '.monitoringConfig.projectId')"
+  kpt cfg set asm gcloud.container.cluster "$(echo $MONITORING_CONFIG_JSON | jq '.monitoringConfig.cluster')"
+  kpt cfg set asm gcloud.compute.location "$(echo $MONITORING_CONFIG_JSON | jq '.monitoringConfig.location')"
 }
 
 configure_kubectl(){

@@ -848,33 +848,12 @@ ensure_cross_project_sa() {
   false
 }
 
-get_monitoring_config_membership_location () {
+get_monitoring_config_membership_json () {
   local MEMBERSHIP_NAME; MEMBERSHIP_NAME="${1}"
   local PROJECT_ID; PROJECT_ID="${2}"
-  local CONFIG_LOCATION; 
+  local CONFIG; 
   
-  CONFIG_LOCATION="$(gcloud container hub memberships describe "${MEMBERSHIP_NAME}" --project "${PROJECT_ID}" --format="value(monitoringConfig.location)")"
+  CONFIG="$(gcloud container hub memberships describe "${MEMBERSHIP_NAME}" --project "${PROJECT_ID}" --format="json(monitoringConfig)")"
   
-  echo "${CONFIG_LOCATION}"
+  echo "${CONFIG}"
 }
-
-get_monitoring_config_membership_cluster () {
-  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="${1}"
-  local PROJECT_ID; PROJECT_ID="${2}"
-  local CONFIG_CLUSTER; 
-
-  CONFIG_CLUSTER="$(gcloud container hub memberships describe "${MEMBERSHIP_NAME}" --project "${PROJECT_ID}" --format="value(monitoringConfig.cluster)")"
-  
-  echo "${CONFIG_CLUSTER}"
-}
-
-get_monitoring_config_membership_project_id () {
-  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="${1}"
-  local PROJECT_ID; PROJECT_ID="${2}"
-  local CONFIG_PROJECT_ID; 
-
-  CONFIG_PROJECT_ID="$(gcloud container hub memberships describe "${MEMBERSHIP_NAME}" --project "${PROJECT_ID}" --format="value(monitoringConfig.projectId)")"
-  
-  echo "${CONFIG_PROJECT_ID}"
-}
-
