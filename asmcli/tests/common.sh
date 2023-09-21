@@ -305,7 +305,7 @@ cleanup_lt_cluster() {
   local DIR; DIR="$2"
 
   set +e
-  "${DIR}"/istio*/bin/istioctl x uninstall --purge -y
+  "${DIR}"/istio*/bin/istioctl uninstall --purge -y
   remove_ns "${NAMESPACE}" || true
   remove_ns istio-system || true
   remove_ns asm-system || true
@@ -323,7 +323,7 @@ cleanup_old_test_namespaces() {
   local CREATE_TS
   local NSS; NSS="istio-system asm-system"
 
-  "${DIR}"/istio*/bin/istioctl x uninstall --purge -y
+  "${DIR}"/istio*/bin/istioctl uninstall --purge -y
 
   while read -r isodate ns; do
     CREATE_TS="$(date -d "${isodate}" +%s)"
