@@ -63,9 +63,6 @@ required_apis() {
 mesh.googleapis.com
 EOF
   case "${CA}" in
-   gcp_cas)
-     echo privateca.googleapis.com
-     ;;
    managed_cas)
      echo workloadcertificate.googleapis.com
      ;;
@@ -84,9 +81,6 @@ required_fleet_apis() {
   case "${CA}" in
    mesh_ca)
      echo meshca.googleapis.com
-     ;;
-   gcp_cas)
-     echo privateca.googleapis.com
      ;;
    managed_cas)
      echo workloadcertificate.googleapis.com
