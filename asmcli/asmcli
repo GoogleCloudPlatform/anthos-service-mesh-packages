@@ -41,7 +41,7 @@ _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"; readonly _CI_I_AM_A_TEST_RO
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=16}"; readonly MINOR;
 POINT="${POINT:=7}"; readonly POINT;
-REV="${REV:=7}"; readonly REV;
+REV="${REV:=10}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
@@ -3351,7 +3351,7 @@ populate_fleet_info() {
     -n "${HUB_IDP_URL}" ]]; then return; fi
 
   if ! is_membership_crd_installed; then return; fi
-HUB_MEMBERSHIP_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.owner.id | sed 's/^\"\/\/\(autopush-\)\{0,1\}gkehub\(.sandbox\)\{0,1\}.googleapis.com\/projects\/\(.*\)\/locations\/global\/memberships\/\(.*\)\"$/\4/g')"
+  HUB_MEMBERSHIP_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.owner.id | sed 's/^\"\/\/\(autopush-\)\{0,1\}gkehub\(.sandbox\)\{0,1\}.googleapis.com\/projects\/\(.*\)\/locations\/\(.*\)\/memberships\/\(.*\)\"$/\5/g')"
   context_set-option "HUB_MEMBERSHIP_ID" "${HUB_MEMBERSHIP_ID}"
   HUB_IDP_URL="$(kubectl get memberships.hub.gke.io membership -o=jsonpath='{.spec.identity_provider}')"
   context_set-option "HUB_IDP_URL" "${HUB_IDP_URL}"
