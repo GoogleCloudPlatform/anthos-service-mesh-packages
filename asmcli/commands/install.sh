@@ -144,23 +144,36 @@ install_fleet_api() {
   info "...done!"
 }
 
-install_control_plane_revisions() {
-  info "Configuring ASM managed control plane revision CR for channels..."
+install_control_plane_revision() {
+  info "Configuring ASM managed control plane revision CR..."
 
-  local CHANNEL CR REVISION
-  while read -r CHANNEL; do
-    read -r CR REVISION<<EOF
+  local CHANNEL CR REVISION SPECIFIED_CHANNEL
+  CHANNEL="$(get_cr_channel)"
+  SPECIFIED_CHANNEL="$(context_get-option "CHANNEL")"
+
+  read -r CR REVISION<<EOF
 $(get_cr_yaml "${CHANNEL}")
 EOF
-    info "Installing ASM Control Plane Revision CR with ${REVISION} channel in istio-system namespace..."
-    retry 3 kubectl apply -f "${CR}"
+  info "Installing ASM Control Plane Revision CR with ${REVISION} channel in istio-system namespace..."
+  retry 3 kubectl apply -f "${CR}"
 
-    info "Waiting for deployment..."
-    retry 3 kubectl wait --for=condition=ProvisioningFinished \
-      controlplanerevision "${REVISION}" -n istio-system --timeout 600s
-  done <<EOF
-$(get_cr_channel)
-EOF
+  if [[ -n "${SPECIFIED_CHANNEL}" && "${SPECIFIED_CHANNEL}" != "${CHANNEL}" ]]; then
+    info "Adding tag for ${SPECIFIED_CHANNEL}..."
+    local TAG_NAME; TAG_NAME="$(map_channel_name "${SPECIFIED_CHANNEL}")"
+    kubectl annotate -f "${CR}" "mesh.cloud.google.com/tags=${TAG_NAME}"
+  fi
+
+  info "Waiting for deployment..."
+  retry 3 kubectl wait --for=condition=ProvisioningFinished \
+    controlplanerevision "${REVISION}" -n istio-system --timeout 600s
+}
+
+map_channel_name() {
+  case "${1}" in
+    regular) echo "asm-managed";;
+    rapid) echo "asm-managed-rapid";;
+    stable) echo "asm-managed-stable";;
+  esac
 }
 
 expose_istiod() {
@@ -255,7 +268,7 @@ install_control_plane() {
   apply_kube_yamls
 
   if is_managed; then
-    if use_fleet_api; then install_fleet_api; else install_control_plane_revisions; fi
+    if use_fleet_api; then install_fleet_api; else install_control_plane_revision; fi
   fi
 
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]] && ! is_managed; then

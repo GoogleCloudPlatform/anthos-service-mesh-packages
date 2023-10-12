@@ -224,6 +224,7 @@ parse_args() {
       --channel)
         arg_required "${@}"
         context_set-option "CHANNEL" "${2}"
+        warn "Channel selection will no longer affect version, but revision names and tags will be respected."
         shift 2
         ;;
       --offline)
