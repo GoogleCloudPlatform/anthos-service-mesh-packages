@@ -853,7 +853,5 @@ get_monitoring_config_membership_json () {
   local PROJECT_ID; PROJECT_ID="${2}"
   local CONFIG; 
   
-  CONFIG="$(gcloud container hub memberships describe "${MEMBERSHIP_NAME}" --project "${PROJECT_ID}" --format="json(monitoringConfig)")"
-  
-  echo "${CONFIG}"
+  echo "$(gcloud container hub memberships describe "${MEMBERSHIP_NAME}" --project "${PROJECT_ID}" --format="json(monitoringConfig)")"
 }
