@@ -826,12 +826,11 @@ ensure_cross_project_sa() {
   false
 }
 
-get_monitoring_config_membership_location () {
+get_monitoring_config_membership_json () {
   local MEMBERSHIP_NAME; MEMBERSHIP_NAME="${1}"
   local PROJECT_ID; PROJECT_ID="${2}"
-
-  LOCATION="$(gcloud container hub memberships describe "${MEMBERSHIP_NAME}" --project "${PROJECT_ID}" --format="value(monitoringConfig.location)")"
+  local CONFIG; 
   
-  echo "${LOCATION}"
+  CONFIG="$(gcloud container hub memberships describe "${MEMBERSHIP_NAME}" --project "${PROJECT_ID}" --format="json(monitoringConfig)")"
+  echo "${CONFIG}"
 }
-
