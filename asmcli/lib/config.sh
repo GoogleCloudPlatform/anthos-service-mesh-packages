@@ -22,7 +22,7 @@ configure_package() {
 
   local MONITORING_CONFIG_JSON; MONITORING_CONFIG_JSON=$(get_monitoring_config_membership_json "${HUB_MEMBERSHIP_ID}" "${PROJECT_ID}")
   local MONITORING_CONFIG_JSON_PROJECT_ID; MONITORING_CONFIG_JSON_PROJECT_ID="$(echo "${MONITORING_CONFIG_JSON}" | jq -r '.monitoringConfig.projectId')"
-  if [ -n "$MONITORING_CONFIG_JSON_PROJECT_ID" ]
+  if [[ -n "$MONITORING_CONFIG_JSON_PROJECT_ID" && "${MONITORING_CONFIG_JSON_PROJECT_ID}" != "null" ]]
   then
     kpt cfg set asm gcloud.core.project "${MONITORING_CONFIG_JSON_PROJECT_ID}"
     kpt cfg set asm gcloud.container.cluster "$(echo "${MONITORING_CONFIG_JSON}" | jq -r '.monitoringConfig.cluster')"
