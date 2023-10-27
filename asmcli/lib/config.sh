@@ -20,10 +20,13 @@ configure_package() {
 
   populate_fleet_info
 
-  if is_gcp; then
-    kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
-    kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
-    kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
+  local MONITORING_CONFIG_JSON; MONITORING_CONFIG_JSON=$(get_monitoring_config_membership_json "${HUB_MEMBERSHIP_ID}" "${PROJECT_ID}")
+  local MONITORING_CONFIG_JSON_PROJECT_ID; MONITORING_CONFIG_JSON_PROJECT_ID="$(echo "${MONITORING_CONFIG_JSON}" | jq -r '.monitoringConfig.projectId')"
+  if [[ -n "$MONITORING_CONFIG_JSON_PROJECT_ID" && "${MONITORING_CONFIG_JSON_PROJECT_ID}" != "null" ]]
+  then
+    kpt cfg set asm gcloud.core.project "${MONITORING_CONFIG_JSON_PROJECT_ID}"
+    kpt cfg set asm gcloud.container.cluster "$(echo "${MONITORING_CONFIG_JSON}" | jq -r '.monitoringConfig.cluster')"
+    kpt cfg set asm gcloud.compute.location "$(echo "${MONITORING_CONFIG_JSON}" | jq -r '.monitoringConfig.location')"
   else
     kpt cfg set asm gcloud.core.project "${FLEET_ID}"
     if [[ -n "${HUB_MEMBERSHIP_ID}" ]]; then

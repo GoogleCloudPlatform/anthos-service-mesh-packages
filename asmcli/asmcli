@@ -42,7 +42,7 @@ MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=19}"; readonly MINOR;
 POINT="${POINT:=3}"; readonly POINT;
 REV="${REV:=0}"; readonly REV;
-CONFIG_VER="${CONFIG_VER:="1"}"; readonly CONFIG_VER;
+CONFIG_VER="${CONFIG_VER:="2"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
 ### File related constants ###
@@ -2621,10 +2621,13 @@ configure_package() {
 
   populate_fleet_info
 
-  if is_gcp; then
-    kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
-    kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
-    kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
+  local MONITORING_CONFIG_JSON; MONITORING_CONFIG_JSON=$(get_monitoring_config_membership_json "${HUB_MEMBERSHIP_ID}" "${PROJECT_ID}")
+  local MONITORING_CONFIG_JSON_PROJECT_ID; MONITORING_CONFIG_JSON_PROJECT_ID="$(echo "${MONITORING_CONFIG_JSON}" | jq -r '.monitoringConfig.projectId')"
+  if [[ -n "$MONITORING_CONFIG_JSON_PROJECT_ID" && "${MONITORING_CONFIG_JSON_PROJECT_ID}" != "null" ]]
+  then
+    kpt cfg set asm gcloud.core.project "${MONITORING_CONFIG_JSON_PROJECT_ID}"
+    kpt cfg set asm gcloud.container.cluster "$(echo "${MONITORING_CONFIG_JSON}" | jq -r '.monitoringConfig.cluster')"
+    kpt cfg set asm gcloud.compute.location "$(echo "${MONITORING_CONFIG_JSON}" | jq -r '.monitoringConfig.location')"
   else
     kpt cfg set asm gcloud.core.project "${FLEET_ID}"
     if [[ -n "${HUB_MEMBERSHIP_ID}" ]]; then
@@ -4730,6 +4733,14 @@ ensure_cross_project_sa() {
   false
 }
 
+get_monitoring_config_membership_json () {
+  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="${1}"
+  local PROJECT_ID; PROJECT_ID="${2}"
+  local CONFIG; 
+  
+  CONFIG="$(gcloud container hub memberships describe "${MEMBERSHIP_NAME}" --project "${PROJECT_ID}" --format="json(monitoringConfig)")"
+  echo "${CONFIG}"
+}
 validate_revision_label() {
   # Matches DNS label formats of RFC 1123
   local DNS_1123_LABEL_MAX_LEN; DNS_1123_LABEL_MAX_LEN=63;
