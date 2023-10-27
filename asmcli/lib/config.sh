@@ -28,23 +28,14 @@ configure_package() {
     kpt cfg set asm gcloud.container.cluster "$(echo "${MONITORING_CONFIG_JSON}" | jq -r '.monitoringConfig.cluster')"
     kpt cfg set asm gcloud.compute.location "$(echo "${MONITORING_CONFIG_JSON}" | jq -r '.monitoringConfig.location')"
   else
-    if is_gcp; then
-      kpt cfg set asm gcloud.core.project "${PROJECT_ID}"
-      kpt cfg set asm gcloud.container.cluster "${CLUSTER_NAME}"
-      kpt cfg set asm gcloud.compute.location "${CLUSTER_LOCATION}"
+    kpt cfg set asm gcloud.core.project "${FLEET_ID}"
+    if [[ -n "${HUB_MEMBERSHIP_ID}" ]]; then
+      kpt cfg set asm gcloud.container.cluster "${HUB_MEMBERSHIP_ID}"
     else
-      kpt cfg set asm gcloud.core.project "${FLEET_ID}"
-      if [[ -n "${HUB_MEMBERSHIP_ID}" ]]; then
-        kpt cfg set asm gcloud.container.cluster "${HUB_MEMBERSHIP_ID}"
-      else
-        kpt cfg set asm gcloud.container.cluster "cluster" # default off-GCP cluster name
-      fi
-      # "global" is the current default value for off-GCP
-      kpt cfg set asm gcloud.compute.location "global"
+      kpt cfg set asm gcloud.container.cluster "cluster" # default off-GCP cluster name
     fi
-  fi
-
-  if ! is_gcp; then
+    # "global" is the current default value for off-GCP
+    kpt cfg set asm gcloud.compute.location "global"
     if [[ "${CA}" == "citadel" && "${INCLUDES_STACKDRIVER}" -eq 0 ]]; then
       kpt cfg set asm anthos.servicemesh.controlplane.monitoring.enabled "false"
     fi
