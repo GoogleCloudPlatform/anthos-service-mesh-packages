@@ -4733,6 +4733,14 @@ ensure_cross_project_sa() {
   false
 }
 
+get_monitoring_config_membership_json () {
+  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="${1}"
+  local PROJECT_ID; PROJECT_ID="${2}"
+  local CONFIG;
+
+  CONFIG="$(gcloud container hub memberships describe "${MEMBERSHIP_NAME}" --project "${PROJECT_ID}" --format="json(monitoringConfig)")"
+  echo "${CONFIG}"
+}
 validate_revision_label() {
   # Matches DNS label formats of RFC 1123
   local DNS_1123_LABEL_MAX_LEN; DNS_1123_LABEL_MAX_LEN=63;
