@@ -20,7 +20,7 @@ configure_package() {
 
   populate_fleet_info
 
-  local MONITORING_CONFIG_JSON; MONITORING_CONFIG_JSON=$(get_monitoring_config_membership_json "${HUB_MEMBERSHIP_ID}" "${PROJECT_ID}")
+  local MONITORING_CONFIG_JSON; MONITORING_CONFIG_JSON=$(get_monitoring_config_membership_json "${HUB_MEMBERSHIP_ID}" "${FLEET_ID}")
   local MONITORING_CONFIG_JSON_PROJECT_ID; MONITORING_CONFIG_JSON_PROJECT_ID="$(echo "${MONITORING_CONFIG_JSON}" | jq -r '.monitoringConfig.projectId')"
   if [[ -n "$MONITORING_CONFIG_JSON_PROJECT_ID" && "${MONITORING_CONFIG_JSON_PROJECT_ID}" != "null" ]]
   then
