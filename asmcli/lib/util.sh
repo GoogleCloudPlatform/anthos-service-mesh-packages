@@ -302,8 +302,9 @@ EOF
     if should_download_kpt_package; then
       download_kpt_package
     fi
-    organize_kpt_files
   fi
+
+  organize_kpt_files
 }
 
 init() {
