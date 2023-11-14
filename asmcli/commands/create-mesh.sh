@@ -247,8 +247,9 @@ create-mesh_prepare_environment() {
         download_kpt_package
       fi
     fi
-    organize_kpt_files
   fi
+
+  organize_kpt_files
 }
 
 patch_trust_domain_aliases() {
