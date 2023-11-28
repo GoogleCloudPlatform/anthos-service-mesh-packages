@@ -79,6 +79,10 @@ parse_args() {
         elif [[ "${2}" == "prometheus-and-stackdriver" ]]; then
           context_set-option "INCLUDES_PROMETHEUS" 1
           context_set-option "INCLUDES_STACKDRIVER" 1
+        elif [[ "${2}" == "legacy-default-ingressgateway" ]]; then
+          context_set-option "INCLUDES_LEGACY_INGRESS" 1
+        elif [[ "${2}" == "iap-operator" ]]; then
+          context_set-option "INCLUDES_LEGACY_INGRESS" 1
         fi
 
         OPTIONAL_OVERLAY="${2},${OPTIONAL_OVERLAY}"
