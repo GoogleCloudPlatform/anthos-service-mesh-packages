@@ -728,10 +728,7 @@ use_fleet_api() {
 }
 
 get_cr_channel() {
-  local CHANNEL; CHANNEL="$(context_get-option "CHANNEL")"
-  if [[ -n "${CHANNEL}" ]]; then
-    echo "${CHANNEL}"
-  elif ! is_gcp; then
+  if ! is_gcp; then
     echo regular
   else
     local GKE_CHANNEL; GKE_CHANNEL="$(get_gke_release_channel)"

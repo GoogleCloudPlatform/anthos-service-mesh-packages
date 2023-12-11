@@ -88,17 +88,20 @@ EOF
 @test "UTIL: channels should be determined by GKE release channel" {
 
   ### [START] Specified by the users ###
+  get_gke_release_channel() {
+    echo "regular"
+  }
   context_set-option "CHANNEL" "regular"
   run get_cr_channel
   assert_output "regular"
 
   context_set-option "CHANNEL" "stable"
   run get_cr_channel
-  assert_output "stable"
+  assert_output "regular"
 
   context_set-option "CHANNEL" "rapid"
   run get_cr_channel
-  assert_output "rapid"
+  assert_output "regular"
 
   context_set-option "CHANNEL" ""
   ### [END] Specified by the users ###
