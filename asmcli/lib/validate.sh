@@ -255,11 +255,8 @@ validate_ca_consistency() {
 }
 
 validate_no_ingress_gateway() {
-  local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
-  if [[ "${CUSTOM_OVERLAY}" =~ "legacy-default-ingressgateway" || \
-        "${CUSTOM_OVERLAY}" =~ "iap-operator" ]]; then
-    return
-  fi
+  local LEGACY_INGRESS; LEGACY_INGRESS="$(context_get-option "INCLUDES_LEGACY_INGRESS")"
+  if [[ "${LEGACY_INGRESS}" -eq 1 ]]; then return; fi
 
   local INGRESS_GATEWAY_SVC INGRESS_GATEWAY_DEP
   INGRESS_GATEWAY_SVC="$(kubectl get svc istio-ingressgateway -n istio-system || true)"
@@ -269,7 +266,7 @@ validate_no_ingress_gateway() {
   fi
 
   warn "We detected an ASM ingress gateway currently running in the cluster that"
-  warn "will be disabled if installation continues. If this is not intended, please enter"
+  warn "may be disabled if installation continues. If this is not intended, please enter"
   warn "N and re-run the tool with the '--option legacy-default-ingressgateway'."
   if ! prompt_default_no "Continue?"; then fatal "Stopping installation at user request."; fi
 }
