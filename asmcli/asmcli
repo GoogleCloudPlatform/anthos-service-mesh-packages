@@ -40,7 +40,7 @@ _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"; readonly _CI_I_AM_A_TEST_RO
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=18}"; readonly MINOR;
-POINT="${POINT:=5}"; readonly POINT;
+POINT="${POINT:=6}"; readonly POINT;
 REV="${REV:=2}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1"}"; readonly CONFIG_VER;
 K8S_MINOR=0
@@ -2741,6 +2741,7 @@ context_init() {
     "OFFLINE": "${OFFLINE:-0}",
     "INCLUDES_PROMETHEUS": "${INCLUDES_PROMETHEUS:-0}",
     "INCLUDES_STACKDRIVER": "${INCLUDES_STACKDRIVER:-1}",
+    "INCLUDES_LEGACY_INGRESS": "${INCLUDES_LEGACY_INGRESS:-0}",
     "CHANNEL": "${CHANNEL:-}",
     "PRIVATE_ISSUER": "${PRIVATE_ISSUER:-}"
   },
@@ -2881,6 +2882,7 @@ EXPERIMENTAL
 KC_VIA_CONNECT
 OFFLINE
 INCLUDES_PROMETHEUS
+INCLUDES_LEGACY_INGRESS
 EOF
 }
 
@@ -3509,6 +3511,10 @@ parse_args() {
         elif [[ "${2}" == "prometheus-and-stackdriver" ]]; then
           context_set-option "INCLUDES_PROMETHEUS" 1
           context_set-option "INCLUDES_STACKDRIVER" 1
+        elif [[ "${2}" == "legacy-default-ingressgateway" ]]; then
+          context_set-option "INCLUDES_LEGACY_INGRESS" 1
+        elif [[ "${2}" == "iap-operator" ]]; then
+          context_set-option "INCLUDES_LEGACY_INGRESS" 1
         fi
 
         OPTIONAL_OVERLAY="${2},${OPTIONAL_OVERLAY}"
@@ -4950,11 +4956,8 @@ validate_ca_consistency() {
 }
 
 validate_no_ingress_gateway() {
-  local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
-  if [[ "${CUSTOM_OVERLAY}" =~ "legacy-default-ingressgateway" || \
-        "${CUSTOM_OVERLAY}" =~ "iap-operator" ]]; then
-    return
-  fi
+  local LEGACY_INGRESS; LEGACY_INGRESS="$(context_get-option "INCLUDES_LEGACY_INGRESS")"
+  if [[ "${LEGACY_INGRESS}" -eq 1 ]]; then return; fi
 
   local INGRESS_GATEWAY_SVC INGRESS_GATEWAY_DEP
   INGRESS_GATEWAY_SVC="$(kubectl get svc istio-ingressgateway -n istio-system || true)"
@@ -4964,7 +4967,7 @@ validate_no_ingress_gateway() {
   fi
 
   warn "We detected an ASM ingress gateway currently running in the cluster that"
-  warn "will be disabled if installation continues. If this is not intended, please enter"
+  warn "may be disabled if installation continues. If this is not intended, please enter"
   warn "N and re-run the tool with the '--option legacy-default-ingressgateway'."
   if ! prompt_default_no "Continue?"; then fatal "Stopping installation at user request."; fi
 }
