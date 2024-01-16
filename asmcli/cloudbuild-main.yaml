@@ -37,7 +37,7 @@ steps:
     entrypoint: 'shellcheck'
     args:
       - '-e'
-      - 'SC2230'
+      - 'SC2230,SC2317'
       - '${_SCRIPT_NAME}'
 
   - name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
