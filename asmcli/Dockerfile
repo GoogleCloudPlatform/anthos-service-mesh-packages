@@ -7,7 +7,7 @@ ENV KEY_FILE path_to_a_key_file_goes_here
 # cloudbuild will override this variable:
 ENV USE_GKE_GCLOUD_AUTH_PLUGIN gcloud_plugin_goes_here
 # install script dependencies
-RUN apt-get install google-cloud-sdk-kpt jq kubectl google-cloud-sdk-gke-gcloud-auth-plugin -y
+RUN apt-get install google-cloud-cli-kpt jq kubectl google-cloud-cli-gke-gcloud-auth-plugin -y
 # install test dependencies
 RUN apt-get install shellcheck posh bc procps openssl yamllint -y
 
