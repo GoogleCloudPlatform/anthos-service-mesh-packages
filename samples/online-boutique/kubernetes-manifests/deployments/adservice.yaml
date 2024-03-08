@@ -33,34 +33,40 @@ spec:
     spec:
       serviceAccountName: ad
       terminationGracePeriodSeconds: 5
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
       containers:
-        - name: server
-          image: gcr.io/google-samples/microservices-demo/adservice:v0.3.6
-          ports:
-            - containerPort: 9555
-          env:
-            - name: PORT
-              value: "9555"
-            - name: DISABLE_STATS
-              value: "1"
-            - name: DISABLE_TRACING
-              value: "1"
-          # - name: JAEGER_SERVICE_ADDR
-          #   value: "jaeger-collector:14268"
-          resources:
-            requests:
-              cpu: 200m
-              memory: 180Mi
-            limits:
-              cpu: 300m
-              memory: 300Mi
-          readinessProbe:
-            initialDelaySeconds: 20
-            periodSeconds: 15
-            exec:
-              command: ["/bin/grpc_health_probe", "-addr=:9555"]
-          livenessProbe:
-            initialDelaySeconds: 20
-            periodSeconds: 15
-            exec:
-              command: ["/bin/grpc_health_probe", "-addr=:9555"]
+      - name: server
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+        image: gcr.io/google-samples/microservices-demo/adservice:v0.9.0
+        ports:
+        - containerPort: 9555
+        env:
+        - name: PORT
+          value: "9555"
+        resources:
+          requests:
+            cpu: 200m
+            memory: 180Mi
+          limits:
+            cpu: 300m
+            memory: 300Mi
+        readinessProbe:
+          initialDelaySeconds: 20
+          periodSeconds: 15
+          grpc:
+            port: 9555
+        livenessProbe:
+          initialDelaySeconds: 20
+          periodSeconds: 15
+          grpc:
+            port: 9555
