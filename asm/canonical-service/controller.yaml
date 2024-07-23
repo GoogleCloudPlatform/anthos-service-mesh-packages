@@ -284,7 +284,6 @@ spec:
   selector:
     control-plane: controller-manager
 ---
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
