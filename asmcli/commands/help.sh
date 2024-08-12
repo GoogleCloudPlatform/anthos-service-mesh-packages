@@ -166,7 +166,7 @@ FLAGS:
      --enable_namespace_creation      Allow the script to create the istio-system
                                       namespace for the user
      --use_managed_cni                Deprecated. Managed CNI now defaults to be on.
-     --managed                        Provision a remote, managed control plane
+     --managed                        Deprecated. Provision a remote, managed control plane
                                       instead of installing one in-cluster.
                                       The channel matches with the GKE version:
                                         GKE Channel  |  ASM Channel
