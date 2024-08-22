@@ -40,8 +40,8 @@ _CI_I_AM_A_TEST_ROBOT="${_CI_I_AM_A_TEST_ROBOT:=0}"; readonly _CI_I_AM_A_TEST_RO
 ### Internal variables ###
 MAJOR="${MAJOR:=1}"; readonly MAJOR;
 MINOR="${MINOR:=22}"; readonly MINOR;
-POINT="${POINT:=3}"; readonly POINT;
-REV="${REV:=1}"; readonly REV;
+POINT="${POINT:=4}"; readonly POINT;
+REV="${REV:=0}"; readonly REV;
 CONFIG_VER="${CONFIG_VER:="1"}"; readonly CONFIG_VER;
 K8S_MINOR=0
 
@@ -902,7 +902,7 @@ FLAGS:
      --enable_namespace_creation      Allow the script to create the istio-system
                                       namespace for the user
      --use_managed_cni                Deprecated. Managed CNI now defaults to be on.
-     --managed                        Provision a remote, managed control plane
+     --managed                        Deprecated. Provision a remote, managed control plane
                                       instead of installing one in-cluster.
                                       The channel matches with the GKE version:
                                         GKE Channel  |  ASM Channel
@@ -3614,6 +3614,8 @@ parse_args() {
         shift 1
         ;;
       --managed)
+        warn "Onboarding Managed Cloud Service Mesh through asmcli is deprecated starting Aug 22, 2024."
+        warn "Follow the supported onboarding path at https://cloud.google.com/service-mesh/docs/onboarding/provision-control-plane"
         context_set-option "MANAGED" 1
         REVISION_LABEL="asm-managed"
         shift 1
@@ -3802,6 +3804,8 @@ x_parse_install_args() {
         shift 2
         ;;
       --managed)
+        warn "Onboarding Managed Cloud Service Mesh through asmcli is deprecated starting Aug 22, 2024."
+        warn "Follow the supported onboarding path at https://cloud.google.com/service-mesh/docs/onboarding/provision-control-plane"
         context_set-option "MANAGED" 1
         shift 1
         ;;
