@@ -136,6 +136,8 @@ parse_args() {
         shift 1
         ;;
       --managed)
+        warn "Onboarding Managed Cloud Service Mesh through asmcli is deprecated starting Aug 22, 2024."
+        warn "Follow the supported onboarding path at https://cloud.google.com/service-mesh/docs/onboarding/provision-control-plane"
         context_set-option "MANAGED" 1
         REVISION_LABEL="asm-managed"
         shift 1
@@ -324,6 +326,8 @@ x_parse_install_args() {
         shift 2
         ;;
       --managed)
+        warn "Onboarding Managed Cloud Service Mesh through asmcli is deprecated starting Aug 22, 2024."
+        warn "Follow the supported onboarding path at https://cloud.google.com/service-mesh/docs/onboarding/provision-control-plane"
         context_set-option "MANAGED" 1
         shift 1
         ;;
