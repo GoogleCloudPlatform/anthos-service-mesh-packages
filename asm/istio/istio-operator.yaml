@@ -87,7 +87,7 @@ spec:
       rewriteAppHTTPProbe: true
     global:
       caAddress: "meshca.googleapis.com:443"
-      pilotCertProvider: kubernetes
+      pilotCertProvider: istiod
       sts:
         servicePort: 15463
       sds:
