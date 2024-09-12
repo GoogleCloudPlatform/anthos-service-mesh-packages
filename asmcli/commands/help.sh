@@ -56,7 +56,6 @@ variables.
 SUBCOMMANDS:
   install                             Install will attempt a new ASM installation
   validate                            Validate will attempt a new ASM validation
-  print-config                        Print Config will attempt to print the configurations used
   create-mesh                         Add multiple clusters to the mesh
   build-offline-package               Download required packages for offline installation
 
@@ -234,7 +233,6 @@ Use -h|--help with -v|--verbose to show detailed descriptions.
 SUBCOMMANDS:
   install
   validate
-  print-config
   create-mesh
   build-offline-package
 

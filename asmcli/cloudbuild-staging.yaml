@@ -156,27 +156,6 @@ steps:
   - 'KEY_FILE=${_KEY_FILE}'
   timeout: 120s
 
-- name: 'gcr.io/$PROJECT_ID/${_IMAGE_NAME}'
-  dir: 'asmcli'
-  id: 'run-print-config-test'
-  entrypoint: '/bin/bash'
-  args:
-  - '-c'
-  - >
-    ./tests/run_print_config_test
-  waitFor:
-  - 'setup-long-term-cluster'
-  env:
-  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
-  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
-  - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
-  - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
-  - 'KEY_FILE=${_KEY_FILE}'
-  - '_CI_ASM_IMAGE_LOCATION=${_IMAGE_LOCATION}'
-  - '_CI_ASM_PKG_LOCATION=${_PKG_LOCATION}'
-  - '_CI_ASM_KPT_BRANCH=${_ASM_PKG_BRANCH}'
-  timeout: 120s
-
   #############
   # SLOW TESTS
   #############
@@ -210,7 +189,6 @@ steps:
     --BUILD_ID "${BUILD_ID}"
     --CLUSTER_LOCATION "${_CLUSTER_LOCATION}"
   waitFor:
-  - 'run-print-config-test'
   - 'run-cli-tests'
   env:
   - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
@@ -232,7 +210,6 @@ steps:
     --BUILD_ID "${BUILD_ID}"
     --CLUSTER_LOCATION "${_CLUSTER_LOCATION}"
   waitFor:
-  - 'run-print-config-test'
   - 'run-cli-tests'
   env:
   - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
@@ -254,7 +231,6 @@ steps:
     --BUILD_ID "${BUILD_ID}"
     --CLUSTER_LOCATION "${_CLUSTER_LOCATION}"
   waitFor:
-  - 'run-print-config-test'
   - 'run-cli-tests'
   env:
   - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'
@@ -276,7 +252,6 @@ steps:
     --BUILD_ID "${BUILD_ID}"
     --CLUSTER_LOCATION "${_CLUSTER_LOCATION}"
   waitFor:
-  - 'run-print-config-test'
   - 'run-cli-tests'
   env:
   - 'SERVICE_ACCOUNT=${_SERVICE_ACCOUNT}@${PROJECT_ID}.iam.gserviceaccount.com'

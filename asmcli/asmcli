@@ -114,10 +114,6 @@ main() {
       shift 1
       validate_subcommand "${@}"
       ;;
-    print-config)
-      shift 1
-      print-config_subcommand "${@}"
-      ;;
     create-mesh)
       shift 1
       create-mesh_subcommand "${@}"
@@ -792,7 +788,6 @@ variables.
 SUBCOMMANDS:
   install                             Install will attempt a new ASM installation
   validate                            Validate will attempt a new ASM validation
-  print-config                        Print Config will attempt to print the configurations used
   create-mesh                         Add multiple clusters to the mesh
   build-offline-package               Download required packages for offline installation
 
@@ -970,7 +965,6 @@ Use -h|--help with -v|--verbose to show detailed descriptions.
 SUBCOMMANDS:
   install
   validate
-  print-config
   create-mesh
   build-offline-package
 
@@ -1410,44 +1404,6 @@ install_control_plane() {
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]] && ! is_managed; then
     install_canonical_controller
   fi
-}
-print-config_subcommand() {
-  # make sure to redirect stdout as soon as possible if we're dumping the config
-  exec 3>&1
-  exec 1>&2
-
-  ### Preparation ###
-  context_set-option "PRINT_CONFIG" 1   # used by some validations
-  parse_args "${@}"
-  validate_args
-  prepare_environment
-
-  ### Validate ###
-  validate
-
-  ### Configure ###
-  configure_package
-  post_process_istio_yamls
-
-  local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
-  if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
-    populate_fleet_info
-  fi
-  print_config >&3
-}
-
-print_config() {
-  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
-
-  if [[ "${MANAGED}" -eq 1 ]]; then
-    cat "${MANAGED_MANIFEST}"
-    return
-  fi
-
-  local PARAMS; PARAMS="$(gen_install_params)"
-
-  # shellcheck disable=SC2086
-  istioctl profile dump ${PARAMS}
 }
 validate_subcommand() {
   ### Preparation ###
@@ -3635,10 +3591,6 @@ parse_args() {
         ;;
       --disable_canonical_service | --disable-canonical-service)
         context_set-option "DISABLE_CANONICAL_SERVICE" 1
-        shift 1
-        ;;
-      --print_config | --print-config)
-        context_set-option "PRINT_CONFIG" 1
         shift 1
         ;;
       -s | --service_account | --service-account)

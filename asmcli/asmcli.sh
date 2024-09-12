@@ -110,10 +110,6 @@ main() {
       shift 1
       validate_subcommand "${@}"
       ;;
-    print-config)
-      shift 1
-      print-config_subcommand "${@}"
-      ;;
     create-mesh)
       shift 1
       create-mesh_subcommand "${@}"
