@@ -2449,7 +2449,7 @@ needs_kpt() {
 needs_asm() {
   if only_enable; then false; return; fi
 
-  if [[ can_modify_at_all || should_validate; then
+  if can_modify_at_all || should_validate; then
     true
   else
     false
