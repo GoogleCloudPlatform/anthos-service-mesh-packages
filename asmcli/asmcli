@@ -1163,7 +1163,6 @@ install_in_cluster_control_plane() {
   # Prevent the stderr buffer from ^ messing up the terminal output below
   sleep 1
   info "...done!"
-
 }
 
 install_private_ca() {
@@ -2312,7 +2311,6 @@ is_service_mesh_feature_enabled() {
 }
 
 should_validate() {
-
   if [[ "${_CI_NO_VALIDATE}" -eq 1 ]] || only_enable; then false; fi
 }
 
