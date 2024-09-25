@@ -56,7 +56,6 @@ variables.
 SUBCOMMANDS:
   install                             Install will attempt a new ASM installation
   validate                            Validate will attempt a new ASM validation
-  print-config                        Print Config will attempt to print the configurations used
   create-mesh                         Add multiple clusters to the mesh
   build-offline-package               Download required packages for offline installation
 
@@ -183,11 +182,6 @@ FLAGS:
                                       package in the output directory. If the directory is not
                                       specified or does not contain the required files, the
                                       script will exit with error.
-     --print_config                   Instead of installing ASM, print all of
-                                      the compiled YAML to stdout. All other
-                                      output will be written to stderr, even if
-                                      it would normally go to stdout. Skip all
-                                      validations and setup.
      --disable_canonical_service      Do not install the CanonicalService
                                       controller. This is required for ASM UI to
                                       support various features.
@@ -234,7 +228,6 @@ Use -h|--help with -v|--verbose to show detailed descriptions.
 SUBCOMMANDS:
   install
   validate
-  print-config
   create-mesh
   build-offline-package
 
@@ -280,7 +273,6 @@ FLAGS:
 
      --offline
 
-     --print_config
      --disable_canonical_service
   --managed_certificates
   -v|--verbose

@@ -159,10 +159,6 @@ parse_args() {
         context_set-option "DISABLE_CANONICAL_SERVICE" 1
         shift 1
         ;;
-      --print_config | --print-config)
-        context_set-option "PRINT_CONFIG" 1
-        shift 1
-        ;;
       -s | --service_account | --service-account)
         arg_required "${@}"
         context_set-option "SERVICE_ACCOUNT" "${2}"

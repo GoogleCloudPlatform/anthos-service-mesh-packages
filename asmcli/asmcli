@@ -55,7 +55,6 @@ OPTIONS_DIRECTORY=""
 OPERATOR_MANIFEST=""
 BETA_CRD_MANIFEST=""
 CITADEL_MANIFEST=""
-MANAGED_MANIFEST=""
 EXPOSE_ISTIOD_DEFAULT_SERVICE=""
 EXPOSE_ISTIOD_REVISION_SERVICE=""
 CANONICAL_CONTROLLER_MANIFEST=""
@@ -113,10 +112,6 @@ main() {
     validate)
       shift 1
       validate_subcommand "${@}"
-      ;;
-    print-config)
-      shift 1
-      print-config_subcommand "${@}"
       ;;
     create-mesh)
       shift 1
@@ -792,7 +787,6 @@ variables.
 SUBCOMMANDS:
   install                             Install will attempt a new ASM installation
   validate                            Validate will attempt a new ASM validation
-  print-config                        Print Config will attempt to print the configurations used
   create-mesh                         Add multiple clusters to the mesh
   build-offline-package               Download required packages for offline installation
 
@@ -919,11 +913,6 @@ FLAGS:
                                       package in the output directory. If the directory is not
                                       specified or does not contain the required files, the
                                       script will exit with error.
-     --print_config                   Instead of installing ASM, print all of
-                                      the compiled YAML to stdout. All other
-                                      output will be written to stderr, even if
-                                      it would normally go to stdout. Skip all
-                                      validations and setup.
      --disable_canonical_service      Do not install the CanonicalService
                                       controller. This is required for ASM UI to
                                       support various features.
@@ -970,7 +959,6 @@ Use -h|--help with -v|--verbose to show detailed descriptions.
 SUBCOMMANDS:
   install
   validate
-  print-config
   create-mesh
   build-offline-package
 
@@ -1016,7 +1004,6 @@ FLAGS:
 
      --offline
 
-     --print_config
      --disable_canonical_service
   --managed_certificates
   -v|--verbose
@@ -1175,11 +1162,6 @@ install_in_cluster_control_plane() {
   # Prevent the stderr buffer from ^ messing up the terminal output below
   sleep 1
   info "...done!"
-
-  print_config >| "${RAW_YAML}"
-  istioctl manifest generate \
-    <"${RAW_YAML}" \
-    >|"${EXPANDED_YAML}"
 }
 
 install_private_ca() {
@@ -1410,44 +1392,6 @@ install_control_plane() {
   if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]] && ! is_managed; then
     install_canonical_controller
   fi
-}
-print-config_subcommand() {
-  # make sure to redirect stdout as soon as possible if we're dumping the config
-  exec 3>&1
-  exec 1>&2
-
-  ### Preparation ###
-  context_set-option "PRINT_CONFIG" 1   # used by some validations
-  parse_args "${@}"
-  validate_args
-  prepare_environment
-
-  ### Validate ###
-  validate
-
-  ### Configure ###
-  configure_package
-  post_process_istio_yamls
-
-  local USE_HUB_WIP; USE_HUB_WIP="$(context_get-option "USE_HUB_WIP")"
-  if [[ "${USE_HUB_WIP}" -eq 1 ]]; then
-    populate_fleet_info
-  fi
-  print_config >&3
-}
-
-print_config() {
-  local MANAGED; MANAGED="$(context_get-option "MANAGED")"
-
-  if [[ "${MANAGED}" -eq 1 ]]; then
-    cat "${MANAGED_MANIFEST}"
-    return
-  fi
-
-  local PARAMS; PARAMS="$(gen_install_params)"
-
-  # shellcheck disable=SC2086
-  istioctl profile dump ${PARAMS}
 }
 validate_subcommand() {
   ### Preparation ###
@@ -2366,9 +2310,7 @@ is_service_mesh_feature_enabled() {
 }
 
 should_validate() {
-  local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
-
-  if [[ "${PRINT_CONFIG}" -eq 1 || "${_CI_NO_VALIDATE}" -eq 1 ]] || only_enable; then false; fi
+  if [[ "${_CI_NO_VALIDATE}" -eq 1 ]] || only_enable; then false; fi
 }
 
 only_validate() {
@@ -2383,9 +2325,8 @@ only_enable() {
 
 can_modify_at_all() {
   local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
-  local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
 
-  if [[ "${ONLY_VALIDATE}" -eq 1 || "${PRINT_CONFIG}" -eq 1 ]]; then false; fi
+  if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then false; fi
 }
 
 can_modify_cluster_roles() {
@@ -2503,11 +2444,9 @@ needs_kpt() {
 }
 
 needs_asm() {
-  local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
-
   if only_enable; then false; return; fi
 
-  if [[ "${PRINT_CONFIG}" -eq 1 ]] || can_modify_at_all || should_validate; then
+  if can_modify_at_all || should_validate; then
     true
   else
     false
@@ -2756,7 +2695,6 @@ context_init() {
     "USE_VPCSC": ${USE_VPCSC:-0},
     "DISABLE_CANONICAL_SERVICE": ${DISABLE_CANONICAL_SERVICE:-0},
     "TRUST_FLEET_IDENTITY": ${TRUST_FLEET_IDENTITY:-1},
-    "PRINT_CONFIG": ${PRINT_CONFIG:-0},
     "NON_INTERACTIVE": ${NON_INTERACTIVE:-0},
     "SERVICE_ACCOUNT": "${SERVICE_ACCOUNT:-}",
     "KEY_FILE": "${KEY_FILE:-}",
@@ -2914,7 +2852,6 @@ ENABLE_NAMESPACE_CREATION
 ENABLE_MESHCONFIG_INIT
 USE_VPCSC
 DISABLE_CANONICAL_SERVICE
-PRINT_CONFIG
 NON_INTERACTIVE
 DRY_RUN
 ONLY_VALIDATE
@@ -3637,10 +3574,6 @@ parse_args() {
         context_set-option "DISABLE_CANONICAL_SERVICE" 1
         shift 1
         ;;
-      --print_config | --print-config)
-        context_set-option "PRINT_CONFIG" 1
-        shift 1
-        ;;
       -s | --service_account | --service-account)
         arg_required "${@}"
         context_set-option "SERVICE_ACCOUNT" "${2}"
@@ -4263,7 +4196,6 @@ init() {
   OPERATOR_MANIFEST="${PACKAGE_DIRECTORY}/istio-operator.yaml"; readonly OPERATOR_MANIFEST;
   BETA_CRD_MANIFEST="${OPTIONS_DIRECTORY}/v1beta1-crds.yaml"; readonly BETA_CRD_MANIFEST;
   CITADEL_MANIFEST="${OPTIONS_DIRECTORY}/citadel-ca.yaml"; readonly CITADEL_MANIFEST;
-  MANAGED_MANIFEST="${OPTIONS_DIRECTORY}/managed-control-plane.yaml"; readonly MANAGED_MANIFEST;
   EXPOSE_ISTIOD_DEFAULT_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_DEFAULT_SERVICE;
   EXPOSE_ISTIOD_REVISION_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod-rev.yaml"; readonly EXPOSE_ISTIOD_REVISION_SERVICE;
   CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
@@ -5301,7 +5233,6 @@ validate_args() {
   local ENABLE_REGISTRATION; ENABLE_REGISTRATION="$(context_get-option "ENABLE_REGISTRATION")"
   local ENABLE_NAMESPACE_CREATION; ENABLE_NAMESPACE_CREATION="$(context_get-option "ENABLE_NAMESPACE_CREATION")"
   local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
-  local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
   local SERVICE_ACCOUNT; SERVICE_ACCOUNT="$(context_get-option "SERVICE_ACCOUNT")"
   local KEY_FILE; KEY_FILE="$(context_get-option "KEY_FILE")"
   local CA_CERT; CA_CERT="$(context_get-option "CA_CERT")"
@@ -5586,7 +5517,6 @@ x_validate_install_args() {
   local ENABLE_NAMESPACE_CREATION; ENABLE_NAMESPACE_CREATION="$(context_get-option "ENABLE_NAMESPACE_CREATION")"
   local USE_VPCSC; USE_VPCSC="$(context_get-option "USE_VPCSC")"
   local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
-  local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
   local SERVICE_ACCOUNT; SERVICE_ACCOUNT="$(context_get-option "SERVICE_ACCOUNT")"
   local KEY_FILE; KEY_FILE="$(context_get-option "KEY_FILE")"
   local DRY_RUN; DRY_RUN="$(context_get-option "DRY_RUN")"

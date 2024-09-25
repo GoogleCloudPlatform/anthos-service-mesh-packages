@@ -255,9 +255,7 @@ is_service_mesh_feature_enabled() {
 }
 
 should_validate() {
-  local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
-
-  if [[ "${PRINT_CONFIG}" -eq 1 || "${_CI_NO_VALIDATE}" -eq 1 ]] || only_enable; then false; fi
+  if [[ "${_CI_NO_VALIDATE}" -eq 1 ]] || only_enable; then false; fi
 }
 
 only_validate() {
@@ -272,9 +270,8 @@ only_enable() {
 
 can_modify_at_all() {
   local ONLY_VALIDATE; ONLY_VALIDATE="$(context_get-option "ONLY_VALIDATE")"
-  local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
 
-  if [[ "${ONLY_VALIDATE}" -eq 1 || "${PRINT_CONFIG}" -eq 1 ]]; then false; fi
+  if [[ "${ONLY_VALIDATE}" -eq 1 ]]; then false; fi
 }
 
 can_modify_cluster_roles() {
@@ -392,11 +389,9 @@ needs_kpt() {
 }
 
 needs_asm() {
-  local PRINT_CONFIG; PRINT_CONFIG="$(context_get-option "PRINT_CONFIG")"
-
   if only_enable; then false; return; fi
 
-  if [[ "${PRINT_CONFIG}" -eq 1 ]] || can_modify_at_all || should_validate; then
+  if can_modify_at_all || should_validate; then
     true
   else
     false

@@ -51,7 +51,6 @@ OPTIONS_DIRECTORY=""
 OPERATOR_MANIFEST=""
 BETA_CRD_MANIFEST=""
 CITADEL_MANIFEST=""
-MANAGED_MANIFEST=""
 EXPOSE_ISTIOD_DEFAULT_SERVICE=""
 EXPOSE_ISTIOD_REVISION_SERVICE=""
 CANONICAL_CONTROLLER_MANIFEST=""
@@ -109,10 +108,6 @@ main() {
     validate)
       shift 1
       validate_subcommand "${@}"
-      ;;
-    print-config)
-      shift 1
-      print-config_subcommand "${@}"
       ;;
     create-mesh)
       shift 1
