@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -CeEu
+set -CeEux
 set -o pipefail
 
 SPATH="$(readlink -f "$0")"
@@ -23,6 +23,7 @@ setup_cluster() {
 
     configure_kubectl "${cluster}" "${LT_PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
     kubectl delete validatingwebhookconfiguration istiod-istio-system || true
+    prepare_environment
     cleanup_old_test_namespaces "${OUTPUT_DIR}"
   else
     echo "Creating long term test cluster ${cluster}"
