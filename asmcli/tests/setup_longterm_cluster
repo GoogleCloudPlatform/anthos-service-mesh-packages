@@ -21,9 +21,10 @@ setup_cluster() {
   if [[ -n "${RESULT}" ]]; then
     echo "Long term test cluster ${cluster} exists already."
 
+    ../asmcli build-offline-package > /dev/null
+    
     configure_kubectl "${cluster}" "${LT_PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
     kubectl delete validatingwebhookconfiguration istiod-istio-system || true
-    prepare_environment
     cleanup_old_test_namespaces "${OUTPUT_DIR}"
   else
     echo "Creating long term test cluster ${cluster}"
