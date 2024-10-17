@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -CeEu
+set -CeEux
 set -o pipefail
 
 SPATH="$(readlink -f "$0")"
@@ -22,12 +22,9 @@ setup_cluster() {
     echo "Long term test cluster ${cluster} exists already."
 
     ../asmcli \
-      print-config \
-      -l "${LT_CLUSTER_LOCATION}" \
-      -n "${cluster}" \
-      -p "${LT_PROJECT_ID}" \
-      -D "${OUTPUT_DIR}" > /dev/null
-
+    build-offline-package \
+    -D "${OUTPUT_DIR}" > /dev/null
+    
     configure_kubectl "${cluster}" "${LT_PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
     kubectl delete validatingwebhookconfiguration istiod-istio-system || true
     cleanup_old_test_namespaces "${OUTPUT_DIR}"
