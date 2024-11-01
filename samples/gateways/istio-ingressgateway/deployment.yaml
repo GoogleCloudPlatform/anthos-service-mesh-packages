@@ -42,4 +42,9 @@ spec:
           requests:
             cpu: 100m
             memory: 128Mi
+      # Allow binding to all ports (such as 80 and 443)
+      securityContext:
+        sysctls:
+        - name: net.ipv4.ip_unprivileged_port_start
+          value: "0"
       serviceAccountName: istio-ingressgateway
