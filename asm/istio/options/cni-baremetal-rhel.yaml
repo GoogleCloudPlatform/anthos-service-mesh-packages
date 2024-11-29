@@ -21,9 +21,15 @@ spec:
     cni:
       enabled: true
       namespace: kube-system
+      k8s:
+        overlays:
+        - kind: DaemonSet
+          name: istio-cni-node
+          patches:
+          - path: spec.template.spec.containers.[name:install-cni].securityContext.seLinuxOptions
+            value: {"type": "spc_t"}
   values:
     cni:
-      privileged: true
       cniBinDir: /opt/cni/bin
       excludeNamespaces:
       - istio-system
