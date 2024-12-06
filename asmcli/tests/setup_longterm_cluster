@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -CeEu
+set -CeEux
 set -o pipefail
 
 SPATH="$(readlink -f "$0")"
