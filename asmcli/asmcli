@@ -4198,7 +4198,7 @@ init() {
   CITADEL_MANIFEST="${OPTIONS_DIRECTORY}/citadel-ca.yaml"; readonly CITADEL_MANIFEST;
   EXPOSE_ISTIOD_DEFAULT_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod.yaml"; readonly EXPOSE_ISTIOD_DEFAULT_SERVICE;
   EXPOSE_ISTIOD_REVISION_SERVICE="${PACKAGE_DIRECTORY}/expansion/expose-istiod-rev.yaml"; readonly EXPOSE_ISTIOD_REVISION_SERVICE;
-  CANONICAL_CONTROLLER_MANIFEST="asm/canonical-service/controller.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
+  CANONICAL_CONTROLLER_MANIFEST="/home/prow/go/src/istio.io/istio/prow/asm/tester/configs/csc.yaml"; readonly CANONICAL_CONTROLLER_MANIFEST;
   ASM_VERSION_FILE=".asm_version"; readonly ASM_VERSION_FILE;
   ASM_SETTINGS_FILE=".asm_settings"; readonly ASM_SETTINGS_FILE;
 
