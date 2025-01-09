@@ -1018,7 +1018,7 @@ EOF
 create-mesh_usage() {
   cat << EOF
 ${SCRIPT_NAME} $(version_message)
-usage: ${SCRIPT_NAME} create-mesh FLEET_ID (PROJECT_ID/CLUSTER_LOCATION/CLUSTER_NAME | KUBECONFIG_PATH) ... 
+usage: ${SCRIPT_NAME} create-mesh FLEET_ID (PROJECT_ID/CLUSTER_LOCATION/CLUSTER_NAME | KUBECONFIG_PATH) ...
 
 Create a multi-cluster service mesh and allow cross-cluster service discovery. This is done by
 registering the clusters to the specified fleet and installing the necessary Kubernetes cluster
@@ -1847,7 +1847,7 @@ EOF
 }
 validate_private_ca() {
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
-  
+
   local CA_POOL_TEMPLATE; CA_POOL_TEMPLATE="projects/project_name/locations/ca_region/caPools/ca_pool"
   local CT_TEMPLATE; CT_TEMPLATE="projects/project_name/locations/ca_region/certificateTemplates/cert_template"
   local CA_NAME_TEMPLATE; CA_NAME_TEMPLATE="${CA_POOL_TEMPLATE}:${CT_TEMPLATE}"
@@ -2528,7 +2528,7 @@ is_autopilot() {
 node_pool_wi_enabled(){
   # Autopilot clusters do not allow accessing/mutating the node pools
   # so we skip in such cases.
-  if is_autopilot || [[ "${NODE_POOL_WI_ENABLED}" -eq 1 ]]; then 
+  if is_autopilot || [[ "${NODE_POOL_WI_ENABLED}" -eq 1 ]]; then
     return
   fi
   local METADATA_CONFIG_MODE MACHINE_CPU_REQ
@@ -4700,8 +4700,8 @@ ensure_cross_project_sa() {
 get_monitoring_config_membership_json () {
   local MEMBERSHIP_NAME; MEMBERSHIP_NAME="${1}"
   local PROJECT_ID; PROJECT_ID="${2}"
-  local CONFIG; 
-  
+  local CONFIG;
+
   CONFIG="$(gcloud container hub memberships describe "${MEMBERSHIP_NAME}" --project "${PROJECT_ID}" --format="json(monitoringConfig)")"
   echo "${CONFIG}"
 }
@@ -4710,7 +4710,7 @@ validate_revision_label() {
   local DNS_1123_LABEL_MAX_LEN; DNS_1123_LABEL_MAX_LEN=63;
   readonly DNS_1123_LABEL_MAX_LEN
 
-  local DNS_1123_LABEL_FMT; DNS_1123_LABEL_FMT="^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?$";
+  local DNS_1123_LABEL_FMT; DNS_1123_LABEL_FMT="^[a-z0-9]([-a-z0-9]*[a-z0-9])?$";
   readonly DNS_1123_LABEL_FMT
 
   if [[ ${#REVISION_LABEL} -gt ${DNS_1123_LABEL_MAX_LEN} ]]; then
