@@ -19,7 +19,6 @@ spec:
   values:
     pilot:
       env:
-        ENABLE_CA_SERVER: false
         ISTIO_MULTIROOT_MESH: true
   meshConfig:
     defaultConfig:
