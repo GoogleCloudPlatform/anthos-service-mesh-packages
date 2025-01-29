@@ -101,6 +101,17 @@ install_canonical_controller() {
   info "...done!"
 }
 
+install_managed_canonical_controller() {
+  local IN_CLUSTER_CSC_DEP="$(kubectl get deployment/canonical-service-controller-manager -n asm-system --ignore-not-found=true || true)"
+  if [[ -z "$IN_CLUSTER_CSC_DEP" ]]; then
+    # In-cluster canonical service controller present
+    warn "Kindly migrate to managed canonical service controller. Refer <Doc>"
+  else
+    enable_service_mesh_feature
+    check_managed_canonical_controller_state
+  fi
+}
+
 install_fleet_api() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
@@ -266,7 +277,5 @@ install_control_plane() {
     if use_fleet_api; then install_fleet_api; else install_control_plane_revision; fi
   fi
 
-  if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]] && ! is_managed; then
-    install_canonical_controller
-  fi
+  install_managed_canonical_controller
 }

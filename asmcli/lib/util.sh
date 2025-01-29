@@ -853,3 +853,40 @@ get_monitoring_config_membership_json () {
   CONFIG="$(gcloud container hub memberships describe "${MEMBERSHIP_NAME}" --project "${PROJECT_ID}" --format="json(monitoringConfig)")"
   echo "${CONFIG}"
 }
+
+check_managed_canonical_controller_state() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+
+  local CSC_STATUS_AVAILABLE=0
+  local CS_ERROR="CANONICAL_SERVICE_ERROR"
+  local MEMBERSHIP_STATE,CODE, CONDITIONS
+
+  for i in {1..3}; do
+    MEMBERSHIP_STATE=$( gcloud container fleet mesh describe --project "${FLEET_ID}" --format=json | \
+                     	jq '.membershipStates | with_entries(select(.key|test("'"${MEMBERSHIP_NAME}"'")))[]' )
+    CODE=$( jq -r '.state.code' <<< "$MEMBERSHIP_STATE" )
+    if [ "$CODE" = "OK" ]; then
+      info "Managed Canonical Service Controller working successfully"
+      CSC_STATUS_AVAILABLE=1; break
+    elif [ "$CODE" = "WARNING" ]; then
+      CONDITIONS=$( jq -r '.servicemesh.conditions'  <<< "$MEMBERSHIP_STATE" )
+      if grep -q "$CS_ERROR" <<< "$CONDITIONS"; then
+        warn "Managed Canonical Service Controller facing issues. Kindly refer to <wiki link>"
+        CSC_STATUS_AVAILABLE=1
+      fi
+      break
+    else
+      echo "Retry to get featureState.code for the membership: $MEMBERSHIP_NAME"
+      sleep 3
+    fi
+  done
+
+  if [ ${CSC_STATUS_AVAILABLE} -eq 0 ]; then
+    warn "Unable to verify Managed Canonical Service Controller State. Kindly refer to <wiki link>"
+  fi
+}
+
