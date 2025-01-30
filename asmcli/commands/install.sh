@@ -102,13 +102,16 @@ install_canonical_controller() {
 }
 
 install_managed_canonical_controller() {
-  local IN_CLUSTER_CSC_DEP="$(kubectl get deployment/canonical-service-controller-manager -n asm-system --ignore-not-found=true || true)"
+  info "Installing managed caonical service controller..."
+  local IN_CLUSTER_CSC_DEP="$(kubectl get deployment/canonical-service-controller-manager \
+   -n asm-system --ignore-not-found=true || true)"
   if [[ -z "$IN_CLUSTER_CSC_DEP" ]]; then
-    # In-cluster canonical service controller present
-    warn "Kindly migrate to managed canonical service controller. Refer <Doc>"
-  else
-    enable_service_mesh_feature
+    if ! is_service_mesh_feature_enabled; then
+      enable_service_mesh_feature
+    fi
     check_managed_canonical_controller_state
+  else
+    warn "Kindly migrate to managed canonical service controller. Refer <Doc>"
   fi
 }
 

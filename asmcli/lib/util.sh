@@ -863,9 +863,10 @@ check_managed_canonical_controller_state() {
 
   local CSC_STATUS_AVAILABLE=0
   local CS_ERROR="CANONICAL_SERVICE_ERROR"
-  local MEMBERSHIP_STATE,CODE, CONDITIONS
+  local MEMBERSHIP_STATE;
+  local CODE;
 
-  for i in {1..3}; do
+  for i in {1..5}; do
     MEMBERSHIP_STATE=$( gcloud container fleet mesh describe --project "${FLEET_ID}" --format=json | \
                      	jq '.membershipStates | with_entries(select(.key|test("'"${MEMBERSHIP_NAME}"'")))[]' )
     CODE=$( jq -r '.state.code' <<< "$MEMBERSHIP_STATE" )
@@ -873,15 +874,14 @@ check_managed_canonical_controller_state() {
       info "Managed Canonical Service Controller working successfully"
       CSC_STATUS_AVAILABLE=1; break
     elif [ "$CODE" = "WARNING" ]; then
-      CONDITIONS=$( jq -r '.servicemesh.conditions'  <<< "$MEMBERSHIP_STATE" )
-      if grep -q "$CS_ERROR" <<< "$CONDITIONS"; then
+      if jq -r '.servicemesh.conditions | contains("'$CS_ERROR'")' <<< "$MEMBERSHIP_STATE" | grep -q true; then
         warn "Managed Canonical Service Controller facing issues. Kindly refer to <wiki link>"
         CSC_STATUS_AVAILABLE=1
       fi
       break
     else
       echo "Retry to get featureState.code for the membership: $MEMBERSHIP_NAME"
-      sleep 3
+      sleep 60
     fi
   done
 
