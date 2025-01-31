@@ -880,7 +880,7 @@ check_managed_canonical_controller_state() {
       fi
       break
     else
-      echo "Retry to get featureState.code for the membership: $MEMBERSHIP_NAME"
+      echo "MEMBERSHIP_STATE: $MEMBERSHIP_STATE. Retry to get featureState.code for the membership: $MEMBERSHIP_NAME"
       sleep 60
     fi
   done

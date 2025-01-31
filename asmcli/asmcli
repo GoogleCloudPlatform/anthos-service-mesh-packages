@@ -1229,9 +1229,7 @@ install_managed_canonical_controller() {
   local IN_CLUSTER_CSC_DEP; IN_CLUSTER_CSC_DEP="$(kubectl get deployment/canonical-service-controller-manager \
    -n asm-system --ignore-not-found=true || true)"
   if [[ -z "$IN_CLUSTER_CSC_DEP" ]]; then
-    if ! is_service_mesh_feature_enabled; then
-      enable_service_mesh_feature
-    fi
+    enable_service_mesh_feature
     check_managed_canonical_controller_state
   else
     warn "Kindly migrate to managed canonical service controller. Refer <DocLink  to be added>"
@@ -4744,7 +4742,7 @@ check_managed_canonical_controller_state() {
       fi
       break
     else
-      echo "Retry to get featureState.code for the membership: $MEMBERSHIP_NAME"
+      echo "MEMBERSHIP_STATE: $MEMBERSHIP_STATE. Retry to get featureState.code for the membership: $MEMBERSHIP_NAME"
       sleep 60
     fi
   done
