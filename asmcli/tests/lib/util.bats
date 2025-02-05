@@ -4,6 +4,9 @@ setup() {
   load '../unit_test_common.bash'
   _common_setup
   CITADEL_MANIFEST="citadel-ca.yaml"
+  PROJECT_ID="test-project"
+  CLUSTER_NAME="test_cluster"
+  CLUSTER_LOCATION="us-east-2a"
   context_init
 }
 
@@ -188,4 +191,35 @@ EOF
   assert_output "World"
   
   rm "${LOG_FILE_LOCATION}"
+}
+
+@test "UTIL: Managed Canonical Controller Status is read correctly" {
+
+  _intercept_setup
+  run context_set-option "HUB_MEMBERSHIP_ID" "test-cluster"
+
+  run context_set-option "FLEET_ID" "unknown-state-fleet"
+  run check_managed_canonical_controller_state
+  assert_output --partial "Unable to verify Managed Canonical Service Controller State"
+
+  run context_set-option "FLEET_ID" "error-state-fleet"
+  run check_managed_canonical_controller_state
+  assert_output --partial "Unable to verify Managed Canonical Service Controller State"
+
+  run context_set-option "FLEET_ID" "warning-non-csc-condition-state-fleet"
+  run check_managed_canonical_controller_state
+  assert_output --partial "Unable to verify Managed Canonical Service Controller State"
+
+  run context_set-option "FLEET_ID" "ok-state-fleet"
+  run check_managed_canonical_controller_state
+  assert_output --partial "Managed Canonical Service Controller working successfully"
+
+  run context_set-option "FLEET_ID" "warning-csc-condition-state-fleet"
+  run check_managed_canonical_controller_state
+  assert_output --partial "Managed Canonical Service Controller facing issues"
+
+  run context_set-option "FLEET_ID" "multi-cluster-fleet"
+  run check_managed_canonical_controller_state
+  assert_output --partial "Managed Canonical Service Controller facing issues"
+
 }

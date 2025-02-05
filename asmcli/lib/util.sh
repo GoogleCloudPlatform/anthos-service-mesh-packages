@@ -868,13 +868,13 @@ check_managed_canonical_controller_state() {
 
   for i in {1..5}; do
     MEMBERSHIP_STATE=$( gcloud container fleet mesh describe --project "${FLEET_ID}" --format=json | \
-                     	jq '.membershipStates | with_entries(select(.key|test("'"${MEMBERSHIP_NAME}"'")))[]' )
+                     	jq '.membershipStates | with_entries(select(.key| endswith("'/"${MEMBERSHIP_NAME}"'")))[]' )
     CODE=$( jq -r '.state.code' <<< "$MEMBERSHIP_STATE" )
     if [ "$CODE" = "OK" ]; then
       info "Managed Canonical Service Controller working successfully"
       CSC_STATUS_AVAILABLE=1; break
     elif [ "$CODE" = "WARNING" ]; then
-      if jq -r '.servicemesh.conditions | contains("'$CS_ERROR'")' <<< "$MEMBERSHIP_STATE" | grep -q true; then
+      if jq -r '.servicemesh.conditions[].code' <<< "$MEMBERSHIP_STATE" | grep -q "$CS_ERROR" ; then
         warn "Managed Canonical Service Controller facing issues. Kindly refer to <wiki link>"
         CSC_STATUS_AVAILABLE=1
       fi

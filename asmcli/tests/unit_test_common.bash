@@ -200,6 +200,112 @@ EOF
     return 0
   fi
 
+  if [[ "${*}" == *"fleet mesh describe"* ]]; then
+    if [[ "${*}" == *"error-state-fleet"* ]]; then
+      cat <<EOF
+{
+  "membershipStates": {
+    "memberships/test-cluster": {
+        "servicemesh":"",
+        "state": {
+           "code": "ERROR"
+        }
+    }
+  }
+}
+EOF
+    elif [[ "${*}" == *"ok-state-fleet"* ]]; then
+        cat <<EOF
+{
+  "membershipStates": {
+    "memberships/test-cluster": {
+        "servicemesh":"",
+        "state": {
+           "code": "OK"
+        }
+    }
+  }
+}
+EOF
+    elif [[ "${*}" == *"warning-non-csc-condition-state-fleet"* ]]; then
+        cat <<EOF
+{
+  "membershipStates": {
+    "memberships/test-cluster": {
+      "servicemesh": {
+        "conditions": [
+          {
+            "code": "CONTROL_PLANE_ISSUE",
+            "details": "Non CSC Error",
+            "severity": "WARNING"
+          }
+        ]
+      },
+      "state": {
+        "code": "WARNING"
+      }
+    }
+  }
+}
+EOF
+    elif [[ "${*}" == *"warning-csc-condition-state-fleet"* ]]; then
+        cat <<EOF
+{
+  "membershipStates": {
+    "memberships/test-cluster": {
+      "servicemesh": {
+        "conditions": [
+          {
+            "code": "CONTROL_PLANE_ISSUE",
+            "details": "Non CSC Error",
+            "severity": "WARNING"
+          },
+          {
+            "code": "CANONICAL_SERVICE_ERROR",
+            "details": "CSC Error",
+            "severity": "WARNING"
+          }
+        ]
+      },
+      "state": {
+        "code": "WARNING"
+      }
+    }
+  }
+}
+EOF
+   elif [[ "${*}" == *"multi-cluster-fleet"* ]]; then
+           cat <<EOF
+{
+  "membershipStates": {
+    "memberships/test-cluster-1": {
+      "servicemesh": "",
+      "state": {
+        "code": "OK"
+      }
+    },
+    "memberships/test-cluster": {
+      "servicemesh": {
+        "conditions": [
+          {
+            "code": "CANONICAL_SERVICE_ERROR",
+            "details": "CSC Error",
+            "severity": "WARNING"
+          }
+        ]
+      },
+      "state": {
+        "code": "WARNING"
+      }
+    }
+  }
+}
+EOF
+    else
+      echo ""
+    fi
+    return 0
+  fi
   return 1
 }
 
