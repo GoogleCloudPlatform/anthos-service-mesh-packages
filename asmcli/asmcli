@@ -1470,7 +1470,7 @@ validate_dependencies() {
       fi
     fi
   fi
-
+  enable_service_mesh_feature
   if can_register_cluster; then
     register_cluster
     exit_if_cluster_unregistered
