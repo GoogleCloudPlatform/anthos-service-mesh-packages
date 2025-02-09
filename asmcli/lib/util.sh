@@ -864,9 +864,11 @@ check_managed_canonical_controller_state() {
   local CSC_STATUS_AVAILABLE=0
   local CS_ERROR="CANONICAL_SERVICE_ERROR"
   local MEMBERSHIP_STATE;
+  local STATE;
   local CODE;
 
-  for i in {1..5}; do
+  for i in {1..10}; do
+    STATE=$( gcloud container fleet mesh describe --project "${FLEET_ID}" --format=json )
     MEMBERSHIP_STATE=$( gcloud container fleet mesh describe --project "${FLEET_ID}" --format=json | \
                      	jq '.membershipStates | with_entries(select(.key| endswith("'/"${MEMBERSHIP_NAME}"'")))[]' )
     CODE=$( jq -r '.state.code' <<< "$MEMBERSHIP_STATE" )
@@ -880,6 +882,7 @@ check_managed_canonical_controller_state() {
       fi
       break
     else
+      echo "STATE: $STATE"
       echo "MEMBERSHIP_STATE: $MEMBERSHIP_STATE. Retry to get featureState.code for the membership: $MEMBERSHIP_NAME"
       sleep 60
     fi
