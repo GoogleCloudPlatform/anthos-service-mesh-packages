@@ -92,25 +92,21 @@ apply_kube_yamls() {
   done
 }
 
-install_canonical_controller() {
-  info "Installing ASM CanonicalService controller in asm-system namespace..."
-  retry 3 kubectl apply -f "${CANONICAL_CONTROLLER_MANIFEST}"
-  info "Waiting for deployment..."
-  retry 3 kubectl wait --for=condition=available --timeout=600s \
-      deployment/canonical-service-controller-manager -n asm-system
-  info "...done!"
-}
-
-install_managed_canonical_controller() {
-  info "Installing managed canonical service controller..."
+verify_canonical_controller() {
   local IN_CLUSTER_CSC_DEP; IN_CLUSTER_CSC_DEP="$(kubectl get deployment/canonical-service-controller-manager \
-   -n asm-system --ignore-not-found=true || true)"
+    -n asm-system --ignore-not-found=true || true)"
   if [[ -z "$IN_CLUSTER_CSC_DEP" ]]; then
-    enable_service_mesh_feature
+    info "Checking Managed CanonicalService controller state..."
     check_managed_canonical_controller_state
   else
     warn "Kindly migrate to managed canonical service controller. Refer <DocLink  to be added>"
+    info "Updating ASM CanonicalService controller in asm-system namespace..."
+    retry 3 kubectl apply -f "${CANONICAL_CONTROLLER_MANIFEST}"
+    info "Waiting for deployment..."
+    retry 3 kubectl wait --for=condition=available --timeout=600s \
+      deployment/canonical-service-controller-manager -n asm-system
   fi
+  info "...done!"
 }
 
 install_fleet_api() {
@@ -278,5 +274,5 @@ install_control_plane() {
     if use_fleet_api; then install_fleet_api; else install_control_plane_revision; fi
   fi
 
-  install_managed_canonical_controller
+  verify_canonical_controller
 }

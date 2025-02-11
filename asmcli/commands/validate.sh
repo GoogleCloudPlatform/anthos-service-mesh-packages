@@ -50,9 +50,7 @@ validate_dependencies() {
       if ! is_stackdriver_enabled; then
         enable_stackdriver_kubernetes
       fi
-      if needs_service_mesh_feature; then
-        enable_service_mesh_feature
-      fi
+      enable_service_mesh_feature
       if [[ "${CA}" == "managed_cas" ]]; then
         x_wait_for_gke_hub_api_enablement
         x_enable_workload_certificate_on_fleet "gkehub.googleapis.com"
@@ -64,8 +62,9 @@ validate_dependencies() {
         exit_if_service_mesh_feature_not_enabled
       fi
     fi
+  else
+    enable_service_mesh_feature
   fi
-
   if can_register_cluster; then
     register_cluster
     exit_if_cluster_unregistered
