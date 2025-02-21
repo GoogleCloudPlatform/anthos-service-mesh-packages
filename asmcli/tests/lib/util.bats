@@ -4,6 +4,9 @@ setup() {
   load '../unit_test_common.bash'
   _common_setup
   CITADEL_MANIFEST="citadel-ca.yaml"
+  PROJECT_ID="test-project"
+  CLUSTER_NAME="test_cluster"
+  CLUSTER_LOCATION="us-east-2a"
   context_init
 }
 
@@ -188,4 +191,59 @@ EOF
   assert_output "World"
   
   rm "${LOG_FILE_LOCATION}"
+}
+
+@test "UTIL: Managed Canonical Controller Status is read correctly" {
+
+  _intercept_setup
+  run context_set-option "HUB_MEMBERSHIP_ID" "test-cluster"
+
+  #Test Case 1: Unknown Membership State Code for test-cluster
+  run context_set-option "FLEET_ID" "unknown-state-fleet"
+  run check_managed_canonical_controller_state
+  assert_output --partial "Managed Canonical Service Controller status could not be determined"
+
+  #Test Case 2: Error Membership State Code for test-cluster
+  run context_set-option "FLEET_ID" "error-state-fleet"
+  run check_managed_canonical_controller_state
+  assert_output --partial "Managed Canonical Service Controller status could not be determined"
+
+  #Test Case 3: Warning State Code, No CSC Condition for test-cluster
+  run context_set-option "FLEET_ID" "warning-non-csc-condition-state-fleet"
+  run check_managed_canonical_controller_state
+  assert_output --partial "Managed Canonical Service Controller status could not be determined"
+
+  #Test Case 4: OK Membership State Code for test-cluster
+  run context_set-option "FLEET_ID" "ok-state-fleet"
+  run check_managed_canonical_controller_state
+  assert_output --partial "Managed Canonical Service Controller working successfully"
+
+  #Test Case 5: Warning State Code, CSC Condition Present  for test-cluster
+  run context_set-option "FLEET_ID" "warning-csc-condition-state-fleet"
+  run check_managed_canonical_controller_state
+  assert_output --partial "Managed Canonical Service Controller facing issues"
+
+  #Test Case 6: Warning State Code, CSC Condition, Multi-Cluster Fleet
+  run context_set-option "FLEET_ID" "multi-cluster-fleet"
+  run check_managed_canonical_controller_state
+  assert_output --partial "Managed Canonical Service Controller facing issues"
+
+  #Test Case 7: Membership Not Found
+  run context_set-option "FLEET_ID" "no-membership-fleet"
+  run check_managed_canonical_controller_state
+  assert_output --partial "Membership state for test-cluster not found"
+  assert_output --partial "Managed Canonical Service Controller status could not be determined"
+
+  #Test Case 8: MembershipStates Field Missing from feature state
+  run context_set-option "FLEET_ID" "membership-field-missing"
+  run check_managed_canonical_controller_state
+  assert_output --partial "Membership state for test-cluster not found"
+  assert_output --partial "Managed Canonical Service Controller status could not be determined"
+
+  #Test Case 9: gcloud Command Error
+  run context_set-option "FLEET_ID" "gcloud-error-result"
+  run check_managed_canonical_controller_state
+  assert_output --partial "Membership state for test-cluster not found"
+  assert_output --partial "Managed Canonical Service Controller status could not be determined"
+
 }

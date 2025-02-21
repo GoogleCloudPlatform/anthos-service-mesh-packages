@@ -50,9 +50,7 @@ validate_dependencies() {
       if ! is_stackdriver_enabled; then
         enable_stackdriver_kubernetes
       fi
-      if needs_service_mesh_feature; then
-        enable_service_mesh_feature
-      fi
+      enable_service_mesh_feature
       if [[ "${CA}" == "managed_cas" ]]; then
         x_wait_for_gke_hub_api_enablement
         x_enable_workload_certificate_on_fleet "gkehub.googleapis.com"
@@ -60,12 +58,17 @@ validate_dependencies() {
     else
       exit_if_no_workload_identity
       exit_if_stackdriver_not_enabled
-      if needs_service_mesh_feature; then
-        exit_if_service_mesh_feature_not_enabled
-      fi
+      exit_if_service_mesh_feature_not_enabled
+    fi
+  else
+    # Service mesh feature will be enabled
+    # if asmcli install is executed with --enable_gcp_components or --enable_all flags.
+    if can_modify_gcp_components; then
+      enable_service_mesh_feature
+    else
+      exit_if_service_mesh_feature_not_enabled
     fi
   fi
-
   if can_register_cluster; then
     register_cluster
     exit_if_cluster_unregistered

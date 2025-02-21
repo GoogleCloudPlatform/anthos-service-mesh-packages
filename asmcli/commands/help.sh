@@ -182,9 +182,6 @@ FLAGS:
                                       package in the output directory. If the directory is not
                                       specified or does not contain the required files, the
                                       script will exit with error.
-     --disable_canonical_service      Do not install the CanonicalService
-                                      controller. This is required for ASM UI to
-                                      support various features.
      --managed_certificates           Enable the managed certificates, which automatically manages
                                       the workload certificates. When this flag is enabled,
                                       you should not specify the --ca option.
@@ -273,7 +270,6 @@ FLAGS:
 
      --offline
 
-     --disable_canonical_service
   --managed_certificates
   -v|--verbose
      --dry_run

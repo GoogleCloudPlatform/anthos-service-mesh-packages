@@ -164,7 +164,10 @@ EOF
 {
   "loggingService": "logging.googleapis.com/kubernetes",
   "monitoringService": "monitoring.googleapis.com/kubernetes",
-  "workloadIdentityConfig": "definitely_enabled"
+  "workloadIdentityConfig": "definitely_enabled",
+  "resourceState": {
+    "state": "ACTIVE"
+  }
 }
 EOF
     return 0
@@ -200,6 +203,126 @@ EOF
     return 0
   fi
 
+  if [[ "${*}" == *"fleet mesh describe"* ]]; then
+    if [[ "${*}" == *"error-state-fleet"* ]]; then
+      cat <<EOF
+{
+  "membershipStates": {
+    "memberships/test-cluster": {
+        "servicemesh":"",
+        "state": {
+           "code": "ERROR"
+        }
+    }
+  }
+}
+EOF
+    elif [[ "${*}" == *"ok-state-fleet"* ]]; then
+        cat <<EOF
+{
+  "membershipStates": {
+    "memberships/test-cluster": {
+        "servicemesh":"",
+        "state": {
+           "code": "OK"
+        }
+    }
+  }
+}
+EOF
+    elif [[ "${*}" == *"warning-non-csc-condition-state-fleet"* ]]; then
+        cat <<EOF
+{
+  "membershipStates": {
+    "memberships/test-cluster": {
+      "servicemesh": {
+        "conditions": [
+          {
+            "code": "CONTROL_PLANE_ISSUE",
+            "details": "Non CSC Error",
+            "severity": "WARNING"
+          }
+        ]
+      },
+      "state": {
+        "code": "WARNING"
+      }
+    }
+  }
+}
+EOF
+    elif [[ "${*}" == *"warning-csc-condition-state-fleet"* ]]; then
+        cat <<EOF
+{
+  "membershipStates": {
+    "memberships/test-cluster": {
+      "servicemesh": {
+        "conditions": [
+          {
+            "code": "CONTROL_PLANE_ISSUE",
+            "details": "Non CSC Error",
+            "severity": "WARNING"
+          },
+          {
+            "code": "CANONICAL_SERVICE_ERROR",
+            "details": "CSC Error",
+            "severity": "WARNING"
+          }
+        ]
+      },
+      "state": {
+        "code": "WARNING"
+      }
+    }
+  }
+}
+EOF
+   elif [[ "${*}" == *"multi-cluster-fleet"* ]]; then
+           cat <<EOF
+{
+  "membershipStates": {
+    "memberships/test-cluster-1": {
+      "servicemesh": "",
+      "state": {
+        "code": "OK"
+      }
+    },
+    "memberships/test-cluster": {
+      "servicemesh": {
+        "conditions": [
+          {
+            "code": "CANONICAL_SERVICE_ERROR",
+            "details": "CSC Error",
+            "severity": "WARNING"
+          }
+        ]
+      },
+      "state": {
+        "code": "WARNING"
+      }
+    }
+  }
+}
+EOF
+    elif [[ "${*}" == *"no-membership-fleet"* ]]; then
+           cat <<EOF
+{
+  "membershipStates": {}
+}
+EOF
+   elif [[ "${*}" == *"membership-field-missing"* ]]; then
+           cat <<EOF
+{
+  "createTime": "2024-06-05T08:13:23.380501417Z"
+}
+EOF
+   elif [[ "${*}" == *"gcloud-error-result"* ]]; then
+     echo "ERROR: (gcloud.container.fleet.mesh.describe) PERMISSION_DENIED"
+   else
+     echo ""
+   fi
+    return 0
+  fi
   return 1
 }
 
