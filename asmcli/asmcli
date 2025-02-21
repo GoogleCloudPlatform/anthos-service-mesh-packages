@@ -913,9 +913,6 @@ FLAGS:
                                       package in the output directory. If the directory is not
                                       specified or does not contain the required files, the
                                       script will exit with error.
-     --disable_canonical_service      Do not install the CanonicalService
-                                      controller. This is required for ASM UI to
-                                      support various features.
      --managed_certificates           Enable the managed certificates, which automatically manages
                                       the workload certificates. When this flag is enabled,
                                       you should not specify the --ca option.
@@ -1004,7 +1001,6 @@ FLAGS:
 
      --offline
 
-     --disable_canonical_service
   --managed_certificates
   -v|--verbose
      --dry_run
@@ -1382,8 +1378,6 @@ install_ca() {
 }
 
 install_control_plane() {
-  local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
-
   label_istio_namespace
   if is_managed; then
     install_managed_control_plane
@@ -1459,12 +1453,16 @@ validate_dependencies() {
     else
       exit_if_no_workload_identity
       exit_if_stackdriver_not_enabled
-      if needs_service_mesh_feature; then
-        exit_if_service_mesh_feature_not_enabled
-      fi
+      exit_if_service_mesh_feature_not_enabled
     fi
   else
-    enable_service_mesh_feature
+    # Service mesh feature will be enabled
+    # if asmcli install is executed with --enable_gcp_components or --enable_all flags.
+    if can_modify_gcp_components; then
+      enable_service_mesh_feature
+    else
+      exit_if_service_mesh_feature_not_enabled
+    fi
   fi
   if can_register_cluster; then
     register_cluster
@@ -2458,10 +2456,6 @@ needs_asm() {
   fi
 }
 
-needs_service_mesh_feature() {
-  is_managed
-}
-
 version_valid_for_upgrade() {
   local VERSION; VERSION=$1
 
@@ -2698,7 +2692,6 @@ context_init() {
     "ENABLE_NAMESPACE_CREATION": ${ENABLE_NAMESPACE_CREATION:-0},
     "ENABLE_MESHCONFIG_INIT": ${ENABLE_MESHCONFIG_INIT:-0},
     "USE_VPCSC": ${USE_VPCSC:-0},
-    "DISABLE_CANONICAL_SERVICE": ${DISABLE_CANONICAL_SERVICE:-0},
     "TRUST_FLEET_IDENTITY": ${TRUST_FLEET_IDENTITY:-1},
     "NON_INTERACTIVE": ${NON_INTERACTIVE:-0},
     "SERVICE_ACCOUNT": "${SERVICE_ACCOUNT:-}",
@@ -2856,7 +2849,6 @@ ENABLE_REGISTRATION
 ENABLE_NAMESPACE_CREATION
 ENABLE_MESHCONFIG_INIT
 USE_VPCSC
-DISABLE_CANONICAL_SERVICE
 NON_INTERACTIVE
 DRY_RUN
 ONLY_VALIDATE
@@ -3575,10 +3567,6 @@ parse_args() {
         warn "The managed CNI now defaults to be on--continuing with normal installation."
         shift 1
         ;;
-      --disable_canonical_service | --disable-canonical-service)
-        context_set-option "DISABLE_CANONICAL_SERVICE" 1
-        shift 1
-        ;;
       -s | --service_account | --service-account)
         arg_required "${@}"
         context_set-option "SERVICE_ACCOUNT" "${2}"
@@ -3782,10 +3770,6 @@ x_parse_install_args() {
       --use_managed_cni | --use-managed-cni)
         # Kept to not break customers' CI.
         warn "The managed CNI now defaults to be on--continuing with normal installation."
-        shift 1
-        ;;
-      --disable_canonical_service | --disable-canonical-service)
-        context_set-option "DISABLE_CANONICAL_SERVICE" 1
         shift 1
         ;;
       -s | --service_account | --service-account)
@@ -4717,18 +4701,21 @@ check_managed_canonical_controller_state() {
   local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
   local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}")"
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
-
+  local RETRY_MESSAGE="Retry to get state code for the membership: ${MEMBERSHIP_NAME}"
   local CSC_STATUS_AVAILABLE=0
   local CS_ERROR="CANONICAL_SERVICE_ERROR"
   local MEMBERSHIP_STATE;
-  local STATE;
   local CODE;
 
-  for i in {1..10}; do
-    STATE=$( gcloud container fleet mesh describe --project "${FLEET_ID}" --format=json )
-    MEMBERSHIP_STATE=$( gcloud container fleet mesh describe --project "${FLEET_ID}" --format=json | \
-                     	jq '.membershipStates | with_entries(select(.key| endswith("'/"${MEMBERSHIP_NAME}"'")))[]' )
-    CODE=$( jq -r '.state.code' <<< "$MEMBERSHIP_STATE" )
+  for i in {1..5}; do
+    MEMBERSHIP_STATE=$( gcloud container fleet mesh describe --project "${FLEET_ID}" --format=json 2>/dev/null | \
+            jq '.membershipStates | if (. == null) then empty else . end | with_entries(select(.key| endswith("'/"${MEMBERSHIP_NAME}"'")))[]' )
+    if [[ -z "$MEMBERSHIP_STATE" ]]; then
+      echo "Membership state for ${MEMBERSHIP_NAME} not found. ${RETRY_MESSAGE}"
+      sleep 60
+      continue
+    fi
+    CODE=$( jq -r '.state.code' <<< "$MEMBERSHIP_STATE" 2>/dev/null)
     if [ "$CODE" = "OK" ]; then
       info "Managed Canonical Service Controller working successfully"
       CSC_STATUS_AVAILABLE=1; break
@@ -4739,14 +4726,13 @@ check_managed_canonical_controller_state() {
       fi
       break
     else
-      echo "STATE: $STATE"
-      echo "MEMBERSHIP_STATE: $MEMBERSHIP_STATE. Retry to get featureState.code for the membership: $MEMBERSHIP_NAME"
+      echo "Retry to get state code for the membership: $MEMBERSHIP_NAME"
       sleep 60
     fi
   done
 
   if [ ${CSC_STATUS_AVAILABLE} -eq 0 ]; then
-    warn "Unable to verify Managed Canonical Service Controller State. Kindly refer to <wiki link>"
+    warn "Maximum retries reached. Managed Canonical Service Controller status could not be determined. Kindly refer to <wiki link>"
   fi
 }
 
@@ -5277,7 +5263,6 @@ validate_args() {
   local ENABLE_GCP_COMPONENTS; ENABLE_GCP_COMPONENTS="$(context_get-option "ENABLE_GCP_COMPONENTS")"
   local ENABLE_REGISTRATION; ENABLE_REGISTRATION="$(context_get-option "ENABLE_REGISTRATION")"
   local ENABLE_NAMESPACE_CREATION; ENABLE_NAMESPACE_CREATION="$(context_get-option "ENABLE_NAMESPACE_CREATION")"
-  local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
   local SERVICE_ACCOUNT; SERVICE_ACCOUNT="$(context_get-option "SERVICE_ACCOUNT")"
   local KEY_FILE; KEY_FILE="$(context_get-option "KEY_FILE")"
   local CA_CERT; CA_CERT="$(context_get-option "CA_CERT")"
@@ -5464,7 +5449,6 @@ ENABLE_GCP_IAM_ROLES
 ENABLE_GCP_COMPONENTS
 ENABLE_REGISTRATION
 MANAGED
-DISABLE_CANONICAL_SERVICE
 ONLY_VALIDATE
 ONLY_ENABLE
 VERBOSE
@@ -5561,7 +5545,6 @@ x_validate_install_args() {
   local ENABLE_REGISTRATION; ENABLE_REGISTRATION="$(context_get-option "ENABLE_REGISTRATION")"
   local ENABLE_NAMESPACE_CREATION; ENABLE_NAMESPACE_CREATION="$(context_get-option "ENABLE_NAMESPACE_CREATION")"
   local USE_VPCSC; USE_VPCSC="$(context_get-option "USE_VPCSC")"
-  local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
   local SERVICE_ACCOUNT; SERVICE_ACCOUNT="$(context_get-option "SERVICE_ACCOUNT")"
   local KEY_FILE; KEY_FILE="$(context_get-option "KEY_FILE")"
   local DRY_RUN; DRY_RUN="$(context_get-option "DRY_RUN")"
@@ -5686,7 +5669,6 @@ ENABLE_GCP_IAM_ROLES
 ENABLE_GCP_COMPONENTS
 ENABLE_REGISTRATION
 USE_VPCSC
-DISABLE_CANONICAL_SERVICE
 ONLY_VALIDATE
 ONLY_ENABLE
 VERBOSE

@@ -58,12 +58,16 @@ validate_dependencies() {
     else
       exit_if_no_workload_identity
       exit_if_stackdriver_not_enabled
-      if needs_service_mesh_feature; then
-        exit_if_service_mesh_feature_not_enabled
-      fi
+      exit_if_service_mesh_feature_not_enabled
     fi
   else
-    enable_service_mesh_feature
+    # Service mesh feature will be enabled
+    # if asmcli install is executed with --enable_gcp_components or --enable_all flags.
+    if can_modify_gcp_components; then
+      enable_service_mesh_feature
+    else
+      exit_if_service_mesh_feature_not_enabled
+    fi
   fi
   if can_register_cluster; then
     register_cluster

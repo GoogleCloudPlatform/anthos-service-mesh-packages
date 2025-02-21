@@ -164,7 +164,10 @@ EOF
 {
   "loggingService": "logging.googleapis.com/kubernetes",
   "monitoringService": "monitoring.googleapis.com/kubernetes",
-  "workloadIdentityConfig": "definitely_enabled"
+  "workloadIdentityConfig": "definitely_enabled",
+  "resourceState": {
+    "state": "ACTIVE"
+  }
 }
 EOF
     return 0
@@ -301,9 +304,23 @@ EOF
   }
 }
 EOF
-    else
-      echo ""
-    fi
+    elif [[ "${*}" == *"no-membership-fleet"* ]]; then
+           cat <<EOF
+{
+  "membershipStates": {}
+}
+EOF
+   elif [[ "${*}" == *"membership-field-missing"* ]]; then
+           cat <<EOF
+{
+  "createTime": "2024-06-05T08:13:23.380501417Z"
+}
+EOF
+   elif [[ "${*}" == *"gcloud-error-result"* ]]; then
+     echo "ERROR: (gcloud.container.fleet.mesh.describe) PERMISSION_DENIED"
+   else
+     echo ""
+   fi
     return 0
   fi
   return 1

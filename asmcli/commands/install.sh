@@ -259,8 +259,6 @@ install_ca() {
 }
 
 install_control_plane() {
-  local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
-
   label_istio_namespace
   if is_managed; then
     install_managed_control_plane
