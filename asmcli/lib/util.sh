@@ -865,7 +865,7 @@ check_managed_canonical_controller_state() {
   local CS_ERROR="CANONICAL_SERVICE_ERROR"
   local MEMBERSHIP_STATE;
   local CODE;
-
+  # TODO(shavigupta): Update Doc links
   for i in {1..5}; do
     MEMBERSHIP_STATE=$( gcloud container fleet mesh describe --project "${FLEET_ID}" --format=json 2>/dev/null | \
             jq '.membershipStates | if (. == null) then empty else . end | with_entries(select(.key| endswith("'/"${MEMBERSHIP_NAME}"'")))[]' )
@@ -885,13 +885,13 @@ check_managed_canonical_controller_state() {
       fi
       break
     else
-      echo "Retry to get state code for the membership: $MEMBERSHIP_NAME"
+      echo "${RETRY_MESSAGE}"
       sleep 60
     fi
   done
 
   if [ ${CSC_STATUS_AVAILABLE} -eq 0 ]; then
-    warn "Maximum retries reached. Managed Canonical Service Controller status could not be determined. Kindly refer to <wiki link>"
+    warn "Managed Canonical Service Controller status could not be determined. Kindly refer to <wiki link>"
   fi
 }
 

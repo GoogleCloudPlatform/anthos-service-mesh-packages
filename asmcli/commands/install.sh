@@ -99,7 +99,8 @@ verify_canonical_controller() {
     info "Checking Managed CanonicalService controller state..."
     check_managed_canonical_controller_state
   else
-    warn "Kindly migrate to managed canonical service controller. Refer <DocLink  to be added>"
+    # TODO(shavigupta): Update Doc link
+    warn "In-cluster canonical service controller is deprecated, please upgrade to managed canonical service controller. Refer [DocLink to be added]"
     info "Updating ASM CanonicalService controller in asm-system namespace..."
     retry 3 kubectl apply -f "${CANONICAL_CONTROLLER_MANIFEST}"
     info "Waiting for deployment..."

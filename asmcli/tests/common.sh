@@ -179,6 +179,8 @@ install_demo_app_istio_manifests() {
     istio-injection=enabled \
     --overwrite
 
+   echo "$NAMESPACE: {NAMESPACE}"
+   sleep 7200
   kubectl -n "${NAMESPACE}" apply -f - <<EOF
 $(get_demo_yaml "istio" )
 EOF

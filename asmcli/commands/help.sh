@@ -182,6 +182,10 @@ FLAGS:
                                       package in the output directory. If the directory is not
                                       specified or does not contain the required files, the
                                       script will exit with error.
+     --disable_canonical_service      DEPRECATED: This flag is now a no-operation.
+                                      The managed Canonical Service Controller is always provisioned.
+                                      It is required for the ASM UI to support various features.
+                                      Adding this flag will have no effect.
      --managed_certificates           Enable the managed certificates, which automatically manages
                                       the workload certificates. When this flag is enabled,
                                       you should not specify the --ca option.

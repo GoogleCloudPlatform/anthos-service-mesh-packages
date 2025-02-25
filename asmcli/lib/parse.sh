@@ -155,6 +155,11 @@ parse_args() {
         warn "The managed CNI now defaults to be on--continuing with normal installation."
         shift 1
         ;;
+      --disable_canonical_service | --disable-canonical-service)
+        # Kept to not break customers' CI.
+        warn "The disable_canonical_service option is no longer supported. The managed Canonical Service Controller is always provisioned."
+        shift 1
+        ;;
       -s | --service_account | --service-account)
         arg_required "${@}"
         context_set-option "SERVICE_ACCOUNT" "${2}"
@@ -358,6 +363,11 @@ x_parse_install_args() {
       --use_managed_cni | --use-managed-cni)
         # Kept to not break customers' CI.
         warn "The managed CNI now defaults to be on--continuing with normal installation."
+        shift 1
+        ;;
+      --disable_canonical_service | --disable-canonical-service)
+        # Kept to not break customers' CI.
+        warn "The disable_canonical_service option is no longer supported. The managed Canonical Service Controller is always provisioned."
         shift 1
         ;;
       -s | --service_account | --service-account)

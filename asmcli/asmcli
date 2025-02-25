@@ -913,6 +913,10 @@ FLAGS:
                                       package in the output directory. If the directory is not
                                       specified or does not contain the required files, the
                                       script will exit with error.
+     --disable_canonical_service      DEPRECATED: This flag is now a no-operation.
+                                      The managed Canonical Service Controller is always provisioned.
+                                      It is required for the ASM UI to support various features.
+                                      Adding this flag will have no effect.
      --managed_certificates           Enable the managed certificates, which automatically manages
                                       the workload certificates. When this flag is enabled,
                                       you should not specify the --ca option.
@@ -1218,7 +1222,8 @@ verify_canonical_controller() {
     info "Checking Managed CanonicalService controller state..."
     check_managed_canonical_controller_state
   else
-    warn "Kindly migrate to managed canonical service controller. Refer <DocLink  to be added>"
+    # TODO(shavigupta): Update Doc link
+    warn "In-cluster canonical service controller is deprecated, please upgrade to managed canonical service controller. Refer [DocLink to be added]"
     info "Updating ASM CanonicalService controller in asm-system namespace..."
     retry 3 kubectl apply -f "${CANONICAL_CONTROLLER_MANIFEST}"
     info "Waiting for deployment..."
@@ -3567,6 +3572,11 @@ parse_args() {
         warn "The managed CNI now defaults to be on--continuing with normal installation."
         shift 1
         ;;
+      --disable_canonical_service | --disable-canonical-service)
+        # Kept to not break customers' CI.
+        warn "The disable_canonical_service option is no longer supported. The managed Canonical Service Controller is always provisioned."
+        shift 1
+        ;;
       -s | --service_account | --service-account)
         arg_required "${@}"
         context_set-option "SERVICE_ACCOUNT" "${2}"
@@ -3770,6 +3780,11 @@ x_parse_install_args() {
       --use_managed_cni | --use-managed-cni)
         # Kept to not break customers' CI.
         warn "The managed CNI now defaults to be on--continuing with normal installation."
+        shift 1
+        ;;
+      --disable_canonical_service | --disable-canonical-service)
+        # Kept to not break customers' CI.
+        warn "The disable_canonical_service option is no longer supported. The managed Canonical Service Controller is always provisioned."
         shift 1
         ;;
       -s | --service_account | --service-account)
@@ -4706,7 +4721,7 @@ check_managed_canonical_controller_state() {
   local CS_ERROR="CANONICAL_SERVICE_ERROR"
   local MEMBERSHIP_STATE;
   local CODE;
-
+  # TODO(shavigupta): Update Doc links
   for i in {1..5}; do
     MEMBERSHIP_STATE=$( gcloud container fleet mesh describe --project "${FLEET_ID}" --format=json 2>/dev/null | \
             jq '.membershipStates | if (. == null) then empty else . end | with_entries(select(.key| endswith("'/"${MEMBERSHIP_NAME}"'")))[]' )
@@ -4726,13 +4741,13 @@ check_managed_canonical_controller_state() {
       fi
       break
     else
-      echo "Retry to get state code for the membership: $MEMBERSHIP_NAME"
+      echo "${RETRY_MESSAGE}"
       sleep 60
     fi
   done
 
   if [ ${CSC_STATUS_AVAILABLE} -eq 0 ]; then
-    warn "Maximum retries reached. Managed Canonical Service Controller status could not be determined. Kindly refer to <wiki link>"
+    warn "Managed Canonical Service Controller status could not be determined. Kindly refer to <wiki link>"
   fi
 }
 
