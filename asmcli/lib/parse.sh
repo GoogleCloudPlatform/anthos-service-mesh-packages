@@ -156,7 +156,8 @@ parse_args() {
         shift 1
         ;;
       --disable_canonical_service | --disable-canonical-service)
-        context_set-option "DISABLE_CANONICAL_SERVICE" 1
+        # Kept to not break customers' CI.
+        warn "The disable_canonical_service option is no longer supported. The managed Canonical Service Controller is always provisioned."
         shift 1
         ;;
       -s | --service_account | --service-account)
@@ -365,7 +366,8 @@ x_parse_install_args() {
         shift 1
         ;;
       --disable_canonical_service | --disable-canonical-service)
-        context_set-option "DISABLE_CANONICAL_SERVICE" 1
+        # Kept to not break customers' CI.
+        warn "The disable_canonical_service option is no longer supported. The managed Canonical Service Controller is always provisioned."
         shift 1
         ;;
       -s | --service_account | --service-account)
