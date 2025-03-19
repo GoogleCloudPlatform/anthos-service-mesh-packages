@@ -865,7 +865,7 @@ check_managed_canonical_controller_state() {
   local CS_ERROR="CANONICAL_SERVICE_ERROR"
   local MEMBERSHIP_STATE;
   local CODE;
-  # TODO(shavigupta): Update Doc links
+  local TROUBLESHOOT_DOC_LINK="https://cloud.google.com/service-mesh/docs/troubleshooting/troubleshoot-canonical-service#resolve-managed-canonical-controller-issues"
   for i in {1..5}; do
     MEMBERSHIP_STATE=$( gcloud container fleet mesh describe --project "${FLEET_ID}" --format=json 2>/dev/null | \
             jq '.membershipStates | if (. == null) then empty else . end | with_entries(select(.key| endswith("'/"${MEMBERSHIP_NAME}"'")))[]' )
@@ -880,7 +880,7 @@ check_managed_canonical_controller_state() {
       CSC_STATUS_AVAILABLE=1; break
     elif [ "$CODE" = "WARNING" ]; then
       if jq -r '.servicemesh.conditions[].code' <<< "$MEMBERSHIP_STATE" | grep -q "$CS_ERROR" ; then
-        warn "Managed Canonical Service Controller facing issues. Kindly refer to <wiki link>"
+        warn "Managed Canonical Service Controller facing issues. Please refer to ${TROUBLESHOOT_DOC_LINK}"
         CSC_STATUS_AVAILABLE=1
       fi
       break
@@ -891,7 +891,7 @@ check_managed_canonical_controller_state() {
   done
 
   if [ ${CSC_STATUS_AVAILABLE} -eq 0 ]; then
-    warn "Managed Canonical Service Controller status could not be determined. Kindly refer to <wiki link>"
+    warn "Managed Canonical Service Controller status could not be determined. Please refer to ${TROUBLESHOOT_DOC_LINK}"
   fi
 }
 

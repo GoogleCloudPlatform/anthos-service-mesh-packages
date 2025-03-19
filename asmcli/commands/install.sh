@@ -93,14 +93,14 @@ apply_kube_yamls() {
 }
 
 verify_canonical_controller() {
+  local MIGRATION_DOC_LINK="https://cloud.google.com/service-mesh/docs/canonical-service-migrate-from-in-cluster-controller"
   local IN_CLUSTER_CSC_DEP; IN_CLUSTER_CSC_DEP="$(kubectl get deployment/canonical-service-controller-manager \
     -n asm-system --ignore-not-found=true || true)"
   if [[ -z "$IN_CLUSTER_CSC_DEP" ]]; then
     info "Checking Managed CanonicalService controller state..."
     check_managed_canonical_controller_state
   else
-    # TODO(shavigupta): Update Doc link
-    warn "In-cluster canonical service controller is deprecated, please upgrade to managed canonical service controller. Refer [DocLink to be added]"
+    warn "In-cluster canonical service controller is deprecated, please upgrade to managed canonical service controller. Please refer to ${MIGRATION_DOC_LINK}"
     info "Updating ASM CanonicalService controller in asm-system namespace..."
     retry 3 kubectl apply -f "${CANONICAL_CONTROLLER_MANIFEST}"
     info "Waiting for deployment..."
