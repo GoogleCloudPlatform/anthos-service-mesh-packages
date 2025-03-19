@@ -853,3 +853,45 @@ get_monitoring_config_membership_json () {
   CONFIG="$(gcloud container hub memberships describe "${MEMBERSHIP_NAME}" --project "${PROJECT_ID}" --format="json(monitoringConfig)")"
   echo "${CONFIG}"
 }
+
+check_managed_canonical_controller_state() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  local RETRY_MESSAGE="Retry to get state code for the membership: ${MEMBERSHIP_NAME}"
+  local CSC_STATUS_AVAILABLE=0
+  local CS_ERROR="CANONICAL_SERVICE_ERROR"
+  local MEMBERSHIP_STATE;
+  local CODE;
+  local TROUBLESHOOT_DOC_LINK="https://cloud.google.com/service-mesh/docs/troubleshooting/troubleshoot-canonical-service#resolve-managed-canonical-controller-issues"
+  for i in {1..5}; do
+    MEMBERSHIP_STATE=$( gcloud container fleet mesh describe --project "${FLEET_ID}" --format=json 2>/dev/null | \
+            jq '.membershipStates | if (. == null) then empty else . end | with_entries(select(.key| endswith("'/"${MEMBERSHIP_NAME}"'")))[]' )
+    if [[ -z "$MEMBERSHIP_STATE" ]]; then
+      echo "Membership state for ${MEMBERSHIP_NAME} not found. ${RETRY_MESSAGE}"
+      sleep 60
+      continue
+    fi
+    CODE=$( jq -r '.state.code' <<< "$MEMBERSHIP_STATE" 2>/dev/null)
+    if [ "$CODE" = "OK" ]; then
+      info "Managed Canonical Service Controller working successfully"
+      CSC_STATUS_AVAILABLE=1; break
+    elif [ "$CODE" = "WARNING" ]; then
+      if jq -r '.servicemesh.conditions[].code' <<< "$MEMBERSHIP_STATE" | grep -q "$CS_ERROR" ; then
+        warn "Managed Canonical Service Controller facing issues. Please refer to ${TROUBLESHOOT_DOC_LINK}"
+        CSC_STATUS_AVAILABLE=1
+      fi
+      break
+    else
+      echo "${RETRY_MESSAGE}"
+      sleep 60
+    fi
+  done
+
+  if [ ${CSC_STATUS_AVAILABLE} -eq 0 ]; then
+    warn "Managed Canonical Service Controller status could not be determined. Please refer to ${TROUBLESHOOT_DOC_LINK}"
+  fi
+}
+

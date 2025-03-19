@@ -16,8 +16,14 @@ main() {
   parse_args "$@"
 
   run_basic_test "install" "mesh_ca" "--managed --enable-registration"; RETVAL=$?;
-  cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"
 
+  echo "Verifying service mesh feature is enabled..."
+  if ! is_service_mesh_feature_enabled; then
+    fatal "Service mesh feature is not enabled."
+  fi
+
+  cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"
+  delete_service_mesh_feature
   exit "${RETVAL}"
 }
 
