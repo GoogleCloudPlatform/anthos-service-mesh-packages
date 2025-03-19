@@ -913,9 +913,10 @@ FLAGS:
                                       package in the output directory. If the directory is not
                                       specified or does not contain the required files, the
                                       script will exit with error.
-     --disable_canonical_service      Do not install the CanonicalService
-                                      controller. This is required for ASM UI to
-                                      support various features.
+     --disable_canonical_service      DEPRECATED: This flag is now a no-operation.
+                                      The managed Canonical Service Controller is always provisioned.
+                                      It is required for the ASM UI to support various features.
+                                      Adding this flag will have no effect.
      --managed_certificates           Enable the managed certificates, which automatically manages
                                       the workload certificates. When this flag is enabled,
                                       you should not specify the --ca option.
@@ -1004,7 +1005,6 @@ FLAGS:
 
      --offline
 
-     --disable_canonical_service
   --managed_certificates
   -v|--verbose
      --dry_run
@@ -1215,12 +1215,21 @@ apply_kube_yamls() {
   done
 }
 
-install_canonical_controller() {
-  info "Installing ASM CanonicalService controller in asm-system namespace..."
-  retry 3 kubectl apply -f "${CANONICAL_CONTROLLER_MANIFEST}"
-  info "Waiting for deployment..."
-  retry 3 kubectl wait --for=condition=available --timeout=600s \
+verify_canonical_controller() {
+  local MIGRATION_DOC_LINK="https://cloud.google.com/service-mesh/docs/canonical-service-migrate-from-in-cluster-controller"
+  local IN_CLUSTER_CSC_DEP; IN_CLUSTER_CSC_DEP="$(kubectl get deployment/canonical-service-controller-manager \
+    -n asm-system --ignore-not-found=true || true)"
+  if [[ -z "$IN_CLUSTER_CSC_DEP" ]]; then
+    info "Checking Managed CanonicalService controller state..."
+    check_managed_canonical_controller_state
+  else
+    warn "In-cluster canonical service controller is deprecated, please upgrade to managed canonical service controller. Please refer to ${MIGRATION_DOC_LINK}"
+    info "Updating ASM CanonicalService controller in asm-system namespace..."
+    retry 3 kubectl apply -f "${CANONICAL_CONTROLLER_MANIFEST}"
+    info "Waiting for deployment..."
+    retry 3 kubectl wait --for=condition=available --timeout=600s \
       deployment/canonical-service-controller-manager -n asm-system
+  fi
   info "...done!"
 }
 
@@ -1374,8 +1383,6 @@ install_ca() {
 }
 
 install_control_plane() {
-  local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
-
   label_istio_namespace
   if is_managed; then
     install_managed_control_plane
@@ -1389,9 +1396,7 @@ install_control_plane() {
     if use_fleet_api; then install_fleet_api; else install_control_plane_revision; fi
   fi
 
-  if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]] && ! is_managed; then
-    install_canonical_controller
-  fi
+  verify_canonical_controller
 }
 validate_subcommand() {
   ### Preparation ###
@@ -1445,9 +1450,7 @@ validate_dependencies() {
       if ! is_stackdriver_enabled; then
         enable_stackdriver_kubernetes
       fi
-      if needs_service_mesh_feature; then
-        enable_service_mesh_feature
-      fi
+      enable_service_mesh_feature
       if [[ "${CA}" == "managed_cas" ]]; then
         x_wait_for_gke_hub_api_enablement
         x_enable_workload_certificate_on_fleet "gkehub.googleapis.com"
@@ -1455,12 +1458,17 @@ validate_dependencies() {
     else
       exit_if_no_workload_identity
       exit_if_stackdriver_not_enabled
-      if needs_service_mesh_feature; then
-        exit_if_service_mesh_feature_not_enabled
-      fi
+      exit_if_service_mesh_feature_not_enabled
+    fi
+  else
+    # Service mesh feature will be enabled
+    # if asmcli install is executed with --enable_gcp_components or --enable_all flags.
+    if can_modify_gcp_components; then
+      enable_service_mesh_feature
+    else
+      exit_if_service_mesh_feature_not_enabled
     fi
   fi
-
   if can_register_cluster; then
     register_cluster
     exit_if_cluster_unregistered
@@ -2453,10 +2461,6 @@ needs_asm() {
   fi
 }
 
-needs_service_mesh_feature() {
-  is_managed
-}
-
 version_valid_for_upgrade() {
   local VERSION; VERSION=$1
 
@@ -2693,7 +2697,6 @@ context_init() {
     "ENABLE_NAMESPACE_CREATION": ${ENABLE_NAMESPACE_CREATION:-0},
     "ENABLE_MESHCONFIG_INIT": ${ENABLE_MESHCONFIG_INIT:-0},
     "USE_VPCSC": ${USE_VPCSC:-0},
-    "DISABLE_CANONICAL_SERVICE": ${DISABLE_CANONICAL_SERVICE:-0},
     "TRUST_FLEET_IDENTITY": ${TRUST_FLEET_IDENTITY:-1},
     "NON_INTERACTIVE": ${NON_INTERACTIVE:-0},
     "SERVICE_ACCOUNT": "${SERVICE_ACCOUNT:-}",
@@ -2851,7 +2854,6 @@ ENABLE_REGISTRATION
 ENABLE_NAMESPACE_CREATION
 ENABLE_MESHCONFIG_INIT
 USE_VPCSC
-DISABLE_CANONICAL_SERVICE
 NON_INTERACTIVE
 DRY_RUN
 ONLY_VALIDATE
@@ -3571,7 +3573,8 @@ parse_args() {
         shift 1
         ;;
       --disable_canonical_service | --disable-canonical-service)
-        context_set-option "DISABLE_CANONICAL_SERVICE" 1
+        # Kept to not break customers' CI.
+        warn "The disable_canonical_service option is no longer supported. The managed Canonical Service Controller is always provisioned."
         shift 1
         ;;
       -s | --service_account | --service-account)
@@ -3780,7 +3783,8 @@ x_parse_install_args() {
         shift 1
         ;;
       --disable_canonical_service | --disable-canonical-service)
-        context_set-option "DISABLE_CANONICAL_SERVICE" 1
+        # Kept to not break customers' CI.
+        warn "The disable_canonical_service option is no longer supported. The managed Canonical Service Controller is always provisioned."
         shift 1
         ;;
       -s | --service_account | --service-account)
@@ -4705,6 +4709,48 @@ get_monitoring_config_membership_json () {
   CONFIG="$(gcloud container hub memberships describe "${MEMBERSHIP_NAME}" --project "${PROJECT_ID}" --format="json(monitoringConfig)")"
   echo "${CONFIG}"
 }
+
+check_managed_canonical_controller_state() {
+  local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
+  local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
+  local CLUSTER_LOCATION; CLUSTER_LOCATION="$(context_get-option "CLUSTER_LOCATION")"
+  local MEMBERSHIP_NAME; MEMBERSHIP_NAME="$(generate_membership_name "${PROJECT_ID}" "${CLUSTER_LOCATION}" "${CLUSTER_NAME}")"
+  local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
+  local RETRY_MESSAGE="Retry to get state code for the membership: ${MEMBERSHIP_NAME}"
+  local CSC_STATUS_AVAILABLE=0
+  local CS_ERROR="CANONICAL_SERVICE_ERROR"
+  local MEMBERSHIP_STATE;
+  local CODE;
+  local TROUBLESHOOT_DOC_LINK="https://cloud.google.com/service-mesh/docs/troubleshooting/troubleshoot-canonical-service#resolve-managed-canonical-controller-issues"
+  for i in {1..5}; do
+    MEMBERSHIP_STATE=$( gcloud container fleet mesh describe --project "${FLEET_ID}" --format=json 2>/dev/null | \
+            jq '.membershipStates | if (. == null) then empty else . end | with_entries(select(.key| endswith("'/"${MEMBERSHIP_NAME}"'")))[]' )
+    if [[ -z "$MEMBERSHIP_STATE" ]]; then
+      echo "Membership state for ${MEMBERSHIP_NAME} not found. ${RETRY_MESSAGE}"
+      sleep 60
+      continue
+    fi
+    CODE=$( jq -r '.state.code' <<< "$MEMBERSHIP_STATE" 2>/dev/null)
+    if [ "$CODE" = "OK" ]; then
+      info "Managed Canonical Service Controller working successfully"
+      CSC_STATUS_AVAILABLE=1; break
+    elif [ "$CODE" = "WARNING" ]; then
+      if jq -r '.servicemesh.conditions[].code' <<< "$MEMBERSHIP_STATE" | grep -q "$CS_ERROR" ; then
+        warn "Managed Canonical Service Controller facing issues. Please refer to ${TROUBLESHOOT_DOC_LINK}"
+        CSC_STATUS_AVAILABLE=1
+      fi
+      break
+    else
+      echo "${RETRY_MESSAGE}"
+      sleep 60
+    fi
+  done
+
+  if [ ${CSC_STATUS_AVAILABLE} -eq 0 ]; then
+    warn "Managed Canonical Service Controller status could not be determined. Please refer to ${TROUBLESHOOT_DOC_LINK}"
+  fi
+}
+
 validate_revision_label() {
   # Matches DNS label formats of RFC 1123
   local DNS_1123_LABEL_MAX_LEN; DNS_1123_LABEL_MAX_LEN=63;
@@ -5232,7 +5278,6 @@ validate_args() {
   local ENABLE_GCP_COMPONENTS; ENABLE_GCP_COMPONENTS="$(context_get-option "ENABLE_GCP_COMPONENTS")"
   local ENABLE_REGISTRATION; ENABLE_REGISTRATION="$(context_get-option "ENABLE_REGISTRATION")"
   local ENABLE_NAMESPACE_CREATION; ENABLE_NAMESPACE_CREATION="$(context_get-option "ENABLE_NAMESPACE_CREATION")"
-  local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
   local SERVICE_ACCOUNT; SERVICE_ACCOUNT="$(context_get-option "SERVICE_ACCOUNT")"
   local KEY_FILE; KEY_FILE="$(context_get-option "KEY_FILE")"
   local CA_CERT; CA_CERT="$(context_get-option "CA_CERT")"
@@ -5419,7 +5464,6 @@ ENABLE_GCP_IAM_ROLES
 ENABLE_GCP_COMPONENTS
 ENABLE_REGISTRATION
 MANAGED
-DISABLE_CANONICAL_SERVICE
 ONLY_VALIDATE
 ONLY_ENABLE
 VERBOSE
@@ -5516,7 +5560,6 @@ x_validate_install_args() {
   local ENABLE_REGISTRATION; ENABLE_REGISTRATION="$(context_get-option "ENABLE_REGISTRATION")"
   local ENABLE_NAMESPACE_CREATION; ENABLE_NAMESPACE_CREATION="$(context_get-option "ENABLE_NAMESPACE_CREATION")"
   local USE_VPCSC; USE_VPCSC="$(context_get-option "USE_VPCSC")"
-  local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
   local SERVICE_ACCOUNT; SERVICE_ACCOUNT="$(context_get-option "SERVICE_ACCOUNT")"
   local KEY_FILE; KEY_FILE="$(context_get-option "KEY_FILE")"
   local DRY_RUN; DRY_RUN="$(context_get-option "DRY_RUN")"
@@ -5641,7 +5684,6 @@ ENABLE_GCP_IAM_ROLES
 ENABLE_GCP_COMPONENTS
 ENABLE_REGISTRATION
 USE_VPCSC
-DISABLE_CANONICAL_SERVICE
 ONLY_VALIDATE
 ONLY_ENABLE
 VERBOSE

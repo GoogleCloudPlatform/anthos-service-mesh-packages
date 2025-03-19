@@ -398,10 +398,6 @@ needs_asm() {
   fi
 }
 
-needs_service_mesh_feature() {
-  is_managed
-}
-
 version_valid_for_upgrade() {
   local VERSION; VERSION=$1
 

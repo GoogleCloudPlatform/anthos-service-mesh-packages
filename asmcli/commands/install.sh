@@ -92,12 +92,21 @@ apply_kube_yamls() {
   done
 }
 
-install_canonical_controller() {
-  info "Installing ASM CanonicalService controller in asm-system namespace..."
-  retry 3 kubectl apply -f "${CANONICAL_CONTROLLER_MANIFEST}"
-  info "Waiting for deployment..."
-  retry 3 kubectl wait --for=condition=available --timeout=600s \
+verify_canonical_controller() {
+  local MIGRATION_DOC_LINK="https://cloud.google.com/service-mesh/docs/canonical-service-migrate-from-in-cluster-controller"
+  local IN_CLUSTER_CSC_DEP; IN_CLUSTER_CSC_DEP="$(kubectl get deployment/canonical-service-controller-manager \
+    -n asm-system --ignore-not-found=true || true)"
+  if [[ -z "$IN_CLUSTER_CSC_DEP" ]]; then
+    info "Checking Managed CanonicalService controller state..."
+    check_managed_canonical_controller_state
+  else
+    warn "In-cluster canonical service controller is deprecated, please upgrade to managed canonical service controller. Please refer to ${MIGRATION_DOC_LINK}"
+    info "Updating ASM CanonicalService controller in asm-system namespace..."
+    retry 3 kubectl apply -f "${CANONICAL_CONTROLLER_MANIFEST}"
+    info "Waiting for deployment..."
+    retry 3 kubectl wait --for=condition=available --timeout=600s \
       deployment/canonical-service-controller-manager -n asm-system
+  fi
   info "...done!"
 }
 
@@ -251,8 +260,6 @@ install_ca() {
 }
 
 install_control_plane() {
-  local DISABLE_CANONICAL_SERVICE; DISABLE_CANONICAL_SERVICE="$(context_get-option "DISABLE_CANONICAL_SERVICE")"
-
   label_istio_namespace
   if is_managed; then
     install_managed_control_plane
@@ -266,7 +273,5 @@ install_control_plane() {
     if use_fleet_api; then install_fleet_api; else install_control_plane_revision; fi
   fi
 
-  if [[ "$DISABLE_CANONICAL_SERVICE" -eq 0 ]] && ! is_managed; then
-    install_canonical_controller
-  fi
+  verify_canonical_controller
 }
