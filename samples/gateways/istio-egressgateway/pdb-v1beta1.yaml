@@ -4,10 +4,10 @@
 apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
 metadata:
-  name: istio-ingressgateway
+  name: istio-egressgateway
 spec:
   maxUnavailable: 1
   selector:
     matchLabels:
-      istio: ingressgateway
-      app: istio-ingressgateway
+      istio: egressgateway
+      app: istio-egressgateway
