@@ -40,6 +40,10 @@ main() {
   install_oss_istio "${NAMESPACE}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}"
 
   echo "Installing Istio manifests for demo app..."
+  # --- ADDED WAIT TIMER ---
+  echo "Waiting 5 minutes for resources to be up..."
+  sleep 300
+  # ------------------------
   install_demo_app_istio_manifests "${NAMESPACE}"
 
   echo -n "Waiting for Istio ingress.."
