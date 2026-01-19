@@ -5,7 +5,7 @@ with [Anthos Service Mesh] features enabled.
 
 [Anthos Service Mesh]: https://cloud.google.com/anthos/service-mesh/
 
-Package Descriptions:
+Package Descriptions: 
 
 * `asm`: Contains various manifests to help configure and install ASM
 * `docs`: Contains useful reading material around design, development and release
