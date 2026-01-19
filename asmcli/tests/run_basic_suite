@@ -11,6 +11,8 @@ SCRIPT_NAME="${0##*/}"
 
 cd "${SDIR}"
 
+export _CI_ASM_IMAGE_LOCATION="gcr.io/gke-release-staging/asm"
+
 main() {
   # CLI setup
   parse_args "$@"
