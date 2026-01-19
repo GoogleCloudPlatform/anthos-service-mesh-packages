@@ -2614,9 +2614,11 @@ configure_package() {
   kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
   if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then
     kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
-  fi
-  if [[ -n "${_CI_ASM_IMAGE_TAG}" ]]; then
-    kpt cfg set asm anthos.servicemesh.tag "${_CI_ASM_IMAGE_TAG}"
+  if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then
+    # Print the image location to the console
+    echo "Setting ASM image location to: ${_CI_ASM_IMAGE_LOCATION}"
+    
+    kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
   fi
 
   if [[ -n "${CA_NAME}" && "${CA}" = "gcp_cas" ]]; then
