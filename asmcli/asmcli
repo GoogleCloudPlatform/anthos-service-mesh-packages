@@ -2613,9 +2613,11 @@ configure_package() {
   kpt cfg set asm anthos.servicemesh.rev "${REVISION_LABEL}"
   kpt cfg set asm anthos.servicemesh.tag "${RELEASE}"
   if [[ -n "${_CI_ASM_IMAGE_LOCATION}" ]]; then
+    echo "DEBUG: Setting ASM image hub to: ${_CI_ASM_IMAGE_LOCATION}"
     kpt cfg set asm anthos.servicemesh.hub "${_CI_ASM_IMAGE_LOCATION}"
   fi
   if [[ -n "${_CI_ASM_IMAGE_TAG}" ]]; then
+    echo "DEBUG: Setting ASM image hub to: ${_CI_ASM_IMAGE_TAG}"
     kpt cfg set asm anthos.servicemesh.tag "${_CI_ASM_IMAGE_TAG}"
   fi
 
