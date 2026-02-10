@@ -71,6 +71,9 @@ main() {
   echo "Installing Istio manifests for demo app..."
   install_demo_app_istio_manifests "${NAMESPACE}"
 
+  echo "Waiting for Managed ASM control plane to be ready..."
+  kubectl wait --for=condition=available --timeout=300s deployment/istiod -n "${ISTIO_NAMESPACE}"
+
   echo "Performing a rolling restart of the demo app..."
   local LABEL; LABEL="istio-injection=enabled"
   kubectl label \

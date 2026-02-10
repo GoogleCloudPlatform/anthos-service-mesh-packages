@@ -750,6 +750,9 @@ run_basic_test() {
   echo "Installing Istio manifests for demo app..."
   install_demo_app_istio_manifests "${LT_NAMESPACE}"
 
+  echo "Waiting for istiod revision ${REV} to be ready..."
+  kubectl wait --for=condition=available --timeout=300s deployment/istiod-"${REV}" -n "${ISTIO_NAMESPACE}"
+
   echo "Performing a rolling restart of the demo app..."
   label_with_revision "${LT_NAMESPACE}" "${LABEL}"
   roll "${LT_NAMESPACE}"
