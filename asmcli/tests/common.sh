@@ -747,6 +747,7 @@ run_basic_test() {
   #   sleep 5
   # fi
 
+
   echo "Installing Istio manifests for demo app..."
   install_demo_app_istio_manifests "${LT_NAMESPACE}"
 
