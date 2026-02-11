@@ -1,1 +1,2 @@
 build --incompatible_disallow_empty_glob=false
+common --unsupported_ignore_wrong_bazel_version
