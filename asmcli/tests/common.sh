@@ -746,8 +746,7 @@ run_basic_test() {
   #   install_sample_ingress "${LT_NAMESPACE}" "${REV}"
   #   sleep 5
   # fi
-
-
+  
   echo "Installing Istio manifests for demo app..."
   install_demo_app_istio_manifests "${LT_NAMESPACE}"
 
