@@ -740,6 +740,9 @@ run_basic_test() {
   rm "${LT_NAMESPACE}"
   sleep 5
 
+  echo "Waiting for istiod revision ${REV} to be ready..."
+  kubectl wait --for=condition=available --timeout=300s deployment/istiod-"${REV}" -n "${ISTIO_NAMESPACE}"
+
   # @zerobfd to suggest fix for failing GW
   # if [[ "${EXTRA_FLAGS}" != *--managed* && "${SUBCOMMAND}" != *experimental* ]]; then
   #   echo "Installing Istio ingress..."

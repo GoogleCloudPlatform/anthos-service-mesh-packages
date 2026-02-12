@@ -40,6 +40,9 @@ main() {
   OSS_VERSION="${OLD_OSS_VERSION}"
   install_oss_istio "${NAMESPACE}" "${CLUSTER_NAME}" "${CLUSTER_LOCATION}"
 
+  echo "Waiting for OSS Istio control plane to be ready..."
+  kubectl wait --for=condition=available --timeout=300s deployment/istiod -n "${ISTIO_NAMESPACE}"
+  
   echo "Installing Istio manifests for demo app..."
   install_demo_app_istio_manifests "${NAMESPACE}"
 
