@@ -17,6 +17,6 @@ RUN \
   curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor > bazel.gpg && \
   mv bazel.gpg /etc/apt/trusted.gpg.d/ && \
   echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list && \
-  apt update --allow-releaseinfo-change -y && apt install bazel -y
+  apt update --allow-releaseinfo-change -y && apt install bazel-8.5.1 -y && ln -sf /usr/bin/bazel-8.5.1 /usr/bin/bazel
 
 ENTRYPOINT [ "bash" ]
