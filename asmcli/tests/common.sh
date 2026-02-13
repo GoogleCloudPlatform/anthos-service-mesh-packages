@@ -680,6 +680,9 @@ run_basic_test() {
   shift 2 # increment this if more arguments are added
   local EXTRA_FLAGS; EXTRA_FLAGS="${*}"
 
+  kubectl delete validatingwebhookconfigurations -l app=istiod --ignore-not-found || true
+  kubectl delete mutatingwebhookconfigurations -l app=istiod --ignore-not-found || true
+
   date +"%T"
 
   if [[ -n "${SERVICE_ACCOUNT}" ]]; then
