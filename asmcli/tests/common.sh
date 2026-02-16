@@ -754,6 +754,16 @@ run_basic_test() {
   label_with_revision "${LT_NAMESPACE}" "${LABEL}"
   roll "${LT_NAMESPACE}"
 
+  #tracking live data
+  kubectl get all -n "${ISTIO_NAMESPACE}"
+  kubectl get mutatingwebhookconfiguration
+  kubectl get validatingwebhookconfiguration
+  kubectl get cm -n "${ISTIO_NAMESPACE}"
+  for pod in $(kubectl get pods -n "${ISTIO_NAMESPACE}" -o jsonpath='{.items[*].metadata.name}'); do
+    echo "Logs for $pod:"
+    kubectl logs "$pod" -n "${ISTIO_NAMESPACE}" | head -n 50
+  done
+
   if [[ "${EXTRA_FLAGS}" = *--managed* || "${SUBCOMMAND}" = *experimental* ]]; then
     local READY; READY=0
     for _ in {1..5}; do
