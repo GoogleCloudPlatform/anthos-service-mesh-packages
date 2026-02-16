@@ -737,7 +737,7 @@ run_basic_test() {
   LABEL="$(grep -o -m 1 'istio.io/rev=\S*' "${LT_NAMESPACE}")"
   REV="$(echo "${LABEL}" | cut -f 2 -d =)"
   echo "Got label ${LABEL}"
-  rm "${LT_NAMESPACE}"
+  rm -f "${LT_NAMESPACE}" || true
   sleep 5
 
   # @zerobfd to suggest fix for failing GW
