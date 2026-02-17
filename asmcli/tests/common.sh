@@ -726,6 +726,10 @@ run_basic_test() {
   local GATEWAY; GATEWAY="$(kube_ingress "${LT_NAMESPACE}")";
   verify_demo_app "$GATEWAY"
 
+  echo ">>> POC 2: INTENTIONALLY FAILING JOB NOW <<<"
+  echo ">>> TESTING IF CLEANUP RUNS ON CRASH <<<"
+  return 1
+
   if [[ -n "${KEY_FILE}" && -n "${SERVICE_ACCOUNT}" ]]; then
     KEY_FILE="-k ${KEY_FILE}"
     SERVICE_ACCOUNT="-s ${SERVICE_ACCOUNT}"
