@@ -776,7 +776,7 @@ run_basic_test() {
 
   echo ">>> POC 2: INTENTIONALLY FAILING JOB NOW <<<"
   echo ">>> TESTING IF CLEANUP RUNS ON CRASH <<<"
-  return 1
+  exit 1
 
   echo "Performing a rolling restart of the demo app..."
   label_with_revision "${LT_NAMESPACE}" "${LABEL}"
