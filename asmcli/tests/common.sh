@@ -304,14 +304,33 @@ cleanup_lt_cluster() {
   local NAMESPACE; NAMESPACE="$1"
   local DIR; DIR="$2"
 
+  echo ">>> CAPTURING LIVE PROOF <<<"
+  kubectl get all -n istio-system
+  kubectl get mutatingwebhookconfiguration
+  kubectl get validatingwebhookconfiguration
+  kubectl get cm -n istio-system
+
+  # This finds the pod name
+  local ISTIOD_POD=$(kubectl get pods -n istio-system -l app=istiod -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+  if [[ -n "${ISTIOD_POD}" ]]; then
+    kubectl get pod "${ISTIOD_POD}" -n istio-system -o yaml
+    kubectl describe pod "${ISTIOD_POD}" -n istio-system
+    
+    # Log loop for the lead's status check
+    for pod in $(kubectl get pods -n istio-system -o jsonpath='{.items[*].metadata.name}'); do
+      echo "Logs for $pod:"
+      kubectl logs "$pod" -n istio-system | tail -n 30
+    done
+  fi
+
   set +e
   "${DIR}"/istio*/bin/istioctl uninstall --purge -y
   remove_ns "${NAMESPACE}" || true
   remove_ns istio-system || true
   remove_ns asm-system || true
-  # Remove managed control plane webhooks
-  kubectl delete mutatingwebhookconfigurations istiod-asm-managed istiod-asmca istiod-ossmanaged || true
-  kubectl delete validatingwebhookconfigurations istiod-istio-system || true
+  # Delete webhooks to prevent interference/intercepting traffic
+  kubectl delete mutatingwebhookconfigurations -l app=istiod --ignore-not-found || true
+  kubectl delete validatingwebhookconfigurations -l app=istiod --ignore-not-found || true
   # Remove managed CNI resources
   kubectl delete -f "${DIR}"/asm/istio/options/cni-managed.yaml || true
   set -e
