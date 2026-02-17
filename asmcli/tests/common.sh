@@ -758,10 +758,6 @@ run_basic_test() {
     --output-dir "${OUTPUT_DIR}" \
     ${EXTRA_FLAGS} ${_EXTRA_FLAGS} 2>&1 | tee "${LT_NAMESPACE}" &
 
-  echo ">>> POC 2: INTENTIONALLY FAILING JOB NOW <<<"
-  echo ">>> TESTING IF CLEANUP RUNS ON CRASH <<<"
-  return 1
-  
   LABEL="$(grep -o -m 1 'istio.io/rev=\S*' "${LT_NAMESPACE}")"
   REV="$(echo "${LABEL}" | cut -f 2 -d =)"
   echo "Got label ${LABEL}"
@@ -777,6 +773,10 @@ run_basic_test() {
 
   echo "Installing Istio manifests for demo app..."
   install_demo_app_istio_manifests "${LT_NAMESPACE}"
+
+  echo ">>> POC 2: INTENTIONALLY FAILING JOB NOW <<<"
+  echo ">>> TESTING IF CLEANUP RUNS ON CRASH <<<"
+  return 1
 
   echo "Performing a rolling restart of the demo app..."
   label_with_revision "${LT_NAMESPACE}" "${LABEL}"
