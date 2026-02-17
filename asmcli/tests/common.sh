@@ -726,10 +726,6 @@ run_basic_test() {
   local GATEWAY; GATEWAY="$(kube_ingress "${LT_NAMESPACE}")";
   verify_demo_app "$GATEWAY"
 
-  echo ">>> POC 2: INTENTIONALLY FAILING JOB NOW <<<"
-  echo ">>> TESTING IF CLEANUP RUNS ON CRASH <<<"
-  return 1
-
   if [[ -n "${KEY_FILE}" && -n "${SERVICE_ACCOUNT}" ]]; then
     KEY_FILE="-k ${KEY_FILE}"
     SERVICE_ACCOUNT="-s ${SERVICE_ACCOUNT}"
@@ -762,7 +758,10 @@ run_basic_test() {
     --output-dir "${OUTPUT_DIR}" \
     ${EXTRA_FLAGS} ${_EXTRA_FLAGS} 2>&1 | tee "${LT_NAMESPACE}" &
 
-
+  echo ">>> POC 2: INTENTIONALLY FAILING JOB NOW <<<"
+  echo ">>> TESTING IF CLEANUP RUNS ON CRASH <<<"
+  return 1
+  
   LABEL="$(grep -o -m 1 'istio.io/rev=\S*' "${LT_NAMESPACE}")"
   REV="$(echo "${LABEL}" | cut -f 2 -d =)"
   echo "Got label ${LABEL}"
