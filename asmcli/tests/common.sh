@@ -316,7 +316,7 @@ cleanup_lt_cluster() {
     kubectl get pod "${ISTIOD_POD}" -n istio-system -o yaml
     kubectl describe pod "${ISTIOD_POD}" -n istio-system
     
-    # Log loop for the lead's status check
+    # Log loop for the status check
     for pod in $(kubectl get pods -n istio-system -o jsonpath='{.items[*].metadata.name}'); do
       echo "Logs for $pod:"
       kubectl logs "$pod" -n istio-system | tail -n 30
