@@ -827,15 +827,8 @@ run_basic_test() {
     echo "Could not find istiod service."
   fi
 
-  echo "Verifying service mesh feature is enabled..."
-
-  # >>> FIX: This prevents the Double Cleanup <<<
-  trap - EXIT
-
-  cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}"
-  delete_service_mesh_feature
-
   date +"%T"
+  
   return "$SUCCESS"
 }
 
