@@ -717,7 +717,7 @@ run_basic_test() {
 
   configure_kubectl "${LT_CLUSTER_NAME}" "${PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
 
-  trap 'cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}"' ERR
+  trap 'cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}"' EXIT
   
   # Demo app setup
   echo "Installing and verifying demo app..."
@@ -791,6 +791,17 @@ run_basic_test() {
       fatal "CNI daemonset never becomes ready."
     fi
   fi
+
+  echo "Verifying service mesh feature is enabled..."
+
+  # >>> FIX: This prevents the Double Cleanup <<<
+  trap - EXIT
+
+  cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}"
+  delete_service_mesh_feature 
+
+  return 0
+}
 
   return # see above for @zerobfd
 
