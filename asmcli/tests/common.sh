@@ -717,7 +717,7 @@ run_basic_test() {
 
   configure_kubectl "${LT_CLUSTER_NAME}" "${PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
 
-  trap 'cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}"' EXIT
+  trap 'cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}"; delete_service_mesh_feature' EXIT
   
   # Demo app setup
   echo "Installing and verifying demo app..."
@@ -828,7 +828,7 @@ run_basic_test() {
   fi
 
   date +"%T"
-  
+
   return "$SUCCESS"
 }
 
