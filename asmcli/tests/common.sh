@@ -801,7 +801,6 @@ run_basic_test() {
   delete_service_mesh_feature 
 
   return 0
-}
 
   return # see above for @zerobfd
 
