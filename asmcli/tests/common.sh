@@ -309,9 +309,9 @@ cleanup_lt_cluster() {
   remove_ns "${NAMESPACE}" || true
   remove_ns istio-system || true
   remove_ns asm-system || true
-  # Remove managed control plane webhooks
-  kubectl delete mutatingwebhookconfigurations istiod-asm-managed istiod-asmca istiod-ossmanaged || true
-  kubectl delete validatingwebhookconfigurations istiod-istio-system || true
+  # Delete all Istio webhooks dynamically by label to prevent "Internal Error" on next run
+  kubectl delete mutatingwebhookconfigurations -l app=istiod --ignore-not-found || true
+  kubectl delete validatingwebhookconfigurations -l app=istiod --ignore-not-found || true
   # Remove managed CNI resources
   kubectl delete -f "${DIR}"/asm/istio/options/cni-managed.yaml || true
   set -e
@@ -692,8 +692,8 @@ run_basic_test() {
 
   configure_kubectl "${LT_CLUSTER_NAME}" "${PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
 
-  trap 'remove_ns "${LT_NAMESPACE}"; rm "${LT_NAMESPACE}"; exit 1' ERR
-
+  trap 'cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}"' EXIT
+  
   # Demo app setup
   echo "Installing and verifying demo app..."
   install_demo_app "${LT_NAMESPACE}"
