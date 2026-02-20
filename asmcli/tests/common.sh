@@ -304,17 +304,42 @@ cleanup_lt_cluster() {
   local NAMESPACE; NAMESPACE="$1"
   local DIR; DIR="$2"
 
+  echo ">>> CAPTURING LIVE PROOF <<<"
+  kubectl get all -n istio-system
+  kubectl get mutatingwebhookconfiguration
+  kubectl get validatingwebhookconfiguration
+  kubectl get cm -n istio-system
+
+  # This finds the pod name
+  local ISTIOD_POD=$(kubectl get pods -n istio-system -l app=istiod -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+  if [[ -n "${ISTIOD_POD}" ]]; then
+    kubectl get pod "${ISTIOD_POD}" -n istio-system -o yaml
+    kubectl describe pod "${ISTIOD_POD}" -n istio-system
+    
+    # Log loop for the status check
+    for pod in $(kubectl get pods -n istio-system -o jsonpath='{.items[*].metadata.name}'); do
+      echo "Logs for $pod:"
+      kubectl logs "$pod" -n istio-system | tail -n 30
+    done
+  fi
+  # Show webhooks exist before delete
+  echo ">>> WEBHOOK STATUS BEFORE DELETE <<<"
+  kubectl get mutatingwebhookconfiguration | grep -E "istio|${NAMESPACE}" || echo "None found"
+
   set +e
   "${DIR}"/istio*/bin/istioctl uninstall --purge -y
   remove_ns "${NAMESPACE}" || true
   remove_ns istio-system || true
   remove_ns asm-system || true
-  # Remove managed control plane webhooks
-  kubectl delete mutatingwebhookconfigurations istiod-asm-managed istiod-asmca istiod-ossmanaged || true
-  kubectl delete validatingwebhookconfigurations istiod-istio-system || true
+  # Delete webhooks to prevent interference/intercepting traffic
+  kubectl delete mutatingwebhookconfigurations -l app=istiod --ignore-not-found || true
+  kubectl delete validatingwebhookconfigurations -l app=istiod --ignore-not-found || true
   # Remove managed CNI resources
   kubectl delete -f "${DIR}"/asm/istio/options/cni-managed.yaml || true
   set -e
+  echo ">>> POC 1: FINAL LIVE VERIFICATION (POST-CLEANUP) <<<" 
+  kubectl get mutatingwebhookconfiguration | grep -E "istio|${NAMESPACE}" || echo "SUCCESS: No mutating webhooks left."
+  kubectl get validatingwebhookconfiguration | grep -E "istio|${NAMESPACE}" || echo "SUCCESS: No validating webhooks left." 
 }
 
 cleanup_old_test_namespaces() {
@@ -692,7 +717,7 @@ run_basic_test() {
 
   configure_kubectl "${LT_CLUSTER_NAME}" "${PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
 
-  trap 'remove_ns "${LT_NAMESPACE}"; rm "${LT_NAMESPACE}"; exit 1' ERR
+  trap 'cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}"' EXIT
 
   # Demo app setup
   echo "Installing and verifying demo app..."
@@ -733,7 +758,6 @@ run_basic_test() {
     --output-dir "${OUTPUT_DIR}" \
     ${EXTRA_FLAGS} ${_EXTRA_FLAGS} 2>&1 | tee "${LT_NAMESPACE}" &
 
-
   LABEL="$(grep -o -m 1 'istio.io/rev=\S*' "${LT_NAMESPACE}")"
   REV="$(echo "${LABEL}" | cut -f 2 -d =)"
   echo "Got label ${LABEL}"
@@ -749,6 +773,10 @@ run_basic_test() {
 
   echo "Installing Istio manifests for demo app..."
   install_demo_app_istio_manifests "${LT_NAMESPACE}"
+
+  echo ">>> POC 2: INTENTIONALLY FAILING JOB NOW <<<"
+  echo ">>> TESTING IF CLEANUP RUNS ON CRASH <<<"
+  exit 1
 
   echo "Performing a rolling restart of the demo app..."
   label_with_revision "${LT_NAMESPACE}" "${LABEL}"
