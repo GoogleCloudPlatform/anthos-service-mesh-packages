@@ -1,7 +1,7 @@
 _DEBUG="${_DEBUG:=}"
 if [[ "${_DEBUG}" -eq 1 ]]; then
   gsutil() {
-    echo "DEBUG: would have run 'gsutil ${*}'" >&2
+    echo "DEBUG: would have run 'gcloud storage ${*}'" >&2
   }
 
   git() {
@@ -20,7 +20,7 @@ BUCKET_PATH="csm-artifacts/asm"; readonly BUCKET_PATH
 STABLE_VERSION_FILE="ASMCLI_VERSIONS"; readonly STABLE_VERSION_FILE
 STABLE_VERSION_FILE_PATH="${BUCKET_PATH}/${STABLE_VERSION_FILE}"; readonly STABLE_VERSION_FILE_PATH
 HOLD_TYPE="temp"; readonly HOLD_TYPE
-trap 'gsutil retention "${HOLD_TYPE}" release gs://"${STABLE_VERSION_FILE_PATH}"' ERR # hope that the hold is cleared
+trap 'gcloud storage objects update --no-temporary-hold gs://"${STABLE_VERSION_FILE_PATH}"' ERR # hope that the hold is cleared
 
 prod_releases() {
   cat << EOF
@@ -75,7 +75,7 @@ is_proper_tag() {
 }
 
 is_on_hold() {
-  local HOLD_STATUS; HOLD_STATUS="$(gsutil stat gs://${STABLE_VERSION_FILE_PATH} | grep -i ${HOLD_TYPE})"
+  local HOLD_STATUS; HOLD_STATUS="$(gcloud storage objects list --stat --fetch-encrypted-object-hashes gs://${STABLE_VERSION_FILE_PATH} | grep -i ${HOLD_TYPE})"
   if [[ ! "${HOLD_STATUS}" =~ "Enabled" ]]; then false; fi
 }
 
@@ -140,7 +140,7 @@ get_stable_version() {
 }
 
 get_version_file_and_lock() {
-  if ! gsutil -q stat "gs://${STABLE_VERSION_FILE_PATH}"; then
+  if ! gcloud storage objects list --stat --fetch-encrypted-object-hashes "gs://${STABLE_VERSION_FILE_PATH}"; then
     echo "[ERROR]: file does not exist: ${STABLE_VERSION_FILE_PATH}." >&2
     exit 1
   fi
@@ -149,17 +149,17 @@ get_version_file_and_lock() {
     echo "[ERROR]: file already on hold: ${STABLE_VERSION_FILE_PATH}." >&2
     exit 1
   fi
-  gsutil retention "${HOLD_TYPE}" set "gs://${STABLE_VERSION_FILE_PATH}"
-  gsutil cp "gs://${STABLE_VERSION_FILE_PATH}" .
+  gcloud storage objects update --temporary-hold "gs://${STABLE_VERSION_FILE_PATH}"
+  gcloud storage cp "gs://${STABLE_VERSION_FILE_PATH}" .
 }
 
 upload_version_file_and_unlock() {
   TMPFILE="$(mktemp)"
   sort -r "${STABLE_VERSION_FILE}" | uniq >> "${TMPFILE}" && mv "${TMPFILE}" "${STABLE_VERSION_FILE}"
 
-  gsutil retention "${HOLD_TYPE}" release gs://"${STABLE_VERSION_FILE_PATH}"
-  gsutil cp "${STABLE_VERSION_FILE}" gs://"${STABLE_VERSION_FILE_PATH}"
-  gsutil acl ch -u AllUsers:R gs://"${STABLE_VERSION_FILE_PATH}"
+  gcloud storage objects update --no-temporary-hold gs://"${STABLE_VERSION_FILE_PATH}"
+  gcloud storage cp "${STABLE_VERSION_FILE}" gs://"${STABLE_VERSION_FILE_PATH}"
+  gcloud storage objects update --add-acl-grant=allUsers=READER gs://"${STABLE_VERSION_FILE_PATH}"
 }
 
 upload() {
@@ -168,9 +168,9 @@ upload() {
   local FILE_PATH; FILE_PATH="${3}";
   local FILE_URI; FILE_URI="${4}";
 
-  gsutil cp "${FILE_NAME}" gs://"${FILE_PATH}"
-  gsutil cp "${SCRIPT_NAME}.sha256" gs://"${FILE_PATH}.sha256"
-  gsutil acl ch -u AllUsers:R gs://"${FILE_PATH}" gs://"${FILE_PATH}.sha256"
+  gcloud storage cp "${FILE_NAME}" gs://"${FILE_PATH}"
+  gcloud storage cp "${SCRIPT_NAME}.sha256" gs://"${FILE_PATH}.sha256"
+  gcloud storage objects update --add-acl-grant=allUsers=READER gs://"${FILE_PATH}" gs://"${FILE_PATH}.sha256"
 
   curl -O "${FILE_URI}"
   curl -O "${FILE_URI}.sha256"
