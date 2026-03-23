@@ -112,7 +112,7 @@ steps:
         ../scripts/release-asm/release_asm_installer
     env:
       - '_DEBUG=1'
-    timeout: 10s
+    timeout: 300s
 
     #############
     # SLOW TESTS

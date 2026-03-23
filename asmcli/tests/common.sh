@@ -272,7 +272,7 @@ create_working_cluster() {
     --machine-type "e2-standard-4" \
     --disk-type "pd-standard" \
     --disk-size "100" \
-    --num-nodes "4" \
+    --num-nodes "6" \
     --enable-stackdriver-kubernetes \
     --enable-ip-alias \
     --no-enable-master-authorized-networks \
@@ -469,27 +469,42 @@ auth_service_account() {
 
 anneal_k8s() {
   local NAMESPACE; NAMESPACE="$1"
-  for _ in $(seq 1 30); do
-    kubectl wait \
-      --for=condition=available \
-      deployments --all \
-      -n "${NAMESPACE}" \
-      --timeout=3m \
-      && break \
-      || echo "Retrying kubectl wait deployments..." \
-      && sleep 1
-  done
+  local TIMEOUT="600s" 
 
-  for _ in $(seq 1 30); do
-    kubectl wait \
-      --for=condition=Ready \
-      pods --all \
-      -n "${NAMESPACE}" \
-      --timeout=5s \
-      && break \
-      || echo "Retrying kubectl wait pods..." \
-      && sleep 1
-  done
+  # Changed 'info' to 'echo'
+  echo "Waiting for deployments in ${NAMESPACE} to become available (Timeout: ${TIMEOUT})..."
+  
+  # Wait for Deployments
+  if ! kubectl wait --for=condition=available deployments --all \
+    -n "${NAMESPACE}" --timeout="${TIMEOUT}"; then
+    
+    echo "--- ERROR: DEPLOYMENT TIMEOUT DETECTED ---"
+    echo "Proof for Manager: Capturing Deployment and Pod failure details..."
+    
+    # PROOFS:
+    kubectl get deployments -n "${NAMESPACE}"
+    kubectl get pods -n "${NAMESPACE}"
+    
+    # Capture the specific reason (Events) for the first non-ready pod
+    local FAILING_POD; FAILING_POD=$(kubectl get pods -n "${NAMESPACE}" --no-headers | grep -v "Running" | awk '{print $1}' | head -n 1)
+    if [[ -n "${FAILING_POD}" ]]; then
+      echo "Describing failing pod: ${FAILING_POD}"
+      kubectl describe pod "${FAILING_POD}" -n "${NAMESPACE}" | grep -A 30 "Events:"
+    fi
+    
+    return 1
+  fi
+
+  # Changed 'info' to 'echo'
+  echo "Waiting for pods in ${NAMESPACE} to be fully Ready..."
+  if ! kubectl wait --for=condition=Ready pods --all \
+    -n "${NAMESPACE}" --timeout=60s; then
+    
+    echo "--- ERROR: PODS NOT READY ---"
+    # Show sidecar status: 1/1 means missing ASM sidecar, 2/2 means present
+    kubectl get pods -n "${NAMESPACE}" -o custom-columns=NAME:.metadata.name,READY:.status.containerStatuses[*].ready,IMAGE:.spec.containers[*].image
+    return 1
+  fi
 }
 
 roll() {
@@ -692,7 +707,7 @@ run_basic_test() {
 
   configure_kubectl "${LT_CLUSTER_NAME}" "${PROJECT_ID}" "${LT_CLUSTER_LOCATION}"
 
-  trap 'cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}"' EXIT
+  #trap 'cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}"' EXIT
   
   # Demo app setup
   echo "Installing and verifying demo app..."
