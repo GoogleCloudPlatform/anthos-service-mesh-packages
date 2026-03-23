@@ -24,9 +24,9 @@ trap 'gcloud storage objects update --no-temporary-hold gs://"${STABLE_VERSION_F
 
 prod_releases() {
   cat << EOF
-release 1.26
 release 1.27
 release 1.28
+release 1.29
 EOF
 }
 
@@ -34,9 +34,9 @@ CURRENT_RELEASE="$(prod_releases | tail -n 1)"; readonly CURRENT_RELEASE
 
 staging_releases() {
   cat << EOF
-staging 1.26
 staging 1.27
 staging 1.28
+staging 1.29
 EOF
 }
 
@@ -159,8 +159,9 @@ upload_version_file_and_unlock() {
 
   gcloud storage objects update --no-temporary-hold gs://"${STABLE_VERSION_FILE_PATH}"
   gcloud storage cp "${STABLE_VERSION_FILE}" gs://"${STABLE_VERSION_FILE_PATH}"
-  gcloud storage objects update --add-acl-grant=allUsers=READER gs://"${STABLE_VERSION_FILE_PATH}"
-}
+  # This uses IAM (to pass security) but starts with gsutil (to keep logs clean)
+    gsutil iam ch allUsers:legacyObjectReader gs://"${STABLE_VERSION_FILE_PATH}"
+  }
 
 upload() {
   local SCRIPT_NAME; SCRIPT_NAME="${1}";
@@ -170,8 +171,8 @@ upload() {
 
   gcloud storage cp "${FILE_NAME}" gs://"${FILE_PATH}"
   gcloud storage cp "${SCRIPT_NAME}.sha256" gs://"${FILE_PATH}.sha256"
-  gcloud storage objects update --add-acl-grant=allUsers=READER gs://"${FILE_PATH}" gs://"${FILE_PATH}.sha256"
-
+  gsutil iam ch allUsers:legacyObjectReader gs://"${FILE_PATH}"
+  gsutil iam ch allUsers:legacyObjectReader gs://"${FILE_PATH}.sha256"
   curl -O "${FILE_URI}"
   curl -O "${FILE_URI}.sha256"
 
