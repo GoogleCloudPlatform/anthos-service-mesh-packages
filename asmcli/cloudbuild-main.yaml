@@ -157,7 +157,7 @@ steps:
     timeout: 900s
 
 substitutions:
-  _BUCKET_PATH: staging_artifacts
+  _BUCKET_PATH: staging_artifacts_dummy_test
   _BUCKET_NAME: my-gcs-bucket
   _CLUSTER_LOCATION: us-central1-c
   _IMAGE_NAME: gcloud-with-kpt
