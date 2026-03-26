@@ -112,6 +112,7 @@ steps:
         ../scripts/release-asm/release_asm_installer
     env:
       - '_DEBUG=1'
+      - '_BUCKET_PATH=${_BUCKET_PATH}'
     timeout: 10s
 
     #############
@@ -156,6 +157,7 @@ steps:
     timeout: 900s
 
 substitutions:
+  _BUCKET_PATH: staging_artifacts_dummy_test
   _BUCKET_NAME: my-gcs-bucket
   _CLUSTER_LOCATION: us-central1-c
   _IMAGE_NAME: gcloud-with-kpt
