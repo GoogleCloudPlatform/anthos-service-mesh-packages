@@ -1,7 +1,10 @@
 _DEBUG="${_DEBUG:=}"
 if [[ "${_DEBUG}" -eq 1 ]]; then
-  gsutil() {
+  gcloud() {
     echo "DEBUG: would have run 'gcloud storage ${*}'" >&2
+  }
+  gsutil() {
+    echo "DEBUG: would have run 'gsutil ${*}'" >&2
   }
 
   git() {
@@ -14,7 +17,9 @@ if [[ "${_DEBUG}" -eq 1 ]]; then
 fi
 
 BUCKET_URL="https://storage.googleapis.com"
-BUCKET_PATH="csm-artifacts/asm"; readonly BUCKET_PATH
+# Check if _BUCKET_PATH is in the environment; if not, use the default
+BUCKET_PATH="${_BUCKET_PATH:-csm-artifacts/asm}"
+readonly BUCKET_PATH
 
 
 STABLE_VERSION_FILE="ASMCLI_VERSIONS"; readonly STABLE_VERSION_FILE
