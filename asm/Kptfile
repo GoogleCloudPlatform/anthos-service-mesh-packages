@@ -9,12 +9,14 @@ openAPI:
         setter:
           name: base-dir
           value: base
+          description: "Base directory for the package"
     io.k8s.cli.setters.gcloud.compute.network:
       type: string
       x-k8s-cli:
         setter:
           name: gcloud.compute.network
           value: "NETWORK_ID"
+          description: "The name of the GCP VPC network the cluster belongs to"
     io.k8s.cli.setters.anthos.servicemesh.trustDomainAliases:
       items:
         type: string
@@ -24,6 +26,7 @@ openAPI:
         setter:
           name: anthos.servicemesh.trustDomainAliases
           listValues:
+          description: "List of additional trust domain aliases for the mesh (e.g. for multiproject or CA migration scenarios)"
     io.k8s.cli.setters.gcloud.container.cluster.ingress.statusPort:
       type: integer
       x-k8s-cli:
@@ -31,6 +34,7 @@ openAPI:
           name: gcloud.container.cluster.ingress.statusPort
           value: "31223"
           isSet: true
+          description: "NodePort used for the ingress gateway status port (required for IAP/GCLB integration)"
     io.k8s.cli.setters.gcloud.container.cluster.ingress.httpPort:
       type: integer
       x-k8s-cli:
@@ -38,46 +42,54 @@ openAPI:
           name: gcloud.container.cluster.ingress.httpPort
           value: "31224"
           isSet: true
+          description: "NodePort used for the ingress gateway HTTP port (required for IAP/GCLB integration)"
     io.k8s.cli.setters.gcloud.container.cluster:
       type: string
       x-k8s-cli:
         setter:
           name: gcloud.container.cluster
           value: asm-cluster
+          description: "Name of the GKE cluster where ASM is being installed"
     io.k8s.cli.setters.gcloud.core.project:
       type: string
       x-k8s-cli:
         setter:
           name: gcloud.core.project
           value: PROJECT_ID
+          description: "GCP project ID where the GKE cluster is running"
     io.k8s.cli.setters.gcloud.project.projectNumber:
       type: string
       x-k8s-cli:
         setter:
           name: gcloud.project.projectNumber
           value: PROJECT_NUMBER
+          description: "Numeric GCP project number for the cluster project"
     io.k8s.cli.setters.gcloud.project.environProjectNumber:
       type: string
       x-k8s-cli:
         setter:
           name: gcloud.project.environProjectNumber
           value: PROJECT_NUMBER
+          description: "Numeric GCP project number for the Fleet (environ) host project; may differ from the cluster project in multiproject setups"
     io.k8s.cli.setters.gcloud.compute.location:
       x-k8s-cli:
         setter:
           name: gcloud.compute.location
           value: us-central1-c
+          description: "GCP location (zone or region) where the GKE cluster is running"
     io.k8s.cli.setters.anthos.servicemesh.hub:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.hub
           value: gke.gcr.io/asm
+          description: "Container image registry hub for ASM component images"
     io.k8s.cli.setters.anthos.servicemesh.tag:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.tag
           value: 1.28.2-asm.4
           isSet: true
+          description: "ASM release version tag used for all ASM component images (e.g. 1.28.2-asm.4)"
     io.k8s.cli.setters.anthos.servicemesh.managed-controlplane.vpcsc.enabled:
       type: string
       x-k8s-cli:
@@ -85,72 +97,84 @@ openAPI:
           name: anthos.servicemesh.managed-controlplane.vpcsc.enabled
           value: "false"
           isSet: true
+          description: "Set to 'true' to enable VPC Service Controls support for the managed control plane"
     io.k8s.cli.setters.anthos.servicemesh.rev:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.rev
           value: ASM_REV
           isSet: true
+          description: "Istio revision label used to identify this ASM control plane installation (e.g. asm-1182-4)"
     io.k8s.cli.setters.anthos.servicemesh.istiodHost:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.istiodHost
           value: istiod.istio-system.svc
           isSet: true
+          description: "Short hostname for the istiod service, used in east-west gateway SNI routing"
     io.k8s.cli.setters.anthos.servicemesh.istiodHostFQDN:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.istiodHostFQDN
           value: istiod.istio-system.svc.cluster.local
           isSet: true
+          description: "Fully qualified domain name for the istiod service, used as the routing destination in the east-west gateway VirtualService"
     io.k8s.cli.setters.anthos.servicemesh.istiod-vs-name:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.istiod-vs-name
           value: istiod-vs
           isSet: true
+          description: "Name of the VirtualService resource that exposes istiod through the east-west gateway"
     io.k8s.cli.setters.anthos.servicemesh.canonicalServiceHub:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.canonicalServiceHub
           value: gke.gcr.io/asm/canonical-service-controller:1.7.3-asm.6
           isSet: true
+          description: "Full image reference (registry, name, and tag) for the Canonical Service controller"
     io.k8s.cli.setters.anthos.servicemesh.idp-url:
       type: string
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.idp-url
           value: IDP_URL
+          description: "Identity provider URL used by the GKE cluster for workload identity (GKE_CLUSTER_URL env var passed to istiod and proxies)"
     io.k8s.cli.setters.anthos.servicemesh.trustDomain:
       type: string
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.trustDomain
           value: TRUST_DOMAIN
+          description: "SPIFFE trust domain for the mesh, typically '<project-id>.svc.id.goog' for GKE clusters"
     io.k8s.cli.setters.anthos.servicemesh.tokenAudiences:
       type: string
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.tokenAudiences
           value: TOKEN_AUDIENCES
+          description: "Comma-separated list of audiences accepted for workload identity tokens (TOKEN_AUDIENCES env var for istiod)"
     io.k8s.cli.setters.anthos.servicemesh.spiffeBundleEndpoints:
       type: string
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.spiffeBundleEndpoints
           value: SPIFFE_BUNDLE_ENDPOINTS
+          description: "SPIFFE bundle endpoints for cross-cluster trust in multicluster/multiproject setups"
     io.k8s.cli.setters.anthos.servicemesh.controlplane.validation-url:
       type: string
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.controlplane.validation-url
           value: VALIDATION_URL
+          description: "URL for the managed control plane's validating webhook endpoint (used with managed-control-plane-webhooks.yaml)"
     io.k8s.cli.setters.anthos.servicemesh.managed-controlplane.cloudrun-addr:
       type: string
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.managed-controlplane.cloudrun-addr
           value: CLOUDRUN_ADDR
+          description: "Cloud Run address of the managed istiod service (automatically populated during managed control plane provisioning)"
     io.k8s.cli.substitutions.mesh-id:
       type: string
       x-k8s-cli:
@@ -276,12 +300,14 @@ openAPI:
         setter:
           name: anthos.servicemesh.controlplane.monitoring.enabled
           value: "true"
+          description: "Set to 'true' to enable Stackdriver monitoring for the ASM control plane (istiod)"
     io.k8s.cli.setters.anthos.servicemesh.external_ca.ca_name:
       x-k8s-cli:
         setter:
           name: anthos.servicemesh.external_ca.ca_name
           value: ""
           isSet: true
+          description: "Resource name of the Google Certificate Authority Service (CAS) CA pool to use for workload certificate signing (e.g. projects/PROJECT/locations/LOCATION/caPools/POOL)"
     io.k8s.cli.substitutions.istio-ingressgateway-deploy-name:
       x-k8s-cli:
         substitution:
@@ -297,6 +323,7 @@ openAPI:
           name: anthos.servicemesh.custom-ingressgateway-name
           value: "INGRESSGATEWAY_NAME"
           isSet: true
+          description: "Name for a custom ingress gateway deployment (used when deploying a gateway other than the default istio-ingressgateway)"
     io.k8s.cli.setters.anthos.servicemesh.custom-ingressgateway-namespace:
       type: string
       x-k8s-cli:
@@ -304,6 +331,7 @@ openAPI:
           name: anthos.servicemesh.custom-ingressgateway-namespace
           value: "istio-system"
           isSet: true
+          description: "Kubernetes namespace where the custom ingress gateway will be deployed"
     io.k8s.cli.substitutions.custom-ingressgateway-deploy-name:
       x-k8s-cli:
         substitution:
@@ -320,3 +348,4 @@ openAPI:
         setter:
           name: anthos.servicemesh.created-by
           value: ""
+          description: "Tool or process that created this ASM installation, stored as a label on ControlPlaneRevision resources (e.g. asmcli)"
