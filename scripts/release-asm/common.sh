@@ -1,5 +1,8 @@
 _DEBUG="${_DEBUG:=}"
 if [[ "${_DEBUG}" -eq 1 ]]; then
+  gcloud() {
+    echo "DEBUG: would have run 'gcloud storage ${*}'" >&2
+  }
   gsutil() {
     echo "DEBUG: would have run 'gsutil ${*}'" >&2
   }
