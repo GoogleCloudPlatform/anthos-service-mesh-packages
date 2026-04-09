@@ -112,6 +112,7 @@ steps:
         ../scripts/release-asm/release_asm_installer
     env:
       - '_DEBUG=1'
+    timeout: 300s
       - '_BUCKET_PATH=${_BUCKET_PATH}'
     timeout: 10s
 
