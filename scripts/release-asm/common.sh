@@ -245,3 +245,5 @@ setup() {
     touch asmcli
   fi
 }
+
+#check
