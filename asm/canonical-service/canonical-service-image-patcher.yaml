@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: image-patcher-sa
+  namespace: asm-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: image-patcher-role
+  namespace: asm-system
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: image-patcher-binding
+  namespace: asm-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: image-patcher-role
+subjects:
+- kind: ServiceAccount
+  name: image-patcher-sa
+  namespace: asm-system
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: canonical-image-patcher
+  namespace: asm-system
+spec:
+  schedule: "*/1 * * * *" # Runs every minute
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: image-patcher-sa
+          restartPolicy: OnFailure
+          containers:
+          - name: patcher
+            image: bitnami/kubectl:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Checking for ImagePullBackOff failures..."
+              # Search for pods stuck pulling the broken gcr.io proxy image
+              FAILED_POD=$(kubectl get pods -n asm-system -l control-plane=controller-manager -o jsonpath='{.items[*].metadata.name}')
+              
+              if [ -n "$FAILED_POD" ]; then
+                REASON=$(kubectl get pod $FAILED_POD -n asm-system -o jsonpath='{.status.containerStatuses[?(@.name=="kube-rbac-proxy")].state.waiting.reason}')
+                if [ "$REASON" = "ImagePullBackOff" ] || [ "$REASON" = "ErrImagePull" ]; then
+                  echo "Found failing container in $FAILED_POD. Patching deployment to Bitnami registry..."
+                  kubectl patch deployment canonical-service-controller-manager -n asm-system --type='json' -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "bitnami/kube-rbac-proxy"}]'
+                fi
+              fi
