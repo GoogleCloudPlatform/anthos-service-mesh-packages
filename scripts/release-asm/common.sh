@@ -29,9 +29,9 @@ trap 'gcloud storage objects update --no-temporary-hold gs://"${STABLE_VERSION_F
 
 prod_releases() {
   cat << EOF
-release 1.26
 release 1.27
 release 1.28
+release 1.29
 EOF
 }
 
@@ -39,9 +39,9 @@ CURRENT_RELEASE="$(prod_releases | tail -n 1)"; readonly CURRENT_RELEASE
 
 staging_releases() {
   cat << EOF
-staging 1.26
 staging 1.27
 staging 1.28
+staging 1.29
 EOF
 }
 
@@ -178,6 +178,7 @@ upload() {
   gcloud storage cp "${SCRIPT_NAME}.sha256" gs://"${FILE_PATH}.sha256"
   gsutil iam ch allUsers:legacyObjectReader gs://"${FILE_PATH}"
   gsutil iam ch allUsers:legacyObjectReader gs://"${FILE_PATH}.sha256"
+
   curl -O "${FILE_URI}"
   curl -O "${FILE_URI}.sha256"
 
