@@ -130,7 +130,6 @@ main() {
       ;;
   esac
 }
-
 build-offline-package_subcommand() {
   build-offline-package_parse_args "$@"
   build-offline-package
@@ -217,7 +216,6 @@ build-offline-package_outro() {
 
   info "$(starline)"
 }
-
 create-mesh_subcommand() {
   ### Preparation ###
 
@@ -536,7 +534,6 @@ has_fleet_alias() {
   done < <(printf '%s\n' "$RAW_TRUST_DOMAIN_ALIASES")
   false
 }
-
 experimental_subcommand() {
   if [[ "${*}" = '' ]]; then
     x_usage >&2
@@ -557,7 +554,6 @@ experimental_subcommand() {
       ;;
   esac
 }
-
 x_help_subcommand() {
   x_usage
 }
@@ -585,7 +581,6 @@ FLAGS:
                                       environment.
 EOF
 }
-
 x_install_subcommand() {
   context_set-option "PLATFORM" "gcp"
   context_set-option "EXPERIMENTAL" 1
@@ -632,7 +627,6 @@ x_configure_package() {
 
   kpt cfg set asm anthos.servicemesh.created-by "asmcli-${ASMCLI_VERSION//+/.}"
 }
-
 x_mcp_migrate_check() {
   x_parse_mcp_migrate_args "${@}"
   x_download_istioctl_tarball
@@ -695,7 +689,6 @@ EOF
 x_istioctl() {
   run_command "$(istioctl_path)" "${@}"
 }
-
 x_validate_dependencies() {
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
 
@@ -736,7 +729,6 @@ x_validate_dependencies() {
     exit_if_istio_namespace_not_exists
   fi
 }
-
 help_subcommand() {
   local PRINT_HELP; PRINT_HELP=0
   local PRINT_VERSION; PRINT_VERSION=0
@@ -1129,7 +1121,6 @@ FLAGS:
   --version
 EOF
 }
-
 install_subcommand() {
   ### Preparation ###
   parse_args "${@}"
@@ -1407,7 +1398,6 @@ install_control_plane() {
 
   verify_canonical_controller
 }
-
 validate_subcommand() {
   ### Preparation ###
   context_set-option "ONLY_VALIDATE" 1
@@ -1543,7 +1533,6 @@ to migrate or update to a Workload Identity Enabled Node pool.
 EOF
   fi
 }
-
 validate_custom_ca() {
   local CA_ROOT; CA_ROOT="$(context_get-option "CA_ROOT")"
   local CA_KEY; CA_KEY="$(context_get-option "CA_KEY")"
@@ -1650,7 +1639,6 @@ install_custom_certificates() {
     --from-file="${CA_ROOT}" \
     --from-file="${CA_CHAIN}"
 }
-
 x_configure_managed_cas() {
   local CUSTOM_OVERLAY; CUSTOM_OVERLAY="$(context_get-option "CUSTOM_OVERLAY")"
 
@@ -1799,7 +1787,6 @@ x_install_managed_cas_for_mcp() {
 
   context_append "mcpOptions" "CA=MANAGEDCAS"
 }
-
 validate_meshca() {
   return
 }
@@ -1866,7 +1853,6 @@ EOF
   # shellcheck disable=SC2046
   kpt cfg set asm anthos.servicemesh.trustDomainAliases $(context_get-option "TRUST_DOMAIN_ALIASES")
 }
-
 validate_private_ca() {
   local CA_NAME; CA_NAME="$(context_get-option "CA_NAME")"
   
@@ -1913,7 +1899,6 @@ configure_private_ca() {
 
   configure_trust_domain_aliases
 }
-
 validate_in_cluster_control_plane() {
   local FLEET_ID; FLEET_ID="$(context_get-option "FLEET_ID")"
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
@@ -1967,7 +1952,6 @@ init_meshconfig() {
     init_meshconfig_curl '' "${PROJECT_ID}"
   fi
 }
-
 install_managed_control_plane() {
   local CA; CA="$(context_get-option "CA")"
   wait_for_cpr_crd
@@ -2077,7 +2061,6 @@ append_existing_asm_opts() {
     -o jsonpath='{.data.ASM_OPTS}' || true)"
   context_append "mcpOptions" "${ASM_OPTS}"
 }
-
 has_value() {
   local VALUE; VALUE="$(context_get-option "${1}")"
 
@@ -2573,7 +2556,6 @@ node_pool_wi_enabled(){
   done
   NODE_POOL_WI_ENABLED=1; readonly NODE_POOL_WI_ENABLED
 }
-
 configure_package() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
   local CLUSTER_NAME; CLUSTER_NAME="$(context_get-option "CLUSTER_NAME")"
@@ -2686,7 +2668,6 @@ configure_kubectl(){
   CONTEXT="$(context_get-option "CONTEXT")"
   info "using context ${CONTEXT}"
 }
-
 context_init() {
   local CONTEXT_JSON; CONTEXT_JSON=$(cat <<EOF
 {
@@ -2941,7 +2922,6 @@ context_list() {
   local KEY; KEY="${1}"
   jq -S -r --arg KEY "${KEY}" '.[$KEY][]' "${context_FILE_LOCATION}"
 }
-
 required_iam_roles_mcp_sa() {
   cat <<EOF
 roles/serviceusage.serviceUsageConsumer
@@ -3394,7 +3374,6 @@ get_auth_token() {
   local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
   echo "${TOKEN}"
 }
-
 info() {
   local VERBOSE; VERBOSE="$(context_get-option "VERBOSE")"
   if hash ts 2>/dev/null && [[ "${VERBOSE}" -eq 1 ]]; then
@@ -3436,7 +3415,6 @@ echo_log() {
     echo "${@}" >> "${LOG_FILE_LOCATION}";
   fi
 }
-
 parse_args() {
   # shellcheck disable=SC2064
   trap "$(shopt -p nocasematch)" RETURN
@@ -3876,7 +3854,6 @@ x_parse_install_args() {
     exit
   fi
 }
-
 KUBE_TAG_MAX_LEN=63; readonly KUBE_TAG_MAX_LEN
 GKE_RELEASE_CHANNEL="";
 
@@ -4773,7 +4750,6 @@ check_managed_canonical_controller_state() {
     warn "Managed Canonical Service Controller status could not be determined. Please refer to ${TROUBLESHOOT_DOC_LINK}"
   fi
 }
-
 
 validate_revision_label() {
   # Matches DNS label formats of RFC 1123
@@ -5728,6 +5704,5 @@ EOF
     fatal "Service account and key file must be used together."
   fi
 }
-
 
 main "${@}"
