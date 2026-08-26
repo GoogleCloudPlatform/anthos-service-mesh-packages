@@ -11,10 +11,10 @@ RUN apt-get install google-cloud-cli-kpt jq kubectl google-cloud-cli-gke-gcloud-
 # install test dependencies
 RUN apt-get install shellcheck posh bc procps openssl yamllint -y
 
-# https://docs.bazel.build/versions/master/install-ubuntu.html
+# https://bazel.build/install/ubuntu
 RUN \
   apt install apt-transport-https curl gnupg -y && \
-  curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor > bazel.gpg && \
+  curl -fsSL https://releases.bazel.build/bazel-release.pub.gpg | gpg --dearmor > bazel.gpg && \
   mv bazel.gpg /etc/apt/trusted.gpg.d/ && \
   echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list && \
   apt update --allow-releaseinfo-change -y && apt install bazel-8.5.1 -y && ln -sf /usr/bin/bazel-8.5.1 /usr/bin/bazel
