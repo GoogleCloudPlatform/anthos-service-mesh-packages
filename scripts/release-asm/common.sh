@@ -32,7 +32,6 @@ prod_releases() {
 release 1.27
 release 1.28
 release 1.29
-release 1.30
 EOF
 }
 
@@ -43,7 +42,6 @@ staging_releases() {
 staging 1.27
 staging 1.28
 staging 1.29
-staging 1.30
 EOF
 }
 
