@@ -27,7 +27,6 @@ main() {
     fi
 
   cleanup_lt_cluster "${LT_NAMESPACE}" "${OUTPUT_DIR}" "${REV}"
-  delete_service_mesh_feature
   exit "${RETVAL}"
 }
 
