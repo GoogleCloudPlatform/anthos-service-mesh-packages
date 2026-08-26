@@ -232,8 +232,8 @@ verify_demo_app() {
   local PAGE
   local COUNT
 
-  for _ in $(seq 1 30); do
-    PAGE="$(curl "${IP}" -L -N -s || echo "")"
+  for _ in $(seq 1 100); do
+    PAGE="$(curl --max-time 10 "${IP}" -L -N -s || echo "")"
     COUNT="$(echo "${PAGE}" | grep -c Hipster || true)"
     { [[ "${COUNT}" -ne 0 ]] && break; } || sleep 10
   done
@@ -251,7 +251,7 @@ send_persistent_traffic() {
   local PAGE
   local COUNT
   while true; do
-    PAGE="$(curl "${IP}" -L -N -s || echo "")"
+    PAGE="$(curl --max-time 10 "${IP}" -L -N -s || echo "")"
     COUNT="$(echo "${PAGE}" | grep -c Hipster || true)"
     { [[ "${COUNT}" -eq 0 ]] && echo -e "Receive unexpected response from demo app:\n${PAGE}" && exit 1; } || sleep 1
   done
