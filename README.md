@@ -11,3 +11,4 @@ Package Descriptions:
 * `docs`: Contains useful reading material around design, development and release
 * `samples`: Contains sample application and gateway manifests  
 * `scripts`: Contains the executables to install or modify ASM
+** 
