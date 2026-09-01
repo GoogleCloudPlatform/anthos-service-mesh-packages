@@ -418,6 +418,7 @@ populate_fleet_info() {
   HUB_MEMBERSHIP_ID="$(kubectl get memberships.hub.gke.io membership -o=json | jq .spec.owner.id | sed 's/^\"\/\/\(autopush-\)\{0,1\}gkehub\(.sandbox\)\{0,1\}.googleapis.com\/projects\/\(.*\)\/locations\/\(.*\)\/memberships\/\(.*\)\"$/\5/g')"
   context_set-option "HUB_MEMBERSHIP_ID" "${HUB_MEMBERSHIP_ID}"
   HUB_IDP_URL="$(kubectl get memberships.hub.gke.io membership -o=jsonpath='{.spec.identity_provider}')"
+  HUB_IDP_URL="${HUB_IDP_URL//container.mtls.googleapis.com/container.googleapis.com}"
   context_set-option "HUB_IDP_URL" "${HUB_IDP_URL}"
 }
 
@@ -447,6 +448,6 @@ register_gce_identity_provider() {
 
 get_auth_token() {
   local PROJECT_ID; PROJECT_ID="$(context_get-option "PROJECT_ID")"
-  local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
+  local TOKEN; TOKEN="$(gcloud auth application-default print-access-token 2>/dev/null || retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
   echo "${TOKEN}"
 }
