@@ -195,6 +195,15 @@ publish_script() {
 
   if [[ ! -f "${SCRIPT_NAME}" ]]; then echo "${SCRIPT_NAME} not found" >&2; return; fi
 
+  if [[ ! -s "${SCRIPT_NAME}" ]]; then
+    if [[ "${_DEBUG}" -eq 1 ]]; then
+      echo "DEBUG: ${SCRIPT_NAME} size is 0, but continuing since _DEBUG=1." >&2
+    else
+      echo "Error: The ${SCRIPT_NAME} binary size is 0. Push stopped to prevent releasing an empty file." >&2
+      exit 1
+    fi
+  fi
+
   check_tags "${BRANCH_NAME}" "${SCRIPT_NAME}"
 
   STABLE_VERSION="$(get_stable_version)"
