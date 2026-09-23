@@ -7,13 +7,13 @@ ENV KEY_FILE path_to_a_key_file_goes_here
 # cloudbuild will override this variable:
 ENV USE_GKE_GCLOUD_AUTH_PLUGIN gcloud_plugin_goes_here
 # install script dependencies
-RUN apt-get install google-cloud-cli-kpt jq kubectl google-cloud-cli-gke-gcloud-auth-plugin -y
+RUN apt-get update -y && apt-get install google-cloud-cli-kpt jq kubectl google-cloud-cli-gke-gcloud-auth-plugin -y
 # install test dependencies
-RUN apt-get install shellcheck posh bc procps openssl yamllint -y
+RUN apt-get update -y && apt-get install shellcheck posh bc procps openssl yamllint -y
 
 # https://bazel.build/install/ubuntu
 RUN \
-  apt install apt-transport-https curl gnupg -y && \
+  apt-get update -y && apt-get install apt-transport-https curl gnupg -y && \
   curl -fsSL https://releases.bazel.build/bazel-release.pub.gpg | gpg --dearmor > bazel.gpg && \
   mv bazel.gpg /etc/apt/trusted.gpg.d/ && \
   echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list && \
