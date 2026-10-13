@@ -742,6 +742,7 @@ EOF
 
   local ABS_OVERLAYS; ABS_OVERLAYS=""
   while read -d ',' -r yaml_file; do
+    [[ -z "${yaml_file}" ]] && continue
     if [[ -f "${yaml_file}" ]]; then
       ABS_OVERLAYS="$(apath -f "${yaml_file}"),${ABS_OVERLAYS}"
     elif [[ -n "${yaml_file}" ]]; then
