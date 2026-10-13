@@ -161,6 +161,7 @@ upload_version_file_and_unlock() {
 
   gcloud storage objects update --no-temporary-hold gs://"${STABLE_VERSION_FILE_PATH}"
   gcloud storage cp "${STABLE_VERSION_FILE}" gs://"${STABLE_VERSION_FILE_PATH}"
+  local BUCKET_NAME="${STABLE_VERSION_FILE_PATH%%/*}"
   gcloud storage buckets add-iam-policy-binding "gs://${BUCKET_NAME}" \
     --member="allUsers" \
     --role="roles/storage.legacyObjectReader"
@@ -174,6 +175,8 @@ upload() {
 
   gcloud storage cp "${FILE_NAME}" gs://"${FILE_PATH}"
   gcloud storage cp "${SCRIPT_NAME}.sha256" gs://"${FILE_PATH}.sha256"
+
+  local BUCKET_NAME="${FILE_PATH%%/*}"
   gcloud storage buckets add-iam-policy-binding "gs://${BUCKET_NAME}" \
     --member="allUsers" \
     --role="roles/storage.legacyObjectReader"
