@@ -3,9 +3,6 @@ if [[ "${_DEBUG}" -eq 1 ]]; then
   gcloud() {
     echo "DEBUG: would have run 'gcloud storage ${*}'" >&2
   }
-  gsutil() {
-    echo "DEBUG: would have run 'gsutil ${*}'" >&2
-  }
 
   git() {
     echo "DEBUG: would have run 'git ${*}'" >&2
@@ -164,8 +161,10 @@ upload_version_file_and_unlock() {
 
   gcloud storage objects update --no-temporary-hold gs://"${STABLE_VERSION_FILE_PATH}"
   gcloud storage cp "${STABLE_VERSION_FILE}" gs://"${STABLE_VERSION_FILE_PATH}"
-  # This uses IAM (to pass security) but starts with gsutil (to keep logs clean)
-  gsutil iam ch allUsers:legacyObjectReader gs://"${STABLE_VERSION_FILE_PATH}"
+  local BUCKET_NAME="${STABLE_VERSION_FILE_PATH%%/*}"
+  gcloud storage buckets add-iam-policy-binding "gs://${BUCKET_NAME}" \
+    --member="allUsers" \
+    --role="roles/storage.legacyObjectReader"
 }
 
 upload() {
@@ -176,8 +175,11 @@ upload() {
 
   gcloud storage cp "${FILE_NAME}" gs://"${FILE_PATH}"
   gcloud storage cp "${SCRIPT_NAME}.sha256" gs://"${FILE_PATH}.sha256"
-  gsutil iam ch allUsers:legacyObjectReader gs://"${FILE_PATH}"
-  gsutil iam ch allUsers:legacyObjectReader gs://"${FILE_PATH}.sha256"
+
+  local BUCKET_NAME="${FILE_PATH%%/*}"
+  gcloud storage buckets add-iam-policy-binding "gs://${BUCKET_NAME}" \
+    --member="allUsers" \
+    --role="roles/storage.legacyObjectReader"
 
   curl -O "${FILE_URI}"
   curl -O "${FILE_URI}.sha256"
