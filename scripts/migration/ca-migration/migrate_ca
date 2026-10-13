@@ -477,7 +477,11 @@ EOF
 }
 
 initialize_istiod_ca() {
-  fatal "Not implemented yet"
+  info "*****Checking for Citadel (istio-ca-secret)*****"
+  if ! kube get secret istio-ca-secret -n istio-system &> /dev/null; then
+    fatal "Citadel secret (istio-ca-secret) not found in istio-system. Ensure Istiod is configured as a CA."
+  fi
+  info "*****Citadel is ready.*****"
 }
 
 initialize_mesh_ca() {
@@ -581,8 +585,14 @@ download-trust-anchor_subcommand() {
 
   case "${CA}" in
     gcp_cas) fatal "download-trust-anchor not implemented for gcp_cas CA";;
-    citadel) fatal "download-trust-anchor not implemented for citadel CA";;
     mesh_ca) echo "${MESHCA_CA_CERT}" > ${CA_CERT};;
+    citadel) 
+      info "*****Extracting Citadel Root CA*****"
+      kube get secret istio-ca-secret -n istio-system -o jsonpath='{.data.ca-cert\.pem}' | base64 -d > "${CA_CERT}"
+      ;;
+    *)
+      fatal "Unknown CA type: ${CA}"
+      ;;
   esac
 }
 
@@ -776,7 +786,10 @@ migrate-ca_subcommand() {
   case "${CA}" in
     mesh_ca) CA_PROVIDER="GoogleCA"; CA_ADDR="";;
     gcp_cas) CA_PROVIDER="GoogleCAS"; CA_ADDR="${CA_NAME}";;
-    citadel) fatal "Not implemented";;
+    citadel) 
+      CA_PROVIDER="Citadel"
+      CA_ADDR="istiod.istio-system.svc:15012" # Standard Istiod CA port
+      ;;
   esac
 
   update_proxyConfig_cr "${CA_ADDR}" "${CA_PROVIDER}"
