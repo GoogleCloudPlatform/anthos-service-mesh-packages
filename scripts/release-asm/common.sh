@@ -161,6 +161,7 @@ upload_version_file_and_unlock() {
 
   gcloud storage objects update --no-temporary-hold gs://"${STABLE_VERSION_FILE_PATH}"
   gcloud storage cp "${STABLE_VERSION_FILE}" gs://"${STABLE_VERSION_FILE_PATH}"
+  # This uses IAM (to pass security)
   gcloud storage buckets add-iam-policy-binding "gs://${STABLE_VERSION_FILE_PATH}" \
     --member="allUsers" \
     --role="roles/storage.legacyObjectReader"
