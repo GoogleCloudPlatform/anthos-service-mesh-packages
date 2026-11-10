@@ -192,7 +192,7 @@ download_asm() {
         | tar xz
     fi
   else
-    local TOKEN; TOKEN="$(retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
+    local TOKEN; TOKEN="$(gcloud auth application-default print-access-token 2>/dev/null || retry 2 gcloud --project="${PROJECT_ID}" auth print-access-token)"
     run_command curl -sSL "https://storage.googleapis.com/${_CI_ASM_PKG_LOCATION}/asm/${TARBALL}" \
       --header @- <<EOF | tar xz
 Authorization: Bearer ${TOKEN}
@@ -551,6 +551,7 @@ organize_kpt_files() {
   local OPTIONAL_OVERLAY; OPTIONAL_OVERLAY="$(context_get-option "OPTIONAL_OVERLAY")"
 
   while read -d ',' -r yaml_file; do
+    [[ -z "${yaml_file}" ]] && continue
     ABS_YAML="${OPTIONS_DIRECTORY}/${yaml_file}.yaml"
     if [[ ! -f "${ABS_YAML}" ]]; then
     { read -r -d '' MSG; fatal "${MSG}"; } <<EOF || true
@@ -575,6 +576,7 @@ handle_multi_yaml_bug() {
   local CSPLIT_OUTPUT; CSPLIT_OUTPUT="";
   local BASE_NAME
   while read -d ',' -r yaml_file; do
+    [[ -z "${yaml_file}" ]] && continue
     BASE_NAME="$(basename "${yaml_file}")"
     if [[ "$(csplit -f "overlay-${BASE_NAME}" "${yaml_file}" '/^---$/' '{*}' | wc -l)" -eq 1 ]]; then
       CSPLIT_OUTPUT="${CSPLIT_OUTPUT},${yaml_file}"
@@ -598,6 +600,7 @@ post_process_istio_yamls() {
   handle_multi_yaml_bug
 
   while read -d ',' -r yaml_file; do
+    [[ -z "${yaml_file}" ]] && continue
     context_append "istioctlFiles" "${yaml_file}"
   done <<EOF
 $(context_get-option "CUSTOM_OVERLAY")
