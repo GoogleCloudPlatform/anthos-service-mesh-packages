@@ -288,28 +288,46 @@ update_migration_cm() {
   if  [[ "${1}" = "INITIALIZE" ]]; then
     START_TIME="${CURRENT_TIME}"
   else
-    START_TIME="$(kube get cm/"${NAME}" -n istio-system -ojsonpath={.data.start_time})"
-    CA_OLD="$(kube get cm/"${NAME}" -n istio-system -ojsonpath={.data.old_ca} | cut -d":" -f 1)"
-    CA_POOL_OLD="$(kube get cm/"${NAME}" -n istio-system -ojsonpath={.data.old_ca} | cut -d":" -f 2-)"
+    START_TIME="$(kube get cm/"${NAME}" -n istio-system '-ojsonpath={.data.start_time}')"
+    if ! [[ "${START_TIME}" =~ ^[0-9]+$ ]]; then
+      fatal "ConfigMap ${NAME} has invalid start_time; aborting"
+    fi
+    local OLD_CA_RAW
+    OLD_CA_RAW="$(kube get cm/"${NAME}" -n istio-system '-ojsonpath={.data.old_ca}')"
+    if ! [[ "${OLD_CA_RAW}" =~ ^[a-zA-Z0-9][a-zA-Z0-9_-]*:[a-zA-Z0-9_.:/-]*$ ]]; then
+      fatal "ConfigMap ${NAME} has invalid old_ca; aborting"
+    fi
+    CA_OLD="${OLD_CA_RAW%%:*}"
+    CA_POOL_OLD="${OLD_CA_RAW#*:}"
   fi
 
   local CA_NAME; CA_NAME="${CA}:${CA_POOL}"
   local CA_NAME_OLD; CA_NAME_OLD="${CA_OLD}:${CA_POOL_OLD}"
 
-    cat <<EOF | kube apply -f -
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name:  ${NAME}
-  namespace: istio-system
-data:
-  start_time: "${START_TIME}"
-  revision: "${REVISION}"
-  state_update_time: "${CURRENT_TIME}"
-  state: "${1}"
-  target_ca: "${CA_NAME}"
-  old_ca: "${CA_NAME_OLD}"
-EOF
+  jq -n \
+    --arg name "${NAME}" \
+    --arg start_time "${START_TIME}" \
+    --arg revision "${REVISION}" \
+    --arg state_update_time "${CURRENT_TIME}" \
+    --arg state "${1}" \
+    --arg target_ca "${CA_NAME}" \
+    --arg old_ca "${CA_NAME_OLD}" \
+    '{
+      apiVersion: "v1",
+      kind: "ConfigMap",
+      metadata: {
+        name: $name,
+        namespace: "istio-system"
+      },
+      data: {
+        start_time: $start_time,
+        revision: $revision,
+        state_update_time: $state_update_time,
+        state: $state,
+        target_ca: $target_ca,
+        old_ca: $old_ca
+      }
+    }' | kube apply -f -
 
 }
 
